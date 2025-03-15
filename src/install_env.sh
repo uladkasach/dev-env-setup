@@ -345,6 +345,16 @@ for organization in {ehmpathy,ahbode}; do
 done
 
 #######################
+## install certutil so that local dev certificates can be added to your browser as trusted
+#######################
+sudo apt-get install libnss3-tools
+
+#######################
+## install uuid-runtime to enable uuidgen + getuuid commands
+#######################
+sudo apt-get install uuid-runtime
+
+#######################
 ## install ngrok
 #######################
 wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -P ~/Downloads;
