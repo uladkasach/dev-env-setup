@@ -21,6 +21,7 @@ alias tf='terraform'
 alias use.tugether='export AWS_PROFILE=tugether'
 alias use.ahbode.dev='export AWS_PROFILE=ahbode.dev'
 alias use.ahbode.prod='export AWS_PROFILE=ahbode.prod'
+alias use.ahction='export AWS_PROFILE=ahction'
 alias use.whodis.prod='export AWS_PROFILE=whodis.prod'
 alias use.alistokrad.prod='export AWS_PROFILE=alistokrad.prod'
 
