@@ -1,17 +1,25 @@
 disabled:
   - id: asvetliakov.vscode-neovim
     uuid: caf8995c-5426-4bf7-9d01-f7968ebd49bb
+  - id: vscodevim.vim
+    uuid: d96e79c6-8b25-4be3-8545-0e0ecefcae03
 enabled:
   - id: aaron-bond.better-comments
     uuid: 7a0110bb-231a-4598-aa1b-0769ea46d28b
   - id: adam-watters.vscode-color-pick
     uuid: f1910b5d-212e-46a3-ac67-0e20e3f70ad9
+  - id: AdamViola.parquet-explorer
+    uuid: 0a105200-2f15-48fe-bb53-11f0385b9052
+  - id: AndenetAlexander.vim-cheatsheet
+    uuid: 44fa5d50-e2da-44ec-9a99-2ac839c51a64
+  - id: Anthropic.claude-code
+    uuid: 3c13ae49-babe-45fe-8c48-5e45077a62bf
   - id: bierner.emojisense
     uuid: 081cd2e9-bc51-4ea3-977e-544bed2e33a8
   - id: bierner.markdown-mermaid
     uuid: f8d0ffc4-66bb-4a9c-8149-ef8f043691a1
-  - id: chrmarti.regex
-    uuid: 7ed7bccd-f358-4c6f-88c0-1296185abaa1
+  - id: ctcuff.font-preview
+    uuid: 89d4a1d0-a567-4ed7-9f81-a03ab672d713
   - id: dbaeumer.vscode-eslint
     uuid: 583b2b34-2c1e-4634-8c0b-0b82e283ea3a
   - id: DiemasMichiels.emulate
@@ -34,10 +42,10 @@ enabled:
     uuid: ee108066-df8b-43ae-9a83-e6c11400a759
   - id: lihui.vs-color-picker
     uuid: 8f26d05e-e8ef-4156-af0a-ca7778b47006
+  - id: mechatroner.rainbow-csv
+    uuid: 3792588c-3d35-442d-91ea-fe6a755e8155
   - id: mike-co.import-sorter
     uuid: 1cbadbba-0bd6-46fa-a309-76704bf66217
-  - id: mrmlnc.vscode-duplicate
-    uuid: 03944bdc-9bcb-4ac2-b9b3-fdb050dd43e4
   - id: ms-vscode.vscode-typescript-tslint-plugin
     uuid: 90a37ca1-92a2-488a-b196-7a8c0b0127ea
   - id: naumovs.color-highlight
@@ -48,6 +56,10 @@ enabled:
     uuid: 92c29c11-fed4-4cea-9726-6492fcaa806d
   - id: phplasma.csv-to-table
     uuid: 276fcd36-48fc-4505-bccb-24ec72a7f051
+  - id: redhat.vscode-yaml
+    uuid: 2061917f-f76a-458a-8da9-f162de22b97e
+  - id: shakram02.bash-beautify
+    uuid: 3cd12c20-0143-473f-b7f3-0d5f15cb7249
   - id: shubham-saudolla.lilac
     uuid: 1bfca39f-30a9-45e3-8631-027297c85b5c
   - id: sleistner.vscode-fileutils
@@ -56,19 +68,13 @@ enabled:
     uuid: f6dbd813-b0a0-42c1-90ea-10dde9d925a7
   - id: usernamehw.errorlens
     uuid: 9d8c32ab-354c-4daf-a9bf-20b633734435
-  - id: VisualStudioExptTeam.intellicode-api-usage-examples
-    uuid: 9fa2a00e-3bfa-4c2a-abc4-a865bb2b5cf3
-  - id: VisualStudioExptTeam.vscodeintellicode
-    uuid: 876e8f93-74d0-4f4f-91b7-34a09f19f444
   - id: vscode-icons-team.vscode-icons
     uuid: 9ccc1dd7-7ec4-4a46-bd4f-7d7b8b9d322a
-  - id: vscodevim.vim
-    uuid: d96e79c6-8b25-4be3-8545-0e0ecefcae03
   - id: yzhang.markdown-all-in-one
     uuid: 98790d67-10fa-497c-9113-f6c7489207b2
   - id: zhuangtongfa.material-theme
     uuid: 26a529c9-2654-4b95-a63f-02f6a52429e6
   - id: zokugun.cron-tasks
-    uuid: eb05256f-c7aa-4554-95c6-1bb8e30e0cea
+    uuid: b7bbbbd5-7a39-4312-87aa-ef6a41de67fb
   - id: zxh404.vscode-proto3
     uuid: 1d3d1fb2-0d8f-47ed-bfce-990b8ddfc9d8
