@@ -32,10 +32,6 @@ alias use.ahbode.bannerbear='export BANNER_BEAR_API_KEY=$( op get item bannerbea
 alias use.ahbode.googlecloudplatform.apikey='export GCP_API_KEY=$(op get item ahbode.googlecloudplatform.providerstorefronts.apikey | jq -r .details.password)'
 alias use.ahbode.googlecloudplatform.keyfilejson='export GCLOUD_KEYFILE_JSON=$(op get item ahbode.googlecloudplatform.providerstorefronts.admin.serviceaccountkey | jq -r .details.password)'
 
-# vpn
-alias use.ahbode.dev.vpn="sudo openvpn --config ~/.vpn/ahbode.dev.vpn.main.connection.ovpn"
-alias use.ahbode.prod.vpn="sudo openvpn --config ~/.vpn/ahbode.prod.vpn.main.connection.ovpn"
-
 # github token
 alias use.github.admin='export GITHUB_TOKEN=$(op item get github.admin.pat --fields label=password --format json | jq -r .value)'
 
@@ -94,3 +90,43 @@ alias keyboard.backlight.bright='sudo tee /sys/class/leds/dell::kbd_backlight/br
 # make it easy to fetch the weather
 alias weather.in.here='curl wttr.in'
 alias weather.in.indianapolis='curl wttr.in/Indianapolis'
+
+# mark nvm as dirty when entering a directory with .nvmrc, to ensure we lazyload it later
+autoload -U add-zsh-hook
+hook_use_nvmrc() {
+  [[ -f "$PWD/.nvmrc" ]] && NVM_DIRTY=1
+}
+add-zsh-hook chpwd hook_use_nvmrc
+hook_use_nvmrc
+
+# ahbode use.vpc.tunnel aliases
+alias use.ahbode.dev.vpc='use.ahbode.dev && /home/vlad/.local/bin/use.vpc.tunnel'
+alias use.ahbode.prod.vpc='use.ahbode.prod && /home/vlad/.local/bin/use.vpc.tunnel'
+
+# alias npm -> pnpm
+alias npm.slow="/home/vlad/.nvm/versions/node/v20.12.2/bin/npm"
+alias npm="pnpm"
+
+
+# lazyload nvm
+export NVM_DIR="$HOME/.nvm"
+lazyload_nvm() {
+  # remove the wrapper on nvm, after we lazy load it
+  unset -f nvm node npx pnpm
+
+  # setup nvm
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+  if [[ -f "$PWD/.nvmrc" ]]; then
+    # auto-switch if we entered a dir with .nvmrc
+    nvm use
+    unset NVM_DIRTY
+  fi
+
+  # add autocomplete, if interactive
+  [[ -t 1 ]] && compdef _pnpm_completion npm 2>/dev/null
+}
+nvm() { lazyload_nvm; nvm "$@"; }
+node() { lazyload_nvm; node "$@"; }
+npx() { lazyload_nvm; npx "$@"; }
+pnpm() { lazyload_nvm; pnpm "$@"; }

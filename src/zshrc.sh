@@ -12,7 +12,7 @@ export SPACESHIP_PROMPT_ORDER=(
   host          # Hostname section
   git           # Git section (git_branch + git_status)
   package       # Package version
-  node          # Node.js section
+  # node        # Node.js section (disabled - triggers NVM lazy-load)
   rust          # Rust section
   docker        # Docker section
   aws           # Amazon Web Services section
@@ -52,7 +52,8 @@ export SPACESHIP_AWS_SYMBOL="☁️  "
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(git)
 
-source $ZSH/oh-my-zsh.sh
+# Skip oh-my-zsh for non-TTY sessions (e.g., Claude Code, scripts, pipes)
+[[ -t 1 ]] && source $ZSH/oh-my-zsh.sh
 
 # aliases
 source ~/.bash_aliases
@@ -62,10 +63,7 @@ if [ -d "$HOME/.local/bin" ] ; then
  PATH="$HOME/.local/bin:$PATH"
 fi
 
-# nvm for node
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+# note, we lazyload nvm within .bash_aliases
 
 # deeno!
 export DENO_INSTALL="$HOME/.deno"
@@ -78,14 +76,5 @@ export EDITOR="vim"
 # allow aws-sdks to load config (e.g., node.aws-sdk grab region from ~/.aws)
 export AWS_SDK_LOAD_CONFIG=1
 
-# automatically nvm use the .nvmrc specified version, if .nvmrc exists; https://stackoverflow.com/a/48322289/3068233 https://stackoverflow.com/a/39519460/3068233
-autoload -U add-zsh-hook
-hook_use_nvmrc() {
-  if [[ $PWD == $PWD_PREV ]]; then
-    return
-  fi
-  PWD_PREV=$PWD
-  [[ -f ".nvmrc" ]] && nvm use
-}
-add-zsh-hook chpwd hook_use_nvmrc
-hook_use_nvmrc
+
+export PATH="$HOME/.local/bin:$PATH"
