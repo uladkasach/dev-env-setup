@@ -91,28 +91,24 @@ alias keyboard.backlight.bright='sudo tee /sys/class/leds/dell::kbd_backlight/br
 alias weather.in.here='curl wttr.in'
 alias weather.in.indianapolis='curl wttr.in/Indianapolis'
 
-# mark nvm as dirty when entering a directory with .nvmrc, to ensure we lazyload it later
-autoload -U add-zsh-hook
-hook_use_nvmrc() {
-  [[ -f "$PWD/.nvmrc" ]] && NVM_DIRTY=1
-}
-add-zsh-hook chpwd hook_use_nvmrc
-hook_use_nvmrc
-
 # ahbode use.vpc.tunnel aliases
 alias use.ahbode.dev.vpc='use.ahbode.dev && /home/vlad/.local/bin/use.vpc.tunnel'
 alias use.ahbode.prod.vpc='use.ahbode.prod && /home/vlad/.local/bin/use.vpc.tunnel'
 
-# alias npm -> pnpm
-alias npm.slow="/home/vlad/.nvm/versions/node/v20.12.2/bin/npm"
-alias npm="pnpm"
-
+# smart npm: use npm if package-lock.json exists, otherwise pnpm
+npm() {
+  if [[ -f "package-lock.json" ]]; then
+    npm_real "$@"
+  else
+    pnpm "$@"
+  fi
+}
 
 # lazyload nvm
 export NVM_DIR="$HOME/.nvm"
 lazyload_nvm() {
   # remove the wrapper on nvm, after we lazy load it
-  unset -f nvm node npx pnpm
+  unset -f nvm node npx pnpm npm_real
 
   # setup nvm
   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
@@ -120,13 +116,18 @@ lazyload_nvm() {
   if [[ -f "$PWD/.nvmrc" ]]; then
     # auto-switch if we entered a dir with .nvmrc
     nvm use
-    unset NVM_DIRTY
   fi
 
   # add autocomplete, if interactive
-  [[ -t 1 ]] && compdef _pnpm_completion npm 2>/dev/null
+  [[ -t 1 ]] && eval "$(pnpm completion zsh 2>/dev/null || pnpm completion bash)"
+  [[ -t 1 ]] && compdef _pnpm npm 2>/dev/null || complete -o default -F _pnpm npm 2>/dev/null
+
+  # define npm_real to call the actual npm binary
+  npm_real() { "$(dirname "$(nvm which current)")/npm" "$@"; }
 }
 nvm() { lazyload_nvm; nvm "$@"; }
 node() { lazyload_nvm; node "$@"; }
 npx() { lazyload_nvm; npx "$@"; }
 pnpm() { lazyload_nvm; pnpm "$@"; }
+npm_real() { lazyload_nvm; npm_real "$@"; }
+
