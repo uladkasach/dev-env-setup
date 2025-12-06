@@ -104,6 +104,15 @@ npm() {
   fi
 }
 
+# smart npx: use npx if package-lock.json exists, otherwise pnpx
+npx() {
+  if [[ -f "package-lock.json" ]]; then
+    npx_real "$@"
+  else
+    pnpm dlx "$@"
+  fi
+}
+
 # lazyload nvm
 export NVM_DIR="$HOME/.nvm"
 lazyload_nvm() {
@@ -124,10 +133,11 @@ lazyload_nvm() {
 
   # define npm_real to call the actual npm binary
   npm_real() { "$(dirname "$(nvm which current)")/npm" "$@"; }
+  npx_real() { "$(dirname "$(nvm which current)")/npx" "$@"; }
 }
 nvm() { lazyload_nvm; nvm "$@"; }
 node() { lazyload_nvm; node "$@"; }
-npx() { lazyload_nvm; npx "$@"; }
 pnpm() { lazyload_nvm; pnpm "$@"; }
+npx_real() { lazyload_nvm; npx_real "$@"; }
 npm_real() { lazyload_nvm; npm_real "$@"; }
 
