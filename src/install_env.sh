@@ -18,52 +18,51 @@ grep -qxF 'stty intr ^X' ~/.bashrc || echo '\n# bind interrupt key to ctrl-x\stt
 #########################
 sudo apt install vim -y # note: ~/.zshrc already defines that this is default
 
-#########################
-## change keybind of caps lock modifier -> control modifier, && caps lock -> escape
-#########################
-sudo apt install xcape -y;
-gsettings set org.gnome.desktop.input-sources xkb-options "['caps:ctrl_modifier']"; # make caps work as ctrl; https://unix.stackexchange.com/a/66657/77522
-grep -qxF 'xcape -e "'"Caps_Lock=Escape"'"' ~/.profile || echo '\n# map caps key to escape if pressed on its own\nxcape -e "'"Caps_Lock=Escape"'"' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
-grep -qxF 'xcape -e "'"Control_L=Escape"'"' ~/.profile || echo '\n# map caps key to escape if pressed on its own\nxcape -e "'"Control_L=Escape"'"' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
+#############################
+## keyd - remap keys for optimal experience
+#############################
+install_keyd() {
+  sudo add-apt-repository -y ppa:keyd-team/ppa
+  sudo apt-get update
+  sudo apt-get install -y keyd
+  # symlink keyd.rvaiya -> keyd for convenience
+  sudo ln -sf /usr/bin/keyd.rvaiya /usr/bin/keyd
+  sudo systemctl enable --now keyd
+}
+install_keyd
 
-#########################
-## add `alt` + `h/j/k/l` => left/up/down/right - per vim bindings
-## - https://askubuntu.com/questions/1025765/how-to-map-alt-hjkl-keys-to-arrow-keys
-## - https://unix.stackexchange.com/questions/65507/use-setxkbmap-to-swap-the-left-shift-and-left-control?noredirect=1&lq=1
-## - https://wiki.archlinux.org/title/X_keyboard_extension
-## - https://stackoverflow.com/questions/45021978/create-a-custom-setxkbmap-option
-## - https://askubuntu.com/questions/876005/what-file-is-the-setxkbmap-option-rules-meant-to-take-and-how-can-i-add-keyboa
-##
-## note:
-## - unfortunately ~/.profile does not pick up these changes on startup _and_ whenever system sleeps / bluetooth reconnects / other, the xmodmap gets wiped, so call the `use.keymap.vimnav` bash alias for now # TODO: make these mappings persist on session starts
-#########################
-XKB_SHARED_DIR=/usr/share/X11/xkb
-XKB_VIMLIKE_ARROWS_OPTION_FILE=$XKB_SHARED_DIR/symbols/vimlike
-# sudo vim $XKB_VIMLIKE_ARROWS_OPTION_FILE
-sudo touch $XKB_VIMLIKE_ARROWS_OPTION_FILE
-XKB_VIMLIKE_ARROWS_OPTION_DEFINITION='
-partial alphanumeric_keys modifier_keys
-xkb_symbols "arrows" {
-  key <AC06> { [ h, H,  Left, Left ] };
-  key <AC07> { [ j, J,  Down, Down ] };
-  key <AC08> { [ k, K,    Up, Up ] };
-  key <AC09> { [ l, L, Right, Right ] };
-  key <RALT> { [ ISO_Level3_Shift, ISO_Level3_Shift, ISO_Level3_Shift, ISO_Level3_Shift ] };
-  key <RWIN> { [ ISO_Level3_Shift, ISO_Level3_Shift, ISO_Level3_Shift, ISO_Level3_Shift ] };
-  modifier_map Mod5 { ISO_Level3_Shift };
-};
-';
-grep -qxF 'xkb_symbols "arrows"' $XKB_VIMLIKE_ARROWS_OPTION_FILE || echo $XKB_VIMLIKE_ARROWS_OPTION_DEFINITION | sudo tee $XKB_VIMLIKE_ARROWS_OPTION_FILE # https://askubuntu.com/questions/103643/cannot-echo-hello-x-txt-even-with-sudo
-XKB_OPTIONS_REGISTRY_FILE=$XKB_SHARED_DIR/rules/evdev # can be identified by running `setxkbmap -query -verbose 10` and seeing where rules are loaded from
-XKB_OPTION_VIMLIKE_ARROWS_REGISTRATION='
-// vimlike arrow registration, added during dev-env-setup
-! option        =       symbols
-  vimlike:arrows = +vimlike(arrows)
-';
-sudo cp $XKB_OPTIONS_REGISTRY_FILE $XKB_OPTIONS_REGISTRY_FILE.bak
-grep -qxF '  vimlike:arrows = +vimlike(arrows)' $XKB_OPTIONS_REGISTRY_FILE || echo $XKB_OPTION_VIMLIKE_ARROWS_REGISTRATION | sudo tee -a $XKB_OPTIONS_REGISTRY_FILE # https://askubuntu.com/questions/103643/cannot-echo-hello-x-txt-even-with-sudo
-gsettings set org.gnome.desktop.input-sources xkb-options "['caps:ctrl_modifier', 'vimlike:arrows']"; # !: we _append_ this option to the ctrl_modifier option from prior steps
-gsettings get org.gnome.desktop.input-sources xkb-options
+upsert_keyd_config() {
+  sudo mkdir -p /etc/keyd
+  sudo rm -f /etc/keyd/*.conf 2>/dev/null || true
+  sudo tee /etc/keyd/default.conf >/dev/null <<'EOF'
+[ids]
+*
+
+[main]
+# capslock = control (held) / escape (tapped)
+capslock = overload(control, esc)
+
+# disable disruptive keys
+coffee  = noop
+sleep   = noop
+suspend = noop
+power   = noop
+
+# vim-style arrows with right alt, right ctrl, or right meta (magic keyboard)
+rightalt = layer(vimarrows)
+rightcontrol = layer(vimarrows)
+rightmeta = layer(vimarrows)
+
+[vimarrows]
+h = left
+j = down
+k = up
+l = right
+EOF
+  sudo systemctl restart keyd
+}
+upsert_keyd_config
+
 
 #########################
 ## install keynav
@@ -460,31 +459,3 @@ EOF
 # Note: Run 'sudo systemctl restart systemd-logind' to apply (will log you out)
 # Or just reboot after running this script
 
-
-#############################
-## ignore magic keyboard lock button
-#############################
-disable_disruptive_keys() {
-  # install keyd via PPA
-  sudo add-apt-repository -y ppa:keyd-team/ppa
-  sudo apt-get update
-  sudo apt-get install -y keyd
-
-  # setup keyd to disable disruptive keys across all keyboards
-  sudo mkdir -p /etc/keyd
-  sudo rm -f /etc/keyd/*.conf
-  sudo tee /etc/keyd/default.conf >/dev/null <<'EOF'
-[ids]
-*
-
-[main]
-coffee  = noop
-sleep   = noop
-suspend = noop
-power   = noop
-EOF
-
-  sudo systemctl enable --now keyd
-  sudo systemctl restart keyd
-}
-disable_disruptive_keys
