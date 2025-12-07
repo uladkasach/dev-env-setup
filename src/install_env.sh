@@ -431,3 +431,60 @@ sudo apt update
 sudo apt install appimagelauncher
 
 
+######################
+## dont suspend on lid close
+## ref: https://ubuntuhandbook.org/index.php/2020/05/lid-close-behavior-ubuntu-20-04/
+######################
+LOGIND_CONF="/etc/systemd/logind.conf"
+
+# Remove any existing lines for these settings (commented or not)
+for key in HandlePowerKey HandleSuspendKey HandleHibernateKey HandleRebootKey HandleLidSwitch HandleLidSwitchExternalPower HandleLidSwitchDocked; do
+    sudo sed -i "/^#*${key}=/d" "$LOGIND_CONF"
+done
+
+# Append the new settings
+sudo tee -a "$LOGIND_CONF" > /dev/null <<'EOF'
+
+# use terminal instead; keyboard misfire is too common
+HandlePowerKey=ignore
+HandleSuspendKey=ignore
+HandleHibernateKey=ignore
+HandleRebootKey=ignore
+
+# use terminal instead; display disconnect is too common
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+HandleLidSwitchDocked=ignore
+EOF
+
+# Note: Run 'sudo systemctl restart systemd-logind' to apply (will log you out)
+# Or just reboot after running this script
+
+
+#############################
+## ignore magic keyboard lock button
+#############################
+disable_disruptive_keys() {
+  # install keyd via PPA
+  sudo add-apt-repository -y ppa:keyd-team/ppa
+  sudo apt-get update
+  sudo apt-get install -y keyd
+
+  # setup keyd to disable disruptive keys across all keyboards
+  sudo mkdir -p /etc/keyd
+  sudo rm -f /etc/keyd/*.conf
+  sudo tee /etc/keyd/default.conf >/dev/null <<'EOF'
+[ids]
+*
+
+[main]
+coffee  = noop
+sleep   = noop
+suspend = noop
+power   = noop
+EOF
+
+  sudo systemctl enable --now keyd
+  sudo systemctl restart keyd
+}
+disable_disruptive_keys
