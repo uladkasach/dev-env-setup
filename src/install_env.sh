@@ -63,6 +63,24 @@ EOF
 }
 upsert_keyd_config
 
+#############################
+## magictouch-deadzone - filter palm touches from Magic Trackpad corners
+## ref: .behavior/v2025_12_07.magictouch.deadzones/
+#############################
+install_magictouch_deadzone() {
+  # build the rust binary (requires rust to be installed)
+  (cd ~/git/more/dev-env-setup/src/magictouch-deadzone && cargo build --release)
+
+  # install the binary
+  sudo cp ~/git/more/dev-env-setup/src/magictouch-deadzone/target/release/magictouch-deadzone /usr/local/bin/
+  sudo chmod +x /usr/local/bin/magictouch-deadzone
+
+  # install and enable the systemd service
+  sudo cp ~/git/more/dev-env-setup/src/magictouch-deadzone/magictouch-deadzone.service /etc/systemd/system/
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now magictouch-deadzone
+}
+install_magictouch_deadzone
 
 #########################
 ## install keynav
@@ -225,6 +243,13 @@ codium && echo 'run the "Sync Settings: Download (repository -> user)" command' 
 browser https://github.com/nvm-sh/nvm; # check if newer version avail; update the below version if it is
 wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash;
 nvm install 16 # and install latest version
+
+#########################
+## install rust
+## ref: https://www.rust-lang.org/tools/install
+#########################
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source "$HOME/.cargo/env"
 
 #########################
 ## install drop box

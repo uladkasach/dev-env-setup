@@ -1,0 +1,14 @@
+[Unit]
+Description=Magic Trackpad Dead Zone Filter
+After=systemd-udevd.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/magictouch-deadzone
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

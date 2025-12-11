@@ -69,6 +69,9 @@ fi
 export DENO_INSTALL="$HOME/.deno"
 export PATH="$DENO_INSTALL/bin:$PATH"
 
+# rust
+[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+
 # use vim by default in terminal
 export VISUAL=vim
 export EDITOR="vim"
