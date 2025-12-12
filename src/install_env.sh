@@ -407,7 +407,7 @@ flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flath
 ######################
 flatpak install flathub com.spotify.Client
 flatpak install flathub com.jetbrains.DataGrip
-flatpak install flathub com.slack.Slack
+flatpak install flathub com.slack.Slack # flatpak update com.slack.Slack
 
 ######################
 ## install proton vpn
