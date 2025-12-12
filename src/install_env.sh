@@ -168,10 +168,80 @@ git config --global user.email "u...k...@gmail.com" # change me to your email
 git config --global user.name "U... K..." # change me to your name
 git config --global pull.ff only # make sure that pull only ever automatically fasts forward
 git config --global init.defaultBranch main # default root branch name to `main`
+
+#######################
+## set git aliases
+#######################
 git config --global alias.lg "log --pretty=format:'%C(yellow)%h %Cred%ad %C(cyan)%an%Cgreen%d %Creset%s' --date=short" # more concise alt to git log
 git config --global alias.root 'rev-parse --show-toplevel' # e.g., `cd $(git root)`
 git config --global alias.recommit 'commit --amend --no-edit' # e.g., to update the last commit in place
 git config --global alias.shove 'push origin HEAD --force-with-lease' # e.g., git push current branches commits, as long as we have all the commits already too
+
+git config --global alias.release '!f() { \
+  mode="${1:-plan}"; \
+  pr=$(gh pr list --search "chore(release)" --state open --json number,title,statusCheckRollup,autoMergeRequest --limit 1); \
+  if [ "$pr" = "[]" ]; then \
+    echo "🫧  no open release prs yet"; \
+    git fetch origin --tags -q 2>/dev/null; \
+    latest_tag=$(git tag --sort=-v:refname | head -1); \
+    if [ -n "$latest_tag" ]; then \
+      echo ""; \
+      echo "🌊 last release: $latest_tag"; \
+      tag_runs=$(gh run list --branch "$latest_tag" --json name,conclusion,status,url,databaseId --limit 5); \
+      tag_failed=$(echo "$tag_runs" | jq -r "[.[] | select(.conclusion == \"failure\")] | length"); \
+      tag_pending=$(echo "$tag_runs" | jq -r "[.[] | select(.status != \"completed\")] | length"); \
+      if [ "$tag_failed" -gt 0 ]; then \
+        echo "⛈️  $tag_failed check(s) failed"; \
+        echo "$tag_runs" | jq -r ".[] | select(.conclusion == \"failure\") | [.name, .url, .databaseId] | @tsv" | while IFS=$(printf "\t") read -r name url run_id; do \
+          echo "  🔴 $name"; \
+          err=$(gh run view "$run_id" --json jobs -q ".jobs[] | select(.conclusion == \"failure\") | (.steps[] | select(.conclusion == \"failure\") | .name) // .name" | head -1); \
+          echo "     ├─ $url"; \
+          echo "     └─ ${err:-(see logs)}"; \
+        done; \
+      elif [ "$tag_pending" -gt 0 ]; then \
+        echo "   └─ 👌 $tag_pending check(s) in progress"; \
+      else \
+        echo "   └─ 👌 all checks passed"; \
+      fi; \
+    fi; \
+    return 0; \
+  fi; \
+  num=$(echo "$pr" | jq -r ".[0].number"); \
+  title=$(echo "$pr" | jq -r ".[0].title"); \
+  automerge=$(echo "$pr" | jq -r ".[0].autoMergeRequest"); \
+  failed=$(echo "$pr" | jq -r "[.[0].statusCheckRollup[] | select(.conclusion == \"FAILURE\")] | length"); \
+  pending=$(echo "$pr" | jq -r "[.[0].statusCheckRollup[] | select(.status != \"COMPLETED\")] | length"); \
+  version=$(echo "$title" | sed -n "s/.*\\(v[0-9][0-9.]*\\).*/\\1/p"); \
+  echo "🌊 this release: ${version:-$title}"; \
+  if [ "$failed" -gt 0 ]; then \
+    echo "⛈️  $failed check(s) failed"; \
+    _err_marker=$(mktemp); \
+    echo "$pr" | jq -r ".[0].statusCheckRollup[] | select(.conclusion == \"FAILURE\") | [.name, (.detailsUrl // .targetUrl // \"\")] | @tsv" | while IFS=$(printf "\t") read -r name url; do \
+      echo "  🔴 $name"; \
+      run_id=$(echo "$url" | sed -n "s/.*actions\\/runs\\/\\([0-9]*\\).*/\\1/p"); \
+      if [ -z "$run_id" ]; then echo "ERROR: could not extract run_id from $url" >&2; echo 1 > "$_err_marker"; break; fi; \
+      err=$(gh run view "$run_id" --json jobs -q ".jobs[] | select(.conclusion == \"failure\") | (.steps[] | select(.conclusion == \"failure\") | .name) // .name" | head -1); \
+      echo "     ├─ $url"; \
+      echo "     └─ ${err:-(see logs)}"; \
+    done; \
+    if [ -s "$_err_marker" ]; then rm -f "$_err_marker"; return 1; fi; \
+    rm -f "$_err_marker"; \
+  elif [ "$pending" -gt 0 ]; then \
+    echo "   ├─ 👌 $pending check(s) in progress"; \
+  else \
+    echo "   ├─ 👌 all checks passed"; \
+  fi; \
+  if [ "$automerge" = "null" ]; then \
+    if [ "$mode" = "apply" ]; then \
+      gh pr merge "$num" --auto --squash; \
+      echo "   └─ 🌴  automerge enabled [added]"; \
+    else \
+      echo "   └─ 🌴  automerge not enabled (run 'git release apply')"; \
+    fi; \
+  else \
+    echo "   └─ 🌴  automerge enabled [found]"; \
+  fi; \
+}; f'
 
 #######################
 ## install bash alias dependencies
