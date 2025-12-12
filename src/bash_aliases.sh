@@ -127,6 +127,11 @@ lazyload_nvm() {
     nvm use
   fi
 
+  # enable pnpm via corepack if not found
+  if ! command -v pnpm &>/dev/null; then
+    corepack enable pnpm
+  fi
+
   # add autocomplete, if interactive
   [[ -t 1 ]] && eval "$(pnpm completion zsh 2>/dev/null || pnpm completion bash)"
   [[ -t 1 ]] && compdef _pnpm npm 2>/dev/null || complete -o default -F _pnpm npm 2>/dev/null
