@@ -528,4 +528,3 @@ EOF
 
 # Note: Run 'sudo systemctl restart systemd-logind' to apply (will log you out)
 # Or just reboot after running this script
-
