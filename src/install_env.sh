@@ -80,12 +80,20 @@ upsert_keyd_config
 sudo apt-get install keynav
 grep -qxF 'keynav' ~/.profile || echo '\n# start keynav in background\n(keynav && echo "keynav started" || echo "keynav already running") &' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
 
-#########################
-## install chrome
-#########################
-wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -P ~/Downloads;
-sudo apt install ~/Downloads/google-chrome-stable_current_amd64.deb;
-google-chrome; # open it; set it as your defualt
+
+##########################
+## install firefox via flatpak (we like sandboxes)
+##########################
+flatpak install flathub org.mozilla.firefox
+xdg-settings set default-web-browser org.mozilla.firefox.desktop
+sudo apt remove firefox
+
+# #########################
+# ## install chrome
+# #########################
+# wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -P ~/Downloads;
+# sudo apt install ~/Downloads/google-chrome-stable_current_amd64.deb;
+# google-chrome; # open it; set it as your defualt
 
 #########################
 ## install ssh + generate ssh key for your machine
