@@ -305,12 +305,13 @@ _git_release_main() {
 _git_release_pr() {
   local pr_num="$1" apply="$2" retry="$3"
   local pr
-  pr=$(gh pr view "$pr_num" --json number,title,state,statusCheckRollup,autoMergeRequest)
+  pr=$(gh pr view "$pr_num" --json number,title,state,statusCheckRollup,autoMergeRequest,mergeStateStatus)
 
-  local title state automerge failed pending version
+  local title state automerge failed pending version merge_state
   title=$(echo "$pr" | jq -r '.title')
   state=$(echo "$pr" | jq -r '.state')
   automerge=$(echo "$pr" | jq -r '.autoMergeRequest')
+  merge_state=$(echo "$pr" | jq -r '.mergeStateStatus')
   failed=$(echo "$pr" | jq -r '[.statusCheckRollup[] | select(.conclusion == "FAILURE")] | length')
   pending=$(echo "$pr" | jq -r '[.statusCheckRollup[] | select(.status != "COMPLETED")] | length')
   version=$(echo "$title" | sed -n 's/.*\(v[0-9][0-9.]*\).*/\1/p')
@@ -348,6 +349,11 @@ _git_release_pr() {
     echo "   ├─ 🐢 $pending check(s) in progress"
   else
     echo "   ├─ 👌 all checks passed"
+  fi
+
+  # warn if branch is behind base
+  if [ "$merge_state" = "BEHIND" ] && [ "$is_merged" != "true" ]; then
+    echo "   ├─ 🐚 needs rebase" # shell: left behind on shore while the wave moves on
   fi
 
   # show automerge status
