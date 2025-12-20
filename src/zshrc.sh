@@ -1,3 +1,6 @@
+# enable profiling if ZPROF=1 (usage: shelltest.profile)
+[[ "$ZPROF" == "1" ]] && zmodload zsh/zprof
+
 # Path to your oh-my-zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 
@@ -12,7 +15,7 @@ export SPACESHIP_PROMPT_ORDER=(
   host          # Hostname section
   git           # Git section (git_branch + git_status)
   package       # Package version
-  # node        # Node.js section (disabled - triggers NVM lazy-load)
+  node          # Node.js section
   rust          # Rust section
   docker        # Docker section
   aws           # Amazon Web Services section
@@ -63,7 +66,14 @@ if [ -d "$HOME/.local/bin" ] ; then
  PATH="$HOME/.local/bin:$PATH"
 fi
 
-# note, we lazyload nvm within .bash_aliases
+# fnm (fast node manager) - no lazy loading needed, it's fast
+export PATH="$HOME/.local/share/fnm:$PATH"
+if command -v fnm &>/dev/null; then
+  eval "$(fnm env --use-on-cd --corepack-enabled)"
+
+  # pnpm completions
+  [[ -t 1 ]] && command -v pnpm &>/dev/null && eval "$(pnpm completion zsh 2>/dev/null || pnpm completion bash)"
+fi
 
 # deeno!
 export DENO_INSTALL="$HOME/.deno"

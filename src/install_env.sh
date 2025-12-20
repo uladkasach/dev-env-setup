@@ -234,11 +234,11 @@ codium && echo 'run the "Sync Settings: Download (repository -> user)" command' 
 
 
 #########################
-## install node + npm + nvm
+## install node + npm via fnm (fast node manager)
+## ref: https://github.com/Schniz/fnm
 #########################
-browser https://github.com/nvm-sh/nvm; # check if newer version avail; update the below version if it is
-wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash;
-nvm install 16 # and install latest version
+curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
+fnm install --lts # install latest lts version
 
 #########################
 ## install drop box

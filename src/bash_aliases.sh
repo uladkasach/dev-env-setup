@@ -116,38 +116,9 @@ npx() {
 # tsx: always resolve via smart npx (which routes to npx or pnpm dlx)
 tsx() { npx tsx "$@"; }
 
-# lazyload nvm
-export NVM_DIR="$HOME/.nvm"
-lazyload_nvm() {
-  # remove the lazy wrappers after we load nvm (keep smart npm/npx wrappers)
-  unset -f nvm node pnpm npm_real npx_real
-
-  # setup nvm
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-  [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-  if [[ -f "$PWD/.nvmrc" ]]; then
-    # auto-switch if we entered a dir with .nvmrc
-    nvm use
-  fi
-
-  # enable pnpm via corepack if not found
-  if ! command -v pnpm &>/dev/null; then
-    corepack enable pnpm
-  fi
-
-  # add autocomplete, if interactive
-  [[ -t 1 ]] && eval "$(pnpm completion zsh 2>/dev/null || pnpm completion bash)"
-  [[ -t 1 ]] && compdef _pnpm npm 2>/dev/null || complete -o default -F _pnpm npm 2>/dev/null
-
-  # define npm_real to call the actual npm binary
-  npm_real() { "$(dirname "$(nvm which current)")/npm" "$@"; }
-  npx_real() { "$(dirname "$(nvm which current)")/npx" "$@"; }
-}
-nvm() { lazyload_nvm; nvm "$@"; }
-node() { lazyload_nvm; node "$@"; }
-pnpm() { lazyload_nvm; pnpm "$@"; }
-npx_real() { lazyload_nvm; npx_real "$@"; }
-npm_real() { lazyload_nvm; npm_real "$@"; }
+# npm_real/npx_real for smart npm/npx wrappers (fnm setup is in .zshrc)
+npm_real() { command npm "$@"; }
+npx_real() { command npx "$@"; }
 
 
 ######################
