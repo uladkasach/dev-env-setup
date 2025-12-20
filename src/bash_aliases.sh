@@ -59,6 +59,12 @@ alias files='nautilus & disown'
 # make it easy to speed test internet connection
 alias speedtest='wget --output-document=/dev/null http://speedtest.wdc01.softlayer.com/downloads/test500.zip'
 
+# make it easy to speed test shell startup time
+alias speedtest.shell.startup='ZPROF=1 zsh -i -c "zprof"'
+
+# force rebuild zsh completions (use when tab completion missing for new tool)
+alias compinit.rebuild='rm -f ~/.zcompdump* && autoload -Uz compinit && compinit && zcompile ~/.zcompdump'
+
 # make it easy to change brightness beyond default brightness range; e.g., brightness 0.6
 alias brightness='xrandr --output eDP-1 --brightness'
 
@@ -66,8 +72,10 @@ alias brightness='xrandr --output eDP-1 --brightness'
 alias restart.bluetooth='bluetoothctl power on && systemctl restart bluetooth'
 alias restart.wifi='systemctl restart NetworkManager.service'
 
-# make it easy to update bashalias
-alias devenv.sync.bashalias='cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases && source ~/.bash_aliases'
+# make it easy to update shell configs
+alias sync.devenv.bashaliases='cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases && source ~/.bash_aliases'
+alias sync.devenv.zshrc='cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc && source ~/.zshrc'
+alias sync.devenv='sync.devenv.bashaliases && sync.devenv.zshrc'
 
 # make it easy to pull down the devenv repo
 alias devenv.sync.repo='cd ~/git/more/dev-env-setup && git checkout main && git pull origin HEAD'

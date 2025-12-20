@@ -56,7 +56,26 @@ export SPACESHIP_AWS_SYMBOL="☁️  "
 plugins=(git)
 
 # Skip oh-my-zsh for non-TTY sessions (e.g., Claude Code, scripts, pipes)
-[[ -t 1 ]] && source $ZSH/oh-my-zsh.sh
+if [[ -t 1 ]]; then
+  # speed up compinit: only rebuild if completion files changed
+  # ref: https://gist.github.com/ctechols/ca1035271ad134841284
+  #
+  # security note: we run full compinit (with compaudit security check) on cache miss,
+  # only skipping the audit on cache hit when files haven't changed. this ensures new
+  # or modified completion files are always security-checked before being trusted.
+  autoload -Uz compinit
+  zcompdump="${ZDOTDIR:-$HOME}/.zcompdump"
+  if [[ -f "$zcompdump" ]] && ! find /usr/share/zsh/functions/Completion ~/.oh-my-zsh/completions -newer "$zcompdump" -quit 2>/dev/null | grep -q .; then
+    source "$zcompdump"   # cache hit: load compiled dump directly (skips compinit overhead)
+  else
+    compinit              # cache miss: full rebuild with security audit
+    zcompile "$zcompdump" 2>/dev/null  # compile for faster loading
+  fi
+
+  # tell oh-my-zsh we already ran compinit
+  skip_global_compinit=1
+  source $ZSH/oh-my-zsh.sh
+fi
 
 # aliases
 source ~/.bash_aliases
@@ -86,5 +105,5 @@ export EDITOR="vim"
 # allow aws-sdks to load config (e.g., node.aws-sdk grab region from ~/.aws)
 export AWS_SDK_LOAD_CONFIG=1
 
-
-export PATH="$HOME/.local/bin:$PATH"
+# rust
+[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
