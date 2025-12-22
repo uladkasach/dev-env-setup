@@ -56,8 +56,38 @@ alias terminal='gnome-terminal & disown'
 # make it easier to open the file manager
 alias files='nautilus & disown'
 
-# make it easy to speed test internet connection
-alias speedtest='wget --output-document=/dev/null http://speedtest.wdc01.softlayer.com/downloads/test500.zip'
+# make it easy to speed test internet connection (25MB download via Cloudflare)
+_speedtest_internet() {
+  setopt local_options no_notify no_monitor
+  local total=25000000
+  local width=30
+  local tmp=$(mktemp)
+  local tmpdata=$(mktemp)
+  local start=$EPOCHREALTIME
+  curl -o "$tmpdata" -w "%{speed_download}" -s "https://speed.cloudflare.com/__down?bytes=${total}" > "$tmp" &
+  local pid=$!
+  while kill -0 $pid 2>/dev/null; do
+    local size=$(stat -c%s "$tmpdata" 2>/dev/null || echo 0)
+    local elapsed=$(echo "$EPOCHREALTIME - $start" | bc)
+    local speed=$(echo "scale=2; ($size * 8 / 1000000) / $elapsed" | bc 2>/dev/null || echo "0")
+    local pct=$((size * 100 / total))
+    local filled=$((size * width / total))
+    local bar=$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' "$((width - filled))" '' | tr ' ' '-')
+    printf "\r  [%s] %3d%% @ %6s mbps" "$bar" "$pct" "$speed"
+    sleep 0.1
+  done
+  printf "\r  [%s] 100%%              \n" "$(printf '%*s' "$width" '' | tr ' ' '#')"
+  local bytes_per_sec=$(cat "$tmp")
+  rm "$tmp" "$tmpdata"
+  local mbps=$(echo "scale=2; $bytes_per_sec * 8 / 1000000" | bc)
+  local emoji
+  if (( $(echo "$mbps < 5" | bc -l) )); then emoji="🐌"
+  elif (( $(echo "$mbps < 30" | bc -l) )); then emoji="🦘"
+  else emoji="🐆"
+  fi
+  echo "  speed.download = ${mbps} mbps ${emoji}"
+}
+alias speedtest.internet='_speedtest_internet'
 
 # make it easy to speed test shell startup time
 alias speedtest.shell.startup='ZPROF=1 zsh -i -c "zprof"'
