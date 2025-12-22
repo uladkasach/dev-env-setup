@@ -186,6 +186,7 @@ git config --global alias.recommit 'commit --amend --no-edit' # e.g., to update 
 git config --global alias.shove 'push origin HEAD --force-with-lease' # e.g., git push current branches commits, as long as we have all the commits already too
 
 git config --global alias.release '!bash -c "source ~/.bash_aliases && git_alias_release \"\$@\"" --'
+git config --global alias.tree '!bash -c "source ~/.bash_aliases && git_alias_tree \"\$@\"" --'
 
 #######################
 ## install bash alias dependencies

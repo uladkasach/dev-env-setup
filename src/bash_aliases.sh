@@ -414,3 +414,275 @@ _git_release_tag_runs() {
     echo "   └─ 👌 all checks passed"
   fi
 }
+
+######################
+## git worktree helpers (invoked by git alias.tree)
+##
+## what: manage git worktrees with repo-prefixed directory names
+##
+## why: enables parallel work on branches without stashing/switching
+##      repo prefix prevents collisions when working across multiple repos
+##
+## how:
+##   git tree get           # list worktrees for current repo
+##   git tree set <branch>  # create/find worktree for branch
+##   git tree del <branch>  # remove worktree for branch
+##
+## worktree location: @gitroot/../_worktrees/$reponame.$branch/
+######################
+
+# .what: get the repo name from git root
+_git_tree_repo_name() {
+  local git_root
+  git_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+  if [[ "$git_root" == *"_worktrees"* ]]; then
+    # inside a worktree: extract repo name from path (e.g., reponame.branch)
+    basename "$git_root" | cut -d. -f1
+  else
+    basename "$git_root"
+  fi
+}
+
+# .what: sanitize branch name for filesystem (/ -> .)
+_git_tree_sanitize_branch() {
+  echo "$1" | tr '/' '.'
+}
+
+# .what: resolve the _worktrees directory path
+_git_tree_worktrees_dir() {
+  local git_root
+  git_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+  if [[ "$git_root" == *"_worktrees"* ]]; then
+    # inside a worktree: parent is the _worktrees dir
+    dirname "$git_root"
+  else
+    # in main repo: sibling _worktrees dir
+    echo "$(dirname "$git_root")/_worktrees"
+  fi
+}
+
+# .what: main dispatcher for git tree commands
+git_alias_tree() {
+  local cmd="${1:-get}"
+  shift 2>/dev/null || true
+
+  case "$cmd" in
+    -h|--help)
+      echo "git tree - manage worktrees with repo-prefixed directories"
+      echo ""
+      echo "usage: git tree <command> [options]"
+      echo ""
+      echo "commands:"
+      echo "  get          list worktrees for current repo"
+      echo "  set <branch> create or find worktree for branch"
+      echo "  del <branch> remove worktree for branch"
+      echo ""
+      echo "run 'git tree <command> --help' for command-specific options"
+      return 0
+      ;;
+    get) _git_tree_get "$@" ;;
+    set) _git_tree_set "$@" ;;
+    del) _git_tree_del "$@" ;;
+    *)
+      echo "usage: git tree <get|set|del> [branch]"
+      echo "run 'git tree --help' for more info"
+      return 1
+      ;;
+  esac
+}
+
+# .what: list worktrees for current repo
+_git_tree_get() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "git tree get - list worktrees for current repo"
+    echo ""
+    echo "usage: git tree get"
+    echo ""
+    echo "lists all worktrees matching the current repo name"
+    return 0
+  fi
+
+  local worktrees_dir repo_name
+  worktrees_dir="$(_git_tree_worktrees_dir)"
+  repo_name="$(_git_tree_repo_name)"
+
+  if [[ ! -d "$worktrees_dir" ]]; then
+    echo ""
+    echo "🌲 $repo_name"
+    echo "   └─ (no worktrees)"
+    echo ""
+    return 0
+  fi
+
+  local found=0 count=0
+  local branches=()
+  for dir in "$worktrees_dir"/"$repo_name".*; do
+    [[ -d "$dir" ]] || continue
+    branches+=("$dir")
+    ((count++))
+  done
+
+  echo ""
+  echo "🏔️  $repo_name"
+
+  if [[ $count -eq 0 ]]; then
+    echo "   └─ (no worktrees)"
+  else
+    local i=0
+    for dir in "${branches[@]}"; do
+      ((i++))
+      local name branch commit_info
+      name="$(basename "$dir")"
+      branch="${name#$repo_name.}"
+      commit_info=$(git -C "$dir" log -1 --format="%h %s" 2>/dev/null || echo "(unknown)")
+      if [[ $i -eq $count ]]; then
+        echo "   └─ 🌲 $branch"
+        echo "       ├─ path: $dir"
+        echo "       └─ head: $commit_info"
+      else
+        echo "   ├─ 🌲 $branch"
+        echo "   │  ├─ path: $dir"
+        echo "   │  └─ head: $commit_info"
+      fi
+    done
+  fi
+  echo ""
+}
+
+# .what: create or find worktree for branch
+_git_tree_set() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "git tree set - create or find worktree for branch"
+    echo ""
+    echo "usage: git tree set <branch> [options]"
+    echo ""
+    echo "options:"
+    echo "  --main  create branch from origin/main instead of HEAD"
+    echo "  --open  open worktree in codium after creation"
+    echo ""
+    echo "behavior:"
+    echo "  - if worktree exists: keeps it (idempotent)"
+    echo "  - if local branch exists: adds worktree to it"
+    echo "  - if remote branch exists: tracks and adds worktree"
+    echo "  - otherwise: creates new branch from HEAD (or origin/main with --main)"
+    return 0
+  fi
+
+  local branch="" open_flag=false main_flag=false
+
+  # parse args
+  for arg in "$@"; do
+    case "$arg" in
+      --open) open_flag=true ;;
+      --main) main_flag=true ;;
+      -*) ;;
+      *) [[ -z "$branch" ]] && branch="$arg" ;;
+    esac
+  done
+
+  if [[ -z "$branch" ]]; then
+    echo "usage: git tree set <branch> [--open] [--main]"
+    return 1
+  fi
+
+  local repo_name worktrees_dir sanitized worktree_path
+  repo_name="$(_git_tree_repo_name)"
+  worktrees_dir="$(_git_tree_worktrees_dir)"
+  sanitized="$(_git_tree_sanitize_branch "$branch")"
+  worktree_path="$worktrees_dir/$repo_name.$sanitized"
+
+  local status sprouted_from commit_info
+
+  # findsert: find or insert
+  if [[ -d "$worktree_path" ]]; then
+    status="found"
+    # get current commit info from existing worktree
+    commit_info=$(git -C "$worktree_path" log -1 --format="%h %s" 2>/dev/null)
+    sprouted_from=""
+  else
+    status="created"
+    mkdir -p "$worktrees_dir"
+
+    if [[ "$main_flag" == "true" ]]; then
+      # create from origin/main (or origin/master)
+      local base_ref="origin/main"
+      git fetch origin main 2>/dev/null || base_ref="origin/master"
+      sprouted_from="$base_ref"
+      git worktree add -q -b "$branch" "$worktree_path" "$base_ref"
+    elif git show-ref --verify --quiet "refs/heads/$branch"; then
+      # local branch exists
+      sprouted_from="$branch (existing)"
+      git worktree add -q "$worktree_path" "$branch"
+    elif git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+      # remote branch exists
+      sprouted_from="origin/$branch"
+      git worktree add -q --track -b "$branch" "$worktree_path" "origin/$branch"
+    else
+      # create new branch from HEAD
+      sprouted_from=$(git branch --show-current)
+      git worktree add -q -b "$branch" "$worktree_path"
+    fi
+    commit_info=$(git -C "$worktree_path" log -1 --format="%h %s" 2>/dev/null)
+  fi
+
+  # viby output
+  echo ""
+  echo "🌲 $repo_name.$sanitized"
+  echo "   ├─ status: $status"
+  echo "   ├─ branch: $branch"
+  echo "   ├─ path: $worktree_path"
+  if [[ -n "$sprouted_from" ]]; then
+    echo "   ├─ from: $sprouted_from"
+  fi
+  echo "   └─ head: $commit_info"
+  echo ""
+
+  # optionally open in editor
+  if [[ "$open_flag" == "true" ]]; then
+    codium "$worktree_path" &
+  fi
+}
+
+# .what: remove worktree for branch
+_git_tree_del() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "git tree del - remove worktree for branch"
+    echo ""
+    echo "usage: git tree del <branch>"
+    echo ""
+    echo "removes the worktree directory and prunes git references"
+    echo "safe to run if worktree doesn't exist (no-op)"
+    return 0
+  fi
+
+  local branch="$1"
+
+  if [[ -z "$branch" ]]; then
+    echo "usage: git tree del <branch>"
+    return 1
+  fi
+
+  local repo_name worktrees_dir sanitized worktree_path
+  repo_name="$(_git_tree_repo_name)"
+  worktrees_dir="$(_git_tree_worktrees_dir)"
+  sanitized="$(_git_tree_sanitize_branch "$branch")"
+  worktree_path="$worktrees_dir/$repo_name.$sanitized"
+
+  echo ""
+  if [[ -d "$worktree_path" ]]; then
+    local commit_info
+    commit_info=$(git -C "$worktree_path" log -1 --format="%h %s" 2>/dev/null || echo "(unknown)")
+    git worktree remove "$worktree_path" --force 2>/dev/null || {
+      rm -rf "$worktree_path"
+      git worktree prune
+    }
+    echo "🍂 $repo_name.$sanitized"
+    echo "   ├─ status: removed"
+    echo "   ├─ branch: $branch"
+    echo "   └─ was at: $commit_info"
+  else
+    echo "🍂 $repo_name.$sanitized"
+    echo "   └─ status: not found (no-op)"
+  fi
+  echo ""
+}
