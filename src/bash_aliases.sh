@@ -142,9 +142,13 @@ npm() {
   fi
 }
 
-# smart npx: use npx if package-lock.json exists, otherwise pnpx
+# smart npx: prefer local bin, then npx/pnpm dlx based on lockfile
 npx() {
-  if [[ -f "package-lock.json" ]]; then
+  local cmd="$1"
+  if [[ -n "$cmd" && -x "./node_modules/.bin/$cmd" ]]; then
+    shift
+    "./node_modules/.bin/$cmd" "$@"
+  elif [[ -f "package-lock.json" ]]; then
     npx_real "$@"
   else
     pnpm dlx "$@"
