@@ -107,3 +107,10 @@ export AWS_SDK_LOAD_CONFIG=1
 
 # rust
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+
+# pnpm link --global
+export PNPM_HOME="/home/vlad/.local/share/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
