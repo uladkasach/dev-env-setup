@@ -444,9 +444,9 @@ _git_release_tag_runs() {
 ##      repo prefix prevents collisions when working across multiple repos
 ##
 ## how:
-##   git tree get           # list worktrees for current repo
-##   git tree set <branch>  # create/find worktree for branch
-##   git tree del <branch>  # remove worktree for branch
+##   git tree get                            # list worktrees for current repo
+##   git tree set <branch> --from main|this  # create/find worktree for branch
+##   git tree del <branch>                   # remove worktree for branch
 ##
 ## worktree location: @gitroot/../_worktrees/$reponame.$branch/
 ######################
@@ -574,34 +574,52 @@ _git_tree_set() {
   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     echo "git tree set - create or find worktree for branch"
     echo ""
-    echo "usage: git tree set <branch> [options]"
+    echo "usage: git tree set <branch> --from <main|this> [options]"
     echo ""
     echo "options:"
-    echo "  --main  create branch from origin/main instead of HEAD"
-    echo "  --open  open worktree in codium after creation"
+    echo "  --from main  create branch from origin/main"
+    echo "  --from this  create branch from current HEAD"
+    echo "  --open       open worktree in codium after creation"
     echo ""
     echo "behavior:"
     echo "  - if worktree exists: keeps it (idempotent)"
     echo "  - if local branch exists: adds worktree to it"
     echo "  - if remote branch exists: tracks and adds worktree"
-    echo "  - otherwise: creates new branch from HEAD (or origin/main with --main)"
+    echo "  - otherwise: creates new branch from --from target"
     return 0
   fi
 
-  local branch="" open_flag=false main_flag=false
+  local branch="" open_flag=false from_target=""
 
   # parse args
+  local prev=""
   for arg in "$@"; do
+    if [[ "$prev" == "--from" ]]; then
+      from_target="$arg"
+      prev=""
+      continue
+    fi
     case "$arg" in
       --open) open_flag=true ;;
-      --main) main_flag=true ;;
+      --from) prev="--from" ;;
       -*) ;;
       *) [[ -z "$branch" ]] && branch="$arg" ;;
     esac
   done
 
   if [[ -z "$branch" ]]; then
-    echo "usage: git tree set <branch> [--open] [--main]"
+    echo "usage: git tree set <branch> --from <main|this> [--open]"
+    return 1
+  fi
+
+  if [[ -z "$from_target" ]]; then
+    echo "error: --from <main|this> is required"
+    echo "usage: git tree set <branch> --from <main|this> [--open]"
+    return 1
+  fi
+
+  if [[ "$from_target" != "main" && "$from_target" != "this" ]]; then
+    echo "error: --from must be 'main' or 'this'"
     return 1
   fi
 
@@ -623,13 +641,7 @@ _git_tree_set() {
     status="created"
     mkdir -p "$worktrees_dir"
 
-    if [[ "$main_flag" == "true" ]]; then
-      # create from origin/main (or origin/master)
-      local base_ref="origin/main"
-      git fetch origin main 2>/dev/null || base_ref="origin/master"
-      sprouted_from="$base_ref"
-      git worktree add -q -b "$branch" "$worktree_path" "$base_ref"
-    elif git show-ref --verify --quiet "refs/heads/$branch"; then
+    if git show-ref --verify --quiet "refs/heads/$branch"; then
       # local branch exists
       sprouted_from="$branch (existing)"
       git worktree add -q "$worktree_path" "$branch"
@@ -637,8 +649,14 @@ _git_tree_set() {
       # remote branch exists
       sprouted_from="origin/$branch"
       git worktree add -q --track -b "$branch" "$worktree_path" "origin/$branch"
+    elif [[ "$from_target" == "main" ]]; then
+      # create from origin/main (or origin/master)
+      local base_ref="origin/main"
+      git fetch origin main 2>/dev/null || base_ref="origin/master"
+      sprouted_from="$base_ref"
+      git worktree add -q -b "$branch" "$worktree_path" "$base_ref"
     else
-      # create new branch from HEAD
+      # create new branch from HEAD (--from this)
       sprouted_from=$(git branch --show-current)
       git worktree add -q -b "$branch" "$worktree_path"
     fi
