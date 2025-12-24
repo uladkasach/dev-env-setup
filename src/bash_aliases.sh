@@ -511,21 +511,73 @@ git_alias_tree() {
   esac
 }
 
-# .what: list worktrees for current repo
+# .what: list worktrees for current repo, or open a specific one
 _git_tree_get() {
   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     echo "git tree get - list worktrees for current repo"
     echo ""
-    echo "usage: git tree get"
+    echo "usage: git tree get [branch] [--open]"
     echo ""
-    echo "lists all worktrees matching the current repo name"
+    echo "options:"
+    echo "  <branch>  show specific worktree (optional)"
+    echo "  --open    open worktree in codium"
+    echo ""
+    echo "examples:"
+    echo "  git tree get              # list all worktrees"
+    echo "  git tree get feat/foo     # show specific worktree"
+    echo "  git tree get feat/foo --open  # open in codium"
     return 0
   fi
+
+  local branch="" open_flag=false
+
+  # parse args
+  for arg in "$@"; do
+    case "$arg" in
+      --open) open_flag=true ;;
+      -*) ;;
+      *) [[ -z "$branch" ]] && branch="$arg" ;;
+    esac
+  done
 
   local worktrees_dir repo_name
   worktrees_dir="$(_git_tree_worktrees_dir)"
   repo_name="$(_git_tree_repo_name)"
 
+  # if branch specified, find and optionally open it
+  if [[ -n "$branch" ]]; then
+    local sanitized worktree_path
+    sanitized="$(_git_tree_sanitize_branch "$branch")"
+    worktree_path="$worktrees_dir/$repo_name.$sanitized"
+
+    if [[ ! -d "$worktree_path" ]]; then
+      echo "🍃 worktree for '$branch' not found"
+      echo -e "   └─ \033[2mtry 'git tree set $branch --from main|this' to create it\033[0m"
+      return 1
+    fi
+
+    local commit_info
+    commit_info=$(git -C "$worktree_path" log -1 --format="%h %s" 2>/dev/null || echo "(unknown)")
+
+    echo ""
+    echo "🌲 $repo_name.$sanitized"
+    echo "   ├─ branch: $branch"
+    echo "   ├─ path: $worktree_path"
+    if [[ "$open_flag" == "true" ]]; then
+      echo "   ├─ head: $commit_info"
+      echo -e "   └─ \033[2mopening in codium...\033[0m"
+    else
+      echo "   └─ head: $commit_info"
+    fi
+    echo ""
+
+    if [[ "$open_flag" == "true" ]]; then
+      codium "$worktree_path" &
+    fi
+    return 0
+  fi
+
+  # no branch specified: list all worktrees
   if [[ ! -d "$worktrees_dir" ]]; then
     echo ""
     echo "🌲 $repo_name"
@@ -551,16 +603,16 @@ _git_tree_get() {
     local i=0
     for dir in "${branches[@]}"; do
       ((i++))
-      local name branch commit_info
+      local name branch_name commit_info
       name="$(basename "$dir")"
-      branch="${name#$repo_name.}"
+      branch_name="${name#$repo_name.}"
       commit_info=$(git -C "$dir" log -1 --format="%h %s" 2>/dev/null || echo "(unknown)")
       if [[ $i -eq $count ]]; then
-        echo "   └─ 🌲 $branch"
+        echo "   └─ 🌲 $branch_name"
         echo "       ├─ path: $dir"
         echo "       └─ head: $commit_info"
       else
-        echo "   ├─ 🌲 $branch"
+        echo "   ├─ 🌲 $branch_name"
         echo "   │  ├─ path: $dir"
         echo "   │  └─ head: $commit_info"
       fi
@@ -583,8 +635,7 @@ _git_tree_set() {
     echo ""
     echo "behavior:"
     echo "  - if worktree exists: keeps it (idempotent)"
-    echo "  - if local branch exists: adds worktree to it"
-    echo "  - if remote branch exists: tracks and adds worktree"
+    echo "  - if branch exists (local/remote): fails (use 'git tree del' first)"
     echo "  - otherwise: creates new branch from --from target"
     return 0
   fi
@@ -641,15 +692,20 @@ _git_tree_set() {
     status="created"
     mkdir -p "$worktrees_dir"
 
+    # fail fast if branch already exists (--from implies creating new branch)
     if git show-ref --verify --quiet "refs/heads/$branch"; then
-      # local branch exists
-      sprouted_from="$branch (existing)"
-      git worktree add -q "$worktree_path" "$branch"
+      echo "🌲 branch '$branch' already exists locally"
+      echo -e "   ├─ \033[2mtry 'git tree get $branch --open' to open it\033[0m"
+      echo -e "   └─ \033[2mtry 'git tree del $branch' to remove it\033[0m"
+      return 1
     elif git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
-      # remote branch exists
-      sprouted_from="origin/$branch"
-      git worktree add -q --track -b "$branch" "$worktree_path" "origin/$branch"
-    elif [[ "$from_target" == "main" ]]; then
+      echo "🌲 branch '$branch' already exists on remote"
+      echo -e "   ├─ \033[2mtry 'git tree get $branch --open' to open it\033[0m"
+      echo -e "   └─ \033[2mtry 'git tree del $branch' to remove it\033[0m"
+      return 1
+    fi
+
+    if [[ "$from_target" == "main" ]]; then
       # create from origin/main (or origin/master)
       local base_ref="origin/main"
       git fetch origin main 2>/dev/null || base_ref="origin/master"
@@ -672,7 +728,12 @@ _git_tree_set() {
   if [[ -n "$sprouted_from" ]]; then
     echo "   ├─ from: $sprouted_from"
   fi
-  echo "   └─ head: $commit_info"
+  if [[ "$open_flag" == "true" ]]; then
+    echo "   ├─ head: $commit_info"
+    echo -e "   └─ \033[2mopening in codium...\033[0m"
+  else
+    echo "   └─ head: $commit_info"
+  fi
   echo ""
 
   # optionally open in editor
@@ -719,8 +780,9 @@ _git_tree_del() {
     echo "   ├─ branch: $branch"
     echo "   └─ was at: $commit_info"
   else
-    echo "🍂 $repo_name.$sanitized"
-    echo "   └─ status: not found (no-op)"
+    echo "🍃 $repo_name.$sanitized"
+    echo "   ├─ status: not found (no-op)"
+    echo -e "   └─ \033[2mtry 'git tree set $branch --from main|this' to create it\033[0m"
   fi
   echo ""
 }
