@@ -220,12 +220,14 @@ alias use.github.declastruct.test='export GITHUB_TOKEN=$(get_github_app_token \
 ##      and optionally enables automerge with --apply or reruns failed with --retry
 ##
 ## how:
-##   git release this           # check current branch's PR; if on main, delegates to main
-##   git release this --apply   # check PR + enable automerge
-##   git release this --retry   # check PR + rerun failed workflows
-##   git release main           # check open release PR; if none, show latest tag status
-##   git release main --apply   # check + enable automerge
-##   git release main --retry   # check + rerun failed workflows
+##   git release this             # check current branch's PR; if on main, delegates to main
+##   git release this --apply     # check PR + enable automerge
+##   git release this --retry     # check PR + rerun failed workflows
+##   git release this --findsert  # find or create PR for current branch (not main)
+##   git release this --findsert --apply  # find/create PR + enable automerge
+##   git release main             # check open release PR; if none, show latest tag status
+##   git release main --apply     # check + enable automerge
+##   git release main --retry     # check + rerun failed workflows
 ##
 ## output:
 ##   - shows version, CI status, and automerge state
@@ -233,15 +235,16 @@ alias use.github.declastruct.test='export GITHUB_TOKEN=$(get_github_app_token \
 ######################
 git_alias_release() {
   local target="${1:-this}"
-  local apply=false retry=false
+  local apply=false retry=false findsert=false
   [[ "$*" == *"--apply"* ]] && apply=true
   [[ "$*" == *"--retry"* ]] && retry=true
+  [[ "$*" == *"--findsert"* ]] && findsert=true
 
   echo "" # headspace
   if [ "$target" = "main" ]; then
     _git_release_main "$apply" "$retry"
   else
-    _git_release_this "$apply" "$retry"
+    _git_release_this "$apply" "$retry" "$findsert"
   fi
   echo "" # headspace
 }
@@ -249,7 +252,7 @@ git_alias_release() {
 # .what: check current branch's PR; if on main, delegate to _git_release_main
 # .why:  convenient way to check PR status from any feature branch
 _git_release_this() {
-  local apply="$1" retry="$2"
+  local apply="$1" retry="$2" findsert="$3"
   local current_branch
   current_branch=$(git branch --show-current 2>/dev/null)
 
@@ -277,11 +280,16 @@ _git_release_this() {
     if [ "$unpushed" -gt 0 ] 2>/dev/null; then
       echo "   ├─ $unpushed unpushed commit(s)"
     fi
-    if [ "$apply" = "true" ]; then
+    if [ "$findsert" = "true" ]; then
       echo "   └─ 🌴 creating pr..."
       gh pr create --fill
+      # re-fetch the newly created PR and continue to show status / apply automerge
+      pr_num=$(gh pr list --head "$current_branch" --state open --json number --limit 1 | jq -r '.[0].number // empty')
+      if [ -n "$pr_num" ]; then
+        _git_release_pr "$pr_num" "$apply" "$retry"
+      fi
     else
-      echo -e "   ├─ \033[2mtry 'git release --apply' to create pr\033[0m"
+      echo -e "   ├─ \033[2mtry 'git release --findsert' to find or create pr\033[0m"
       echo -e "   └─ \033[2mtry 'git release main' to see latest release\033[0m"
     fi
     return 0
