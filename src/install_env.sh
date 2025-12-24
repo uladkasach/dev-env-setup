@@ -192,7 +192,8 @@ git config --global alias.tree '!bash -c "source ~/.bash_aliases && git_alias_tr
 ## install bash alias dependencies
 #######################
 sudo apt install -y xclip # required for pbpaste, pbcopy
-sudo apt install -y jq  # required for manipulating json in terminal
+sudo apt install -y jq # required for manipulating json in terminal
+sudo apt install -y tree # required for tree view of directories
 
 #########################
 ## install codium
