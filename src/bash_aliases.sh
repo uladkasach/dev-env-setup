@@ -283,6 +283,7 @@ _git_release_this() {
     if [ "$findsert" = "true" ]; then
       echo "   └─ 🌴 creating pr..."
       gh pr create --fill
+      echo ""
       # re-fetch the newly created PR and continue to show status / apply automerge
       pr_num=$(gh pr list --head "$current_branch" --state open --json number --limit 1 | jq -r '.[0].number // empty')
       if [ -n "$pr_num" ]; then
@@ -382,8 +383,15 @@ _git_release_pr() {
     echo "   └─ 🌴 already merged"
   elif [ "$automerge" = "null" ]; then
     if [ "$apply" = "true" ]; then
-      gh pr merge "$pr_num" --auto --squash
-      echo "   └─ 🌴 automerge enabled [added]"
+      gh pr merge "$pr_num" --auto --squash > /dev/null
+      # check if PR was merged immediately (all checks passed + no branch protection delay)
+      local post_state
+      post_state=$(gh pr view "$pr_num" --json state -q '.state')
+      if [ "$post_state" = "MERGED" ]; then
+        echo "   └─ 🌴 automerge enabled [added] -> already merged"
+      else
+        echo "   └─ 🌴 automerge enabled [added]"
+      fi
     else
       echo "   └─ 🌴 automerge unfound (use --apply to add)"
     fi
