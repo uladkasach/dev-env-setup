@@ -373,9 +373,11 @@ _git_release_pr() {
     echo "   ├─ 👌 all checks passed"
   fi
 
-  # warn if branch is behind base
+  # warn if branch is behind base or has conflicts
   if [ "$merge_state" = "BEHIND" ] && [ "$is_merged" != "true" ]; then
     echo "   ├─ 🐚 needs rebase" # shell: left behind on shore while the wave moves on
+  elif [ "$merge_state" = "DIRTY" ] && [ "$is_merged" != "true" ]; then
+    echo "   ├─ 🐚 needs rebase, has conflicts"
   fi
 
   # show automerge status
