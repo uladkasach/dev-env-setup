@@ -771,6 +771,16 @@ _git_tree_del() {
   if [[ -d "$worktree_path" ]]; then
     local commit_info
     commit_info=$(git -C "$worktree_path" log -1 --format="%h %s" 2>/dev/null || echo "(unknown)")
+
+    # ensure node_modules is deletable (pnpm can create files with restricted permissions)
+    if [[ -d "$worktree_path/node_modules" ]]; then
+      chmod -R u+w "$worktree_path/node_modules" 2>/dev/null || {
+        echo "⚠️  cannot get delete ability on node_modules (permission denied without sudo)"
+        echo "   └─ fix: sudo chmod -R u+w \"$worktree_path/node_modules\""
+        return 1
+      }
+    fi
+
     git worktree remove "$worktree_path" --force 2>/dev/null || {
       rm -rf "$worktree_path"
       git worktree prune
