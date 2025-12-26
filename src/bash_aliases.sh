@@ -839,3 +839,366 @@ _git_tree_del() {
   fi
   echo ""
 }
+
+######################
+## git grab helper (invoked by git alias.grab)
+##
+## what: save and transfer patches between worktrees
+##
+## why: enables moving uncommitted changes to a different worktree
+##      useful when you decide changes should go on their own branch
+##
+## how:
+##   git grab set <name>                  # save both staged+unstaged changes
+##   git grab set <name> --mode staged    # save only staged changes
+##   git grab set <name> --mode unstaged  # save only unstaged changes
+##   git grab get                         # list available patches
+##   git grab get --patch <name>          # apply a specific patch
+##   git grab del <name>                  # delete a patch
+##
+## patch location: @gitroot/../_worktrees/_patches/<name>.patch
+######################
+
+# .what: get patches directory
+_git_grab_patches_dir() {
+  local worktrees_dir
+  worktrees_dir="$(_git_tree_worktrees_dir)"
+  echo "$worktrees_dir/_patches"
+}
+
+# .what: main dispatcher for git grab commands
+git_alias_grab() {
+  local cmd="${1:-get}"
+  shift 2>/dev/null || true
+
+  case "$cmd" in
+    -h|--help)
+      echo "git grab - save and transfer patches between worktrees"
+      echo ""
+      echo "usage: git grab <command> [options]"
+      echo ""
+      echo "commands:"
+      echo "  set <name>  save changes as a patch"
+      echo "  get         list patches, or apply with --patch <name>"
+      echo "  del <name>  delete a patch"
+      echo ""
+      echo "run 'git grab <command> --help' for command-specific options"
+      return 0
+      ;;
+    set) _git_grab_set "$@" ;;
+    get) _git_grab_get "$@" ;;
+    del) _git_grab_del "$@" ;;
+    *)
+      echo "error: unknown command '$cmd'"
+      echo "run 'git grab --help' for usage"
+      return 1
+      ;;
+  esac
+}
+
+# .what: save changes as a patch
+_git_grab_set() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "git grab set - save changes as a patch"
+    echo ""
+    echo "usage: git grab set <name> [options]"
+    echo ""
+    echo "options:"
+    echo "  --mode staged    save only staged changes"
+    echo "  --mode unstaged  save only unstaged changes"
+    echo "  --mode both      save staged and unstaged (default)"
+    echo ""
+    echo "behavior:"
+    echo "  - fails if patch with same name already exists"
+    echo "  - fails if no changes to save"
+    return 0
+  fi
+
+  local name="" mode="both"
+
+  # parse args
+  local prev=""
+  for arg in "$@"; do
+    if [[ "$prev" == "--mode" ]]; then
+      mode="$arg"
+      prev=""
+      continue
+    fi
+    case "$arg" in
+      --mode) prev="--mode" ;;
+      -*) ;;
+      *) [[ -z "$name" ]] && name="$arg" ;;
+    esac
+  done
+
+  if [[ -z "$name" ]]; then
+    echo "error: patch name required"
+    echo "usage: git grab set <name> [--mode staged|unstaged|both]"
+    return 1
+  fi
+
+  # validate mode
+  if [[ "$mode" != "staged" && "$mode" != "unstaged" && "$mode" != "both" ]]; then
+    echo "error: invalid mode '$mode'"
+    echo "valid modes: staged, unstaged, both"
+    return 1
+  fi
+
+  local patches_dir patch_file
+  patches_dir="$(_git_grab_patches_dir)"
+  patch_file="$patches_dir/$name.patch"
+
+  # fail if patch exists
+  if [[ -f "$patch_file" ]]; then
+    echo "error: patch '$name' already exists"
+    echo "use 'git grab del $name' to remove it first"
+    return 1
+  fi
+
+  # check for changes based on mode
+  local has_staged has_unstaged
+  has_staged=$(git diff --cached --quiet 2>/dev/null; echo $?)
+  has_unstaged=$(git diff --quiet 2>/dev/null; echo $?)
+
+  case "$mode" in
+    staged)
+      if [[ "$has_staged" -eq 0 ]]; then
+        echo "error: no staged changes to save"
+        return 1
+      fi
+      ;;
+    unstaged)
+      if [[ "$has_unstaged" -eq 0 ]]; then
+        echo "error: no unstaged changes to save"
+        return 1
+      fi
+      ;;
+    both)
+      if [[ "$has_staged" -eq 0 && "$has_unstaged" -eq 0 ]]; then
+        echo "error: no changes to save"
+        return 1
+      fi
+      ;;
+  esac
+
+  # create patches directory
+  mkdir -p "$patches_dir"
+
+  # generate patch
+  local patch_content=""
+  case "$mode" in
+    staged)
+      patch_content=$(git diff --cached)
+      ;;
+    unstaged)
+      patch_content=$(git diff)
+      ;;
+    both)
+      # combine staged and unstaged into one patch
+      patch_content=$(git diff HEAD)
+      ;;
+  esac
+
+  if [[ -z "$patch_content" ]]; then
+    echo "error: no diff content generated"
+    return 1
+  fi
+
+  echo "$patch_content" > "$patch_file"
+
+  # count files affected
+  local file_count
+  file_count=$(echo "$patch_content" | grep -c '^diff --git' || echo 0)
+
+  echo ""
+  echo "🫐 $name"
+  echo "   ├─ status: picked"
+  echo "   ├─ mode: $mode"
+  echo "   ├─ files: $file_count"
+  echo "   └─ path: $patch_file"
+  echo ""
+}
+
+# .what: list patches or apply a specific one
+_git_grab_get() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "git grab get - list patches or apply one"
+    echo ""
+    echo "usage: git grab get [options]"
+    echo ""
+    echo "options:"
+    echo "  --patch <name>  select a patch"
+    echo "  --plan          show what would be applied (requires --patch)"
+    echo "  --apply         apply the patch (requires --patch)"
+    echo ""
+    echo "behavior:"
+    echo "  - without --patch: lists all available patches"
+    echo "  - with --patch --plan: shows diff stats"
+    echo "  - with --patch --apply: applies and deletes the patch"
+    echo "  - fails if patch doesn't apply cleanly"
+    return 0
+  fi
+
+  local patch_name="" plan=false apply=false
+
+  # parse args
+  local prev=""
+  for arg in "$@"; do
+    if [[ "$prev" == "--patch" ]]; then
+      patch_name="$arg"
+      prev=""
+      continue
+    fi
+    case "$arg" in
+      --patch) prev="--patch" ;;
+      --plan) plan=true ;;
+      --apply) apply=true ;;
+      -*) ;;
+    esac
+  done
+
+  local patches_dir
+  patches_dir="$(_git_grab_patches_dir)"
+
+  # if no patch specified, list available patches
+  if [[ -z "$patch_name" ]]; then
+    if [[ ! -d "$patches_dir" ]]; then
+      echo ""
+      echo "🧺 patches"
+      echo "   └─ (empty)"
+      echo ""
+      return 0
+    fi
+
+    local patches=()
+    for f in "$patches_dir"/*.patch; do
+      [[ -f "$f" ]] || continue
+      patches+=("$f")
+    done
+
+    echo ""
+    echo "🧺 patches"
+
+    if [[ ${#patches[@]} -eq 0 ]]; then
+      echo "   └─ (empty)"
+    else
+      local i=0 count=${#patches[@]}
+      for f in "${patches[@]}"; do
+        ((i++))
+        local name file_count
+        name="$(basename "$f" .patch)"
+        file_count=$(grep -c '^diff --git' "$f" 2>/dev/null || echo 0)
+        if [[ $i -eq $count ]]; then
+          echo "   └─ 🫐 $name ($file_count files)"
+        else
+          echo "   ├─ 🫐 $name ($file_count files)"
+        fi
+      done
+    fi
+    echo ""
+    return 0
+  fi
+
+  # apply specific patch
+  local patch_file="$patches_dir/$patch_name.patch"
+
+  if [[ ! -f "$patch_file" ]]; then
+    echo "error: patch '$patch_name' not found"
+    echo "use 'git grab get' to list available patches"
+    return 1
+  fi
+
+  # check if working tree is clean enough (no conflicts)
+  if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+    # has changes, check if patch would conflict
+    if ! git apply --check "$patch_file" 2>/dev/null; then
+      echo "error: patch would not apply cleanly"
+      echo "commit or stash your changes first"
+      return 1
+    fi
+  else
+    # clean tree, still verify patch applies
+    if ! git apply --check "$patch_file" 2>/dev/null; then
+      echo "error: patch would not apply cleanly"
+      echo "the patch may be outdated or for a different branch"
+      return 1
+    fi
+  fi
+
+  local file_count
+  file_count=$(grep -c '^diff --git' "$patch_file" 2>/dev/null || echo 0)
+
+  if [[ "$plan" == "true" ]]; then
+    echo ""
+    echo "🫐 $patch_name (plan)"
+    echo "   ├─ status: would apply cleanly"
+    echo "   └─ files: $file_count"
+    echo ""
+    git apply --stat "$patch_file"
+    return 0
+  fi
+
+  if [[ "$apply" != "true" ]]; then
+    echo ""
+    echo "🫐 $patch_name"
+    echo "   ├─ status: ready"
+    echo "   └─ files: $file_count"
+    echo ""
+    echo -e "   \033[2muse --plan to preview or --apply to apply\033[0m"
+    return 0
+  fi
+
+  # apply the patch
+  if ! git apply "$patch_file"; then
+    echo "error: failed to apply patch"
+    return 1
+  fi
+
+  # remove the patch after successful apply
+  rm "$patch_file"
+
+  echo ""
+  echo "🫐 $patch_name"
+  echo "   ├─ status: applied"
+  echo "   ├─ files: $file_count"
+  echo "   └─ patch consumed"
+  echo ""
+}
+
+# .what: delete a patch
+_git_grab_del() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "git grab del - delete a patch"
+    echo ""
+    echo "usage: git grab del <name>"
+    echo ""
+    echo "removes the patch file permanently"
+    return 0
+  fi
+
+  local name="$1"
+
+  if [[ -z "$name" ]]; then
+    echo "error: patch name required"
+    echo "usage: git grab del <name>"
+    return 1
+  fi
+
+  local patches_dir patch_file
+  patches_dir="$(_git_grab_patches_dir)"
+  patch_file="$patches_dir/$name.patch"
+
+  echo ""
+  if [[ -f "$patch_file" ]]; then
+    local file_count
+    file_count=$(grep -c '^diff --git' "$patch_file" 2>/dev/null || echo 0)
+    rm "$patch_file"
+    echo "🫐 $name"
+    echo "   ├─ status: discarded"
+    echo "   └─ was: $file_count files"
+  else
+    echo "🫐 $name"
+    echo "   └─ not found (no-op)"
+  fi
+  echo ""
+}

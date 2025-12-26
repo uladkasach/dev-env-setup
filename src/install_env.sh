@@ -187,6 +187,7 @@ git config --global alias.shove 'push origin HEAD --force-with-lease' # e.g., gi
 
 git config --global alias.release '!bash -c "source ~/.bash_aliases && git_alias_release \"\$@\"" --'
 git config --global alias.tree '!bash -c "source ~/.bash_aliases && git_alias_tree \"\$@\"" --'
+git config --global alias.grab '!bash -c "source ~/.bash_aliases && git_alias_grab \"\$@\"" --'
 
 #######################
 ## install bash alias dependencies
