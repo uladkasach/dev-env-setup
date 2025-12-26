@@ -346,26 +346,46 @@ _git_release_pr() {
 
   # show check status
   if [ "$failed" -gt 0 ]; then
-    echo "⛈️  $failed check(s) failed"
-    echo "$pr" | jq -r '.statusCheckRollup[] | select(.conclusion == "FAILURE") | [.name, (.detailsUrl // .targetUrl // "")] | @tsv' | while IFS=$'\t' read -r name url; do
-      echo "  🔴 $name"
+    echo "   ├─ ⛈️  $failed check(s) failed"
+    # show running checks first
+    if [ "$pending" -gt 0 ]; then
+      echo "   │  ├─ 🟡 $pending check(s) still running"
+    fi
+    # collect failed checks into array to know when we're at the last one
+    local failed_checks=()
+    while IFS= read -r line; do
+      failed_checks+=("$line")
+    done < <(echo "$pr" | jq -r '.statusCheckRollup[] | select(.conclusion == "FAILURE") | [.name, (.detailsUrl // .targetUrl // "")] | @tsv')
+    local total_failed=${#failed_checks[@]}
+    local idx=0
+    for check in "${failed_checks[@]}"; do
+      idx=$((idx + 1))
+      local name url
+      name=$(echo "$check" | cut -f1)
+      url=$(echo "$check" | cut -f2)
+      local is_last_item=false
+      [ "$idx" -eq "$total_failed" ] && [ "$retry" = "true" ] && is_last_item=true
+      if [ "$is_last_item" = "true" ]; then
+        echo "   │  └─ 🔴 $name"
+      else
+        echo "   │  ├─ 🔴 $name"
+      fi
       local run_id err
       run_id=$(echo "$url" | sed -n 's/.*actions\/runs\/\([0-9]*\).*/\1/p')
       if [ -n "$run_id" ]; then
         err=$(gh run view "$run_id" --json jobs -q '.jobs[] | select(.conclusion == "failure") | (.steps[] | select(.conclusion == "failure") | .name) // .name' | head -1)
-        echo "     ├─ $url"
-        echo "     └─ ${err:-(see logs)}"
+        echo "   │  │     ├─ $url"
+        echo "   │  │     └─ ${err:-(see logs)}"
         if [ "$retry" = "true" ]; then
           gh run rerun "$run_id" --failed
-          echo "     👌 rerun triggered"
+          echo "   │  │     👌 rerun triggered"
         fi
       else
-        echo "     └─ $url"
+        echo "   │  │     └─ $url"
       fi
     done
     if [ "$retry" != "true" ]; then
-      echo ""
-      echo -e "   \033[2mhint: use --retry to rerun failed workflows\033[0m"
+      echo -e "   │  └─ \033[2mhint: use --retry to rerun failed workflows\033[0m"
     fi
   elif [ "$pending" -gt 0 ]; then
     echo "   ├─ 🐢 $pending check(s) in progress"
@@ -414,21 +434,42 @@ _git_release_tag_runs() {
   tag_pending=$(echo "$tag_runs" | jq -r '[.[] | select(.status != "completed")] | length')
 
   if [ "$tag_failed" -gt 0 ]; then
-    echo "⛈️  $tag_failed check(s) failed"
-    echo "$tag_runs" | jq -r '.[] | select(.conclusion == "failure") | [.name, .url, .databaseId] | @tsv' | while IFS=$'\t' read -r name url run_id; do
-      echo "  🔴 $name"
+    echo "   └─ ⛈️  $tag_failed check(s) failed"
+    # show running checks first
+    if [ "$tag_pending" -gt 0 ]; then
+      echo "      ├─ 🟡 $tag_pending check(s) still running"
+    fi
+    # collect failed checks into array to know when we're at the last one
+    local failed_checks=()
+    while IFS= read -r line; do
+      failed_checks+=("$line")
+    done < <(echo "$tag_runs" | jq -r '.[] | select(.conclusion == "failure") | [.name, .url, .databaseId] | @tsv')
+    local total_failed=${#failed_checks[@]}
+    local idx=0
+    for check in "${failed_checks[@]}"; do
+      idx=$((idx + 1))
+      local name url run_id
+      name=$(echo "$check" | cut -f1)
+      url=$(echo "$check" | cut -f2)
+      run_id=$(echo "$check" | cut -f3)
+      local is_last_item=false
+      [ "$idx" -eq "$total_failed" ] && [ "$retry" = "true" ] && is_last_item=true
+      if [ "$is_last_item" = "true" ]; then
+        echo "      └─ 🔴 $name"
+      else
+        echo "      ├─ 🔴 $name"
+      fi
       local err
       err=$(gh run view "$run_id" --json jobs -q '.jobs[] | select(.conclusion == "failure") | (.steps[] | select(.conclusion == "failure") | .name) // .name' | head -1)
-      echo "     ├─ $url"
-      echo "     └─ ${err:-(see logs)}"
+      echo "      │     ├─ $url"
+      echo "      │     └─ ${err:-(see logs)}"
       if [ "$retry" = "true" ]; then
         gh run rerun "$run_id" --failed
-        echo "     👌 rerun triggered"
+        echo "      │     👌 rerun triggered"
       fi
     done
     if [ "$retry" != "true" ]; then
-      echo ""
-      echo "hint: use --retry to rerun failed workflows"
+      echo -e "      └─ \033[2mhint: use --retry to rerun failed workflows\033[0m"
     fi
   elif [ "$tag_pending" -gt 0 ]; then
     echo "   └─ 🐢 $tag_pending check(s) in progress"
