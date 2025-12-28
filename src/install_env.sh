@@ -1,19 +1,4 @@
 #########################
-## enable ctrl-c and ctrl-v as copy and paste in the terminal
-## ref: https://askubuntu.com/questions/53688/making-ctrlc-copy-text-in-gnome-terminal
-#########################
-sudo apt install gconf2
-gconftool-2 -t str -s /apps/gnome-terminal/keybindings/copy "<Control>c"
-gconftool-2 -t str -s /apps/gnome-terminal/keybindings/paste "<Control>v"
-
-#########################
-## rebind interrupt key to ctrl+x
-## ref: https://forums.justlinux.com/showthread.php?127575-Saving-stty-settings-permanently-with-automatic-read; https://stackoverflow.com/a/25391867/3068233; https://forums.justlinux.com/showthread.php?105417-stty-erase-in-bash*; https://askubuntu.com/questions/61543/stty-doesnt-work
-#########################
-stty intr ^X
-grep -qxF 'stty intr ^X' ~/.bashrc || echo '\n# bind interrupt key to ctrl-x\stty intr ^X' >> ~/.bashrc # writes to `~/.bashrc` if that line is not alrady there; Why add to `~/.bashrc` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
-
-#########################
 ## install vim
 #########################
 sudo apt install vim -y # note: ~/.zshrc already defines that this is default
@@ -137,7 +122,6 @@ gnome-terminal
 
 # note: if git icon looks weird, make sure to install font that supports it: https://github.com/tonsky/FiraCode :
 sudo apt install fonts-firacode
-
 
 #########################
 ## make sure your pop-os laptop always starts in battery saver mode
