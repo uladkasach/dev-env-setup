@@ -760,6 +760,10 @@ _git_tree_set() {
       git worktree add -q -b "$branch" "$worktree_path"
     fi
     commit_info=$(git -C "$worktree_path" log -1 --format="%h %s" 2>/dev/null)
+
+    # set up tracking so gh/git know where to push/pull
+    git -C "$worktree_path" config "branch.$branch.remote" origin
+    git -C "$worktree_path" config "branch.$branch.merge" "refs/heads/$branch"
   fi
 
   # viby output
