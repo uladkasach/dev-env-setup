@@ -749,21 +749,18 @@ _git_tree_set() {
     fi
 
     if [[ "$from_target" == "main" ]]; then
-      # create from origin/main (or origin/master)
+      # create from origin/main (or origin/master) without tracking
+      # (tracking is set up later via git push -u)
       local base_ref="origin/main"
       git fetch origin main 2>/dev/null || base_ref="origin/master"
       sprouted_from="$base_ref"
-      git worktree add -q -b "$branch" "$worktree_path" "$base_ref"
+      git worktree add -q --no-track -b "$branch" "$worktree_path" "$base_ref"
     else
-      # create new branch from HEAD (--from this)
+      # create new branch from HEAD (--from this) without tracking
       sprouted_from=$(git branch --show-current)
-      git worktree add -q -b "$branch" "$worktree_path"
+      git worktree add -q --no-track -b "$branch" "$worktree_path"
     fi
     commit_info=$(git -C "$worktree_path" log -1 --format="%h %s" 2>/dev/null)
-
-    # set up tracking so gh/git know where to push/pull
-    git -C "$worktree_path" config "branch.$branch.remote" origin
-    git -C "$worktree_path" config "branch.$branch.merge" "refs/heads/$branch"
   fi
 
   # viby output
