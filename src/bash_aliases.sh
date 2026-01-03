@@ -902,13 +902,82 @@ _git_tree_del() {
     echo "git tree del - remove worktree for branch"
     echo ""
     echo "usage: git tree del <branch>"
+    echo "       git tree del --this"
+    echo ""
+    echo "options:"
+    echo "  --this  delete current branch (with safety guards)"
     echo ""
     echo "removes the worktree directory and prunes git references"
     echo "safe to run if worktree doesn't exist (no-op)"
+    echo ""
+    echo "--this guards:"
+    echo "  - no staged changes"
+    echo "  - no unstaged changes"
+    echo "  - no untracked files"
+    echo "  - no open (unmerged) PR for branch"
     return 0
   fi
 
   local branch="$1"
+  local delete_branch=false
+
+  # handle --this: delete current branch with guards
+  if [[ "$branch" == "--this" ]]; then
+    delete_branch=true
+    local current_branch git_root
+    current_branch=$(git branch --show-current 2>/dev/null)
+    git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+
+    if [[ -z "$current_branch" ]]; then
+      echo "⛈️  not on a branch (detached HEAD?)"
+      return 1
+    fi
+
+    if [[ "$current_branch" == "main" || "$current_branch" == "master" ]]; then
+      echo "⛈️  cannot delete $current_branch"
+      return 1
+    fi
+
+    # must be in a worktree, not main repo
+    if [[ ! "$git_root" == *"_worktrees"* ]]; then
+      echo "⛈️  not in a worktree (use 'git tree del <branch>' from main repo)"
+      return 1
+    fi
+
+    echo ""
+    echo "🍂 '$current_branch'"
+
+    # guard: no staged changes
+    if ! git diff --cached --quiet 2>/dev/null; then
+      echo "   └─ ⛈️  has staged changes"
+      return 1
+    fi
+
+    # guard: no unstaged changes
+    if ! git diff --quiet 2>/dev/null; then
+      echo "   └─ ⛈️  has unstaged changes"
+      return 1
+    fi
+
+    # guard: no untracked files
+    if [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+      echo "   └─ ⛈️  has untracked files"
+      return 1
+    fi
+
+    # guard: no open PR for this branch
+    local open_pr
+    open_pr=$(gh pr list --head "$current_branch" --state open --json number --limit 1 2>/dev/null | jq -r '.[0].number // empty')
+    if [[ -n "$open_pr" ]]; then
+      echo "   └─ ⛈️  has open PR #$open_pr"
+      return 1
+    fi
+
+    echo "   └─ 👌 all guards passed"
+
+    # now delete the branch (can rm current dir while in it)
+    branch="$current_branch"
+  fi
 
   if [[ -z "$branch" ]]; then
     echo "usage: git tree del <branch>"
@@ -942,11 +1011,26 @@ _git_tree_del() {
     echo "🍂 $repo_name.$sanitized"
     echo "   ├─ status: removed"
     echo "   ├─ branch: $branch"
-    echo "   └─ was at: $commit_info"
+    if [[ "$delete_branch" == "true" ]]; then
+      git branch -D "$branch" 2>/dev/null
+      git push origin --delete "$branch" 2>/dev/null
+      echo "   ├─ was at: $commit_info"
+      echo "   └─ branch deleted (local + remote)"
+    else
+      echo "   └─ was at: $commit_info"
+    fi
   else
-    echo "🍃 $repo_name.$sanitized"
-    echo "   ├─ status: not found (no-op)"
-    echo -e "   └─ \033[2mtry 'git tree set $branch --from main|this' to create it\033[0m"
+    if [[ "$delete_branch" == "true" ]]; then
+      # no worktree but still delete the branch
+      git branch -D "$branch" 2>/dev/null
+      git push origin --delete "$branch" 2>/dev/null
+      echo "🍂 $branch"
+      echo "   └─ branch deleted (local + remote)"
+    else
+      echo "🍃 $repo_name.$sanitized"
+      echo "   ├─ status: not found"
+      echo -e "   └─ \033[2mmay have already been deleted\033[0m"
+    fi
   fi
   echo ""
 }
