@@ -718,14 +718,15 @@ _git_tree_get() {
     echo "   ├─ path: $worktree_path"
     if [[ "$open_flag" == "true" ]]; then
       echo "   ├─ head: $commit_info"
-      echo -e "   └─ \033[2mopening in codium...\033[0m"
+      echo -e "   └─ \033[2mopen in codium...\033[0m"
     else
       echo "   └─ head: $commit_info"
     fi
     echo ""
 
+    # note: subshell ensures codium inherits correct cwd for its terminal, without mutate of parent shell
     if [[ "$open_flag" == "true" ]]; then
-      codium "$worktree_path" &
+      (cd "$worktree_path" && codium .) &
     fi
     return 0
   fi
@@ -838,14 +839,14 @@ _git_tree_set() {
   # findsert: find or insert
   if [[ -d "$worktree_path" ]]; then
     status="found"
-    # get current commit info from existing worktree
+    # get current commit info from worktree found
     commit_info=$(git -C "$worktree_path" log -1 --format="%h %s" 2>/dev/null)
     sprouted_from=""
   else
     status="created"
     mkdir -p "$worktrees_dir"
 
-    # fail fast if branch already exists (--from implies creating new branch)
+    # fail fast if branch already exists (--from implies new branch creation)
     if git show-ref --verify --quiet "refs/heads/$branch"; then
       echo "🌲 branch '$branch' already exists locally"
       echo -e "   ├─ \033[2mtry 'git tree get $branch --open' to open it\033[0m"
@@ -859,14 +860,14 @@ _git_tree_set() {
     fi
 
     if [[ "$from_target" == "main" ]]; then
-      # create from origin/main (or origin/master) without tracking
-      # (tracking is set up later via git push -u)
+      # create from origin/main (or origin/master) with no upstream
+      # (upstream is set later via git push -u)
       local base_ref="origin/main"
       git fetch origin main 2>/dev/null || base_ref="origin/master"
       sprouted_from="$base_ref"
       git worktree add -q --no-track -b "$branch" "$worktree_path" "$base_ref"
     else
-      # create new branch from HEAD (--from this) without tracking
+      # create new branch from HEAD (--from this) with no upstream
       sprouted_from=$(git branch --show-current)
       git worktree add -q --no-track -b "$branch" "$worktree_path"
     fi
@@ -884,15 +885,16 @@ _git_tree_set() {
   fi
   if [[ "$open_flag" == "true" ]]; then
     echo "   ├─ head: $commit_info"
-    echo -e "   └─ \033[2mopening in codium...\033[0m"
+    echo -e "   └─ \033[2mopen in codium...\033[0m"
   else
     echo "   └─ head: $commit_info"
   fi
   echo ""
 
-  # optionally open in editor
+  # open in editor if requested
+  # note: subshell ensures codium inherits correct cwd for its terminal, without mutate of parent shell
   if [[ "$open_flag" == "true" ]]; then
-    codium "$worktree_path" &
+    (cd "$worktree_path" && codium .) &
   fi
 }
 
