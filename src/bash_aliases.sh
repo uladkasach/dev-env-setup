@@ -225,9 +225,11 @@ alias use.github.declastruct.test='export GITHUB_TOKEN=$(get_github_app_token \
 ##   git release this --retry     # check PR + rerun failed workflows
 ##   git release this --findsert  # find or create PR for current branch (not main)
 ##   git release this --findsert --apply  # find/create PR + enable automerge
+##   git release this --watch     # poll status every 5s until checks complete (5min timeout)
 ##   git release main             # check open release PR; if none, show latest tag status
 ##   git release main --apply     # check + enable automerge
 ##   git release main --retry     # check + rerun failed workflows
+##   git release main --watch     # poll status every 5s until checks complete (5min timeout)
 ##
 ## output:
 ##   - shows version, CI status, and automerge state
@@ -235,30 +237,130 @@ alias use.github.declastruct.test='export GITHUB_TOKEN=$(get_github_app_token \
 ######################
 git_alias_release() {
   local target="${1:-this}"
-  local apply=false retry=false findsert=false
+  local apply=false retry=false findsert=false watch=false
   [[ "$*" == *"--apply"* ]] && apply=true
   [[ "$*" == *"--retry"* ]] && retry=true
   [[ "$*" == *"--findsert"* ]] && findsert=true
+  [[ "$*" == *"--watch"* ]] && watch=true
 
   echo "" # headspace
   if [ "$target" = "main" ]; then
-    _git_release_main "$apply" "$retry"
+    _git_release_main "$apply" "$retry" "$watch"
   else
-    _git_release_this "$apply" "$retry" "$findsert"
+    _git_release_this "$apply" "$retry" "$findsert" "$watch"
   fi
+
+  # watch mode: poll until checks complete or timeout
+  if [ "$watch" = "true" ]; then
+    _git_release_watch "$target"
+  fi
+
   echo "" # headspace
+}
+
+# .what: poll until checks complete or timeout (5min)
+# .why:  monitor CI progress without manual re-running
+_git_release_watch() {
+  local target="$1"
+  local start_time
+  start_time=$(date +%s)
+
+  echo "   └─ 🥥 let's watch"
+
+  while true; do
+    # check if there are still pending checks
+    local pending=0 pr_num tag_latest
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    local is_main=false
+    [ "$target" = "main" ] || [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ] && is_main=true
+
+    if [ "$is_main" = "true" ]; then
+      pr_num=$(gh pr list --state open --json number,title | jq -r '.[] | select(.title | test("chore\\(release\\)")) | .number' | head -1)
+      # if no release PR, watch latest tag runs instead
+      if [ -z "$pr_num" ]; then
+        git fetch origin --tags -q 2>/dev/null
+        tag_latest=$(git tag --sort=-v:refname | head -1)
+      fi
+    elif [ -n "$current_branch" ]; then
+      pr_num=$(gh pr list --head "$current_branch" --state open --json number --limit 1 | jq -r '.[0].number // empty')
+    fi
+
+    local oldest_started=""
+    if [ -n "$pr_num" ]; then
+      local check_data
+      check_data=$(gh pr view "$pr_num" --json statusCheckRollup -q '[.statusCheckRollup[] | select(.status != "COMPLETED")]')
+      pending=$(echo "$check_data" | jq 'length')
+      oldest_started=$(echo "$check_data" | jq -r '[.[].startedAt // empty] | map(select(. != null)) | sort | first // empty')
+    elif [ -n "$tag_latest" ]; then
+      local tag_runs
+      tag_runs=$(gh run list --branch "$tag_latest" --json status,createdAt --limit 10)
+      pending=$(echo "$tag_runs" | jq '[.[] | select(.status != "completed")] | length')
+      oldest_started=$(echo "$tag_runs" | jq -r '[.[] | select(.status != "completed") | .createdAt] | sort | first // empty')
+    fi
+
+    # calc elapsed times
+    local watch_elapsed=$(( $(date +%s) - start_time ))
+    local watch_mins=$((watch_elapsed / 60))
+    local watch_secs=$((watch_elapsed % 60))
+    local watch_str="${watch_secs}s"
+    [ "$watch_mins" -gt 0 ] && watch_str="${watch_mins}m${watch_secs}s"
+
+    local action_str=""
+    if [ -n "$oldest_started" ]; then
+      local oldest_epoch
+      oldest_epoch=$(date -d "$oldest_started" +%s 2>/dev/null)
+      if [ -n "$oldest_epoch" ]; then
+        local action_elapsed=$(( $(date +%s) - oldest_epoch ))
+        local action_mins=$((action_elapsed / 60))
+        local action_secs=$((action_elapsed % 60))
+        action_str="${action_secs}s"
+        [ "$action_mins" -gt 0 ] && action_str="${action_mins}m${action_secs}s"
+      fi
+    fi
+
+    # exit if no pending checks
+    if [ "$pending" -eq 0 ]; then
+      if [ -n "$action_str" ]; then
+        echo "      └─ ✨ done! ${action_str} in action, ${watch_str} watched"
+      else
+        echo "      └─ ✨ done! ${watch_str} watched"
+      fi
+      return 0
+    fi
+
+    # emit status
+    if [ -n "$action_str" ]; then
+      echo "      ├─ 💤 ${pending} left, ${action_str} in action, ${watch_str} watched"
+    else
+      echo "      ├─ 💤 ${pending} left, ${watch_str} watched"
+    fi
+
+    # timeout after 5 minutes (300 seconds)
+    if [ "$watch_elapsed" -ge 300 ]; then
+      echo "      └─ 🌙 watch timeout"
+      return 1
+    fi
+
+    # sleep 5s for first 60s, then 15s afterwards
+    if [ "$watch_elapsed" -lt 60 ]; then
+      sleep 5
+    else
+      sleep 15
+    fi
+  done
 }
 
 # .what: check current branch's PR; if on main, delegate to _git_release_main
 # .why:  convenient way to check PR status from any feature branch
 _git_release_this() {
-  local apply="$1" retry="$2" findsert="$3"
+  local apply="$1" retry="$2" findsert="$3" watch="$4"
   local current_branch
   current_branch=$(git branch --show-current 2>/dev/null)
 
   # if on main/master, delegate to release main
   if [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ] || [ -z "$current_branch" ]; then
-    _git_release_main "$apply" "$retry"
+    _git_release_main "$apply" "$retry" "$watch"
     return
   fi
 
@@ -287,7 +389,7 @@ _git_release_this() {
       # re-fetch the newly created PR and continue to show status / apply automerge
       pr_num=$(gh pr list --head "$current_branch" --state open --json number --limit 1 | jq -r '.[0].number // empty')
       if [ -n "$pr_num" ]; then
-        _git_release_pr "$pr_num" "$apply" "$retry"
+        _git_release_pr "$pr_num" "$apply" "$retry" "$watch"
       fi
     else
       echo -e "   ├─ \033[2mtry 'git release --findsert' to find or create pr\033[0m"
@@ -296,36 +398,36 @@ _git_release_this() {
     return 0
   fi
 
-  _git_release_pr "$pr_num" "$apply" "$retry"
+  _git_release_pr "$pr_num" "$apply" "$retry" "$watch"
 }
 
 # .what: check open release PR; if none, show latest tag status
 # .why:  see status of pending release or last completed release
 _git_release_main() {
-  local apply="$1" retry="$2"
+  local apply="$1" retry="$2" watch="$3"
   local pr_num
   pr_num=$(gh pr list --state open --json number,title | jq -r '.[] | select(.title | test("chore\\(release\\)")) | .number' | head -1)
 
   if [ -z "$pr_num" ]; then
     echo "🫧  no open release pr"
     git fetch origin --tags -q 2>/dev/null
-    local latest_tag
-    latest_tag=$(git tag --sort=-v:refname | head -1)
+    local tag_latest
+    tag_latest=$(git tag --sort=-v:refname | head -1)
 
-    if [ -n "$latest_tag" ]; then
+    if [ -n "$tag_latest" ]; then
       echo ""
-      _git_release_tag_runs "$latest_tag" "$retry"
+      _git_release_tag_runs "$tag_latest" "$retry"
     fi
     return 0
   fi
 
-  _git_release_pr "$pr_num" "$apply" "$retry"
+  _git_release_pr "$pr_num" "$apply" "$retry" "$watch"
 }
 
 # .what: check a specific PR's CI status and automerge state
 # .why:  unified logic for displaying PR status, regardless of open/merged state
 _git_release_pr() {
-  local pr_num="$1" apply="$2" retry="$3"
+  local pr_num="$1" apply="$2" retry="$3" watch="$4"
   local pr
   pr=$(gh pr view "$pr_num" --json number,title,state,statusCheckRollup,autoMergeRequest,mergeStateStatus)
 
@@ -400,7 +502,10 @@ _git_release_pr() {
     echo "   ├─ 🐚 needs rebase, has conflicts"
   fi
 
-  # show automerge status
+  # show automerge status (use ├─ if watch mode will add more, else └─)
+  local prefix="└─"
+  [ "$watch" = "true" ] && prefix="├─"
+
   if [ "$is_merged" = "true" ]; then
     echo "   └─ 🌴 already merged"
   elif [ "$automerge" = "null" ]; then
@@ -412,13 +517,13 @@ _git_release_pr() {
       if [ "$post_state" = "MERGED" ]; then
         echo "   └─ 🌴 automerge enabled [added] -> already merged"
       else
-        echo "   └─ 🌴 automerge enabled [added]"
+        echo "   $prefix 🌴 automerge enabled [added]"
       fi
     else
-      echo "   └─ 🌴 automerge unfound (use --apply to add)"
+      echo "   $prefix 🌴 automerge unfound (use --apply to add)"
     fi
   else
-    echo "   └─ 🌴 automerge enabled [found]"
+    echo "   $prefix 🌴 automerge enabled [found]"
   fi
 }
 
