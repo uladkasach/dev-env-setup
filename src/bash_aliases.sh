@@ -262,7 +262,7 @@ git_alias_release() {
 # .why:  monitor CI progress without manual re-running
 _git_release_watch() {
   local target="$1"
-  local start_time
+  local start_time action_started_epoch
   start_time=$(date +%s)
 
   echo "   └─ 🥥 let's watch"
@@ -286,17 +286,26 @@ _git_release_watch() {
       pr_num=$(gh pr list --head "$current_branch" --state open --json number --limit 1 | jq -r '.[0].number // empty')
     fi
 
-    local oldest_started=""
     if [ -n "$pr_num" ]; then
       local check_data
-      check_data=$(gh pr view "$pr_num" --json statusCheckRollup -q '[.statusCheckRollup[] | select(.status != "COMPLETED")]')
-      pending=$(echo "$check_data" | jq 'length')
-      oldest_started=$(echo "$check_data" | jq -r '[.[].startedAt // empty] | map(select(. != null)) | sort | first // empty')
+      check_data=$(gh pr view "$pr_num" --json statusCheckRollup -q '.statusCheckRollup')
+      pending=$(echo "$check_data" | jq '[.[] | select(.status != "COMPLETED")] | length')
+      # capture oldest start time across ALL checks on first iteration
+      if [ -z "$action_started_epoch" ]; then
+        local oldest_started
+        oldest_started=$(echo "$check_data" | jq -r '[.[].startedAt // empty] | map(select(. != null)) | sort | first // empty')
+        [ -n "$oldest_started" ] && action_started_epoch=$(date -d "$oldest_started" +%s 2>/dev/null)
+      fi
     elif [ -n "$tag_latest" ]; then
       local tag_runs
       tag_runs=$(gh run list --branch "$tag_latest" --json status,createdAt --limit 10)
       pending=$(echo "$tag_runs" | jq '[.[] | select(.status != "completed")] | length')
-      oldest_started=$(echo "$tag_runs" | jq -r '[.[] | select(.status != "completed") | .createdAt] | sort | first // empty')
+      # capture oldest start time across ALL runs on first iteration
+      if [ -z "$action_started_epoch" ]; then
+        local oldest_started
+        oldest_started=$(echo "$tag_runs" | jq -r '[.[].createdAt] | sort | first // empty')
+        [ -n "$oldest_started" ] && action_started_epoch=$(date -d "$oldest_started" +%s 2>/dev/null)
+      fi
     fi
 
     # calc elapsed times
@@ -307,16 +316,12 @@ _git_release_watch() {
     [ "$watch_mins" -gt 0 ] && watch_str="${watch_mins}m${watch_secs}s"
 
     local action_str=""
-    if [ -n "$oldest_started" ]; then
-      local oldest_epoch
-      oldest_epoch=$(date -d "$oldest_started" +%s 2>/dev/null)
-      if [ -n "$oldest_epoch" ]; then
-        local action_elapsed=$(( $(date +%s) - oldest_epoch ))
-        local action_mins=$((action_elapsed / 60))
-        local action_secs=$((action_elapsed % 60))
-        action_str="${action_secs}s"
-        [ "$action_mins" -gt 0 ] && action_str="${action_mins}m${action_secs}s"
-      fi
+    if [ -n "$action_started_epoch" ]; then
+      local action_elapsed=$(( $(date +%s) - action_started_epoch ))
+      local action_mins=$((action_elapsed / 60))
+      local action_secs=$((action_elapsed % 60))
+      action_str="${action_secs}s"
+      [ "$action_mins" -gt 0 ] && action_str="${action_mins}m${action_secs}s"
     fi
 
     # exit if no pending checks
