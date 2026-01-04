@@ -251,17 +251,92 @@ git_alias_release() {
   fi
 
   # watch mode: poll until checks complete or timeout
+  local watch_result=0
   if [ "$watch" = "true" ]; then
-    _git_release_watch "$target"
+    _git_release_watch "$target" "$retry"
+    watch_result=$?
   fi
 
   echo "" # headspace
+  return $watch_result
+}
+
+# .what: report failed checks with links and optional retry
+# .why:  shared logic for failure reporting across pr, tag, and watch modes
+# .args:
+#   $1 = prefix (indent string, e.g., "   │  " or "      ")
+#   $2 = retry ("true" to trigger reruns)
+#   $3 = source_type ("pr" for statusCheckRollup, "tag" for run list)
+#   $4 = json_data (the raw JSON to extract failures from)
+_git_release_report_failed_checks() {
+  local prefix="$1" retry="$2" source_type="$3" json_data="$4"
+
+  # extract failed checks based on source type
+  local failed_checks=()
+  if [ "$source_type" = "pr" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] && failed_checks+=("$line")
+    done < <(echo "$json_data" | jq -r '.[] | select(.conclusion == "FAILURE") | [.name, (.detailsUrl // .targetUrl // ""), ""] | @tsv')
+  else
+    while IFS= read -r line; do
+      [ -n "$line" ] && failed_checks+=("$line")
+    done < <(echo "$json_data" | jq -r '.[] | select(.conclusion == "failure") | [.name, .url, (.databaseId | tostring)] | @tsv')
+  fi
+
+  local total_failed=${#failed_checks[@]}
+  local idx=0
+  for check in "${failed_checks[@]}"; do
+    idx=$((idx + 1))
+    local name url run_id
+    name=$(echo "$check" | cut -f1)
+    url=$(echo "$check" | cut -f2)
+    run_id=$(echo "$check" | cut -f3)
+
+    # determine if last item (affects tree structure)
+    local is_last_item=false
+    [ "$idx" -eq "$total_failed" ] && [ "$retry" = "true" ] && is_last_item=true
+
+    # set detail prefix based on whether more siblings follow
+    local detail_prefix="${prefix}│"
+    if [ "$is_last_item" = "true" ]; then
+      echo "${prefix}└─ 🔴 $name"
+      detail_prefix="${prefix} "
+    else
+      echo "${prefix}├─ 🔴 $name"
+    fi
+
+    # extract run_id from url if not provided directly (PR case)
+    if [ -z "$run_id" ] && [ -n "$url" ]; then
+      run_id=$(echo "$url" | sed -n 's/.*actions\/runs\/\([0-9]*\).*/\1/p')
+    fi
+
+    # get failure details and optionally retry
+    if [ -n "$run_id" ]; then
+      local err
+      err=$(gh run view "$run_id" --json jobs -q '.jobs[] | select(.conclusion == "failure") | (.steps[] | select(.conclusion == "failure") | .name) // .name' | head -1)
+      echo "${detail_prefix}     ├─ $url"
+      if [ "$retry" = "true" ]; then
+        echo "${detail_prefix}     ├─ ${err:-(see logs)}"
+        gh run rerun "$run_id" --failed
+        echo "${detail_prefix}     └─ 👌 rerun triggered"
+      else
+        echo "${detail_prefix}     └─ ${err:-(see logs)}"
+      fi
+    else
+      echo "${detail_prefix}     └─ $url"
+    fi
+  done
+
+  # show hint if not retrying
+  if [ "$retry" != "true" ]; then
+    echo -e "${prefix}└─ \033[2mhint: use --retry to rerun failed workflows\033[0m"
+  fi
 }
 
 # .what: poll until checks complete or timeout (5min)
 # .why:  monitor CI progress without manual re-running
 _git_release_watch() {
-  local target="$1"
+  local target="$1" retry="$2"
   local start_time action_started_epoch
   start_time=$(date +%s)
 
@@ -326,6 +401,30 @@ _git_release_watch() {
 
     # exit if no pending checks
     if [ "$pending" -eq 0 ]; then
+      # check for failures
+      local failed=0
+      if [ -n "$pr_num" ]; then
+        failed=$(echo "$check_data" | jq '[.[] | select(.conclusion == "FAILURE")] | length')
+      elif [ -n "$tag_latest" ]; then
+        failed=$(echo "$tag_runs" | jq '[.[] | select(.conclusion == "failure")] | length')
+      fi
+
+      if [ "$failed" -gt 0 ]; then
+        # report failures with links (nested under storm)
+        if [ -n "$action_str" ]; then
+          echo "      └─ ⛈️  done with $failed failure(s)! ${action_str} in action, ${watch_str} watched"
+        else
+          echo "      └─ ⛈️  done with $failed failure(s)! ${watch_str} watched"
+        fi
+        if [ -n "$pr_num" ]; then
+          _git_release_report_failed_checks "         " "$retry" "pr" "$check_data"
+        else
+          _git_release_report_failed_checks "         " "$retry" "tag" "$tag_runs"
+        fi
+        return 1
+      fi
+
+      # all checks passed
       if [ -n "$action_str" ]; then
         echo "      └─ ✨ done! ${action_str} in action, ${watch_str} watched"
       else
@@ -452,48 +551,15 @@ _git_release_pr() {
   echo "🌊 release: ${version:-$title}"
 
   # show check status
+  local check_data
+  check_data=$(echo "$pr" | jq -r '.statusCheckRollup')
   if [ "$failed" -gt 0 ]; then
     echo "   ├─ ⛈️  $failed check(s) failed"
-    # show running checks first
+    # show in-progress checks first
     if [ "$pending" -gt 0 ]; then
-      echo "   │  ├─ 🟡 $pending check(s) still running"
+      echo "   │  ├─ 🟡 $pending check(s) still in progress"
     fi
-    # collect failed checks into array to know when we're at the last one
-    local failed_checks=()
-    while IFS= read -r line; do
-      failed_checks+=("$line")
-    done < <(echo "$pr" | jq -r '.statusCheckRollup[] | select(.conclusion == "FAILURE") | [.name, (.detailsUrl // .targetUrl // "")] | @tsv')
-    local total_failed=${#failed_checks[@]}
-    local idx=0
-    for check in "${failed_checks[@]}"; do
-      idx=$((idx + 1))
-      local name url
-      name=$(echo "$check" | cut -f1)
-      url=$(echo "$check" | cut -f2)
-      local is_last_item=false
-      [ "$idx" -eq "$total_failed" ] && [ "$retry" = "true" ] && is_last_item=true
-      if [ "$is_last_item" = "true" ]; then
-        echo "   │  └─ 🔴 $name"
-      else
-        echo "   │  ├─ 🔴 $name"
-      fi
-      local run_id err
-      run_id=$(echo "$url" | sed -n 's/.*actions\/runs\/\([0-9]*\).*/\1/p')
-      if [ -n "$run_id" ]; then
-        err=$(gh run view "$run_id" --json jobs -q '.jobs[] | select(.conclusion == "failure") | (.steps[] | select(.conclusion == "failure") | .name) // .name' | head -1)
-        echo "   │  │     ├─ $url"
-        echo "   │  │     └─ ${err:-(see logs)}"
-        if [ "$retry" = "true" ]; then
-          gh run rerun "$run_id" --failed
-          echo "   │  │     👌 rerun triggered"
-        fi
-      else
-        echo "   │  │     └─ $url"
-      fi
-    done
-    if [ "$retry" != "true" ]; then
-      echo -e "   │  └─ \033[2mhint: use --retry to rerun failed workflows\033[0m"
-    fi
+    _git_release_report_failed_checks "   │  " "$retry" "pr" "$check_data"
   elif [ "$pending" -gt 0 ]; then
     echo "   ├─ 🐢 $pending check(s) in progress"
   else
@@ -545,42 +611,11 @@ _git_release_tag_runs() {
 
   if [ "$tag_failed" -gt 0 ]; then
     echo "   └─ ⛈️  $tag_failed check(s) failed"
-    # show running checks first
+    # show in-progress checks first
     if [ "$tag_pending" -gt 0 ]; then
-      echo "      ├─ 🟡 $tag_pending check(s) still running"
+      echo "      ├─ 🟡 $tag_pending check(s) still in progress"
     fi
-    # collect failed checks into array to know when we're at the last one
-    local failed_checks=()
-    while IFS= read -r line; do
-      failed_checks+=("$line")
-    done < <(echo "$tag_runs" | jq -r '.[] | select(.conclusion == "failure") | [.name, .url, .databaseId] | @tsv')
-    local total_failed=${#failed_checks[@]}
-    local idx=0
-    for check in "${failed_checks[@]}"; do
-      idx=$((idx + 1))
-      local name url run_id
-      name=$(echo "$check" | cut -f1)
-      url=$(echo "$check" | cut -f2)
-      run_id=$(echo "$check" | cut -f3)
-      local is_last_item=false
-      [ "$idx" -eq "$total_failed" ] && [ "$retry" = "true" ] && is_last_item=true
-      if [ "$is_last_item" = "true" ]; then
-        echo "      └─ 🔴 $name"
-      else
-        echo "      ├─ 🔴 $name"
-      fi
-      local err
-      err=$(gh run view "$run_id" --json jobs -q '.jobs[] | select(.conclusion == "failure") | (.steps[] | select(.conclusion == "failure") | .name) // .name' | head -1)
-      echo "      │     ├─ $url"
-      echo "      │     └─ ${err:-(see logs)}"
-      if [ "$retry" = "true" ]; then
-        gh run rerun "$run_id" --failed
-        echo "      │     👌 rerun triggered"
-      fi
-    done
-    if [ "$retry" != "true" ]; then
-      echo -e "      └─ \033[2mhint: use --retry to rerun failed workflows\033[0m"
-    fi
+    _git_release_report_failed_checks "      " "$retry" "tag" "$tag_runs"
   elif [ "$tag_pending" -gt 0 ]; then
     echo "   └─ 🐢 $tag_pending check(s) in progress"
   else
