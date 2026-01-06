@@ -19,6 +19,13 @@ grep -qxF 'stty intr ^X' ~/.bashrc || echo '\n# bind interrupt key to ctrl-x\stt
 sudo apt install vim -y # note: ~/.zshrc already defines that this is default
 
 #############################
+## for happiness, set swappiness
+## keeps os feel snappy faster. if you have 32gb ram or more, this is for you
+## ref: https://wiki.debian.org/swappiness
+#############################
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf # This tells linux: "prefer keeping stuff in RAM; only swap when truly necessary."
+
+#############################
 ## keyd - remap keys for optimal experience
 #############################
 install_keyd() {
