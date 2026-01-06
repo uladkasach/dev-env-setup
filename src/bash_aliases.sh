@@ -445,32 +445,30 @@ _git_release_watch() {
       [ "$action_mins" -gt 0 ] && action_str="${action_mins}m${action_secs}s"
     fi
 
-    # exit if no pending checks
-    if [ "$pending" -eq 0 ]; then
-      # check for failures
-      local failed=0
+    # check for failures early - exit as soon as any check fails
+    local failed=0
+    if [ -n "$pr_num" ]; then
+      failed=$(echo "$check_data" | jq '[.[] | select(.conclusion == "FAILURE")] | length')
+    elif [ -n "$tag_latest" ]; then
+      failed=$(echo "$tag_runs" | jq '[.[] | select(.conclusion == "failure")] | length')
+    fi
+
+    if [ "$failed" -gt 0 ]; then
+      if [ -n "$action_str" ]; then
+        echo "      └─ ⛈️  $failed failure(s) detected! ${action_str} in action, ${watch_str} watched"
+      else
+        echo "      └─ ⛈️  $failed failure(s) detected! ${watch_str} watched"
+      fi
       if [ -n "$pr_num" ]; then
-        failed=$(echo "$check_data" | jq '[.[] | select(.conclusion == "FAILURE")] | length')
-      elif [ -n "$tag_latest" ]; then
-        failed=$(echo "$tag_runs" | jq '[.[] | select(.conclusion == "failure")] | length')
+        _git_release_report_failed_checks "         " "$retry" "pr" "$check_data"
+      else
+        _git_release_report_failed_checks "         " "$retry" "tag" "$tag_runs"
       fi
+      return 1
+    fi
 
-      if [ "$failed" -gt 0 ]; then
-        # report failures with links (nested under storm)
-        if [ -n "$action_str" ]; then
-          echo "      └─ ⛈️  done with $failed failure(s)! ${action_str} in action, ${watch_str} watched"
-        else
-          echo "      └─ ⛈️  done with $failed failure(s)! ${watch_str} watched"
-        fi
-        if [ -n "$pr_num" ]; then
-          _git_release_report_failed_checks "         " "$retry" "pr" "$check_data"
-        else
-          _git_release_report_failed_checks "         " "$retry" "tag" "$tag_runs"
-        fi
-        return 1
-      fi
-
-      # all checks passed
+    # exit if all checks complete
+    if [ "$pending" -eq 0 ]; then
       if [ -n "$action_str" ]; then
         echo "      └─ ✨ done! ${action_str} in action, ${watch_str} watched"
       else
