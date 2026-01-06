@@ -333,6 +333,36 @@ _git_release_report_failed_checks() {
   fi
 }
 
+# .what: execute gh command with retry on transient network errors
+# .why:  api calls can fail due to TLS timeouts, connection resets, etc
+_gh_with_retry() {
+  local max_retries=3
+  local retry_delay=5
+  local attempt=1
+  local output exit_code
+
+  while [ "$attempt" -le "$max_retries" ]; do
+    # capture both stdout and stderr, track exit code
+    output=$("$@" 2>&1)
+    exit_code=$?
+
+    # check for transient network errors in output
+    if [ $exit_code -ne 0 ] || echo "$output" | grep -qiE "(TLS handshake timeout|connection reset|network|timeout|ETIMEDOUT|ECONNRESET)"; then
+      if [ "$attempt" -lt "$max_retries" ]; then
+        sleep "$retry_delay"
+        attempt=$((attempt + 1))
+        continue
+      fi
+      # max retries exceeded
+      return 1
+    fi
+
+    # success
+    echo "$output"
+    return 0
+  done
+}
+
 # .what: poll until checks complete or timeout (5min)
 # .why:  monitor CI progress without manual re-running
 _git_release_watch() {
@@ -351,19 +381,32 @@ _git_release_watch() {
     [ "$target" = "main" ] || [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ] && is_main=true
 
     if [ "$is_main" = "true" ]; then
-      pr_num=$(gh pr list --state open --json number,title | jq -r '.[] | select(.title | test("chore\\(release\\)")) | .number' | head -1)
+      local pr_list_result
+      pr_list_result=$(_gh_with_retry gh pr list --state open --json number,title) || {
+        echo "      └─ ⛈️  gh api failed after retries"
+        return 1
+      }
+      pr_num=$(echo "$pr_list_result" | jq -r '.[] | select(.title | test("chore\\(release\\)")) | .number' | head -1)
       # if no release PR, watch latest tag runs instead
       if [ -z "$pr_num" ]; then
         git fetch origin --tags -q 2>/dev/null
         tag_latest=$(git tag --sort=-v:refname | head -1)
       fi
     elif [ -n "$current_branch" ]; then
-      pr_num=$(gh pr list --head "$current_branch" --state open --json number --limit 1 | jq -r '.[0].number // empty')
+      local pr_list_result
+      pr_list_result=$(_gh_with_retry gh pr list --head "$current_branch" --state open --json number --limit 1) || {
+        echo "      └─ ⛈️  gh api failed after retries"
+        return 1
+      }
+      pr_num=$(echo "$pr_list_result" | jq -r '.[0].number // empty')
     fi
 
     if [ -n "$pr_num" ]; then
       local check_data
-      check_data=$(gh pr view "$pr_num" --json statusCheckRollup -q '.statusCheckRollup')
+      check_data=$(_gh_with_retry gh pr view "$pr_num" --json statusCheckRollup -q '.statusCheckRollup') || {
+        echo "      └─ ⛈️  gh api failed after retries"
+        return 1
+      }
       pending=$(echo "$check_data" | jq '[.[] | select(.status != "COMPLETED")] | length')
       # capture oldest start time across ALL checks on first iteration
       if [ -z "$action_started_epoch" ]; then
@@ -373,7 +416,10 @@ _git_release_watch() {
       fi
     elif [ -n "$tag_latest" ]; then
       local tag_runs
-      tag_runs=$(gh run list --branch "$tag_latest" --json status,createdAt --limit 10)
+      tag_runs=$(_gh_with_retry gh run list --branch "$tag_latest" --json status,createdAt --limit 10) || {
+        echo "      └─ ⛈️  gh api failed after retries"
+        return 1
+      }
       pending=$(echo "$tag_runs" | jq '[.[] | select(.status != "completed")] | length')
       # capture oldest start time across ALL runs on first iteration
       if [ -z "$action_started_epoch" ]; then
