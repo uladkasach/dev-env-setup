@@ -45,6 +45,10 @@ upsert_keyd_config() {
 [ids]
 *
 
+[global]
+# if capslock held > 200ms, skip the escape tap (helps with ctrl+click)
+overload_tap_timeout = 200
+
 [main]
 # capslock = control (held) / escape (tapped)
 capslock = overload(control, esc)

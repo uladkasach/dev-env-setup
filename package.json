@@ -1,6 +1,7 @@
 {
 	"devDependencies": {
-		"rhachet": "^1.19.7",
-		"rhachet-roles-ehmpathy": "^1.17.3"
+		"rhachet": "^1.22.5",
+		"rhachet-roles-bhuild": "^0.6.6",
+		"rhachet-roles-ehmpathy": "^1.17.20"
 	}
 }
