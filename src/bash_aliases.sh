@@ -865,6 +865,7 @@ _git_tree_set() {
     echo "  --from main  create branch from origin/main"
     echo "  --from this  create branch from current HEAD"
     echo "  --open       open worktree in codium after creation"
+    echo "  --init       run pnpm install in background"
     echo ""
     echo "behavior:"
     echo "  - if worktree exists: keeps it (idempotent)"
@@ -873,7 +874,7 @@ _git_tree_set() {
     return 0
   fi
 
-  local branch="" open_flag=false from_target=""
+  local branch="" open_flag=false from_target="" init_flag=false
 
   # parse args
   local prev=""
@@ -885,6 +886,7 @@ _git_tree_set() {
     fi
     case "$arg" in
       --open) open_flag=true ;;
+      --init) init_flag=true ;;
       --from) prev="--from" ;;
       -*) ;;
       *) [[ -z "$branch" ]] && branch="$arg" ;;
@@ -962,13 +964,37 @@ _git_tree_set() {
   if [[ -n "$sprouted_from" ]]; then
     echo "   ├─ from: $sprouted_from"
   fi
-  if [[ "$open_flag" == "true" ]]; then
-    echo "   ├─ head: $commit_info"
-    echo -e "   └─ \033[2mopen in codium...\033[0m"
-  else
+
+  # build output lines after head
+  local lines=()
+  [[ "$init_flag" == "true" ]] && lines+=("will init in background...")
+  [[ "$open_flag" == "true" ]] && lines+=("will open in codium...")
+  [[ "$open_flag" != "true" ]] && lines+=("tip: use --open to open in codium")
+  [[ "$init_flag" != "true" && -f "$worktree_path/package.json" ]] && lines+=("tip: use --init to run pnpm install in background")
+
+  if [[ ${#lines[@]} -eq 0 ]]; then
     echo "   └─ head: $commit_info"
+  else
+    echo "   ├─ head: $commit_info"
+    for ((i=0; i<${#lines[@]}; i++)); do
+      if [[ $i -eq $((${#lines[@]} - 1)) ]]; then
+        echo -e "   └─ \033[2m${lines[$i]}\033[0m"
+      else
+        echo -e "   ├─ \033[2m${lines[$i]}\033[0m"
+      fi
+    done
   fi
   echo ""
+
+  # kick off pnpm install in background if requested and package.json exists
+  if [[ "$init_flag" == "true" && -f "$worktree_path/package.json" ]]; then
+    (
+      cd "$worktree_path" && \
+      pnpm install --silent 2>/dev/null && \
+      echo "🐢 init complete for $repo_name.$sanitized"
+    ) &
+    disown
+  fi
 
   # open in editor if requested
   # note: subshell ensures codium inherits correct cwd for its terminal, without mutate of parent shell
