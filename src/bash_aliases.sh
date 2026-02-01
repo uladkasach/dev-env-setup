@@ -50,8 +50,8 @@ alias op.signin='eval $(op signin)'
 # make it easier to open the browser
 alias browser='google-chrome & disown'
 
-# make it easier to open the terminal
-alias terminal='gnome-terminal & disown'
+# make it easier to open the terminal (uses system default via x-terminal-emulator)
+alias terminal='x-terminal-emulator & disown'
 
 # make it easier to open the file manager
 alias files='nautilus & disown'

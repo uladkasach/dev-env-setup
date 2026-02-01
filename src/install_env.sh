@@ -99,6 +99,78 @@ flatpak install flathub org.mozilla.firefox
 xdg-settings set default-web-browser org.mozilla.firefox.desktop
 sudo apt remove firefox
 
+##########################
+## install ptyxis terminal (rapid, gpu-accelerated, container-aware)
+## ref: https://gitlab.gnome.org/chergert/ptyxis
+## ref: https://ubuntuhandbook.org/index.php/2025/08/install-set-ptyxis-as-default-terminal-in-ubuntu-24-04-22-04/
+## ref: https://documentation.ubuntu.com/desktop/en/latest/how-to/change-the-default-terminal/
+##########################
+install_ptyxis() {
+  # skip if ptyxis is already the default terminal (e.g., ubuntu 25.10+, gnome 47+)
+  local current_terminal
+  current_terminal=$(readlink -f /usr/bin/x-terminal-emulator 2>/dev/null || echo "")
+  if [[ "$current_terminal" == *ptyxis* ]]; then
+    echo "• ptyxis already default terminal; skipped"
+    return 0
+  fi
+
+  # install via flatpak if not already installed
+  if ! flatpak list | grep -q app.devsuite.Ptyxis; then
+    flatpak install -y flathub app.devsuite.Ptyxis
+  fi
+
+  # create wrapper executable for x-terminal-emulator compatibility
+  sudo tee /usr/bin/ptyxis.wrapper > /dev/null << 'EOF'
+#!/bin/sh
+flatpak run app.devsuite.Ptyxis --new-window
+EOF
+  sudo chmod +x /usr/bin/ptyxis.wrapper
+
+  # register and set as default terminal (ctrl+alt+t)
+  sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/ptyxis.wrapper 50
+  sudo update-alternatives --set x-terminal-emulator /usr/bin/ptyxis.wrapper
+}
+install_ptyxis
+
+configure_ptyxis() {
+  # restore ptyxis keybindings and preferences
+  # ref: https://www.garret.is/using/ptyxis/
+  #
+  # howto export your current ptyxis config for backup:
+  #   cat ~/.var/app/app.devsuite.Ptyxis/config/glib-2.0/settings/keyfile
+  #
+  # howto update: after changes via ptyxis preferences gui, re-export and paste below
+  #
+  mkdir -p ~/.var/app/app.devsuite.Ptyxis/config/glib-2.0/settings
+  tee ~/.var/app/app.devsuite.Ptyxis/config/glib-2.0/settings/keyfile > /dev/null << 'EOF'
+[org/gnome/Ptyxis]
+profile-uuids=['48d4f1a48e2fa956aa1f108e697f9492']
+default-profile-uuid='48d4f1a48e2fa956aa1f108e697f9492'
+window-size=(140, 74)
+use-system-font=false
+font-name='Monospace 12'
+
+[org/gnome/Ptyxis/Shortcuts]
+copy-clipboard='<Shift><Control>c'
+paste-clipboard='<Shift><Control>v'
+select-all='<Control>a'
+new-window='<Control>backslash'
+close-window='<Control>q'
+set-title='<Shift><Control>t'
+new-tab='<Control>t'
+tab-overview='<Control>o'
+close-tab='<Shift><Control>w'
+move-previous-tab='<Control>h'
+move-next-tab='<Control>l'
+
+[org/gnome/Ptyxis/Profiles/48d4f1a48e2fa956aa1f108e697f9492]
+palette='Desert'
+label='default'
+cell-height-scale=1.0
+EOF
+}
+configure_ptyxis
+
 # #########################
 # ## install chrome
 # #########################
