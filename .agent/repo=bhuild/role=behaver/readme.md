@@ -1,1 +1,0 @@
-../../../node_modules/.pnpm/rhachet-roles-bhuild@0.6.6_hono@4.11.3/node_modules/rhachet-roles-bhuild/dist/domain.roles/behaver/readme.md

@@ -171,6 +171,19 @@ EOF
 }
 configure_ptyxis
 
+install_terminal_command() {
+  # .what = install 'terminal' command that opens terminal at specified directory
+  # .why  = 'terminal .' works in scripts, subshells, git tree, etc (unlike alias)
+  sudo tee /usr/bin/terminal > /dev/null << 'EOF'
+#!/usr/bin/env bash
+dir="${1:-.}"
+dir="$(realpath "$dir")"
+exec flatpak run app.devsuite.Ptyxis --new-window --working-directory "$dir"
+EOF
+  sudo chmod +x /usr/bin/terminal
+}
+install_terminal_command
+
 # #########################
 # ## install chrome
 # #########################

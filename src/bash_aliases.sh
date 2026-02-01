@@ -50,8 +50,7 @@ alias op.signin='eval $(op signin)'
 # make it easier to open the browser
 alias browser='google-chrome & disown'
 
-# make it easier to open the terminal (uses system default via x-terminal-emulator)
-alias terminal='x-terminal-emulator & disown'
+# note: 'terminal' command installed via install_env.sh (supports 'terminal /path/to/dir')
 
 # make it easier to open the file manager
 alias files='nautilus & disown'
@@ -748,29 +747,42 @@ _git_tree_get() {
   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     echo "git tree get - list worktrees for current repo"
     echo ""
-    echo "usage: git tree get [branch] [--open]"
+    echo "usage: git tree get [branch] [--open <opener>]"
     echo ""
     echo "options:"
-    echo "  <branch>  show specific worktree (optional)"
-    echo "  --open    open worktree in codium"
+    echo "  <branch>            show specific worktree (optional)"
+    echo "  --open <opener>     open worktree with specified opener"
+    echo "                      e.g., --open terminal, --open codium"
     echo ""
     echo "examples:"
-    echo "  git tree get              # list all worktrees"
-    echo "  git tree get feat/foo     # show specific worktree"
-    echo "  git tree get feat/foo --open  # open in codium"
+    echo "  git tree get                        # list all worktrees"
+    echo "  git tree get feat/foo               # show specific worktree"
+    echo "  git tree get feat/foo --open codium # open in codium"
     return 0
   fi
 
-  local branch="" open_flag=false
+  local branch="" opener=""
 
   # parse args
+  local prev=""
   for arg in "$@"; do
+    if [[ "$prev" == "--open" ]]; then
+      opener="$arg"
+      prev=""
+      continue
+    fi
     case "$arg" in
-      --open) open_flag=true ;;
+      --open) prev="--open" ;;
       -*) ;;
       *) [[ -z "$branch" ]] && branch="$arg" ;;
     esac
   done
+
+  # fail fast if --open without opener
+  if [[ "$prev" == "--open" ]]; then
+    echo "error: --open requires an opener (e.g., --open terminal, --open codium)"
+    return 1
+  fi
 
   local worktrees_dir repo_name
   worktrees_dir="$(_git_tree_worktrees_dir)"
@@ -795,17 +807,17 @@ _git_tree_get() {
     echo "🌲 $repo_name.$sanitized"
     echo "   ├─ branch: $branch"
     echo "   ├─ path: $worktree_path"
-    if [[ "$open_flag" == "true" ]]; then
+    if [[ -n "$opener" ]]; then
       echo "   ├─ head: $commit_info"
-      echo -e "   └─ \033[2mopen in codium...\033[0m"
+      echo -e "   └─ \033[2mopen in $opener...\033[0m"
     else
       echo "   └─ head: $commit_info"
     fi
     echo ""
 
-    # note: subshell ensures codium inherits correct cwd for its terminal, without mutate of parent shell
-    if [[ "$open_flag" == "true" ]]; then
-      (cd "$worktree_path" && codium .) &
+    # note: subshell ensures opener inherits correct cwd, without mutate of parent shell
+    if [[ -n "$opener" ]]; then
+      (cd "$worktree_path" && "$opener" .) &
     fi
     return 0
   fi
@@ -862,10 +874,11 @@ _git_tree_set() {
     echo "usage: git tree set <branch> --from <main|this> [options]"
     echo ""
     echo "options:"
-    echo "  --from main  create branch from origin/main"
-    echo "  --from this  create branch from current HEAD"
-    echo "  --open       open worktree in codium after creation"
-    echo "  --init       run pnpm install in background"
+    echo "  --from main         create branch from origin/main"
+    echo "  --from this         create branch from current HEAD"
+    echo "  --open <opener>     open worktree with specified opener"
+    echo "                      e.g., --open terminal, --open codium"
+    echo "  --init              run pnpm install in background"
     echo ""
     echo "behavior:"
     echo "  - if worktree exists: keeps it (idempotent)"
@@ -874,7 +887,7 @@ _git_tree_set() {
     return 0
   fi
 
-  local branch="" open_flag=false from_target="" init_flag=false
+  local branch="" opener="" from_target="" init_flag=false
 
   # parse args
   local prev=""
@@ -884,8 +897,13 @@ _git_tree_set() {
       prev=""
       continue
     fi
+    if [[ "$prev" == "--open" ]]; then
+      opener="$arg"
+      prev=""
+      continue
+    fi
     case "$arg" in
-      --open) open_flag=true ;;
+      --open) prev="--open" ;;
       --init) init_flag=true ;;
       --from) prev="--from" ;;
       -*) ;;
@@ -894,18 +912,23 @@ _git_tree_set() {
   done
 
   if [[ -z "$branch" ]]; then
-    echo "usage: git tree set <branch> --from <main|this> [--open]"
+    echo "usage: git tree set <branch> --from <main|this> [--open <opener>]"
     return 1
   fi
 
   if [[ -z "$from_target" ]]; then
     echo "error: --from <main|this> is required"
-    echo "usage: git tree set <branch> --from <main|this> [--open]"
+    echo "usage: git tree set <branch> --from <main|this> [--open <opener>]"
     return 1
   fi
 
   if [[ "$from_target" != "main" && "$from_target" != "this" ]]; then
     echo "error: --from must be 'main' or 'this'"
+    return 1
+  fi
+
+  if [[ "$prev" == "--open" ]]; then
+    echo "error: --open requires an opener (e.g., --open terminal, --open codium)"
     return 1
   fi
 
@@ -930,12 +953,12 @@ _git_tree_set() {
     # fail fast if branch already exists (--from implies new branch creation)
     if git show-ref --verify --quiet "refs/heads/$branch"; then
       echo "🌲 branch '$branch' already exists locally"
-      echo -e "   ├─ \033[2mtry 'git tree get $branch --open' to open it\033[0m"
+      echo -e "   ├─ \033[2mtry 'git tree get $branch --open <opener>' to open it\033[0m"
       echo -e "   └─ \033[2mtry 'git tree del $branch' to remove it\033[0m"
       return 1
     elif git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
       echo "🌲 branch '$branch' already exists on remote"
-      echo -e "   ├─ \033[2mtry 'git tree get $branch --open' to open it\033[0m"
+      echo -e "   ├─ \033[2mtry 'git tree get $branch --open <opener>' to open it\033[0m"
       echo -e "   └─ \033[2mtry 'git tree del $branch' to remove it\033[0m"
       return 1
     fi
@@ -968,8 +991,8 @@ _git_tree_set() {
   # build output lines after head
   local lines=()
   [[ "$init_flag" == "true" ]] && lines+=("will init in background...")
-  [[ "$open_flag" == "true" ]] && lines+=("will open in codium...")
-  [[ "$open_flag" != "true" ]] && lines+=("tip: use --open to open in codium")
+  [[ -n "$opener" ]] && lines+=("will open in $opener...")
+  [[ -z "$opener" ]] && lines+=("tip: use --open <opener> to open (e.g., --open terminal, --open codium)")
   [[ "$init_flag" != "true" && -f "$worktree_path/package.json" ]] && lines+=("tip: use --init to run pnpm install in background")
 
   if [[ ${#lines[@]} -eq 0 ]]; then
@@ -996,10 +1019,10 @@ _git_tree_set() {
     disown
   fi
 
-  # open in editor if requested
-  # note: subshell ensures codium inherits correct cwd for its terminal, without mutate of parent shell
-  if [[ "$open_flag" == "true" ]]; then
-    (cd "$worktree_path" && codium .) &
+  # open with specified opener if requested
+  # note: subshell ensures opener inherits correct cwd, without mutate of parent shell
+  if [[ -n "$opener" ]]; then
+    (cd "$worktree_path" && "$opener" .) &
   fi
 }
 
