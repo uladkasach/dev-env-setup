@@ -448,6 +448,106 @@ curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo 
 gh auth login
 
 #######################
+## install gitui (terminal tui for git)
+## ref: https://github.com/extrawurst/gitui
+#######################
+install_gitui() {
+  echo "⏳ install gitui..."
+
+  # get latest version tag via gh cli (avoids api rate limits)
+  local version
+  version=$(gh release view --repo extrawurst/gitui --json tagName -q '.tagName' | sed 's/^v//')
+  if [[ -z "$version" || "$version" == "null" ]]; then
+    echo "⛈️ failed to fetch latest gitui version"
+    return 1
+  fi
+  echo "  • version: v$version"
+
+  # download binary via gh cli
+  local extract_dir="/tmp/gitui-extract-${version}"
+  rm -rf "$extract_dir"
+  mkdir -p "$extract_dir"
+  echo "  • download: gitui-linux-x86_64.tar.gz"
+  gh release download "v${version}" \
+    --repo extrawurst/gitui \
+    --pattern "gitui-linux-x86_64.tar.gz" \
+    --dir "$extract_dir"
+
+  local tarball="$extract_dir/gitui-linux-x86_64.tar.gz"
+  if [[ ! -f "$tarball" ]]; then
+    echo "⛈️ download failed: $tarball not found"
+    return 1
+  fi
+  echo "  • downloaded: $(ls -lh "$tarball" | awk '{print $5}')"
+
+  # inspect tarball contents
+  echo "  • tarball contents:"
+  tar -tzf "$tarball" | sed 's/^/      /'
+
+  # extract
+  tar -xzf "$tarball" -C "$extract_dir"
+  echo "  • extracted:"
+  ls -la "$extract_dir" | grep -v '\.tar\.gz' | sed 's/^/      /'
+
+  # find the binary (might be nested or at root)
+  local binary
+  binary=$(find "$extract_dir" -name "gitui" -type f -executable | head -1)
+  if [[ -z "$binary" ]]; then
+    echo "⛈️ gitui binary not found in extracted files"
+    return 1
+  fi
+  echo "  • binary found: $binary"
+
+  # install to /usr/local/bin
+  sudo mv "$binary" /usr/local/bin/gitui
+  sudo chmod +x /usr/local/bin/gitui
+  if [[ ! -x /usr/local/bin/gitui ]]; then
+    echo "⛈️ failed to install gitui to /usr/local/bin"
+    return 1
+  fi
+
+  # cleanup
+  rm -rf "$extract_dir"
+
+  # verify
+  echo "✨ gitui $(gitui --version) installed"
+}
+install_gitui
+
+configure_gitui_theme() {
+  # install desert theme (matches ptyxis Desert palette)
+  # ref: https://github.com/Gogh-Co/Gogh/blob/master/themes/Desert.yml
+  mkdir -p ~/.config/gitui
+  tee ~/.config/gitui/theme.ron > /dev/null << 'EOF'
+(
+  selected_tab: Some("#FFFFFF"),
+  command_fg: Some("#F5DEB3"),
+  selection_bg: Some("#555555"),
+  selection_fg: Some("#FFFFFF"),
+  cmdbar_bg: Some("#333333"),
+  cmdbar_extra_lines_bg: Some("#333333"),
+  disabled_fg: Some("#4D4D4D"),
+  diff_line_add: Some("#98FB98"),
+  diff_line_delete: Some("#FF2B2B"),
+  diff_file_added: Some("#98FB98"),
+  diff_file_removed: Some("#FF5555"),
+  diff_file_moved: Some("#87CEFF"),
+  diff_file_modified: Some("#F0E68C"),
+  commit_hash: Some("#CD853F"),
+  commit_time: Some("#FFDEAD"),
+  commit_author: Some("#87CEFF"),
+  danger_fg: Some("#FF2B2B"),
+  push_gauge_bg: Some("#98FB98"),
+  push_gauge_fg: Some("#333333"),
+  tag_fg: Some("#F0E68C"),
+  branch_fg: Some("#FFA0A0")
+)
+EOF
+  echo "• gitui desert theme configured"
+}
+configure_gitui_theme
+
+#######################
 ## clone all repos in the organizations you care about
 #######################
 for organization in {ehmpathy,ahbode}; do
