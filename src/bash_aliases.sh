@@ -104,7 +104,8 @@ alias restart.wifi='systemctl restart NetworkManager.service'
 # make it easy to update shell configs
 alias sync.devenv.bashaliases='cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases && source ~/.bash_aliases'
 alias sync.devenv.zshrc='cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc && source ~/.zshrc'
-alias sync.devenv='sync.devenv.bashaliases && sync.devenv.zshrc'
+alias sync.devenv.gitaliases='source ~/git/more/dev-env-setup/src/install_env.git.aliases.sh'
+alias sync.devenv='sync.devenv.bashaliases && sync.devenv.zshrc && sync.devenv.gitaliases'
 
 # make it easy to pull down the devenv repo
 alias devenv.sync.repo='cd ~/git/more/dev-env-setup && git checkout main && git pull origin HEAD'
