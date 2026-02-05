@@ -1164,6 +1164,256 @@ _git_tree_del() {
 }
 
 ######################
+## git graft helper (invoked by git alias.graft)
+##
+## what: replay specific commits onto a different base
+##
+## why: enables cascade PRs by cherry-pick of commits onto a new base
+##      works even when original base was rebased or squash-merged
+##
+## how:
+##   git graft --onto main --from B1              # plan B1..HEAD (default)
+##   git graft --onto main --from B1 --till B3   # plan B1..B3
+##   git graft --onto main --from B1 --mode apply # execute
+##
+## note: uses cherry-pick, not rebase. --from is inclusive, --till defaults to HEAD.
+######################
+
+# .what: main entry for git graft
+git_alias_graft() {
+  local graft_state=".git/GRAFT_ORIG_HEAD"
+
+  # handle --continue
+  if [[ "$1" == "--continue" ]]; then
+    if [[ ! -f "$graft_state" ]]; then
+      echo "error: no graft in progress"
+      return 1
+    fi
+    local branch
+    branch=$(head -1 "$graft_state")
+    if git cherry-pick --continue; then
+      # reject if branch is checked out in another worktree
+      local worktree_path
+      worktree_path=$(git worktree list --porcelain 2>/dev/null | grep -B2 "\[${branch}\]" | head -1 | sed 's/^worktree //')
+      if [[ -n "$worktree_path" ]]; then
+        echo ""
+        echo "   ⛈️  branch '$branch' is checked out in worktree: $worktree_path"
+        echo "   └─ close that worktree first, then: git graft --continue"
+        return 1
+      fi
+      # move branch pointer to completed result and checkout
+      git branch -f "$branch" HEAD
+      git checkout "$branch"
+      rm -f "$graft_state"
+      echo ""
+      echo "🌲 graft complete"
+      echo ""
+      return 0
+    fi
+    return $?
+  fi
+
+  # handle --abort
+  if [[ "$1" == "--abort" ]]; then
+    if [[ ! -f "$graft_state" ]]; then
+      echo "error: no graft in progress"
+      return 1
+    fi
+    local branch
+    branch=$(head -1 "$graft_state")
+    git cherry-pick --abort 2>/dev/null
+    git checkout "$branch"
+    rm -f "$graft_state"
+    echo ""
+    echo "🌲 graft aborted, restored to $branch"
+    echo ""
+    return 0
+  fi
+
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "git graft - replay commits onto a different base"
+    echo ""
+    echo "usage: git graft --onto <newbase> --from <commit> [--till <commit>] [--mode plan|apply]"
+    echo "       git graft --continue"
+    echo "       git graft --abort"
+    echo ""
+    echo "options:"
+    echo "  --onto <ref>     the new base to replay commits onto"
+    echo "  --from <commit>  first commit to include (inclusive)"
+    echo "  --till <commit>  last commit to include (default: HEAD)"
+    echo "  --mode plan      preview commits (default)"
+    echo "  --mode apply     execute the graft"
+    echo "  --continue       resume after conflicts are resolved"
+    echo "  --abort          cancel graft and restore original HEAD"
+    echo ""
+    echo "examples:"
+    echo "  git graft --onto main --from abc123              # plan abc123..HEAD"
+    echo "  git graft --onto main --from abc123 --till def456"
+    echo "  git graft --onto main --from abc123 --mode apply # execute"
+    echo ""
+    echo "uses cherry-pick internally. safe for rebased/squashed bases."
+    echo "commits already in --onto are excluded (ancestry filter)."
+    return 0
+  fi
+
+  local onto="" from="" till="HEAD" mode="plan"
+
+  # parse args
+  local prev=""
+  for arg in "$@"; do
+    if [[ "$prev" == "--onto" ]]; then
+      onto="$arg"
+      prev=""
+      continue
+    fi
+    if [[ "$prev" == "--from" ]]; then
+      from="$arg"
+      prev=""
+      continue
+    fi
+    if [[ "$prev" == "--till" ]]; then
+      till="$arg"
+      prev=""
+      continue
+    fi
+    if [[ "$prev" == "--mode" ]]; then
+      mode="$arg"
+      prev=""
+      continue
+    fi
+    case "$arg" in
+      --onto) prev="--onto" ;;
+      --from) prev="--from" ;;
+      --till) prev="--till" ;;
+      --mode) prev="--mode" ;;
+      *)
+        echo "error: unknown argument '$arg'"
+        echo "usage: git graft --onto <newbase> --from <commit> [--till <commit>] [--mode plan|apply]"
+        return 1
+        ;;
+    esac
+  done
+
+  # validate mode
+  if [[ "$mode" != "plan" && "$mode" != "apply" ]]; then
+    echo "error: --mode must be 'plan' or 'apply'"
+    return 1
+  fi
+
+  # validate required args
+  if [[ -z "$onto" ]]; then
+    echo "error: --onto is required"
+    echo "usage: git graft --onto <newbase> --from <commit>"
+    return 1
+  fi
+
+  if [[ -z "$from" ]]; then
+    echo "error: --from is required"
+    echo "usage: git graft --onto <newbase> --from <commit>"
+    return 1
+  fi
+
+  local current_branch
+  current_branch=$(git branch --show-current 2>/dev/null)
+
+  if [[ -z "$current_branch" ]]; then
+    echo "error: not on a branch (detached HEAD?)"
+    return 1
+  fi
+
+  # get list of commits to cherry-pick
+  # from^ makes --from inclusive
+  # ^${onto} excludes commits already reachable from onto (ancestry filter)
+  local commits
+  commits=$(git rev-list --reverse "${from}^..${till}" "^${onto}" 2>/dev/null)
+
+  if [[ -z "$commits" ]]; then
+    echo "error: no commits found in range '${from}..${till}' (after ancestry filter)"
+    return 1
+  fi
+
+  local commit_count
+  commit_count=$(echo "$commits" | wc -l | tr -d ' ')
+
+  echo ""
+  echo "🌲 graft ($mode)"
+  echo "   ├─ branch: $current_branch"
+  echo "   ├─ onto: $onto"
+  echo "   ├─ from: $from"
+  echo "   ├─ till: $till"
+  echo "   ├─ commits: $commit_count"
+
+  # show commits
+  local idx=0
+  for commit in $commits; do
+    ((idx++))
+    local info
+    info=$(git log -1 --format="%h %s" "$commit")
+    if [[ "$idx" -eq "$commit_count" && "$mode" == "plan" ]]; then
+      echo "   │  └─ $info"
+    else
+      echo "   │  ├─ $info"
+    fi
+  done
+
+  if [[ "$mode" == "plan" ]]; then
+    echo "   └─ use --mode apply to execute"
+    echo ""
+    return 0
+  fi
+
+  echo "   └─ ..."
+
+  # reject if work tree is dirty
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+    echo ""
+    echo "   ⛈️  work tree is dirty — commit or stash changes before apply"
+    return 1
+  fi
+
+  # save branch name for recovery (branch itself is never touched until success)
+  echo "$current_branch" > "$graft_state"
+
+  # detach to onto target (original branch stays safe)
+  if ! git checkout --detach "$onto" >/dev/null 2>&1; then
+    echo ""
+    echo "   └─ ⛈️  failed to checkout '$onto'"
+    rm -f "$graft_state"
+    return 1
+  fi
+
+  # cherry-pick the commits in detached HEAD
+  if ! git cherry-pick $commits >/dev/null 2>&1; then
+    echo ""
+    echo "   🟡 cherry-pick conflict!"
+    echo "   ├─ resolve conflicts, then: git graft --continue"
+    echo "   └─ or abort: git graft --abort"
+    return 1
+  fi
+
+  # reject if branch is checked out in another worktree
+  local worktree_path
+  worktree_path=$(git worktree list --porcelain 2>/dev/null | grep -B2 "\[${current_branch}\]" | head -1 | sed 's/^worktree //')
+  if [[ -n "$worktree_path" ]]; then
+    echo ""
+    echo "   ⛈️  branch '$current_branch' is checked out in worktree: $worktree_path"
+    echo "   └─ close that worktree first, then: git graft --continue"
+    return 1
+  fi
+
+  # success: move branch pointer to result and checkout
+  git branch -f "$current_branch" HEAD
+  git checkout "$current_branch"
+  rm -f "$graft_state"
+
+  echo ""
+  echo "🌲 graft complete"
+  echo "   ├─ $commit_count commits replayed"
+  echo "   └─ branch: $current_branch now based on $onto"
+  echo ""
+}
+
+######################
 ## git grab helper (invoked by git alias.grab)
 ##
 ## what: save and transfer patches between worktrees
