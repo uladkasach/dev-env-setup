@@ -1172,12 +1172,13 @@ _git_tree_del() {
 ##      useful when you decide changes should go on their own branch
 ##
 ## how:
-##   git grab set <name>                  # save both staged+unstaged changes
-##   git grab set <name> --mode staged    # save only staged changes
-##   git grab set <name> --mode unstaged  # save only unstaged changes
-##   git grab get                         # list available patches
-##   git grab get --patch <name>          # apply a specific patch
-##   git grab del <name>                  # delete a patch
+##   git grab set <name>                    # save both staged+unstaged changes
+##   git grab set <name> --scope staged     # save only staged changes
+##   git grab set <name> --scope unstaged   # save only unstaged changes
+##   git grab get                           # list available patches
+##   git grab get <name>                    # plan (preview) a patch
+##   git grab get <name> --mode apply       # apply and consume a patch
+##   git grab del <name>                    # delete a patch
 ##
 ## patch location: @gitroot/../_worktrees/_patches/<name>.patch
 ######################
@@ -1202,7 +1203,7 @@ git_alias_grab() {
       echo ""
       echo "commands:"
       echo "  set <name>  save changes as a patch"
-      echo "  get         list patches, or apply with --patch <name>"
+      echo "  get         list patches, or get <name> [--mode apply]"
       echo "  del <name>  delete a patch"
       echo ""
       echo "run 'git grab <command> --help' for command-specific options"
@@ -1227,9 +1228,9 @@ _git_grab_set() {
     echo "usage: git grab set <name> [options]"
     echo ""
     echo "options:"
-    echo "  --mode staged    save only staged changes"
-    echo "  --mode unstaged  save only unstaged changes"
-    echo "  --mode both      save staged and unstaged (default)"
+    echo "  --scope staged    save only staged changes"
+    echo "  --scope unstaged  save only unstaged changes"
+    echo "  --scope both      save staged and unstaged (default)"
     echo ""
     echo "behavior:"
     echo "  - fails if patch with same name already exists"
@@ -1237,18 +1238,18 @@ _git_grab_set() {
     return 0
   fi
 
-  local name="" mode="both"
+  local name="" scope="both"
 
   # parse args
   local prev=""
   for arg in "$@"; do
-    if [[ "$prev" == "--mode" ]]; then
-      mode="$arg"
+    if [[ "$prev" == "--scope" ]]; then
+      scope="$arg"
       prev=""
       continue
     fi
     case "$arg" in
-      --mode) prev="--mode" ;;
+      --scope) prev="--scope" ;;
       -*) ;;
       *) [[ -z "$name" ]] && name="$arg" ;;
     esac
@@ -1256,14 +1257,14 @@ _git_grab_set() {
 
   if [[ -z "$name" ]]; then
     echo "error: patch name required"
-    echo "usage: git grab set <name> [--mode staged|unstaged|both]"
+    echo "usage: git grab set <name> [--scope staged|unstaged|both]"
     return 1
   fi
 
-  # validate mode
-  if [[ "$mode" != "staged" && "$mode" != "unstaged" && "$mode" != "both" ]]; then
-    echo "error: invalid mode '$mode'"
-    echo "valid modes: staged, unstaged, both"
+  # validate scope
+  if [[ "$scope" != "staged" && "$scope" != "unstaged" && "$scope" != "both" ]]; then
+    echo "error: invalid scope '$scope'"
+    echo "valid scopes: staged, unstaged, both"
     return 1
   fi
 
@@ -1278,12 +1279,13 @@ _git_grab_set() {
     return 1
   fi
 
-  # check for changes based on mode
-  local has_staged has_unstaged
+  # check for changes
+  local has_staged has_unstaged has_untracked
   has_staged=$(git diff --cached --quiet 2>/dev/null; echo $?)
   has_unstaged=$(git diff --quiet 2>/dev/null; echo $?)
+  has_untracked=$(git ls-files --others --exclude-standard | head -1)
 
-  case "$mode" in
+  case "$scope" in
     staged)
       if [[ "$has_staged" -eq 0 ]]; then
         echo "error: no staged changes to save"
@@ -1291,13 +1293,13 @@ _git_grab_set() {
       fi
       ;;
     unstaged)
-      if [[ "$has_unstaged" -eq 0 ]]; then
+      if [[ "$has_unstaged" -eq 0 && -z "$has_untracked" ]]; then
         echo "error: no unstaged changes to save"
         return 1
       fi
       ;;
     both)
-      if [[ "$has_staged" -eq 0 && "$has_unstaged" -eq 0 ]]; then
+      if [[ "$has_staged" -eq 0 && "$has_unstaged" -eq 0 && -z "$has_untracked" ]]; then
         echo "error: no changes to save"
         return 1
       fi
@@ -1307,9 +1309,18 @@ _git_grab_set() {
   # create patches directory
   mkdir -p "$patches_dir"
 
+  # temporarily mark untracked files via intent-to-add so git diff sees them
+  local untracked_files=()
+  if [[ "$scope" != "staged" && -n "$has_untracked" ]]; then
+    while IFS= read -r f; do
+      untracked_files+=("$f")
+    done < <(git ls-files --others --exclude-standard)
+    git add -N "${untracked_files[@]}"
+  fi
+
   # generate patch
   local patch_content=""
-  case "$mode" in
+  case "$scope" in
     staged)
       patch_content=$(git diff --cached)
       ;;
@@ -1321,6 +1332,11 @@ _git_grab_set() {
       patch_content=$(git diff HEAD)
       ;;
   esac
+
+  # undo intent-to-add so untracked files go back to untracked
+  if [[ ${#untracked_files[@]} -gt 0 ]]; then
+    git reset -- "${untracked_files[@]}" >/dev/null 2>&1
+  fi
 
   if [[ -z "$patch_content" ]]; then
     echo "error: no diff content generated"
@@ -1336,7 +1352,7 @@ _git_grab_set() {
   echo ""
   echo "🫐 $name"
   echo "   ├─ status: picked"
-  echo "   ├─ mode: $mode"
+  echo "   ├─ scope: $scope"
   echo "   ├─ files: $file_count"
   echo "   └─ path: $patch_file"
   echo ""
@@ -1347,36 +1363,34 @@ _git_grab_get() {
   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     echo "git grab get - list patches or apply one"
     echo ""
-    echo "usage: git grab get [options]"
+    echo "usage: git grab get [<name>] [options]"
     echo ""
     echo "options:"
-    echo "  --patch <name>  select a patch"
-    echo "  --plan          show what would be applied (requires --patch)"
-    echo "  --apply         apply the patch (requires --patch)"
+    echo "  --mode plan    preview what would be applied (default)"
+    echo "  --mode apply   apply and consume the patch"
     echo ""
     echo "behavior:"
-    echo "  - without --patch: lists all available patches"
-    echo "  - with --patch --plan: shows diff stats"
-    echo "  - with --patch --apply: applies and deletes the patch"
-    echo "  - fails if patch doesn't apply cleanly"
+    echo "  - without <name>: lists all available patches"
+    echo "  - with <name>: previews the patch (plan mode)"
+    echo "  - with <name> --mode apply: applies and deletes the patch"
+    echo "  - uses git apply --3way for cross-branch support"
     return 0
   fi
 
-  local patch_name="" plan=false apply=false
+  local patch_name="" mode="plan"
 
   # parse args
   local prev=""
   for arg in "$@"; do
-    if [[ "$prev" == "--patch" ]]; then
-      patch_name="$arg"
+    if [[ "$prev" == "--mode" ]]; then
+      mode="$arg"
       prev=""
       continue
     fi
     case "$arg" in
-      --patch) prev="--patch" ;;
-      --plan) plan=true ;;
-      --apply) apply=true ;;
+      --mode) prev="--mode" ;;
       -*) ;;
+      *) [[ -z "$patch_name" ]] && patch_name="$arg" ;;
     esac
   done
 
@@ -1431,50 +1445,37 @@ _git_grab_get() {
     return 1
   fi
 
-  # check if working tree is clean enough (no conflicts)
-  if ! git diff-index --quiet HEAD -- 2>/dev/null; then
-    # has changes, check if patch would conflict
-    if ! git apply --check "$patch_file" 2>/dev/null; then
-      echo "error: patch would not apply cleanly"
-      echo "commit or stash your changes first"
-      return 1
-    fi
-  else
-    # clean tree, still verify patch applies
-    if ! git apply --check "$patch_file" 2>/dev/null; then
-      echo "error: patch would not apply cleanly"
-      echo "the patch may be outdated or for a different branch"
-      return 1
-    fi
+  # validate mode
+  if [[ "$mode" != "plan" && "$mode" != "apply" ]]; then
+    echo "error: invalid mode '$mode'"
+    echo "valid modes: plan, apply"
+    return 1
   fi
 
   local file_count
   file_count=$(grep -c '^diff --git' "$patch_file" 2>/dev/null || echo 0)
 
-  if [[ "$plan" == "true" ]]; then
+  # plan: preview what would be applied
+  if [[ "$mode" == "plan" ]]; then
     echo ""
     echo "🫐 $patch_name (plan)"
-    echo "   ├─ status: would apply cleanly"
-    echo "   └─ files: $file_count"
+    echo "   ├─ files: $file_count"
+    echo "   └─ stats:"
     echo ""
     git apply --stat "$patch_file"
+    echo ""
+    echo -e "   \033[2muse --mode apply to apply\033[0m"
     return 0
   fi
 
-  if [[ "$apply" != "true" ]]; then
-    echo ""
-    echo "🫐 $patch_name"
-    echo "   ├─ status: ready"
-    echo "   └─ files: $file_count"
-    echo ""
-    echo -e "   \033[2muse --plan to preview or --apply to apply\033[0m"
-    return 0
-  fi
-
-  # apply the patch
-  if ! git apply "$patch_file"; then
-    echo "error: failed to apply patch"
-    return 1
+  # apply the patch (try direct first, fall back to --3way for cross-branch)
+  if ! git apply "$patch_file" 2>/dev/null; then
+    if ! git apply --3way "$patch_file"; then
+      echo ""
+      echo "⛈️  patch did not apply cleanly"
+      echo "   resolve conflicts, then 'git grab del $patch_name' to clean up"
+      return 1
+    fi
   fi
 
   # remove the patch after successful apply
