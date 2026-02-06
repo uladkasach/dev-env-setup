@@ -1182,7 +1182,7 @@ _git_tree_del() {
 
 # .what: main entry for git graft
 git_alias_graft() {
-  local graft_state=".git/GRAFT_ORIG_HEAD"
+  local graft_state="$(git rev-parse --git-dir)/GRAFT_ORIG_HEAD"
 
   # handle --continue
   if [[ "$1" == "--continue" ]]; then
@@ -1248,7 +1248,7 @@ git_alias_graft() {
     echo "  --abort          cancel graft and restore original HEAD"
     echo ""
     echo "examples:"
-    echo "  git graft --onto main --from abc123              # plan abc123..HEAD"
+    echo "  git graft --onto origin/main --from abc123              # plan abc123..HEAD"
     echo "  git graft --onto main --from abc123 --till def456"
     echo "  git graft --onto main --from abc123 --mode apply # execute"
     echo ""
@@ -1305,6 +1305,14 @@ git_alias_graft() {
   if [[ -z "$onto" ]]; then
     echo "error: --onto is required"
     echo "usage: git graft --onto <newbase> --from <commit>"
+    return 1
+  fi
+
+  # reject bare branch names — require origin/ prefix to avoid stale local refs
+  # (if someone wants a specific commit, they can use a SHA)
+  if [[ "$onto" != origin/* && ! "$onto" =~ ^[0-9a-f]{6,40}$ ]]; then
+    echo "error: --onto '$onto' must use origin/ prefix (e.g., origin/$onto)"
+    echo "   └─ bare branch names can be stale; use origin/ or a commit SHA"
     return 1
   fi
 
