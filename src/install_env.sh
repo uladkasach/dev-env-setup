@@ -14,9 +14,17 @@ stty intr ^X
 grep -qxF 'stty intr ^X' ~/.bashrc || echo '\n# bind interrupt key to ctrl-x\stty intr ^X' >> ~/.bashrc # writes to `~/.bashrc` if that line is not alrady there; Why add to `~/.bashrc` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
 
 #########################
-## install vim
+## install vim + neovim
 #########################
 sudo apt install vim -y # note: ~/.zshrc already defines that this is default
+sudo add-apt-repository ppa:neovim-ppa/unstable -y && sudo apt update && sudo apt install neovim -y
+
+configure_neovim() {
+  mkdir -p ~/.config/nvim
+  cp "$(dirname "$0")/init.lua" ~/.config/nvim/init.lua
+  echo "• neovim config applied"
+}
+configure_neovim
 
 #############################
 ## for happiness, set swappiness
@@ -233,6 +241,24 @@ gnome-terminal
 
 # note: if git icon looks weird, make sure to install font that supports it: https://github.com/tonsky/FiraCode :
 sudo apt install fonts-firacode
+
+# install FiraCode Nerd Font (includes icons for neovim plugins like neo-tree)
+# ref: https://github.com/ryanoasis/nerd-fonts
+install_nerd_font() {
+  local font_dir="$HOME/.local/share/fonts"
+  if ls "$font_dir"/FiraCode*.ttf &>/dev/null; then
+    echo "• FiraCode Nerd Font already installed; skipped"
+    return
+  fi
+  mkdir -p "$font_dir"
+  local tmp_zip="/tmp/FiraCode-NerdFont.zip"
+  curl -fsSL -o "$tmp_zip" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/FiraCode.zip
+  unzip -o "$tmp_zip" -d "$font_dir"
+  rm "$tmp_zip"
+  fc-cache -fv
+  echo "• FiraCode Nerd Font installed"
+}
+install_nerd_font
 
 
 #########################
