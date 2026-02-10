@@ -13,6 +13,52 @@ vim.opt.rtp:prepend(lazypath)
 require('lazy').setup({
   { 'lewis6991/gitsigns.nvim', config = true },
   {
+    'nvim-lualine/lualine.nvim',
+    dependencies = { 'nvim-tree/nvim-web-devicons' },
+    opts = {
+      options = {
+        theme = {
+          normal = {
+            a = { fg = '#333333', bg = '#F5DEB3', gui = 'bold' },
+            b = { fg = '#FFFFFF', bg = '#555555' },
+            c = { fg = '#F5DEB3', bg = '#333333' },
+          },
+          insert = { a = { fg = '#333333', bg = '#98FB98', gui = 'bold' } },
+          visual = { a = { fg = '#333333', bg = '#F0E68C', gui = 'bold' } },
+          replace = { a = { fg = '#333333', bg = '#FF2B2B', gui = 'bold' } },
+          inactive = {
+            a = { fg = '#777777', bg = '#333333' },
+            b = { fg = '#777777', bg = '#333333' },
+            c = { fg = '#777777', bg = '#333333' },
+          },
+        },
+        component_separators = { left = '│', right = '│' },
+        section_separators = { left = '', right = '' },
+        globalstatus = true,
+      },
+      sections = {
+        lualine_a = { { 'mode', fmt = string.lower } },
+        lualine_b = { 'branch', 'diff' },
+        lualine_c = { 'filename' },
+        lualine_x = { 'filetype' },
+        lualine_y = { 'location' },
+        lualine_z = { { 'progress', fmt = string.lower } },
+      },
+    },
+  },
+  {
+    'mrjones2014/smart-splits.nvim',
+    version = '>=1.0.0',
+    config = function()
+      local ss = require('smart-splits')
+      ss.setup({})
+      vim.keymap.set('n', '<C-h>', ss.move_cursor_left)
+      vim.keymap.set('n', '<C-j>', ss.move_cursor_down)
+      vim.keymap.set('n', '<C-k>', ss.move_cursor_up)
+      vim.keymap.set('n', '<C-l>', ss.move_cursor_right)
+    end,
+  },
+  {
     'nvim-neo-tree/neo-tree.nvim',
     branch = 'v3.x',
     dependencies = {
@@ -21,6 +67,10 @@ require('lazy').setup({
       'MunifTanjim/nui.nvim',
     },
     opts = {
+      window = {
+        position = 'left',
+        width = 30,
+      },
       filesystem = {
         filtered_items = {
           visible = true,
@@ -106,5 +156,18 @@ vim.keymap.set('n', '<C-v>', '"+p')
 vim.keymap.set('n', '<C-s>', ':w<CR>')
 vim.keymap.set('i', '<C-s>', '<Esc>:w<CR>')
 
--- ctrl+e = toggle file tree
-vim.keymap.set('n', '<C-e>', ':Neotree toggle<CR>')
+-- ctrl+e = smart file tree toggle
+-- if neo-tree not open: open and focus it
+-- if neo-tree open but not focused: focus it
+-- if neo-tree open and focused: close it
+vim.keymap.set('n', '<C-e>', function()
+  local bufname = vim.api.nvim_buf_get_name(0)
+  local filetype = vim.bo.filetype
+  if filetype == 'neo-tree' then
+    vim.cmd('Neotree close')
+  else
+    vim.cmd('Neotree focus')
+  end
+end, { noremap = true, silent = true })
+
+-- ctrl+h/j/k/l = navigate between windows (configured in smart-splits plugin above)

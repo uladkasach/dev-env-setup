@@ -34,6 +34,46 @@ configure_neovim
 echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf # This tells linux: "prefer keeping stuff in RAM; only swap when truly necessary."
 
 #############################
+## add swapfile for overflow (complements zram)
+##
+## why: zram compresses cold pages in RAM (fast, ~16gb default)
+##      when zram fills, overflow goes to disk swap
+##      more disk swap = more headroom for cold pages
+##
+## hierarchy: RAM -> zram (compressed RAM) -> disk swap (SSD)
+#############################
+configure_swapfile() {
+  local swapfile="/swapfile"
+  local size="36G"
+
+  # skip if swapfile already exists and is active
+  if swapon --show | grep -q "$swapfile"; then
+    echo "• swapfile already active; skipped"
+    return 0
+  fi
+
+  # create swapfile if it doesn't exist
+  if [[ ! -f "$swapfile" ]]; then
+    echo "• create ${size} swapfile..."
+    sudo fallocate -l "$size" "$swapfile"
+    sudo chmod 600 "$swapfile"
+    sudo mkswap "$swapfile"
+  fi
+
+  # activate swapfile
+  sudo swapon "$swapfile"
+
+  # add to fstab if not already present
+  if ! grep -q "$swapfile" /etc/fstab; then
+    echo "$swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
+    echo "• swapfile added to /etc/fstab"
+  fi
+
+  echo "• swapfile configured: $size"
+}
+configure_swapfile
+
+#############################
 ## keyd - remap keys for optimal experience
 #############################
 install_keyd() {
@@ -155,8 +195,7 @@ configure_ptyxis() {
 profile-uuids=['48d4f1a48e2fa956aa1f108e697f9492']
 default-profile-uuid='48d4f1a48e2fa956aa1f108e697f9492'
 window-size=(140, 74)
-use-system-font=false
-font-name='Monospace 12'
+use-system-font=true
 
 [org/gnome/Ptyxis/Shortcuts]
 copy-clipboard='<Shift><Control>c'
@@ -168,8 +207,8 @@ set-title='<Shift><Control>t'
 new-tab='<Control>t'
 tab-overview='<Control>o'
 close-tab='<Shift><Control>w'
-move-previous-tab='<Control>h'
-move-next-tab='<Control>l'
+move-previous-tab='<Shift><Control>h'
+move-next-tab='<Shift><Control>l'
 
 [org/gnome/Ptyxis/Profiles/48d4f1a48e2fa956aa1f108e697f9492]
 palette='Desert'
@@ -242,21 +281,24 @@ gnome-terminal
 # note: if git icon looks weird, make sure to install font that supports it: https://github.com/tonsky/FiraCode :
 sudo apt install fonts-firacode
 
-# install FiraCode Nerd Font (includes icons for neovim plugins like neo-tree)
+# install Hack Nerd Font Mono (minimal, clean icons for neovim plugins like neo-tree)
 # ref: https://github.com/ryanoasis/nerd-fonts
+# note: "Mono" variant maintains strict monospace (icons don't break alignment)
 install_nerd_font() {
   local font_dir="$HOME/.local/share/fonts"
-  if ls "$font_dir"/FiraCode*.ttf &>/dev/null; then
-    echo "• FiraCode Nerd Font already installed; skipped"
+  if ls "$font_dir"/Hack*.ttf &>/dev/null; then
+    echo "• Hack Nerd Font already installed; skipped"
     return
   fi
   mkdir -p "$font_dir"
-  local tmp_zip="/tmp/FiraCode-NerdFont.zip"
-  curl -fsSL -o "$tmp_zip" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/FiraCode.zip
+  local tmp_zip="/tmp/Hack-NerdFont.zip"
+  curl -fsSL -o "$tmp_zip" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip
   unzip -o "$tmp_zip" -d "$font_dir"
   rm "$tmp_zip"
   fc-cache -fv
-  echo "• FiraCode Nerd Font installed"
+  # set as system monospace font (required for VTE terminals like ptyxis)
+  gsettings set org.gnome.desktop.interface monospace-font-name 'Hack Nerd Font Mono 12'
+  echo "• Hack Nerd Font installed and set as system monospace"
 }
 install_nerd_font
 

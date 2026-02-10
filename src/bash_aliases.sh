@@ -1,5 +1,8 @@
+# prefer nvim over vim
+alias vim='nvim'
+
 # open notes
-alias notes='vim ~/git/notes/main.txt'
+alias notes='nvim ~/git/notes/main.txt'
 
 # copy paste
 alias pbcopy='xclip -selection clipboard'
@@ -54,6 +57,102 @@ alias browser='google-chrome & disown'
 
 # make it easier to open the file manager
 alias files='nautilus & disown'
+
+# show processes with highest swap usage
+_report_usage_ram_swap() {
+  local limit="${1:-20}"
+  local total_kb=0
+
+  # collect data
+  local data
+  data=$(
+    for pid_dir in /proc/[0-9]*; do
+      p="${pid_dir##*/}"
+      val=$(awk '/VmSwap/{print $2}' "$pid_dir/status" 2>/dev/null)
+      if [ -n "$val" ] && [ "$val" -gt 0 ]; then
+        name=$(cat "$pid_dir/comm" 2>/dev/null)
+        printf "%s\t%s\t%s\n" "$val" "$p" "$name"
+      fi
+    done | sort -rn | head -"$limit"
+  )
+
+  # count lines
+  local count=0
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && ((count++))
+    total_kb=$((total_kb + $(echo "$line" | cut -f1)))
+  done <<< "$data"
+
+  local total_gb
+  total_gb=$(echo "scale=1; $total_kb / 1048576" | bc)
+
+  echo ""
+  echo "🌊 ram.swap (top $limit)"
+  echo "   ├─ total: ${total_gb}gb in top $limit"
+  echo "   │"
+
+  local i=0
+  while IFS=$'\t' read -r kb pid name; do
+    [[ -z "$kb" ]] && continue
+    ((i++))
+    local mb=$((kb / 1024))
+    if [[ $i -eq $count ]]; then
+      printf "   └─ %6dmb  %-20s (pid %s)\n" "$mb" "$name" "$pid"
+    else
+      printf "   ├─ %6dmb  %-20s (pid %s)\n" "$mb" "$name" "$pid"
+    fi
+  done <<< "$data"
+  echo ""
+}
+alias report.usage.ram.swap='_report_usage_ram_swap'
+
+# show processes with highest real memory (RSS) usage
+_report_usage_ram_real() {
+  local limit="${1:-20}"
+  local total_kb=0
+
+  # collect data
+  local data
+  data=$(
+    for pid_dir in /proc/[0-9]*; do
+      p="${pid_dir##*/}"
+      val=$(awk '/VmRSS/{print $2}' "$pid_dir/status" 2>/dev/null)
+      if [ -n "$val" ] && [ "$val" -gt 0 ]; then
+        name=$(cat "$pid_dir/comm" 2>/dev/null)
+        printf "%s\t%s\t%s\n" "$val" "$p" "$name"
+      fi
+    done | sort -rn | head -"$limit"
+  )
+
+  # count lines
+  local count=0
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && ((count++))
+    total_kb=$((total_kb + $(echo "$line" | cut -f1)))
+  done <<< "$data"
+
+  local total_gb
+  total_gb=$(echo "scale=1; $total_kb / 1048576" | bc)
+
+  echo ""
+  echo "🧠 ram.real (top $limit)"
+  echo "   ├─ total: ${total_gb}gb in top $limit"
+  echo "   │"
+
+  local i=0
+  while IFS=$'\t' read -r kb pid name; do
+    [[ -z "$kb" ]] && continue
+    ((i++))
+    local mb=$((kb / 1024))
+    if [[ $i -eq $count ]]; then
+      printf "   └─ %6dmb  %-20s (pid %s)\n" "$mb" "$name" "$pid"
+    else
+      printf "   ├─ %6dmb  %-20s (pid %s)\n" "$mb" "$name" "$pid"
+    fi
+  done <<< "$data"
+  echo ""
+}
+alias report.usage.ram.real='_report_usage_ram_real'
 
 # make it easy to speed test internet connection (25MB download via Cloudflare)
 _speedtest_internet() {
