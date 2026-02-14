@@ -57,6 +57,8 @@ plugins=(git)
 
 # Skip oh-my-zsh for non-TTY sessions (e.g., Claude Code, scripts, pipes)
 if [[ -t 1 ]]; then
+  # disable ctrl+z job suspend (lets apps like nvim use ctrl+z for undo)
+  stty susp undef
   # speed up compinit: only rebuild if completion files changed
   # ref: https://gist.github.com/ctechols/ca1035271ad134841284
   #
@@ -88,7 +90,13 @@ fi
 # fnm (fast node manager) - no lazy loading needed, it's fast
 export PATH="$HOME/.local/share/fnm:$PATH"
 if command -v fnm &>/dev/null; then
-  eval "$(fnm env --use-on-cd --corepack-enabled)"
+  eval "$(fnm env --use-on-cd)"
+
+  # ensure corepack is available (node 25+ doesn't bundle it)
+  if ! command -v corepack &>/dev/null; then
+    echo "• corepack not found, will install via npm..." >&2
+    command npm install -g corepack && corepack enable
+  fi
 
   # pnpm completions
   [[ -t 1 ]] && command -v pnpm &>/dev/null && eval "$(pnpm completion zsh 2>/dev/null || pnpm completion bash)"

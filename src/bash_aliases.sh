@@ -20,6 +20,9 @@ alias jal='LOCALLY=true ja'
 # quick terraform alias
 alias tf='terraform'
 
+# claude code default model
+export ANTHROPIC_MODEL='claude-opus-4-5-20251101'
+
 # aws profiles
 alias use.tugether='export AWS_PROFILE=tugether'
 alias use.ahbode.dev='export AWS_PROFILE=ahbode.dev'
