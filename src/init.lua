@@ -171,3 +171,16 @@ vim.keymap.set('n', '<C-e>', function()
 end, { noremap = true, silent = true })
 
 -- ctrl+h/j/k/l = navigate between windows (configured in smart-splits plugin above)
+
+-- ctrl+z = undo, ctrl+shift+z = redo (standard keybinds)
+vim.keymap.set('n', '<C-z>', 'u', { noremap = true })
+vim.keymap.set('i', '<C-z>', '<Esc>ui', { noremap = true })
+vim.keymap.set('n', '<C-S-z>', '<C-r>', { noremap = true })
+vim.keymap.set('i', '<C-S-z>', '<Esc><C-r>i', { noremap = true })
+
+-- ctrl+r = copy relative path of current file to clipboard (relative to cwd)
+vim.keymap.set('n', '<C-r>', function()
+  local path = vim.fn.expand('%:.')
+  vim.fn.setreg('+', path)
+  print('copied: ' .. path)
+end, { noremap = true, silent = false })
