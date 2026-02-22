@@ -52,10 +52,16 @@ require('lazy').setup({
     config = function()
       local ss = require('smart-splits')
       ss.setup({})
+      -- navigate between windows
       vim.keymap.set('n', '<C-h>', ss.move_cursor_left)
       vim.keymap.set('n', '<C-j>', ss.move_cursor_down)
       vim.keymap.set('n', '<C-k>', ss.move_cursor_up)
       vim.keymap.set('n', '<C-l>', ss.move_cursor_right)
+      -- resize windows with alt+hjkl
+      vim.keymap.set('n', '<A-h>', ss.resize_left)
+      vim.keymap.set('n', '<A-j>', ss.resize_down)
+      vim.keymap.set('n', '<A-k>', ss.resize_up)
+      vim.keymap.set('n', '<A-l>', ss.resize_right)
     end,
   },
   {
@@ -70,6 +76,13 @@ require('lazy').setup({
       window = {
         position = 'left',
         width = 30,
+        mappings = {
+          ['o'] = function(state)
+            local node = state.tree:get_node()
+            local path = node.type == 'directory' and node.path or vim.fn.fnamemodify(node.path, ':h')
+            require('oil').open(path)
+          end,
+        },
       },
       filesystem = {
         filtered_items = {
@@ -79,6 +92,24 @@ require('lazy').setup({
         },
       },
     },
+  },
+  {
+    'stevearc/oil.nvim',
+    dependencies = { 'nvim-tree/nvim-web-devicons' },
+    config = function()
+      require('oil').setup({
+        columns = { 'icon' },
+        view_options = {
+          show_hidden = true,
+        },
+        keymaps = {
+          ['<C-h>'] = false,  -- don't override window nav
+          ['<C-l>'] = false,
+        },
+      })
+      -- `-` opens parent directory
+      vim.keymap.set('n', '-', '<CMD>Oil<CR>', { desc = 'Open parent directory' })
+    end,
   },
 })
 
@@ -138,6 +169,16 @@ hi('NeoTreeRootName',       { fg = '#F0E68C', bold = true })
 hi('NeoTreeTitleBar',       { fg = '#333333', bg = '#F5DEB3' })
 hi('NeoTreeFloatBorder',    { fg = '#555555' })
 hi('NeoTreeCursorLine',     { bg = '#4D4D4D' })
+
+-- oil
+hi('OilDir',               { fg = '#C4A882' })
+hi('OilDirIcon',           { fg = '#C4A882' })
+hi('OilFile',              { fg = '#FFFFFF' })
+hi('OilCreate',            { fg = '#98FB98' })
+hi('OilDelete',            { fg = '#FF2B2B' })
+hi('OilMove',              { fg = '#F0E68C' })
+hi('OilCopy',              { fg = '#87CEFF' })
+hi('OilChange',            { fg = '#F0E68C' })
 
 -- diff
 hi('DiffAdd',      { fg = '#98FB98', bg = '#333333' })
