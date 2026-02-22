@@ -64,6 +64,24 @@ workflow:
 
 oil is safe by default — deletes always show confirmation.
 
+## git
+
+toggle with `Ctrl+g` (symmetric to `Ctrl+e` for neo-tree).
+
+| key | context | action |
+|-----|---------|--------|
+| `Ctrl+g` | anywhere | toggle diff view |
+| `Ctrl+h/j/k/l` | diff view | navigate between panes |
+| `Enter` | file panel | view diff for file |
+| `o` | file panel / history | open file and close diff view |
+| `Ctrl+d j` / `Ctrl+d k` | anywhere / diff | next / prev diff boundary |
+
+workflow:
+1. `Ctrl+g` to open diff view
+2. file panel on left shows changed files
+3. `Enter` to view diff, or `o` to open file and exit
+4. `Ctrl+g` to close when done
+
 ## plugins
 
 | plugin | purpose |
@@ -74,6 +92,7 @@ oil is safe by default — deletes always show confirmation.
 | smart-splits | window navigation + resize |
 | lualine | status line |
 | gitsigns | git indicators in gutter |
+| diffview | git diff view with file tree |
 
 ## theme
 

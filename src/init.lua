@@ -9,9 +9,192 @@ if not vim.loop.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
+-- shared diff boundary navigation
+local function navigate_diff_boundary(direction, get_chunks, fallback)
+  local chunks = get_chunks()
+  if not chunks or #chunks == 0 then return end
+  local cursor = vim.api.nvim_win_get_cursor(0)[1]
+  if direction == 'down' then
+    for i, c in ipairs(chunks) do
+      if cursor >= c.start and cursor < c.fin then
+        vim.api.nvim_win_set_cursor(0, { c.fin, 0 })
+        print('chunk ' .. i .. ' bot')
+        return
+      elseif cursor == c.fin then
+        local next_idx = chunks[i + 1] and (i + 1) or 1
+        vim.api.nvim_win_set_cursor(0, { chunks[next_idx].start, 0 })
+        print('chunk ' .. next_idx .. ' top')
+        return
+      end
+    end
+  else -- up
+    for i, c in ipairs(chunks) do
+      if cursor > c.start and cursor <= c.fin then
+        vim.api.nvim_win_set_cursor(0, { c.start, 0 })
+        print('chunk ' .. i .. ' top')
+        return
+      elseif cursor == c.start then
+        local prev_idx = chunks[i - 1] and (i - 1) or #chunks
+        vim.api.nvim_win_set_cursor(0, { chunks[prev_idx].fin, 0 })
+        print('chunk ' .. prev_idx .. ' bot')
+        return
+      end
+    end
+  end
+  -- not in a chunk, use fallback
+  if fallback then fallback() end
+end
+
+-- get chunks from vim diff highlights
+local function get_diff_hl_chunks()
+  local chunks = {}
+  local lines = vim.api.nvim_buf_line_count(0)
+  local in_chunk = false
+  local chunk_start = nil
+  for lnum = 1, lines do
+    local hl = vim.fn.diff_hlID(lnum, 1)
+    local is_diff = hl > 0
+    if is_diff and not in_chunk then
+      in_chunk = true
+      chunk_start = lnum
+    elseif not is_diff and in_chunk then
+      table.insert(chunks, { start = chunk_start, fin = lnum - 1 })
+      in_chunk = false
+    end
+  end
+  if in_chunk then
+    table.insert(chunks, { start = chunk_start, fin = lines })
+  end
+  return chunks
+end
+
 -- plugins
 require('lazy').setup({
-  { 'lewis6991/gitsigns.nvim', config = true },
+  {
+    'lewis6991/gitsigns.nvim',
+    config = function()
+      local gs = require('gitsigns')
+      gs.setup({})
+      -- get chunks from gitsigns hunks
+      local function get_gitsigns_chunks()
+        local hunks = gs.get_hunks()
+        if not hunks then return {} end
+        local chunks = {}
+        for _, h in ipairs(hunks) do
+          table.insert(chunks, {
+            start = h.added.start,
+            fin = h.added.start + math.max(h.added.count - 1, 0),
+          })
+        end
+        return chunks
+      end
+      -- ctrl+d alone shows hint
+      vim.keymap.set('n', '<C-d>', function()
+        print('diff: j=down k=up')
+      end, { desc = 'Diff navigation hint' })
+      -- ctrl+d j/k to navigate diff boundaries
+      local function boundary_down()
+        navigate_diff_boundary('down', get_gitsigns_chunks, function()
+          gs.next_hunk({ navigation_message = false })
+        end)
+      end
+      local function boundary_up()
+        navigate_diff_boundary('up', get_gitsigns_chunks, function()
+          gs.prev_hunk({ navigation_message = false })
+        end)
+      end
+      vim.keymap.set('n', '<C-d>j', boundary_down, { desc = 'Next diff boundary' })
+      vim.keymap.set('n', '<C-d>k', boundary_up, { desc = 'Prev diff boundary' })
+      vim.keymap.set('n', '<C-d><C-j>', boundary_down, { desc = 'Next diff boundary' })
+      vim.keymap.set('n', '<C-d><C-k>', boundary_up, { desc = 'Prev diff boundary' })
+    end,
+  },
+  {
+    'sindrets/diffview.nvim',
+    dependencies = { 'nvim-lua/plenary.nvim', 'mrjones2014/smart-splits.nvim' },
+    config = function()
+      local ss = require('smart-splits')
+      local actions = require('diffview.actions')
+      require('diffview').setup({
+        view = {
+          default = { layout = 'diff2_vertical' },
+          merge_tool = { layout = 'diff3_mixed' },
+        },
+        keymaps = {
+          disable_defaults = false,
+          view = {
+            ['<C-h>'] = ss.move_cursor_left,
+            ['<C-j>'] = ss.move_cursor_down,
+            ['<C-k>'] = ss.move_cursor_up,
+            ['<C-l>'] = ss.move_cursor_right,
+            ['<C-d>j'] = function()
+              navigate_diff_boundary('down', get_diff_hl_chunks, function()
+                vim.cmd('normal! ]c')
+              end)
+            end,
+            ['<C-d>k'] = function()
+              navigate_diff_boundary('up', get_diff_hl_chunks, function()
+                vim.cmd('normal! [c')
+              end)
+            end,
+            ['<C-d><C-j>'] = function()
+              navigate_diff_boundary('down', get_diff_hl_chunks, function()
+                vim.cmd('normal! ]c')
+              end)
+            end,
+            ['<C-d><C-k>'] = function()
+              navigate_diff_boundary('up', get_diff_hl_chunks, function()
+                vim.cmd('normal! [c')
+              end)
+            end,
+          },
+          file_panel = {
+            ['<C-h>'] = ss.move_cursor_left,
+            ['<C-j>'] = ss.move_cursor_down,
+            ['<C-k>'] = ss.move_cursor_up,
+            ['<C-l>'] = ss.move_cursor_right,
+            ['o'] = function()
+              local lib = require('diffview.lib')
+              local view = lib.get_current_view()
+              if view then
+                local file = view.panel:get_item_at_cursor()
+                if file and file.path then
+                  vim.cmd('DiffviewClose')
+                  vim.cmd('edit ' .. vim.fn.fnameescape(file.path))
+                end
+              end
+            end,
+          },
+          file_history_panel = {
+            ['<C-h>'] = ss.move_cursor_left,
+            ['<C-j>'] = ss.move_cursor_down,
+            ['<C-k>'] = ss.move_cursor_up,
+            ['<C-l>'] = ss.move_cursor_right,
+            ['o'] = function()
+              local lib = require('diffview.lib')
+              local view = lib.get_current_view()
+              if view then
+                local file = view.panel:get_item_at_cursor()
+                if file and file.path then
+                  vim.cmd('DiffviewClose')
+                  vim.cmd('edit ' .. vim.fn.fnameescape(file.path))
+                end
+              end
+            end,
+          },
+        },
+      })
+      -- ctrl+g = toggle diff view (symmetric to ctrl+e for neo-tree)
+      vim.keymap.set('n', '<C-g>', function()
+        local lib = require('diffview.lib')
+        if lib.get_current_view() then
+          vim.cmd('DiffviewClose')
+        else
+          vim.cmd('DiffviewOpen')
+        end
+      end, { desc = 'Toggle diff view' })
+    end,
+  },
   {
     'nvim-lualine/lualine.nvim',
     dependencies = { 'nvim-tree/nvim-web-devicons' },
@@ -39,8 +222,27 @@ require('lazy').setup({
       sections = {
         lualine_a = { { 'mode', fmt = string.lower } },
         lualine_b = { 'branch', 'diff' },
-        lualine_c = { 'filename' },
-        lualine_x = { 'filetype' },
+        lualine_c = { {
+          'filename',
+          fmt = function(name)
+            local ft = vim.bo.filetype
+            if ft == 'DiffviewFiles' then return 'diff tree' end
+            if ft == 'DiffviewFileHistory' then return 'diff history' end
+            if ft == 'neo-tree' then return 'files' end
+            if ft == 'oil' then return 'oil' end
+            return name
+          end,
+        } },
+        lualine_x = { {
+          'filetype',
+          fmt = function(ft)
+            if ft == 'DiffviewFiles' then return 'diff' end
+            if ft == 'DiffviewFileHistory' then return 'history' end
+            if ft == 'neo-tree' then return 'tree' end
+            if ft == 'oil' then return 'oil' end
+            return ft
+          end,
+        } },
         lualine_y = { 'location' },
         lualine_z = { { 'progress', fmt = string.lower } },
       },
@@ -112,6 +314,9 @@ require('lazy').setup({
     end,
   },
 })
+
+-- disable tabline
+vim.opt.showtabline = 0
 
 -- colorscheme: ptyxis Desert palette
 -- ref: https://github.com/Gogh-Co/Gogh/blob/master/themes/Desert.yml
@@ -185,6 +390,13 @@ hi('DiffAdd',      { fg = '#98FB98', bg = '#333333' })
 hi('DiffDelete',   { fg = '#FF2B2B', bg = '#333333' })
 hi('DiffChange',   { fg = '#F0E68C', bg = '#333333' })
 hi('DiffText',     { fg = '#333333', bg = '#F0E68C' })
+
+-- diffview
+hi('DiffviewFilePanelTitle',      { fg = '#F0E68C', bold = true })
+hi('DiffviewFilePanelCounter',    { fg = '#F5DEB3' })
+hi('DiffviewFilePanelFileName',   { fg = '#FFFFFF' })
+hi('DiffviewFilePanelPath',       { fg = '#777777' })
+hi('DiffviewDim1',                { fg = '#555555' })
 
 -- ctrl+c = copy (visual mode)
 vim.keymap.set('v', '<C-c>', '"+y')
