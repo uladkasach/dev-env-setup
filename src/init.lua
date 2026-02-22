@@ -74,7 +74,13 @@ require('lazy').setup({
     'lewis6991/gitsigns.nvim',
     config = function()
       local gs = require('gitsigns')
-      gs.setup({})
+      gs.setup({
+        signs_staged_enable = true,   -- show staged changes differently
+        attach_to_untracked = true,   -- show signs for new untracked files
+        signs = {
+          untracked = { text = '┃' }, -- same as add, not dotted
+        },
+      })
       -- get chunks from gitsigns hunks
       local function get_gitsigns_chunks()
         local hunks = gs.get_hunks()
@@ -90,7 +96,7 @@ require('lazy').setup({
       end
       -- ctrl+d alone shows hint
       vim.keymap.set('n', '<C-d>', function()
-        print('diff: j=down k=up')
+        print('diff: j/k=nav s/a=stage u=unstage x=discard')
       end, { desc = 'Diff navigation hint' })
       -- ctrl+d j/k to navigate diff boundaries
       local function boundary_down()
@@ -107,6 +113,27 @@ require('lazy').setup({
       vim.keymap.set('n', '<C-d>k', boundary_up, { desc = 'Prev diff boundary' })
       vim.keymap.set('n', '<C-d><C-j>', boundary_down, { desc = 'Next diff boundary' })
       vim.keymap.set('n', '<C-d><C-k>', boundary_up, { desc = 'Prev diff boundary' })
+      -- ctrl+d s = stage, u = unstage, x = discard
+      local function stage_buffer()
+        gs.stage_buffer()
+        print('+stage 🤙')
+      end
+      local function unstage_buffer()
+        gs.reset_buffer_index()
+        print('-stage 👋')
+      end
+      local function discard_buffer()
+        gs.reset_buffer()
+        print('discarded 🗑️')
+      end
+      vim.keymap.set('n', '<C-d>s', stage_buffer, { desc = 'Stage buffer' })
+      vim.keymap.set('n', '<C-d><C-s>', stage_buffer, { desc = 'Stage buffer' })
+      vim.keymap.set('n', '<C-d>a', stage_buffer, { desc = 'Stage buffer' })
+      vim.keymap.set('n', '<C-d><C-a>', stage_buffer, { desc = 'Stage buffer' })
+      vim.keymap.set('n', '<C-d>u', unstage_buffer, { desc = 'Unstage buffer' })
+      vim.keymap.set('n', '<C-d><C-u>', unstage_buffer, { desc = 'Unstage buffer' })
+      vim.keymap.set('n', '<C-d>x', discard_buffer, { desc = 'Discard unstaged changes' })
+      vim.keymap.set('n', '<C-d><C-x>', discard_buffer, { desc = 'Discard unstaged changes' })
     end,
   },
   {
@@ -183,6 +210,81 @@ require('lazy').setup({
                 end
               end
             end,
+            -- ctrl+d s = stage, u = unstage, x = discard
+            ['<C-d>s'] = function()
+              local view = require('diffview.lib').get_current_view()
+              local file = view and view.panel:get_item_at_cursor()
+              if file and file.kind ~= 'staged' then
+                actions.toggle_stage_entry()
+                print('+stage 🤙')
+              else
+                print('+stage 🤙 (noop)')
+              end
+            end,
+            ['<C-d><C-s>'] = function()
+              local view = require('diffview.lib').get_current_view()
+              local file = view and view.panel:get_item_at_cursor()
+              if file and file.kind ~= 'staged' then
+                actions.toggle_stage_entry()
+                print('+stage 🤙')
+              else
+                print('+stage 🤙 (noop)')
+              end
+            end,
+            ['<C-d>a'] = function()
+              local view = require('diffview.lib').get_current_view()
+              local file = view and view.panel:get_item_at_cursor()
+              if file and file.kind ~= 'staged' then
+                actions.toggle_stage_entry()
+                print('+stage 🤙')
+              else
+                print('+stage 🤙 (noop)')
+              end
+            end,
+            ['<C-d><C-a>'] = function()
+              local view = require('diffview.lib').get_current_view()
+              local file = view and view.panel:get_item_at_cursor()
+              if file and file.kind ~= 'staged' then
+                actions.toggle_stage_entry()
+                print('+stage 🤙')
+              else
+                print('+stage 🤙 (noop)')
+              end
+            end,
+            ['<C-d>u'] = function()
+              local view = require('diffview.lib').get_current_view()
+              local file = view and view.panel:get_item_at_cursor()
+              if file and file.kind == 'staged' then
+                actions.toggle_stage_entry()
+                print('-stage 👋')
+              else
+                print('-stage 👋 (noop)')
+              end
+            end,
+            ['<C-d><C-u>'] = function()
+              local view = require('diffview.lib').get_current_view()
+              local file = view and view.panel:get_item_at_cursor()
+              if file and file.kind == 'staged' then
+                actions.toggle_stage_entry()
+                print('-stage 👋')
+              else
+                print('-stage 👋 (noop)')
+              end
+            end,
+            ['<C-d>x'] = function()
+              actions.restore_entry()
+              print('discarded 🗑️')
+            end,
+            ['<C-d><C-x>'] = function()
+              actions.restore_entry()
+              print('discarded 🗑️')
+            end,
+            -- disable defaults
+            ['-'] = false,
+            ['s'] = false,
+            ['S'] = false,
+            ['U'] = false,
+            ['X'] = false,
           },
           file_history_panel = {
             ['<C-h>'] = ss.move_cursor_left,
