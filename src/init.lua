@@ -127,6 +127,25 @@ require('lazy').setup({
             ['<C-j>'] = ss.move_cursor_down,
             ['<C-k>'] = ss.move_cursor_up,
             ['<C-l>'] = ss.move_cursor_right,
+            ['o'] = function()
+              local lib = require('diffview.lib')
+              local view = lib.get_current_view()
+              local path = nil
+              -- try to get path from layout
+              if view and view.cur_layout and view.cur_layout.b then
+                local file = view.cur_layout.b.file
+                if file then path = file.path end
+              end
+              -- fallback: parse from buffer name
+              if not path then
+                local bufname = vim.api.nvim_buf_get_name(0)
+                path = bufname:match('diffview://.-/(.+)')
+              end
+              if path and path ~= '' then
+                -- open in new tab, keep diffview open
+                vim.cmd('tabnew ' .. vim.fn.fnameescape(path))
+              end
+            end,
             ['<C-d>j'] = function()
               navigate_diff_boundary('down', get_diff_hl_chunks, function()
                 vim.cmd('normal! ]c')
@@ -184,12 +203,34 @@ require('lazy').setup({
           },
         },
       })
-      -- ctrl+g = toggle diff view (symmetric to ctrl+e for neo-tree)
+      -- ctrl+g = toggle between diff view and file tabs
+      local last_file_tab = nil
       vim.keymap.set('n', '<C-g>', function()
         local lib = require('diffview.lib')
-        if lib.get_current_view() then
-          vim.cmd('DiffviewClose')
+        local view = lib.get_current_view()
+        if view then
+          -- in diffview: go to last file tab or previous tab
+          if last_file_tab and vim.api.nvim_tabpage_is_valid(last_file_tab) then
+            vim.api.nvim_set_current_tabpage(last_file_tab)
+          else
+            vim.cmd('tabprevious')
+          end
         else
+          -- not in diffview: save current tab, find or open diffview
+          last_file_tab = vim.api.nvim_get_current_tabpage()
+          -- find diffview tab
+          for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+            local wins = vim.api.nvim_tabpage_list_wins(tab)
+            for _, win in ipairs(wins) do
+              local buf = vim.api.nvim_win_get_buf(win)
+              local name = vim.api.nvim_buf_get_name(buf)
+              if name:match('^diffview://') then
+                vim.api.nvim_set_current_tabpage(tab)
+                return
+              end
+            end
+          end
+          -- no diffview tab, open new one
           vim.cmd('DiffviewOpen')
         end
       end, { desc = 'Toggle diff view' })
