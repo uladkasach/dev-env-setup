@@ -209,6 +209,8 @@ tab-overview='<Control>o'
 close-tab='<Shift><Control>w'
 move-previous-tab='<Shift><Control>h'
 move-next-tab='<Shift><Control>l'
+scroll-page-up='<Shift><Control>k'
+scroll-page-down='<Shift><Control>j'
 
 [org/gnome/Ptyxis/Profiles/48d4f1a48e2fa956aa1f108e697f9492]
 palette='Desert'

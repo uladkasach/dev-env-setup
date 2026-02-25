@@ -528,11 +528,11 @@ hi('OilMove',              { fg = '#F0E68C' })
 hi('OilCopy',              { fg = '#87CEFF' })
 hi('OilChange',            { fg = '#F0E68C' })
 
--- diff
-hi('DiffAdd',      { fg = '#98FB98', bg = '#333333' })
-hi('DiffDelete',   { fg = '#FF2B2B', bg = '#333333' })
-hi('DiffChange',   { fg = '#F0E68C', bg = '#333333' })
-hi('DiffText',     { fg = '#333333', bg = '#F0E68C' })
+-- diff (subtle tints to preserve syntax colors)
+hi('DiffAdd',      { bg = '#3a4a3a' })  -- subtle green tint
+hi('DiffDelete',   { bg = '#4a3a3a' })  -- subtle red tint
+hi('DiffChange',   { bg = '#4a4a3a' })  -- subtle yellow tint
+hi('DiffText',     { bg = '#5a5a4a' })  -- changed text within line
 
 -- diffview
 hi('DiffviewFilePanelTitle',      { fg = '#F0E68C', bold = true })
