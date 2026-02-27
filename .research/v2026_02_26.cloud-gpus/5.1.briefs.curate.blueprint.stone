@@ -1,0 +1,213 @@
+read:
+- .research/v2026_02_26.cloud-gpus/0.wish.md
+- .research/v2026_02_26.cloud-gpus/3.2.absorb.clusters.v1.i1.md
+- .research/v2026_02_26.cloud-gpus/3.3.absorb.gaps.v1.i1.md
+- .research/v2026_02_26.cloud-gpus/kernel/*.absorb.kernels.v1.i1.md
+
+---
+
+## instructions
+
+propose a blueprint for the knowledge course breakdown:
+
+1. identify domains and subdomains from the cluster organization
+   - each domain gets a code (e.g., `cons` for consensus, `ddd` for domain-driven-design)
+   - subdomains become the hierarchical path within the domain
+
+2. plan the tier structure for each domain:
+   - {code}101 = fundamentals catalog (overview of the domain)
+   - {code}201 = intermediate articles (specific concepts)
+   - {code}301 = advanced articles (complex topics, edge cases)
+   - {code}401 = meta/synthesis (comparisons, frameworks, decision guides)
+   - {code}501 = expert/research (frontier edge, open problems, novel contributions)
+
+3. map kernels to briefs:
+   - which kernels belong in which brief?
+   - what dependencies exist between briefs? (prereqs)
+
+4. use brief name pattern:
+   - `{code}XXX.{subtopic}._.[doctype].{variant}.md`
+
+---
+
+## output
+
+emit a full treestruct of filediffs for the proposed brief structure:
+
+.research/v2026_02_26.cloud-gpus/5.1.briefs.curate.blueprint.v1.i1.md
+
+example format:
+```
+output.briefs/
+├── physics.mechanics/                                            # domain dir (preview)
+│   ├── mech101.fundamentals._.[catalog].md
+│   ├── mech111.newtons-laws._.[catalog].md
+│   ├── mech121.energy._.[catalog].md
+│   ├── mech131.momentum._.[catalog].md
+│   ├── mech141.waves._.[catalog].md                             # waves is part of mechanics
+│   ├── ...                                                      # many more 1xx courses
+│   ├── mech201.rotational._.[catalog].md
+│   ├── mech251.oscillations.[article].md
+│   ├── ...                                                      # many more 2xx courses
+│   ├── mech301.lagrangian._.[catalog].md
+│   ├── mech351.hamiltonian.[article].md
+│   ├── ...                                                      # many more 3xx courses
+│   ├── mech401.classical-vs-quantum._.[article].frame.limits.md
+│   └── mech501.chaos-theory.[article].md
+│
+├── physics.electromagnetism/                                     # domain dir (expanded)
+│   ├── em101.fundamentals._.[catalog].md
+│   ├── em101.fundamentals.1.charge.[article].md
+│   ├── em101.fundamentals.2.fields.[article].md
+│   ├── em101.fundamentals.3.force.[article].md
+│   ├── ...
+│   ├── em111.coulombs-law._.[catalog].md
+│   ├── em111.coulombs-law.1.point-charges.[article].md
+│   ├── em111.coulombs-law.2.superposition.[article].md
+│   ├── em111.coulombs-law.2.superposition.[demo].two-charges.md
+│   ├── ...
+│   ├── em121.electric-fields._.[catalog].md
+│   ├── em121.electric-fields.1.field-lines.[article].md
+│   ├── em121.electric-fields.1.field-lines.[lesson].phet-sim.md
+│   ├── em121.electric-fields.2.flux.[article].md
+│   ├── em121.electric-fields.2.flux.[demo].gaussian-surface.md
+│   ├── ...
+│   ├── em131.resistors._.[catalog].md
+│   ├── em131.resistors.1.ohms-law.[article].md
+│   ├── em131.resistors.2.materials.[article].md
+│   ├── em131.resistors.2.materials.[demo].diy-resistor.md
+│   ├── ...
+│   ├── em141.capacitors._.[catalog].md
+│   ├── em141.capacitors.1.parallel-plates.[article].md
+│   ├── em141.capacitors.1.parallel-plates.[demo].diy-capacitor.md
+│   ├── em141.capacitors.2.dielectrics.[article].md
+│   ├── ...
+│   ├── em151.inductors._.[catalog].md
+│   ├── em151.inductors.1.coils.[article].md
+│   ├── em151.inductors.1.coils.[demo].diy-inductor.md
+│   ├── em151.inductors.2.magnetic-energy.[article].md
+│   ├── ...
+│   ├── em161.generators._.[catalog].md
+│   ├── em161.generators.1.batteries.[article].md
+│   ├── em161.generators.1.batteries.[demo].lemon-battery.md
+│   ├── em161.generators.2.dynamos.[article].md
+│   ├── em161.generators.2.dynamos.[demo].diy-hand-crank.md
+│   ├── em161.generators.3.solar-cells.[article].md
+│   ├── em161.generators.3.solar-cells.[demo].measure-solar-iv.md
+│   ├── em161.generators.4.thermocouples.[article].md
+│   ├── ...
+│   ├── em201.maxwells-equations._.[catalog].md
+│   ├── em201.maxwells-equations.1.gauss-law.[article].md
+│   ├── em201.maxwells-equations.1.gauss-law.[lesson].spherical-symmetry.md
+│   ├── em201.maxwells-equations.2.faraday-law.[article].md
+│   ├── em201.maxwells-equations.2.faraday-law.[demo].induced-emf.md
+│   ├── em201.maxwells-equations.3.ampere-law.[article].md
+│   ├── ...
+│   ├── em251.electromagnetic-waves.[article].md
+│   ├── ...
+│   ├── em301.radiation._.[catalog].md
+│   ├── em301.radiation.1.dipole.[article].md
+│   ├── em301.radiation.1.dipole.[demo].hertzian-dipole.md
+│   ├── em301.radiation.2.antenna.[article].md
+│   ├── em301.radiation.2.antenna.[lesson].nec-software.md
+│   ├── ...
+│   ├── em351.waveguides.[article].md
+│   ├── em351.waveguides.[lesson].rectangular-mode-calc.md
+│   ├── ...
+│   ├── em401.unification._.[article].frame.historical.md
+│   ├── ...
+│   └── em501.quantum-electrodynamics.[article].md
+│
+├── physics.optics/                                               # domain dir (preview)
+│   ├── opt101.fundamentals._.[catalog].md
+│   ├── opt111.reflection._.[catalog].md
+│   ├── opt121.refraction._.[catalog].md
+│   ├── ...                                                      # many more 1xx courses
+│   ├── opt201.wave-optics._.[catalog].md
+│   ├── opt251.fiber-optics.[article].md
+│   ├── ...                                                      # many more 2xx courses
+│   ├── opt301.lasers._.[catalog].md
+│   ├── opt351.holography.[article].md
+│   ├── ...                                                      # many more 3xx courses
+│   ├── opt401.geometric-vs-wave._.[article].frame.when-to-use.md
+│   └── opt501.quantum-optics.[article].md
+│
+└── physics.thermodynamics/                                       # domain dir (preview)
+    ├── thermo101.fundamentals._.[catalog].md
+    ├── thermo111.laws._.[catalog].md
+    ├── thermo121.entropy._.[catalog].md
+    ├── thermo131.phase-change._.[catalog].md                    # boil, melt, etc.
+    ├── ...                                                      # many more 1xx courses
+    ├── thermo201.cycles._.[catalog].md
+    ├── thermo251.phase-transitions.[article].md
+    ├── ...                                                      # many more 2xx courses
+    ├── thermo301.statistical-mechanics._.[catalog].md
+    ├── thermo351.non-equilibrium.[article].md
+    ├── ...                                                      # many more 3xx courses
+    ├── thermo401.macro-vs-micro._.[article].frame.bridges.md
+    └── thermo501.black-hole-thermodynamics.[article].md
+```
+
+note:
+- `_` = category overview that summarizes children with that prefix
+- subtopics without `_` = standalone documents (most briefs)
+- numbers: 101, 110, 121, 201, 251, 301, 351, 401, 501, etc.
+
+include:
+- full list of proposed briefs with their kernel assignments
+- dependency/prereq relationships between briefs
+- rationale for domain/subdomain breakdown
+
+---
+
+## appendix: brief name pattern
+
+briefs follow a course-code pattern inspired by university course catalogs:
+
+```
+{code}XXX.{subtopic}._.[doctype].{variant}.md
+```
+
+| component | description | examples |
+|-----------|-------------|----------|
+| `{code}` | topic-specific prefix (like college course codes) | `kno`, `cons`, `scm`, `ddd` |
+| `XXX` | tier within topic | `101`=fundamentals, `201`=intermediate, `301`=advanced, `401`=meta, `501`=expert |
+| `{subtopic}` | hierarchical path within tier | `paxos`, `raft`, `comparison` |
+| `_` | category overview marker | `cons101.fundamentals._.[catalog].md` |
+| `[doctype]` | document type in brackets | `[article]`, `[catalog]`, `[demo]`, `[lesson]` |
+| `{variant}` | optional frame/perspective | `frame.practical_tradeoffs`, `persp.garden` |
+
+### tiers
+
+| tier | purpose | example |
+|------|---------|---------|
+| `1xx` | fundamentals | `em101.fundamentals._.[catalog].md`, `em111.coulombs-law.1.point-charges.[article].md` |
+| `2xx` | intermediate | `em201.maxwells-equations.1.gauss-law.[article].md`, `em251.electromagnetic-waves.[article].md` |
+| `3xx` | advanced | `em301.radiation.1.dipole.[article].md`, `em351.waveguides.[article].md` |
+| `4xx` | meta/synthesis | `em401.unification._.[article].frame.historical.md` |
+| `5xx` | expert/research | `em501.quantum-electrodynamics.[article].md` |
+
+### doctypes
+
+| doctype | purpose |
+|---------|---------|
+| `[article]` | deep-dive on a single concept |
+| `[catalog]` | index/overview of related concepts |
+| `[demo]` | worked example or demonstration |
+| `[lesson]` | how-to or tutorial |
+
+### examples
+
+| file | explains |
+|------|----------|
+| `em101.fundamentals._.[catalog].md` | overview catalog of fundamentals children |
+| `em101.fundamentals.1.charge.[article].md` | subdocument under fundamentals |
+| `em111.coulombs-law.2.superposition.[article].md` | another 1xx topic with subtopic index |
+| `em111.coulombs-law.2.superposition.[demo].two-charges.md` | worked example for superposition |
+| `em121.electric-fields.1.field-lines.[lesson].phet-sim.md` | how-to with phet simulator tool |
+| `em131.capacitance.1.parallel-plates.[demo].diy-capacitor.md` | build your own capacitor at home |
+| `em251.electromagnetic-waves.[article].md` | standalone intermediate article (no `_`) |
+| `em301.radiation._.[catalog].md` | advanced overview of radiation children |
+| `em301.radiation.2.antenna.[lesson].nec-software.md` | how-to with nec antenna software |
+| `em401.unification._.[article].frame.historical.md` | meta synthesis with historical frame |
+| `em501.quantum-electrodynamics.[article].md` | research frontier topic |

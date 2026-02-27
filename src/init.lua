@@ -45,7 +45,26 @@ local function navigate_diff_boundary(direction, get_chunks, fallback)
   if fallback then fallback() end
 end
 
--- get chunks from vim diff highlights
+-- find file path from codediff-explorer line (searches changed/staged files)
+local function get_codediff_explorer_file()
+  local line = vim.api.nvim_get_current_line()
+  local filename = line:match('([%w_%-%.]+%.[%w]+)')
+  if not filename then return nil end
+  local partial = line:match('[%w_%-%.]+%.[%w]+%s+([%w_%-%.%/]+)')
+  local search_partial = partial and partial:gsub('%.%.%.?$', '') or ''
+  local cmd = 'git diff --name-only HEAD 2>/dev/null; git diff --cached --name-only 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null'
+  local changed = vim.fn.systemlist(cmd)
+  for _, p in ipairs(changed) do
+    if p:match(vim.pesc(filename) .. '$') then
+      if search_partial == '' or p:find(search_partial, 1, true) then
+        return p
+      end
+    end
+  end
+  return filename  -- fallback to just filename
+end
+
+-- get chunks from vim diff highlights (for codediff boundary nav)
 local function get_diff_hl_chunks()
   local chunks = {}
   local lines = vim.api.nvim_buf_line_count(0)
@@ -137,205 +156,119 @@ require('lazy').setup({
     end,
   },
   {
-    'sindrets/diffview.nvim',
-    dependencies = { 'nvim-lua/plenary.nvim', 'mrjones2014/smart-splits.nvim' },
-    config = function()
-      local ss = require('smart-splits')
-      local actions = require('diffview.actions')
-      require('diffview').setup({
-        view = {
-          default = { layout = 'diff2_vertical' },
-          merge_tool = { layout = 'diff3_mixed' },
-        },
-        keymaps = {
-          disable_defaults = false,
-          view = {
-            ['<C-h>'] = ss.move_cursor_left,
-            ['<C-j>'] = ss.move_cursor_down,
-            ['<C-k>'] = ss.move_cursor_up,
-            ['<C-l>'] = ss.move_cursor_right,
-            ['o'] = function()
-              local lib = require('diffview.lib')
-              local view = lib.get_current_view()
-              local path = nil
-              -- try to get path from layout
-              if view and view.cur_layout and view.cur_layout.b then
-                local file = view.cur_layout.b.file
-                if file then path = file.path end
-              end
-              -- fallback: parse from buffer name
-              if not path then
-                local bufname = vim.api.nvim_buf_get_name(0)
-                path = bufname:match('diffview://.-/(.+)')
-              end
-              if path and path ~= '' then
-                -- open in new tab, keep diffview open
-                vim.cmd('tabnew ' .. vim.fn.fnameescape(path))
-              end
-            end,
-            ['<C-d>j'] = function()
-              navigate_diff_boundary('down', get_diff_hl_chunks, function()
-                vim.cmd('normal! ]c')
-              end)
-            end,
-            ['<C-d>k'] = function()
-              navigate_diff_boundary('up', get_diff_hl_chunks, function()
-                vim.cmd('normal! [c')
-              end)
-            end,
-            ['<C-d><C-j>'] = function()
-              navigate_diff_boundary('down', get_diff_hl_chunks, function()
-                vim.cmd('normal! ]c')
-              end)
-            end,
-            ['<C-d><C-k>'] = function()
-              navigate_diff_boundary('up', get_diff_hl_chunks, function()
-                vim.cmd('normal! [c')
-              end)
-            end,
-          },
-          file_panel = {
-            ['<C-h>'] = ss.move_cursor_left,
-            ['<C-j>'] = ss.move_cursor_down,
-            ['<C-k>'] = ss.move_cursor_up,
-            ['<C-l>'] = ss.move_cursor_right,
-            ['o'] = function()
-              local lib = require('diffview.lib')
-              local view = lib.get_current_view()
-              if view then
-                local file = view.panel:get_item_at_cursor()
-                if file and file.path then
-                  vim.cmd('DiffviewClose')
-                  vim.cmd('edit ' .. vim.fn.fnameescape(file.path))
-                end
-              end
-            end,
-            -- ctrl+d s = stage, u = unstage, x = discard
-            ['<C-d>s'] = function()
-              local view = require('diffview.lib').get_current_view()
-              local file = view and view.panel:get_item_at_cursor()
-              if file and file.kind ~= 'staged' then
-                actions.toggle_stage_entry()
-                print('+stage 🤙')
-              else
-                print('+stage 🤙 (noop)')
-              end
-            end,
-            ['<C-d><C-s>'] = function()
-              local view = require('diffview.lib').get_current_view()
-              local file = view and view.panel:get_item_at_cursor()
-              if file and file.kind ~= 'staged' then
-                actions.toggle_stage_entry()
-                print('+stage 🤙')
-              else
-                print('+stage 🤙 (noop)')
-              end
-            end,
-            ['<C-d>a'] = function()
-              local view = require('diffview.lib').get_current_view()
-              local file = view and view.panel:get_item_at_cursor()
-              if file and file.kind ~= 'staged' then
-                actions.toggle_stage_entry()
-                print('+stage 🤙')
-              else
-                print('+stage 🤙 (noop)')
-              end
-            end,
-            ['<C-d><C-a>'] = function()
-              local view = require('diffview.lib').get_current_view()
-              local file = view and view.panel:get_item_at_cursor()
-              if file and file.kind ~= 'staged' then
-                actions.toggle_stage_entry()
-                print('+stage 🤙')
-              else
-                print('+stage 🤙 (noop)')
-              end
-            end,
-            ['<C-d>u'] = function()
-              local view = require('diffview.lib').get_current_view()
-              local file = view and view.panel:get_item_at_cursor()
-              if file and file.kind == 'staged' then
-                actions.toggle_stage_entry()
-                print('-stage 👋')
-              else
-                print('-stage 👋 (noop)')
-              end
-            end,
-            ['<C-d><C-u>'] = function()
-              local view = require('diffview.lib').get_current_view()
-              local file = view and view.panel:get_item_at_cursor()
-              if file and file.kind == 'staged' then
-                actions.toggle_stage_entry()
-                print('-stage 👋')
-              else
-                print('-stage 👋 (noop)')
-              end
-            end,
-            ['<C-d>x'] = function()
-              actions.restore_entry()
-              print('discarded 🗑️')
-            end,
-            ['<C-d><C-x>'] = function()
-              actions.restore_entry()
-              print('discarded 🗑️')
-            end,
-            -- disable defaults
-            ['-'] = false,
-            ['s'] = false,
-            ['S'] = false,
-            ['U'] = false,
-            ['X'] = false,
-          },
-          file_history_panel = {
-            ['<C-h>'] = ss.move_cursor_left,
-            ['<C-j>'] = ss.move_cursor_down,
-            ['<C-k>'] = ss.move_cursor_up,
-            ['<C-l>'] = ss.move_cursor_right,
-            ['o'] = function()
-              local lib = require('diffview.lib')
-              local view = lib.get_current_view()
-              if view then
-                local file = view.panel:get_item_at_cursor()
-                if file and file.path then
-                  vim.cmd('DiffviewClose')
-                  vim.cmd('edit ' .. vim.fn.fnameescape(file.path))
-                end
-              end
-            end,
-          },
-        },
-      })
-      -- ctrl+g = toggle between diff view and file tabs
-      local last_file_tab = nil
-      vim.keymap.set('n', '<C-g>', function()
-        local lib = require('diffview.lib')
-        local view = lib.get_current_view()
-        if view then
-          -- in diffview: go to last file tab or previous tab
-          if last_file_tab and vim.api.nvim_tabpage_is_valid(last_file_tab) then
-            vim.api.nvim_set_current_tabpage(last_file_tab)
+    'esmuellert/codediff.nvim',
+    keys = {
+      { '<C-g>', function()
+        local codediff_loaded, codediff = pcall(require, 'codediff')
+        -- check if in codediff buffer
+        local bufname = vim.api.nvim_buf_get_name(0)
+        local ft = vim.bo.filetype
+        local in_codediff = bufname:match('codediff://') or ft:match('^codediff')
+        if in_codediff then
+          -- in codediff: go to last file tab or previous tab
+          if _G.last_file_tab and vim.api.nvim_tabpage_is_valid(_G.last_file_tab) then
+            vim.api.nvim_set_current_tabpage(_G.last_file_tab)
           else
             vim.cmd('tabprevious')
           end
         else
-          -- not in diffview: save current tab, find or open diffview
-          last_file_tab = vim.api.nvim_get_current_tabpage()
-          -- find diffview tab
+          -- not in codediff: save current tab, find or open codediff
+          _G.last_file_tab = vim.api.nvim_get_current_tabpage()
+          -- find codediff tab
           for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
             local wins = vim.api.nvim_tabpage_list_wins(tab)
             for _, win in ipairs(wins) do
               local buf = vim.api.nvim_win_get_buf(win)
               local name = vim.api.nvim_buf_get_name(buf)
-              if name:match('^diffview://') then
+              local bft = vim.api.nvim_get_option_value('filetype', { buf = buf })
+              if name:match('codediff://') or bft:match('^codediff') then
                 vim.api.nvim_set_current_tabpage(tab)
                 return
               end
             end
           end
-          -- no diffview tab, open new one
-          vim.cmd('DiffviewOpen')
+          -- no codediff tab, open new one
+          vim.cmd('CodeDiff')
         end
-      end, { desc = 'Toggle diff view' })
+      end, desc = 'Toggle diff view' },
+    },
+    cmd = 'CodeDiff',
+    config = function()
+      require('codediff').setup({
+        keymaps = {
+          -- navigation
+          next_change = ']c',
+          prev_change = '[c',
+          next_file = ']f',
+          prev_file = '[f',
+          -- stage with - (codediff default)
+          stage = '-',
+          quit = 'q',
+        },
+      })
+      -- codediff buffer keymaps
+      vim.api.nvim_create_autocmd('BufEnter', {
+        pattern = '*',
+        callback = function()
+          local bufname = vim.api.nvim_buf_get_name(0)
+          local ft = vim.bo.filetype
+          -- only apply to codediff buffers (explorer or diff panes)
+          local is_codediff = bufname:match('[Cc]ode[Dd]iff') or ft:match('codediff')
+          -- also check if any window in this tab has codediff buffer
+          if not is_codediff then
+            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+              local wbuf = vim.api.nvim_win_get_buf(win)
+              local wft = vim.api.nvim_get_option_value('filetype', { buf = wbuf })
+              local wname = vim.api.nvim_buf_get_name(wbuf)
+              if wft:match('codediff') or wname:match('[Cc]ode[Dd]iff') then
+                is_codediff = true
+                break
+              end
+            end
+          end
+          if not is_codediff then return end
+          -- ctrl+d j/k for diff boundary navigation
+          local function boundary_down()
+            navigate_diff_boundary('down', get_diff_hl_chunks, function()
+              vim.cmd('normal! ]c')
+            end)
+          end
+          local function boundary_up()
+            navigate_diff_boundary('up', get_diff_hl_chunks, function()
+              vim.cmd('normal! [c')
+            end)
+          end
+          vim.keymap.set('n', '<C-d>j', boundary_down, { buffer = true, desc = 'Next diff boundary' })
+          vim.keymap.set('n', '<C-d>k', boundary_up, { buffer = true, desc = 'Prev diff boundary' })
+          vim.keymap.set('n', '<C-d><C-j>', boundary_down, { buffer = true, desc = 'Next diff boundary' })
+          vim.keymap.set('n', '<C-d><C-k>', boundary_up, { buffer = true, desc = 'Prev diff boundary' })
+          -- 'o' to open file in new tab
+          vim.keymap.set('n', 'o', function()
+            local bufname = vim.api.nvim_buf_get_name(0)
+            local ft = vim.bo.filetype
+            local path = nil
+            if ft == 'codediff-explorer' then
+              path = get_codediff_explorer_file()
+            else
+              -- in file pane: bufname is the actual file path or virtual codediff:// path
+              if vim.fn.filereadable(bufname) == 1 then
+                path = bufname
+              elseif bufname:match('codediff:') then
+                -- extract relative path from virtual buffer name
+                local relpath = bufname:match(':%d/(.+)$')
+                if relpath then
+                  path = relpath
+                end
+              end
+            end
+            if path then
+              vim.cmd('tabnew ' .. vim.fn.fnameescape(path))
+            else
+              print('no path')
+            end
+          end, { buffer = true, desc = 'Open file in new tab' })
+        end,
+      })
     end,
   },
   {
@@ -367,20 +300,35 @@ require('lazy').setup({
         lualine_b = { 'branch', 'diff' },
         lualine_c = { {
           'filename',
-          fmt = function(name)
+          fmt = function()
             local ft = vim.bo.filetype
-            if ft == 'DiffviewFiles' then return 'diff tree' end
-            if ft == 'DiffviewFileHistory' then return 'diff history' end
+            local bufname = vim.api.nvim_buf_get_name(0)
+            -- codediff explorer: show relative path of file under cursor
+            if ft == 'codediff-explorer' then
+              return get_codediff_explorer_file() or 'diff'
+            end
+            -- codediff file pane: extract relative path
+            if bufname:match('codediff:') then
+              local relpath = bufname:match(':%d/(.+)$')
+              if relpath then return relpath end
+              -- can't determine path, show ???/filename
+              local filename = bufname:match('([^/]+)$')
+              return filename and ('???/' .. filename) or 'diff'
+            end
             if ft == 'neo-tree' then return 'files' end
             if ft == 'oil' then return 'oil' end
-            return name
+            -- regular files: show path relative to git root or cwd
+            local gitroot = vim.fn.system('git rev-parse --show-toplevel 2>/dev/null'):gsub('\n', '')
+            if gitroot ~= '' and bufname:find(gitroot, 1, true) == 1 then
+              return bufname:sub(#gitroot + 2)
+            end
+            return vim.fn.expand('%:.')
           end,
         } },
         lualine_x = { {
           'filetype',
           fmt = function(ft)
-            if ft == 'DiffviewFiles' then return 'diff' end
-            if ft == 'DiffviewFileHistory' then return 'history' end
+            if ft:match('^codediff') then return 'diff' end
             if ft == 'neo-tree' then return 'tree' end
             if ft == 'oil' then return 'oil' end
             return ft
@@ -461,6 +409,15 @@ require('lazy').setup({
 -- disable tabline
 vim.opt.showtabline = 0
 
+-- wrap lines for markdown files
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = 'markdown',
+  callback = function()
+    vim.opt_local.wrap = true
+    vim.opt_local.linebreak = true  -- wrap at word boundaries
+  end,
+})
+
 -- colorscheme: ptyxis Desert palette
 -- ref: https://github.com/Gogh-Co/Gogh/blob/master/themes/Desert.yml
 vim.cmd('highlight clear')
@@ -534,12 +491,6 @@ hi('DiffDelete',   { bg = '#4a3a3a' })  -- subtle red tint
 hi('DiffChange',   { bg = '#4a4a3a' })  -- subtle yellow tint
 hi('DiffText',     { bg = '#5a5a4a' })  -- changed text within line
 
--- diffview
-hi('DiffviewFilePanelTitle',      { fg = '#F0E68C', bold = true })
-hi('DiffviewFilePanelCounter',    { fg = '#F5DEB3' })
-hi('DiffviewFilePanelFileName',   { fg = '#FFFFFF' })
-hi('DiffviewFilePanelPath',       { fg = '#777777' })
-hi('DiffviewDim1',                { fg = '#555555' })
 
 -- ctrl+c = copy (visual mode)
 vim.keymap.set('v', '<C-c>', '"+y')

@@ -1,0 +1,32 @@
+read the probe questions collected in .research/v2026_02_26.cloud-gpus/1.3.probes.aim.blend.v1.i1.md
+
+for each question, launch a parallel subagent to investigate:
+- one probe subagent per one question
+- recommended brain: sonnet or higher
+
+---
+
+## subagent instructions
+
+each probe subagent must do a thorough investigation:
+- websearch to find atleast 11 relevant sources per question
+- for each source, do a deep dive:
+  - full summary of the source
+  - MANY direct quotes (not just one or two)
+  - conclusion with takeaway relationship to the wish
+- distinguish facts from opinions
+- note gaps and uncertainties
+
+this is not a shallow citation list — each probe must thoroughly investigate each citation.
+
+each subagent emits to: .research/v2026_02_26.cloud-gpus/probe.v1/q$N.probe.research.response.v1.i1.md
+- where $N is the question number assigned to that probe
+
+---
+
+## orchestration
+
+emit an inventory of the dispatched probes into:
+.research/v2026_02_26.cloud-gpus/2.probe.emit.v1.i1.inventory.md
+
+as each subagent completes, update its progress & stats in the inventory file

@@ -1,0 +1,58 @@
+read:
+- .research/v2026_02_26.cloud-gpus/5.1.briefs.curate.blueprint.v1.i1.md
+- .research/v2026_02_26.cloud-gpus/kernel/*.absorb.kernels.v1.i1.md
+- .research/v2026_02_26.cloud-gpus/probe.v1/*.probe.research.response.v1.i1.md
+- .research/v2026_02_26.cloud-gpus/probe.v2/*.probe.research.response.v1.i1.md (if present)
+
+---
+
+## instructions
+
+execute the blueprint and produce the knowledge collection:
+
+for each brief in the blueprint:
+1. gather the assigned kernels
+2. trace kernels back to probe sources for citations
+3. compose the brief content per the format below
+4. write to the specified path under output.briefs/
+
+---
+
+## brief format
+
+each brief should:
+- match the established brief patterns in librarian/briefs/
+- include citations from probe findings (with exact quotes where applicable)
+- be self-contained and reusable
+- declare prerequisites if the brief depends on grasp of other briefs
+
+structure:
+```markdown
+# {title}
+
+## .what
+[brief summary of what this brief covers]
+
+## .why
+[why this knowledge matters, when you would use it]
+
+## content
+[main content organized by subtopic]
+
+## citations
+[numbered list of sources with exact quotes]
+
+## see also
+[links to related briefs, prereqs]
+```
+
+---
+
+## output
+
+emit to .research/v2026_02_26.cloud-gpus/output.briefs/{domain}/
+
+create all directories as needed.
+
+emit a completion inventory to:
+.research/v2026_02_26.cloud-gpus/5.2.briefs.curate.execute.v1.i1.inventory.md

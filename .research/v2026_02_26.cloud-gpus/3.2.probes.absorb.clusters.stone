@@ -1,0 +1,25 @@
+read all kernel files in .research/v2026_02_26.cloud-gpus/kernel/
+
+---
+
+## instructions
+
+catalogize the kernels:
+- cluster by domain
+- relate kernels to each other (dependencies, contradictions, reinforcements)
+- blend converged kernels into representative kernels that point to each citation
+
+index based on treestruct hierarchy for lookup:
+- most abstract concepts at root
+- progressively concrete toward leaves
+- cross-references via [$ref(kernel-NNN)] for related kernels
+
+note: this may be a massive inventory of knowledge kernels; do this process incrementally and evolve the treestruct if needed; every single kernel must be accounted for
+
+note: do not pigeonhole kernels into extant clusters if they fundamentally signal a new cluster; these are valuable signals that inform us of gaps in our exploration, via symmetry or inherent questions
+
+---
+
+## output
+
+emit to .research/v2026_02_26.cloud-gpus/3.2.absorb.clusters.v1.i1.md
