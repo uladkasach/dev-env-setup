@@ -1,0 +1,21 @@
+read:
+- .research/v2026_02_26.cloud-gpus/probe.v1/*.probe.research.response.v1.i1.md
+- .research/v2026_02_26.cloud-gpus/kernel/*.absorb.kernels.v1.i1.md
+- .research/v2026_02_26.cloud-gpus/3.2.absorb.clusters.v1.i1.md
+
+---
+
+## instructions
+
+surface knowledge gaps across the research:
+- explicit omissions (questions asked but not answered)
+- implicit omissions (questions that should have been asked)
+- symmetric omissions (patterns from parallel domains not yet explored)
+- contradictions (kernels in conflict with each other)
+- sparse clusters (domains with few kernels relative to others)
+
+---
+
+## output
+
+emit to .research/v2026_02_26.cloud-gpus/3.3.absorb.gaps.v1.i1.md

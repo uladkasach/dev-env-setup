@@ -1,0 +1,33 @@
+read the probe results in .research/v2026_02_26.cloud-gpus/probe.v1/
+
+for each probe result file, launch a parallel subagent to kernelize:
+- one subagent per probe file
+- recommended brain: sonnet or higher
+
+---
+
+## subagent instructions
+
+extract atomic knowledge units from the probe result, with labels:
+- [FACT] = grounded, provable, empirically or logically verifiable knowledge
+- [SUMP] = assumptions; not explicitly proven or provable
+- [KHUE] = questions; defined and available to be explored
+- [HYPO] = hypothesis; provable claims proposed but not yet tested
+- [OPIN] = subjective declaration to consider
+
+each kernel should:
+- be atomic (one idea per kernel)
+- cite the source with exact quote
+- cluster by domain within the probe
+
+each subagent emits to: .research/v2026_02_26.cloud-gpus/kernel/q$N.absorb.kernels.v1.i1.md
+- where $N is the question number of the source probe
+
+---
+
+## orchestration
+
+emit an inventory of dispatched kernelizers into:
+.research/v2026_02_26.cloud-gpus/3.1.absorb.kernels.v1.i1.inventory.md
+
+as each subagent completes, update its progress & stats in the inventory file
