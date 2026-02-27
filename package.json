@@ -1,9 +1,9 @@
 {
 	"devDependencies": {
-		"rhachet": "^1.35.0",
+		"rhachet": "^1.37.1",
 		"rhachet-brains-anthropic": "^0.3.3",
-		"rhachet-roles-bhrain": "^0.12.0",
-		"rhachet-roles-bhuild": "^0.9.0",
-		"rhachet-roles-ehmpathy": "^1.26.2"
+		"rhachet-roles-bhrain": "^0.15.3",
+		"rhachet-roles-bhuild": "^0.12.2",
+		"rhachet-roles-ehmpathy": "^1.26.7"
 	}
 }
