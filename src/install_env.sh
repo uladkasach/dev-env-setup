@@ -1,78 +1,3 @@
-#########################
-## enable ctrl-c and ctrl-v as copy and paste in the terminal
-## ref: https://askubuntu.com/questions/53688/making-ctrlc-copy-text-in-gnome-terminal
-#########################
-sudo apt install gconf2
-gconftool-2 -t str -s /apps/gnome-terminal/keybindings/copy "<Control>c"
-gconftool-2 -t str -s /apps/gnome-terminal/keybindings/paste "<Control>v"
-
-#########################
-## rebind interrupt key to ctrl+x
-## ref: https://forums.justlinux.com/showthread.php?127575-Saving-stty-settings-permanently-with-automatic-read; https://stackoverflow.com/a/25391867/3068233; https://forums.justlinux.com/showthread.php?105417-stty-erase-in-bash*; https://askubuntu.com/questions/61543/stty-doesnt-work
-#########################
-stty intr ^X
-grep -qxF 'stty intr ^X' ~/.bashrc || echo '\n# bind interrupt key to ctrl-x\stty intr ^X' >> ~/.bashrc # writes to `~/.bashrc` if that line is not alrady there; Why add to `~/.bashrc` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
-
-#########################
-## install vim + neovim
-#########################
-sudo apt install vim -y # note: ~/.zshrc already defines that this is default
-sudo add-apt-repository ppa:neovim-ppa/unstable -y && sudo apt update && sudo apt install neovim -y
-
-configure_neovim() {
-  mkdir -p ~/.config/nvim
-  cp "$(dirname "$0")/init.lua" ~/.config/nvim/init.lua
-  echo "• neovim config applied"
-}
-configure_neovim
-
-#############################
-## for happiness, set swappiness
-## keeps os feel snappy faster. if you have 32gb ram or more, this is for you
-## ref: https://wiki.debian.org/swappiness
-#############################
-echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf # This tells linux: "prefer keeping stuff in RAM; only swap when truly necessary."
-
-#############################
-## add swapfile for overflow (complements zram)
-##
-## why: zram compresses cold pages in RAM (fast, ~16gb default)
-##      when zram fills, overflow goes to disk swap
-##      more disk swap = more headroom for cold pages
-##
-## hierarchy: RAM -> zram (compressed RAM) -> disk swap (SSD)
-#############################
-configure_swapfile() {
-  local swapfile="/swapfile"
-  local size="36G"
-
-  # skip if swapfile already exists and is active
-  if swapon --show | grep -q "$swapfile"; then
-    echo "• swapfile already active; skipped"
-    return 0
-  fi
-
-  # create swapfile if it doesn't exist
-  if [[ ! -f "$swapfile" ]]; then
-    echo "• create ${size} swapfile..."
-    sudo fallocate -l "$size" "$swapfile"
-    sudo chmod 600 "$swapfile"
-    sudo mkswap "$swapfile"
-  fi
-
-  # activate swapfile
-  sudo swapon "$swapfile"
-
-  # add to fstab if not already present
-  if ! grep -q "$swapfile" /etc/fstab; then
-    echo "$swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
-    echo "• swapfile added to /etc/fstab"
-  fi
-
-  echo "• swapfile configured: $size"
-}
-configure_swapfile
-
 #############################
 ## keyd - remap keys for optimal experience
 #############################
@@ -139,13 +64,73 @@ upsert_keyd_config
 sudo apt-get install keynav
 grep -qxF 'keynav' ~/.profile || echo '\n# start keynav in background\n(keynav && echo "keynav started" || echo "keynav already running") &' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
 
-
 ##########################
 ## install firefox via flatpak (we like sandboxes)
 ##########################
 flatpak install flathub org.mozilla.firefox
 xdg-settings set default-web-browser org.mozilla.firefox.desktop
 sudo apt remove firefox
+
+#########################
+## install vim + neovim
+#########################
+sudo apt install vim -y # note: ~/.zshrc already defines that this is default
+sudo add-apt-repository ppa:neovim-ppa/unstable -y && sudo apt update && sudo apt install neovim -y
+
+configure_neovim() {
+  mkdir -p ~/.config/nvim
+  cp "$(dirname "$0")/init.lua" ~/.config/nvim/init.lua
+  echo "• neovim config applied"
+}
+configure_neovim
+
+#############################
+## for happiness, set swappiness
+## keeps os feel snappy faster. if you have 32gb ram or more, this is for you
+## ref: https://wiki.debian.org/swappiness
+#############################
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf # This tells linux: "prefer keeping stuff in RAM; only swap when truly necessary."
+
+#############################
+## add swapfile for overflow (complements zram)
+##
+## why: zram compresses cold pages in RAM (fast, ~16gb default)
+##      when zram fills, overflow goes to disk swap
+##      more disk swap = more headroom for cold pages
+##
+## hierarchy: RAM -> zram (compressed RAM) -> disk swap (SSD)
+#############################
+configure_swapfile() {
+  local swapfile="/swapfile"
+  local size="36G"
+
+  # skip if swapfile already exists and is active
+  if swapon --show | grep -q "$swapfile"; then
+    echo "• swapfile already active; skipped"
+    return 0
+  fi
+
+  # create swapfile if it doesn't exist
+  if [[ ! -f "$swapfile" ]]; then
+    echo "• create ${size} swapfile..."
+    sudo fallocate -l "$size" "$swapfile"
+    sudo chmod 600 "$swapfile"
+    sudo mkswap "$swapfile"
+  fi
+
+  # activate swapfile
+  sudo swapon "$swapfile"
+
+  # add to fstab if not already present
+  if ! grep -q "$swapfile" /etc/fstab; then
+    echo "$swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
+    echo "• swapfile added to /etc/fstab"
+  fi
+
+  echo "• swapfile configured: $size"
+}
+configure_swapfile
+
 
 ##########################
 ## install ptyxis terminal (rapid, gpu-accelerated, container-aware)
