@@ -72,9 +72,10 @@ xdg-settings set default-web-browser org.mozilla.firefox.desktop
 sudo apt remove firefox
 
 ##########################
-## set a temporary alias for the browser (we lift this to bash aliases later)
+## set a temporary alias for the browser and terminal (we lift this to bash aliases later)
 #########################
 alias browser='flatpak run org.mozilla.firefox'
+alias terminal='ptyxis 2>/dev/null || cosmic-term'
 
 ########################
 ## install 1password firefox
