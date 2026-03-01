@@ -71,18 +71,15 @@ flatpak install flathub org.mozilla.firefox
 xdg-settings set default-web-browser org.mozilla.firefox.desktop
 sudo apt remove firefox
 
+##########################
+## set a temporary alias for the browser (we lift this to bash aliases later)
 #########################
-## install vim + neovim
-#########################
-sudo apt install vim -y # note: ~/.zshrc already defines that this is default
-sudo add-apt-repository ppa:neovim-ppa/unstable -y && sudo apt update && sudo apt install neovim -y
+alias browser='flatpak run org.mozilla.firefox'
 
-configure_neovim() {
-  mkdir -p ~/.config/nvim
-  cp "$(dirname "$0")/init.lua" ~/.config/nvim/init.lua
-  echo "• neovim config applied"
-}
-configure_neovim
+########################
+## install 1password firefox
+########################
+browser https://addons.mozilla.org/en-US/firefox/addon/1password-x-password-manager/
 
 #############################
 ## for happiness, set swappiness
@@ -131,56 +128,6 @@ configure_swapfile() {
 }
 configure_swapfile
 
-
-##########################
-## install ptyxis terminal (rapid, gpu-accelerated, container-aware)
-## ref: https://gitlab.gnome.org/chergert/ptyxis
-## ref: https://ubuntuhandbook.org/index.php/2025/08/install-set-ptyxis-as-default-terminal-in-ubuntu-24-04-22-04/
-## ref: https://documentation.ubuntu.com/desktop/en/latest/how-to/change-the-default-terminal/
-##########################
-install_ptyxis() {
-  # skip if ptyxis is already the default terminal (e.g., ubuntu 25.10+, gnome 47+)
-  local current_terminal
-  current_terminal=$(readlink -f /usr/bin/x-terminal-emulator 2>/dev/null || echo "")
-  if [[ "$current_terminal" == *ptyxis* ]]; then
-    echo "• ptyxis already default terminal; skipped"
-    return 0
-  fi
-
-  # install via flatpak if not already installed
-  if ! flatpak list | grep -q app.devsuite.Ptyxis; then
-    flatpak install -y flathub app.devsuite.Ptyxis
-  fi
-
-  # create wrapper executable for x-terminal-emulator compatibility
-  sudo tee /usr/bin/ptyxis.wrapper > /dev/null << 'EOF'
-#!/bin/sh
-flatpak run app.devsuite.Ptyxis --new-window
-EOF
-  sudo chmod +x /usr/bin/ptyxis.wrapper
-
-  # register and set as default terminal (ctrl+alt+t)
-  sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/ptyxis.wrapper 50
-  sudo update-alternatives --set x-terminal-emulator /usr/bin/ptyxis.wrapper
-}
-install_ptyxis
-
-source "$(dirname "$0")/install_env.ptyxis.sh"
-configure_ptyxis
-
-install_terminal_command() {
-  # .what = install 'terminal' command that opens terminal at specified directory
-  # .why  = 'terminal .' works in scripts, subshells, git tree, etc (unlike alias)
-  sudo tee /usr/bin/terminal > /dev/null << 'EOF'
-#!/usr/bin/env bash
-dir="${1:-.}"
-dir="$(realpath "$dir")"
-exec flatpak run app.devsuite.Ptyxis --new-window --working-directory "$dir"
-EOF
-  sudo chmod +x /usr/bin/terminal
-}
-install_terminal_command
-
 # #########################
 # ## install chrome
 # #########################
@@ -193,17 +140,17 @@ install_terminal_command
 #########################
 sudo apt-get install ssh -y;
 ssh-keygen; # use the default path to save the key; create your own password
-cat ~/.ssh/id_rsa.pub; # <- view your public key
+cat ~/.ssh/id_ed25519.pub; # <- view your public key
 # add it to your github account manually
 browser https://github.com/settings/keys
 
 ########################
-## install 1password chrome
-########################
-# install the chrome extension
-browser https://chrome.google.com/webstore/detail/1password-%E2%80%93-password-mana/aeblfdkhhhdcdjpifhhbdiojplfjncoa
-# update the extension keyboard shortcut
-browser chrome://extensions/shortcuts
+## set git user
+#######################
+git config --global user.email "u...k...@gmail.com" # change me to your email
+git config --global user.name "U... K..." # change me to your name
+git config --global pull.ff only # make sure that pull only ever automatically fasts forward
+git config --global init.defaultBranch main # default root branch name to `main`
 
 ########################
 ## clone this repo
@@ -254,42 +201,71 @@ install_nerd_font
 
 
 #########################
+## install vim + neovim
+#########################
+sudo apt install vim -y # note: ~/.zshrc already defines that this is default
+sudo add-apt-repository ppa:neovim-ppa/unstable -y && sudo apt update && sudo apt install neovim -y
+
+configure_neovim() {
+  mkdir -p ~/.config/nvim
+  cp "$(dirname "$0")/init.lua" ~/.config/nvim/init.lua
+  echo "• neovim config applied"
+}
+configure_neovim
+
+##########################
+## install ptyxis terminal (rapid, gpu-accelerated, container-aware)
+## ref: https://gitlab.gnome.org/chergert/ptyxis
+## ref: https://ubuntuhandbook.org/index.php/2025/08/install-set-ptyxis-as-default-terminal-in-ubuntu-24-04-22-04/
+## ref: https://documentation.ubuntu.com/desktop/en/latest/how-to/change-the-default-terminal/
+##########################
+install_ptyxis() {
+  # skip if ptyxis is already the default terminal (e.g., ubuntu 25.10+, gnome 47+)
+  local current_terminal
+  current_terminal=$(readlink -f /usr/bin/x-terminal-emulator 2>/dev/null || echo "")
+  if [[ "$current_terminal" == *ptyxis* ]]; then
+    echo "• ptyxis already default terminal; skipped"
+    return 0
+  fi
+
+  # install via flatpak if not already installed
+  if ! flatpak list | grep -q app.devsuite.Ptyxis; then
+    flatpak install -y flathub app.devsuite.Ptyxis
+  fi
+
+  # create wrapper executable for x-terminal-emulator compatibility
+  sudo tee /usr/bin/ptyxis.wrapper > /dev/null << 'EOF'
+#!/bin/sh
+flatpak run app.devsuite.Ptyxis --new-window
+EOF
+  sudo chmod +x /usr/bin/ptyxis.wrapper
+
+  # register and set as default terminal (ctrl+alt+t)
+  sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/ptyxis.wrapper 50
+  sudo update-alternatives --set x-terminal-emulator /usr/bin/ptyxis.wrapper
+}
+install_ptyxis
+
+source "$(dirname "$0")/install_env.ptyxis.sh"
+configure_ptyxis
+
+install_terminal_command() {
+  # .what = install 'terminal' command that opens terminal at specified directory
+  # .why  = 'terminal .' works in scripts, subshells, git tree, etc (unlike alias)
+  sudo tee /usr/bin/terminal > /dev/null << 'EOF'
+#!/usr/bin/env bash
+dir="${1:-.}"
+dir="$(realpath "$dir")"
+exec flatpak run app.devsuite.Ptyxis --new-window --working-directory "$dir"
+EOF
+  sudo chmod +x /usr/bin/terminal
+}
+install_terminal_command
+
+#########################
 ## make sure your pop-os laptop always starts in battery saver mode
 #########################
 grep -qxF 'system76-power profile battery' ~/.profile || echo '\n# start in battery saver\nsystem76-power profile battery' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
-
-#########################
-## install one password (https://support.1password.com/command-line-getting-started/)
-#########################
-curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
-sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg && \
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
-sudo tee /etc/apt/sources.list.d/1password.list && \
-sudo mkdir -p /etc/debsig/policies/AC2D62742012EA22/ && \
-curl -sS https://downloads.1password.com/linux/debian/debsig/1password.pol | \
-sudo tee /etc/debsig/policies/AC2D62742012EA22/1password.pol && \
-sudo mkdir -p /usr/share/debsig/keyrings/AC2D62742012EA22 && \
-curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
-sudo gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg && \
-sudo apt update && sudo apt install 1password-cli
-op --version;
-
-# signin
-op account add --address my.1password.com --email user@example.org # swap with your email
-op.signin; # use this bash alias to signin subsequently; it runs `eval $(op signin my)` for us
-
-# see docs
-browser https://support.1password.com/command-line-getting-started/
-browser https://support.1password.com/command-line/
-# for example, you can backup aws config with `op create document ~/.aws/credentials --title .aws/credentials`
-
-########################
-## set git user
-#######################
-git config --global user.email "u...k...@gmail.com" # change me to your email
-git config --global user.name "U... K..." # change me to your name
-git config --global pull.ff only # make sure that pull only ever automatically fasts forward
-git config --global init.defaultBranch main # default root branch name to `main`
 
 #######################
 ## set git aliases
