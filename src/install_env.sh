@@ -173,7 +173,7 @@ exec zsh
 " >> ~/.bashrc
 
 # now open a new terminal
-gnome-terminal
+terminal
 
 # note: if git icon looks weird, make sure to install font that supports it: https://github.com/tonsky/FiraCode :
 sudo apt install fonts-firacode
