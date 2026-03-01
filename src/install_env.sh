@@ -69,13 +69,9 @@ grep -qxF 'keynav' ~/.profile || echo '\n# start keynav in background\n(keynav &
 ## ref: https://ubuntuhandbook.org/index.php/2020/05/lid-close-behavior-ubuntu-20-04/
 ######################
 LOGIND_CONF="/etc/systemd/logind.conf"
-
-# Remove any existing lines for these settings (commented or not)
 for key in HandlePowerKey HandleSuspendKey HandleHibernateKey HandleRebootKey HandleLidSwitch HandleLidSwitchExternalPower HandleLidSwitchDocked; do
     sudo sed -i "/^#*${key}=/d" "$LOGIND_CONF"
 done
-
-# Append the new settings
 sudo tee -a "$LOGIND_CONF" > /dev/null <<'EOF'
 
 # use terminal instead; keyboard misfire is too common
@@ -89,7 +85,7 @@ HandleLidSwitch=ignore
 HandleLidSwitchExternalPower=ignore
 HandleLidSwitchDocked=ignore
 EOF
-# Note: Run 'sudo systemctl restart systemd-logind' to apply (will log you out)
+echo "run 'sudo systemctl restart systemd-logind' to apply (will log you out)"
 # Or just reboot after running this script
 
 ##########################
