@@ -64,6 +64,34 @@ upsert_keyd_config
 sudo apt-get install keynav
 grep -qxF 'keynav' ~/.profile || echo '\n# start keynav in background\n(keynav && echo "keynav started" || echo "keynav already running") &' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
 
+######################
+## dont suspend on lid close
+## ref: https://ubuntuhandbook.org/index.php/2020/05/lid-close-behavior-ubuntu-20-04/
+######################
+LOGIND_CONF="/etc/systemd/logind.conf"
+
+# Remove any existing lines for these settings (commented or not)
+for key in HandlePowerKey HandleSuspendKey HandleHibernateKey HandleRebootKey HandleLidSwitch HandleLidSwitchExternalPower HandleLidSwitchDocked; do
+    sudo sed -i "/^#*${key}=/d" "$LOGIND_CONF"
+done
+
+# Append the new settings
+sudo tee -a "$LOGIND_CONF" > /dev/null <<'EOF'
+
+# use terminal instead; keyboard misfire is too common
+HandlePowerKey=ignore
+HandleSuspendKey=ignore
+HandleHibernateKey=ignore
+HandleRebootKey=ignore
+
+# use terminal instead; display disconnect is too common
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+HandleLidSwitchDocked=ignore
+EOF
+# Note: Run 'sudo systemctl restart systemd-logind' to apply (will log you out)
+# Or just reboot after running this script
+
 ##########################
 ## install firefox via flatpak (we like sandboxes)
 ##########################
@@ -81,53 +109,6 @@ alias terminal='ptyxis 2>/dev/null || cosmic-term'
 ## install 1password firefox
 ########################
 browser https://addons.mozilla.org/en-US/firefox/addon/1password-x-password-manager/
-
-#############################
-## for happiness, set swappiness
-## keeps os feel snappy faster. if you have 32gb ram or more, this is for you
-## ref: https://wiki.debian.org/swappiness
-#############################
-echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf # This tells linux: "prefer keeping stuff in RAM; only swap when truly necessary."
-
-#############################
-## add swapfile for overflow (complements zram)
-##
-## why: zram compresses cold pages in RAM (fast, ~16gb default)
-##      when zram fills, overflow goes to disk swap
-##      more disk swap = more headroom for cold pages
-##
-## hierarchy: RAM -> zram (compressed RAM) -> disk swap (SSD)
-#############################
-configure_swapfile() {
-  local swapfile="/swapfile"
-  local size="36G"
-
-  # skip if swapfile already exists and is active
-  if swapon --show | grep -q "$swapfile"; then
-    echo "• swapfile already active; skipped"
-    return 0
-  fi
-
-  # create swapfile if it doesn't exist
-  if [[ ! -f "$swapfile" ]]; then
-    echo "• create ${size} swapfile..."
-    sudo fallocate -l "$size" "$swapfile"
-    sudo chmod 600 "$swapfile"
-    sudo mkswap "$swapfile"
-  fi
-
-  # activate swapfile
-  sudo swapon "$swapfile"
-
-  # add to fstab if not already present
-  if ! grep -q "$swapfile" /etc/fstab; then
-    echo "$swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
-    echo "• swapfile added to /etc/fstab"
-  fi
-
-  echo "• swapfile configured: $size"
-}
-configure_swapfile
 
 # #########################
 # ## install chrome
@@ -268,6 +249,53 @@ install_terminal_command
 #########################
 grep -qxF 'system76-power profile battery' ~/.profile || echo '\n# start in battery saver\nsystem76-power profile battery' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
 
+#############################
+## for happiness, set swappiness
+## keeps os feel snappy faster. if you have 32gb ram or more, this is for you
+## ref: https://wiki.debian.org/swappiness
+#############################
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf # This tells linux: "prefer keeping stuff in RAM; only swap when truly necessary."
+
+#############################
+## add swapfile for overflow (complements zram)
+##
+## why: zram compresses cold pages in RAM (fast, ~16gb default)
+##      when zram fills, overflow goes to disk swap
+##      more disk swap = more headroom for cold pages
+##
+## hierarchy: RAM -> zram (compressed RAM) -> disk swap (SSD)
+#############################
+configure_swapfile() {
+  local swapfile="/swapfile"
+  local size="36G"
+
+  # skip if swapfile already exists and is active
+  if swapon --show | grep -q "$swapfile"; then
+    echo "• swapfile already active; skipped"
+    return 0
+  fi
+
+  # create swapfile if it doesn't exist
+  if [[ ! -f "$swapfile" ]]; then
+    echo "• create ${size} swapfile..."
+    sudo fallocate -l "$size" "$swapfile"
+    sudo chmod 600 "$swapfile"
+    sudo mkswap "$swapfile"
+  fi
+
+  # activate swapfile
+  sudo swapon "$swapfile"
+
+  # add to fstab if not already present
+  if ! grep -q "$swapfile" /etc/fstab; then
+    echo "$swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
+    echo "• swapfile added to /etc/fstab"
+  fi
+
+  echo "• swapfile configured: $size"
+}
+configure_swapfile
+
 #######################
 ## set git aliases
 #######################
@@ -281,46 +309,6 @@ sudo apt install -y jq # required for manipulating json in terminal
 sudo apt install -y tree # required for tree view of directories
 
 #########################
-## install codium
-#########################
-# per https://vscodium.com/
-wget -qO - https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/-/raw/master/pub.gpg | gpg --dearmor | sudo dd of=/etc/apt/trusted.gpg.d/vscodium.gpg
-echo 'deb https://paulcarroty.gitlab.io/vscodium-deb-rpm-repo/debs/ vscodium main' | sudo tee --append /etc/apt/sources.list.d/vscodium.list
-sudo apt update && sudo apt install codium -y
-
-# use microsoft extensions lib
-# sudo find / -name product.json # reference for finding the full one
-mkdir ~/.config/VSCodium; # this dir may already exist if you've opened codium before
-touch ~/.config/VSCodium/product.json;
-echo "
-{
-  \"extensionsGallery\": {
-    \"serviceUrl\": \"https://marketplace.visualstudio.com/_apis/public/gallery\",
-    \"cacheUrl\": \"https://vscode.blob.core.windows.net/gallery/index\",
-    \"itemUrl\": \"https://marketplace.visualstudio.com/items\",
-    \"controlUrl\": \"\",
-    \"recommendationsUrl\": \"\"
-  }
-}
-" >> ~/.config/VSCodium/product.json;
-
-# setup copilot; https://github.com/VSCodium/vscodium/discussions/1487
-sudo vim /usr/share/codium/resources/app/product.json; # replace "GitHub.copilot" to ["inlineCompletions","inlineCompletionsNew","inlineCompletionsAdditions","textDocumentNotebook","interactive","terminalDataWriteEvent"]
-echo "manually sign out of github in the bottom left corner user icon in vscodium"
-echo "manually press sign into github copilot in that same link. it will prompt to enter a personal-access-token via web."
-echo "if the pat generated via link doesnt work, try again but instead of using that web url, do the following steps to get a working token"
-curl https://github.com/login/device/code -X POST -d 'client_id=01ab8ac9400c4e429b23&scope=user:email'; # request auth code for vscodium+copilot
-browser https://github.com/login/device/ # enter your user_code to grant this vscodeium client_id access to your email
-export YOUR_DEVICE_CODE="__your_device_code__" # get the device code from earlier
-curl https://github.com/login/oauth/access_token -X POST -d "client_id=01ab8ac9400c4e429b23&scope=user:email&device_code=$YOUR_DEVICE_CODE&grant_type=urn:ietf:params:oauth:grant-type:device_code" # exchange it for an access token
-
-# restore settings from backup
-codium --install-extension zokugun.sync-settings
-cp ~/git/more/dev-env-setup/codium/sync.settings.yml ~/.config/VSCodium/User/globalStorage/zokugun.sync-settings/settings.yml # install our sync settings
-codium && echo 'run the "Sync Settings: Download (repository -> user)" command' && echo 'open the Sync Settings output pane to see install progress'
-
-
-#########################
 ## install node + npm via fnm (fast node manager)
 ## ref: https://github.com/Schniz/fnm
 #########################
@@ -328,7 +316,7 @@ curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
 fnm install --lts # install latest lts version
 
 #########################
-## install drop box
+## install dropbox
 #########################
 browser https://www.dropbox.com/install-linux # see what the latest version is; update the link below if its changed
 wget https://linux.dropbox.com/packages/ubuntu/dropbox_2020.03.04_amd64.deb -P ~/Downloads;
@@ -342,15 +330,6 @@ dropbox start -i; # install the dropbox daemon and start it for the first time
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
 sudo ./aws/install
-
-# restore config into '~/.aws`
-mkdir -p ~/.aws
-op get document .aws/config --output ~/.aws/config
-op get document .aws/credentials --output ~/.aws/credentials
-
-# test installation
-use.ahbode.dev # alias was defined by `./bash_aliases`
-aws sts get-caller-identity
 
 #########################
 ## install terraform w/ tfenv
@@ -414,14 +393,7 @@ echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo s
 #########################
 ## vpn client (https://support.system76.com/articles/use-openvpn/)
 #########################
-sudo apt install openvpn network-manager-openvpn-gnome -y
-
-#########################
-## vpn connections
-#########################
-mkdir -p ~/.vpn \
-  && op get document .vpn/ahbode.dev.vpn.main.connection.ovpn --output ~/.vpn/ahbode.dev.vpn.main.connection.ovpn \
-  && op get document .vpn/ahbode.prod.vpn.main.connection.ovpn --output ~/.vpn/ahbode.prod.vpn.main.connection.ovpn;
+# sudo apt install openvpn network-manager-openvpn-gnome -y
 
 ########################
 ## add github cli tool; https://github.com/cli/cli/blob/trunk/docs/install_linux.md#debian-ubuntu-linux-raspberry-pi-os-apt
@@ -434,127 +406,6 @@ curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo 
   && sudo apt install gh -y
 # login to gh
 gh auth login
-
-#######################
-## install gitui (terminal tui for git)
-## ref: https://github.com/extrawurst/gitui
-#######################
-install_gitui() {
-  echo "⏳ install gitui..."
-
-  # get latest version tag via gh cli (avoids api rate limits)
-  local version
-  version=$(gh release view --repo extrawurst/gitui --json tagName -q '.tagName' | sed 's/^v//')
-  if [[ -z "$version" || "$version" == "null" ]]; then
-    echo "⛈️ failed to fetch latest gitui version"
-    return 1
-  fi
-  echo "  • version: v$version"
-
-  # download binary via gh cli
-  local extract_dir="/tmp/gitui-extract-${version}"
-  rm -rf "$extract_dir"
-  mkdir -p "$extract_dir"
-  echo "  • download: gitui-linux-x86_64.tar.gz"
-  gh release download "v${version}" \
-    --repo extrawurst/gitui \
-    --pattern "gitui-linux-x86_64.tar.gz" \
-    --dir "$extract_dir"
-
-  local tarball="$extract_dir/gitui-linux-x86_64.tar.gz"
-  if [[ ! -f "$tarball" ]]; then
-    echo "⛈️ download failed: $tarball not found"
-    return 1
-  fi
-  echo "  • downloaded: $(ls -lh "$tarball" | awk '{print $5}')"
-
-  # inspect tarball contents
-  echo "  • tarball contents:"
-  tar -tzf "$tarball" | sed 's/^/      /'
-
-  # extract
-  tar -xzf "$tarball" -C "$extract_dir"
-  echo "  • extracted:"
-  ls -la "$extract_dir" | grep -v '\.tar\.gz' | sed 's/^/      /'
-
-  # find the binary (might be nested or at root)
-  local binary
-  binary=$(find "$extract_dir" -name "gitui" -type f -executable | head -1)
-  if [[ -z "$binary" ]]; then
-    echo "⛈️ gitui binary not found in extracted files"
-    return 1
-  fi
-  echo "  • binary found: $binary"
-
-  # install to /usr/local/bin
-  sudo mv "$binary" /usr/local/bin/gitui
-  sudo chmod +x /usr/local/bin/gitui
-  if [[ ! -x /usr/local/bin/gitui ]]; then
-    echo "⛈️ failed to install gitui to /usr/local/bin"
-    return 1
-  fi
-
-  # cleanup
-  rm -rf "$extract_dir"
-
-  # verify
-  echo "✨ gitui $(gitui --version) installed"
-}
-install_gitui
-
-configure_gitui_theme() {
-  # install desert theme (matches ptyxis Desert palette)
-  # ref: https://github.com/Gogh-Co/Gogh/blob/master/themes/Desert.yml
-  mkdir -p ~/.config/gitui
-  tee ~/.config/gitui/theme.ron > /dev/null << 'EOF'
-(
-  selected_tab: Some("#FFFFFF"),
-  command_fg: Some("#F5DEB3"),
-  selection_bg: Some("#555555"),
-  selection_fg: Some("#FFFFFF"),
-  cmdbar_bg: Some("#333333"),
-  cmdbar_extra_lines_bg: Some("#333333"),
-  disabled_fg: Some("#4D4D4D"),
-  diff_line_add: Some("#98FB98"),
-  diff_line_delete: Some("#FF2B2B"),
-  diff_file_added: Some("#98FB98"),
-  diff_file_removed: Some("#FF5555"),
-  diff_file_moved: Some("#87CEFF"),
-  diff_file_modified: Some("#F0E68C"),
-  commit_hash: Some("#CD853F"),
-  commit_time: Some("#FFDEAD"),
-  commit_author: Some("#87CEFF"),
-  danger_fg: Some("#FF2B2B"),
-  push_gauge_bg: Some("#98FB98"),
-  push_gauge_fg: Some("#333333"),
-  tag_fg: Some("#F0E68C"),
-  branch_fg: Some("#FFA0A0")
-)
-EOF
-  echo "• gitui desert theme configured"
-}
-configure_gitui_theme
-
-configure_gitui_keybindings() {
-  # enable vim-style hjkl navigation
-  # ref: https://github.com/extrawurst/gitui/blob/master/KEY_CONFIG.md
-  mkdir -p ~/.config/gitui
-  tee ~/.config/gitui/key_bindings.ron > /dev/null << 'EOF'
-(
-  // vim-style navigation
-  move_left: Some(( code: Char('h'), modifiers: "")),
-  move_right: Some(( code: Char('l'), modifiers: "")),
-  move_up: Some(( code: Char('k'), modifiers: "")),
-  move_down: Some(( code: Char('j'), modifiers: "")),
-
-  // remap displaced defaults
-  stash_open: Some(( code: Char('l'), modifiers: "CONTROL")),
-  open_help: Some(( code: F(1), modifiers: "")),
-)
-EOF
-  echo "• gitui vim keybindings configured"
-}
-configure_gitui_keybindings
 
 #######################
 ## clone all repos in the organizations you care about
@@ -584,19 +435,6 @@ logout # login logout of DE
 # then search "extensions" in settings and turn them on manually
 
 #######################
-## restore gnome-extension-radio channel-list
-#######################
-mkdir -p ~/.gse-radio \
-  && rm ~/.gse-radio/channelList.json \
-  && op get document .gse-radio/channelList.json --output ~/.gse-radio/channelList.json
-
-#######################
-## install support for AAC+ audio format codec (for comedy-radio.ru stream)
-#######################
-# comedy-radio.ru : https://pub0101.101.ru:8000/stream/air/aac/64/202
-sudo apt-get install -y ubuntu-restricted-extras libavcodec58 ffmpeg
-
-#######################
 ## make sure that nightlight is enabled
 #######################
 gsettings set org.gnome.settings-daemon.plugins.color night-light-enabled true # https://askubuntu.com/questions/1246195/how-to-turn-on-night-light-blue-light-filter-in-ubuntu-20-04
@@ -619,12 +457,6 @@ gsettings set org.gnome.shell.keybindings show-screenshot-ui "['Print', '<Primar
 gsettings set org.gnome.shell.keybindings show-screen-recording-ui "['<Ctrl><Shift><Alt>R']"
 
 ######################
-## install flatpak; https://flatpak.org/setup/Pop!_OS
-######################
-sudo apt install flatpak
-flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-
-######################
 ## install client apps
 ######################
 flatpak install flathub com.spotify.Client
@@ -642,41 +474,43 @@ sudo apt update;
 sudo apt-get install -y protonvpn;
 sudo apt install -y gnome-shell-extension-appindicator gir1.2-appindicator3-0.1; # system tray icon
 
-######################
-## install app image launcher
-## https://github.com/TheAssassin/AppImageLauncher
-######################
-sudo apt install software-properties-common
-sudo add-apt-repository ppa:appimagelauncher-team/stable
-sudo apt update
-sudo apt install appimagelauncher
 
+#########################
+## install codium
+#########################
+# per https://vscodium.com/
+wget -qO - https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/-/raw/master/pub.gpg | gpg --dearmor | sudo dd of=/etc/apt/trusted.gpg.d/vscodium.gpg
+echo 'deb https://paulcarroty.gitlab.io/vscodium-deb-rpm-repo/debs/ vscodium main' | sudo tee --append /etc/apt/sources.list.d/vscodium.list
+sudo apt update && sudo apt install codium -y
 
-######################
-## dont suspend on lid close
-## ref: https://ubuntuhandbook.org/index.php/2020/05/lid-close-behavior-ubuntu-20-04/
-######################
-LOGIND_CONF="/etc/systemd/logind.conf"
+# use microsoft extensions lib
+# sudo find / -name product.json # reference for finding the full one
+mkdir ~/.config/VSCodium; # this dir may already exist if you've opened codium before
+touch ~/.config/VSCodium/product.json;
+echo "
+{
+  \"extensionsGallery\": {
+    \"serviceUrl\": \"https://marketplace.visualstudio.com/_apis/public/gallery\",
+    \"cacheUrl\": \"https://vscode.blob.core.windows.net/gallery/index\",
+    \"itemUrl\": \"https://marketplace.visualstudio.com/items\",
+    \"controlUrl\": \"\",
+    \"recommendationsUrl\": \"\"
+  }
+}
+" >> ~/.config/VSCodium/product.json;
 
-# Remove any existing lines for these settings (commented or not)
-for key in HandlePowerKey HandleSuspendKey HandleHibernateKey HandleRebootKey HandleLidSwitch HandleLidSwitchExternalPower HandleLidSwitchDocked; do
-    sudo sed -i "/^#*${key}=/d" "$LOGIND_CONF"
-done
+# setup copilot; https://github.com/VSCodium/vscodium/discussions/1487
+sudo vim /usr/share/codium/resources/app/product.json; # replace "GitHub.copilot" to ["inlineCompletions","inlineCompletionsNew","inlineCompletionsAdditions","textDocumentNotebook","interactive","terminalDataWriteEvent"]
+echo "manually sign out of github in the bottom left corner user icon in vscodium"
+echo "manually press sign into github copilot in that same link. it will prompt to enter a personal-access-token via web."
+echo "if the pat generated via link doesnt work, try again but instead of using that web url, do the following steps to get a working token"
+curl https://github.com/login/device/code -X POST -d 'client_id=01ab8ac9400c4e429b23&scope=user:email'; # request auth code for vscodium+copilot
+browser https://github.com/login/device/ # enter your user_code to grant this vscodeium client_id access to your email
+export YOUR_DEVICE_CODE="__your_device_code__" # get the device code from earlier
+curl https://github.com/login/oauth/access_token -X POST -d "client_id=01ab8ac9400c4e429b23&scope=user:email&device_code=$YOUR_DEVICE_CODE&grant_type=urn:ietf:params:oauth:grant-type:device_code" # exchange it for an access token
 
-# Append the new settings
-sudo tee -a "$LOGIND_CONF" > /dev/null <<'EOF'
+# restore settings from backup
+codium --install-extension zokugun.sync-settings
+cp ~/git/more/dev-env-setup/codium/sync.settings.yml ~/.config/VSCodium/User/globalStorage/zokugun.sync-settings/settings.yml # install our sync settings
+codium && echo 'run the "Sync Settings: Download (repository -> user)" command' && echo 'open the Sync Settings output pane to see install progress'
 
-# use terminal instead; keyboard misfire is too common
-HandlePowerKey=ignore
-HandleSuspendKey=ignore
-HandleHibernateKey=ignore
-HandleRebootKey=ignore
-
-# use terminal instead; display disconnect is too common
-HandleLidSwitch=ignore
-HandleLidSwitchExternalPower=ignore
-HandleLidSwitchDocked=ignore
-EOF
-
-# Note: Run 'sudo systemctl restart systemd-logind' to apply (will log you out)
-# Or just reboot after running this script
