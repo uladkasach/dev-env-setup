@@ -62,7 +62,11 @@ upsert_keyd_config
 ##  - `semicolon` -> move to the selection
 #########################
 sudo apt-get install keynav
-grep -qxF 'keynav' ~/.profile || echo '\n# start keynav in background\n(keynav && echo "keynav started" || echo "keynav already running") &' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
+grep -qxF 'keynav' ~/.profile || cat <<'EOF' >> ~/.profile
+
+# start keynav in background
+(keynav && echo "keynav started" || echo "keynav already running") &
+EOF
 
 ######################
 ## dont suspend on lid close
