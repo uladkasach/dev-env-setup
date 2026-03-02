@@ -1,3 +1,11 @@
+##########################
+## set a temporary alias for the browser and terminal (we lift this to bash aliases later)
+#########################
+alias browser='flatpak run org.mozilla.firefox'
+alias terminal='ptyxis 2>/dev/null || cosmic-term'
+alias machine.logout='loginctl terminate-user "$USER"'
+alias machine.reboot='systemctl reboot'
+
 #############################
 ## keyd - remap keys for optimal experience
 #############################
@@ -89,8 +97,8 @@ HandleLidSwitch=ignore
 HandleLidSwitchExternalPower=ignore
 HandleLidSwitchDocked=ignore
 EOF
-echo "run 'sudo systemctl restart systemd-logind' to apply (will log you out)"
-# Or just reboot after running this script
+echo "run 'machine.logout' or 'machine.reboot' to apply"
+
 
 ##########################
 ## install firefox via flatpak (we like sandboxes)
@@ -98,12 +106,6 @@ echo "run 'sudo systemctl restart systemd-logind' to apply (will log you out)"
 flatpak install flathub org.mozilla.firefox
 xdg-settings set default-web-browser org.mozilla.firefox.desktop
 sudo apt remove firefox
-
-##########################
-## set a temporary alias for the browser and terminal (we lift this to bash aliases later)
-#########################
-alias browser='flatpak run org.mozilla.firefox'
-alias terminal='ptyxis 2>/dev/null || cosmic-term'
 
 ########################
 ## install 1password firefox
