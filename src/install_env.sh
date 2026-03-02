@@ -197,106 +197,10 @@ configure_neovim() {
 }
 configure_neovim
 
-##########################
-## install ptyxis terminal (rapid, gpu-accelerated, container-aware)
-## ref: https://gitlab.gnome.org/chergert/ptyxis
-## ref: https://ubuntuhandbook.org/index.php/2025/08/install-set-ptyxis-as-default-terminal-in-ubuntu-24-04-22-04/
-## ref: https://documentation.ubuntu.com/desktop/en/latest/how-to/change-the-default-terminal/
-##########################
-install_ptyxis() {
-  # skip if ptyxis is already the default terminal (e.g., ubuntu 25.10+, gnome 47+)
-  local current_terminal
-  current_terminal=$(readlink -f /usr/bin/x-terminal-emulator 2>/dev/null || echo "")
-  if [[ "$current_terminal" == *ptyxis* ]]; then
-    echo "• ptyxis already default terminal; skipped"
-    return 0
-  fi
-
-  # install via flatpak if not already installed
-  if ! flatpak list | grep -q app.devsuite.Ptyxis; then
-    flatpak install -y flathub app.devsuite.Ptyxis
-  fi
-
-  # create wrapper executable for x-terminal-emulator compatibility
-  sudo tee /usr/bin/ptyxis.wrapper > /dev/null << 'EOF'
-#!/bin/sh
-flatpak run app.devsuite.Ptyxis --new-window
-EOF
-  sudo chmod +x /usr/bin/ptyxis.wrapper
-
-  # register and set as default terminal (ctrl+alt+t)
-  sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/ptyxis.wrapper 50
-  sudo update-alternatives --set x-terminal-emulator /usr/bin/ptyxis.wrapper
-}
-install_ptyxis
-
-source "$(dirname "$0")/install_env.ptyxis.sh"
-configure_ptyxis
-
-install_terminal_command() {
-  # .what = install 'terminal' command that opens terminal at specified directory
-  # .why  = 'terminal .' works in scripts, subshells, git tree, etc (unlike alias)
-  sudo tee /usr/bin/terminal > /dev/null << 'EOF'
-#!/usr/bin/env bash
-dir="${1:-.}"
-dir="$(realpath "$dir")"
-exec flatpak run app.devsuite.Ptyxis --new-window --working-directory "$dir"
-EOF
-  sudo chmod +x /usr/bin/terminal
-}
-install_terminal_command
-
 #########################
 ## make sure your pop-os laptop always starts in battery saver mode
 #########################
 grep -qxF 'system76-power profile battery' ~/.profile || echo '\n# start in battery saver\nsystem76-power profile battery' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
-
-#############################
-## for happiness, set swappiness
-## keeps os feel snappy faster. if you have 32gb ram or more, this is for you
-## ref: https://wiki.debian.org/swappiness
-#############################
-echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf # This tells linux: "prefer keeping stuff in RAM; only swap when truly necessary."
-
-#############################
-## add swapfile for overflow (complements zram)
-##
-## why: zram compresses cold pages in RAM (fast, ~16gb default)
-##      when zram fills, overflow goes to disk swap
-##      more disk swap = more headroom for cold pages
-##
-## hierarchy: RAM -> zram (compressed RAM) -> disk swap (SSD)
-#############################
-configure_swapfile() {
-  local swapfile="/swapfile"
-  local size="36G"
-
-  # skip if swapfile already exists and is active
-  if swapon --show | grep -q "$swapfile"; then
-    echo "• swapfile already active; skipped"
-    return 0
-  fi
-
-  # create swapfile if it doesn't exist
-  if [[ ! -f "$swapfile" ]]; then
-    echo "• create ${size} swapfile..."
-    sudo fallocate -l "$size" "$swapfile"
-    sudo chmod 600 "$swapfile"
-    sudo mkswap "$swapfile"
-  fi
-
-  # activate swapfile
-  sudo swapon "$swapfile"
-
-  # add to fstab if not already present
-  if ! grep -q "$swapfile" /etc/fstab; then
-    echo "$swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
-    echo "• swapfile added to /etc/fstab"
-  fi
-
-  echo "• swapfile configured: $size"
-}
-configure_swapfile
 
 #######################
 ## set git aliases
@@ -317,13 +221,27 @@ sudo apt install -y tree # required for tree view of directories
 curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
 fnm install --lts # install latest lts version
 
-#########################
-## install dropbox
-#########################
-browser https://www.dropbox.com/install-linux # see what the latest version is; update the link below if its changed
-wget https://linux.dropbox.com/packages/ubuntu/dropbox_2020.03.04_amd64.deb -P ~/Downloads;
-sudo apt install ~/Downloads/dropbox_2020.03.04_amd64.deb;
-dropbox start -i; # install the dropbox daemon and start it for the first time
+
+########################
+## add github cli tool; https://github.com/cli/cli/blob/trunk/docs/install_linux.md#debian-ubuntu-linux-raspberry-pi-os-apt
+#######################
+type -p curl >/dev/null || sudo apt install curl -y # install curl if not already installed
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+  && sudo apt update \
+  && sudo apt install gh -y
+# login to gh
+gh auth login
+
+#######################
+## clone all repos in the organizations you care about
+#######################
+for organization in {ehmpathy,ahbode}; do
+  gh repo list $organization --limit 1000 | while read -r repo _; do
+    gh repo clone "$repo" "$HOME/git/$repo"
+  done
+done
 
 ##########################
 ## install aws cli
@@ -392,40 +310,52 @@ sudo apt-get install -y postgresql-client
 # per https://stackoverflow.com/a/32600959/3068233
 echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
 
-#########################
-## vpn client (https://support.system76.com/articles/use-openvpn/)
-#########################
-# sudo apt install openvpn network-manager-openvpn-gnome -y
+#############################
+## for happiness, set swappiness
+## keeps os feel snappy faster. if you have 32gb ram or more, this is for you
+## ref: https://wiki.debian.org/swappiness
+#############################
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf # This tells linux: "prefer keeping stuff in RAM; only swap when truly necessary."
 
-########################
-## add github cli tool; https://github.com/cli/cli/blob/trunk/docs/install_linux.md#debian-ubuntu-linux-raspberry-pi-os-apt
-#######################
-type -p curl >/dev/null || sudo apt install curl -y # install curl if not already installed
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-  && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
-  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-  && sudo apt update \
-  && sudo apt install gh -y
-# login to gh
-gh auth login
+#############################
+## add swapfile for overflow (complements zram)
+##
+## why: zram compresses cold pages in RAM (fast, ~16gb default)
+##      when zram fills, overflow goes to disk swap
+##      more disk swap = more headroom for cold pages
+##
+## hierarchy: RAM -> zram (compressed RAM) -> disk swap (SSD)
+#############################
+configure_swapfile() {
+  local swapfile="/swapfile"
+  local size="36G"
 
-#######################
-## clone all repos in the organizations you care about
-#######################
-for organization in {ehmpathy,ahbode}; do
-  gh repo list $organization --limit 1000 | while read -r repo _; do
-    gh repo clone "$repo" "$HOME/git/$repo"
-  done
-done
+  # skip if swapfile already exists and is active
+  if swapon --show | grep -q "$swapfile"; then
+    echo "• swapfile already active; skipped"
+    return 0
+  fi
 
-#######################
-## install ngrok
-#######################
-wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -P ~/Downloads;
-unzip ~/Downloads/ngrok-stable-linux-amd64.zip -d ~/Downloads/ngrok-stable-linux-amd64;
-sudo mv ~/Downloads/ngrok-stable-linux-amd64/ngrok /usr/bin/ngrok
-ngrok authtoken __from_you_account_settings__
-ngrok help
+  # create swapfile if it doesn't exist
+  if [[ ! -f "$swapfile" ]]; then
+    echo "• create ${size} swapfile..."
+    sudo fallocate -l "$size" "$swapfile"
+    sudo chmod 600 "$swapfile"
+    sudo mkswap "$swapfile"
+  fi
+
+  # activate swapfile
+  sudo swapon "$swapfile"
+
+  # add to fstab if not already present
+  if ! grep -q "$swapfile" /etc/fstab; then
+    echo "$swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
+    echo "• swapfile added to /etc/fstab"
+  fi
+
+  echo "• swapfile configured: $size"
+}
+configure_swapfile
 
 #######################
 ## install gnome extensions: https://support.system76.com/articles/customize-gnome
@@ -436,27 +366,13 @@ sudo apt install -y gnome-shell-pomodoro # show pomodoro extensinon
 logout # login logout of DE
 # then search "extensions" in settings and turn them on manually
 
-#######################
-## make sure that nightlight is enabled
-#######################
-gsettings set org.gnome.settings-daemon.plugins.color night-light-enabled true # https://askubuntu.com/questions/1246195/how-to-turn-on-night-light-blue-light-filter-in-ubuntu-20-04
-
-#######################
-## make sure that automatic brightness is disabled
-#######################
-gsettings set org.gnome.settings-daemon.plugins.power ambient-enabled false # https://itsfoss.com/automatic-brightness-ubuntu/
-
-#######################
-## bind the screen capture shortcuts
-## - "open print screen ui" to ctrl-shift-alt-p
-## - "open record screen ui" to ctrl-shift-alt-r
-##
-## ref
-## - get current value `gsettings get org.gnome.shell.keybindings show-screenshot-ui`
-## - list all values in schema `gsettings list-recursively org.gnome.shell.keybindings`
-#######################
-gsettings set org.gnome.shell.keybindings show-screenshot-ui "['Print', '<Primary><Shift><Alt>P']"
-gsettings set org.gnome.shell.keybindings show-screen-recording-ui "['<Ctrl><Shift><Alt>R']"
+#########################
+## install dropbox
+#########################
+browser https://www.dropbox.com/install-linux # see what the latest version is; update the link below if its changed
+wget https://linux.dropbox.com/packages/ubuntu/dropbox_2020.03.04_amd64.deb -P ~/Downloads;
+sudo apt install ~/Downloads/dropbox_2020.03.04_amd64.deb;
+dropbox start -i; # install the dropbox daemon and start it for the first time
 
 ######################
 ## install client apps
@@ -475,6 +391,56 @@ sudo apt install ~/Downloads/protonvpn-stable-release_1.0.3-2_all.deb;
 sudo apt update;
 sudo apt-get install -y protonvpn;
 sudo apt install -y gnome-shell-extension-appindicator gir1.2-appindicator3-0.1; # system tray icon
+
+
+##########################
+## install ptyxis terminal (rapid, gpu-accelerated, container-aware)
+## ref: https://gitlab.gnome.org/chergert/ptyxis
+## ref: https://ubuntuhandbook.org/index.php/2025/08/install-set-ptyxis-as-default-terminal-in-ubuntu-24-04-22-04/
+## ref: https://documentation.ubuntu.com/desktop/en/latest/how-to/change-the-default-terminal/
+##########################
+install_ptyxis() {
+  # skip if ptyxis is already the default terminal (e.g., ubuntu 25.10+, gnome 47+)
+  local current_terminal
+  current_terminal=$(readlink -f /usr/bin/x-terminal-emulator 2>/dev/null || echo "")
+  if [[ "$current_terminal" == *ptyxis* ]]; then
+    echo "• ptyxis already default terminal; skipped"
+    return 0
+  fi
+
+  # install via flatpak if not already installed
+  if ! flatpak list | grep -q app.devsuite.Ptyxis; then
+    flatpak install -y flathub app.devsuite.Ptyxis
+  fi
+
+  # create wrapper executable for x-terminal-emulator compatibility
+  sudo tee /usr/bin/ptyxis.wrapper > /dev/null << 'EOF'
+#!/bin/sh
+flatpak run app.devsuite.Ptyxis --new-window
+EOF
+  sudo chmod +x /usr/bin/ptyxis.wrapper
+
+  # register and set as default terminal (ctrl+alt+t)
+  sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/ptyxis.wrapper 50
+  sudo update-alternatives --set x-terminal-emulator /usr/bin/ptyxis.wrapper
+}
+install_ptyxis
+
+source "$(dirname "$0")/install_env.ptyxis.sh"
+configure_ptyxis
+
+install_terminal_command() {
+  # .what = install 'terminal' command that opens terminal at specified directory
+  # .why  = 'terminal .' works in scripts, subshells, git tree, etc (unlike alias)
+  sudo tee /usr/bin/terminal > /dev/null << 'EOF'
+#!/usr/bin/env bash
+dir="${1:-.}"
+dir="$(realpath "$dir")"
+exec flatpak run app.devsuite.Ptyxis --new-window --working-directory "$dir"
+EOF
+  sudo chmod +x /usr/bin/terminal
+}
+install_terminal_command
 
 
 #########################
@@ -515,4 +481,31 @@ curl https://github.com/login/oauth/access_token -X POST -d "client_id=01ab8ac94
 codium --install-extension zokugun.sync-settings
 cp ~/git/more/dev-env-setup/codium/sync.settings.yml ~/.config/VSCodium/User/globalStorage/zokugun.sync-settings/settings.yml # install our sync settings
 codium && echo 'run the "Sync Settings: Download (repository -> user)" command' && echo 'open the Sync Settings output pane to see install progress'
+
+
+
+## todo: deprecate the rest below, now that we're on cosmic?
+
+
+#######################
+## make sure that nightlight is enabled
+#######################
+gsettings set org.gnome.settings-daemon.plugins.color night-light-enabled true # https://askubuntu.com/questions/1246195/how-to-turn-on-night-light-blue-light-filter-in-ubuntu-20-04
+
+#######################
+## make sure that automatic brightness is disabled
+#######################
+gsettings set org.gnome.settings-daemon.plugins.power ambient-enabled false # https://itsfoss.com/automatic-brightness-ubuntu/
+
+#######################
+## bind the screen capture shortcuts
+## - "open print screen ui" to ctrl-shift-alt-p
+## - "open record screen ui" to ctrl-shift-alt-r
+##
+## ref
+## - get current value `gsettings get org.gnome.shell.keybindings show-screenshot-ui`
+## - list all values in schema `gsettings list-recursively org.gnome.shell.keybindings`
+#######################
+gsettings set org.gnome.shell.keybindings show-screenshot-ui "['Print', '<Primary><Shift><Alt>P']"
+gsettings set org.gnome.shell.keybindings show-screen-recording-ui "['<Ctrl><Shift><Alt>R']"
 
