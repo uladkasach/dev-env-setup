@@ -124,9 +124,6 @@ browser https://addons.mozilla.org/en-US/firefox/addon/1password-x-password-mana
 #########################
 sudo apt-get install ssh -y;
 ssh-keygen; # use the default path to save the key; create your own password
-cat ~/.ssh/id_ed25519.pub; # <- view your public key
-# add it to your github account manually
-browser https://github.com/settings/keys
 
 ########################
 ## set git user
