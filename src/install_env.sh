@@ -159,31 +159,6 @@ exec zsh
 # now open a new terminal
 terminal
 
-# note: if git icon looks weird, make sure to install font that supports it: https://github.com/tonsky/FiraCode :
-sudo apt install fonts-firacode
-
-# install Hack Nerd Font Mono (minimal, clean icons for neovim plugins like neo-tree)
-# ref: https://github.com/ryanoasis/nerd-fonts
-# note: "Mono" variant maintains strict monospace (icons don't break alignment)
-install_nerd_font() {
-  local font_dir="$HOME/.local/share/fonts"
-  if ls "$font_dir"/Hack*.ttf &>/dev/null; then
-    echo "• Hack Nerd Font already installed; skipped"
-    return
-  fi
-  mkdir -p "$font_dir"
-  local tmp_zip="/tmp/Hack-NerdFont.zip"
-  curl -fsSL -o "$tmp_zip" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip
-  unzip -o "$tmp_zip" -d "$font_dir"
-  rm "$tmp_zip"
-  fc-cache -fv
-  # set as system monospace font (required for VTE terminals like ptyxis)
-  gsettings set org.gnome.desktop.interface monospace-font-name 'Hack Nerd Font Mono 12'
-  echo "• Hack Nerd Font installed and set as system monospace"
-}
-install_nerd_font
-
-
 #########################
 ## install vim + neovim
 #########################
@@ -192,20 +167,17 @@ sudo add-apt-repository ppa:neovim-ppa/unstable -y && sudo apt update && sudo ap
 
 configure_neovim() {
   mkdir -p ~/.config/nvim
-  cp "$HOME/git/more/dev-env-setup/src/init.lua" ~/.config/nvim/init.lua
+  THIS_DIR="$HOME/git/more/dev-env-setup/src" # todo: swap w/ command, later
+  cp "$THIS_DIR/init.lua" ~/.config/nvim/init.lua
   echo "• neovim config applied"
 }
 configure_neovim
 
-#########################
-## make sure your pop-os laptop always starts in battery saver mode
-#########################
-grep -qxF 'system76-power profile battery' ~/.profile || echo '\n# start in battery saver\nsystem76-power profile battery' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
-
 #######################
 ## set git aliases
 #######################
-source "$(dirname "$0")/install_env.git.aliases.sh"
+THIS_DIR="$HOME/git/more/dev-env-setup/src" # todo: swap w/ command, later
+source "$THIS_DIR/install_env.git.aliases.sh"
 
 #######################
 ## install bash alias dependencies
@@ -218,9 +190,9 @@ sudo apt install -y tree # required for tree view of directories
 ## install node + npm via fnm (fast node manager)
 ## ref: https://github.com/Schniz/fnm
 #########################
-curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
+curl -fsSL https://fnm.vercel.app/install | bash -s
+source $HOME/.zshrc
 fnm install --lts # install latest lts version
-
 
 ########################
 ## add github cli tool; https://github.com/cli/cli/blob/trunk/docs/install_linux.md#debian-ubuntu-linux-raspberry-pi-os-apt
@@ -242,6 +214,11 @@ for organization in {ehmpathy,ahbode}; do
     gh repo clone "$repo" "$HOME/git/$repo"
   done
 done
+
+#########################
+## install psql
+#########################
+sudo apt-get install -y postgresql-client
 
 ##########################
 ## install aws cli
@@ -298,11 +275,6 @@ docker run hello-world # verify we can run without root
 docker compose version # verify we installed docker compose
 
 #########################
-## install psql
-#########################
-sudo apt-get install -y postgresql-client
-
-#########################
 ## bump max files watched
 ##
 ## otherwise, we'll have errors watching files
@@ -356,15 +328,6 @@ configure_swapfile() {
   echo "• swapfile configured: $size"
 }
 configure_swapfile
-
-#######################
-## install gnome extensions: https://support.system76.com/articles/customize-gnome
-#######################
-sudo apt install lm-sensors gir1.2-gtop-2.0 gir1.2-nm-1.0 gir1.2-clutter-1.0 gnome-system-monitor && echo 'install the system monitor extension through website for now...' && browser https://extensions.gnome.org/extension/3010/system-monitor-next/ # https://github.com/mgalgs/gnome-shell-system-monitor-applet ; # TODO: switch to not using `-next` version when its supported again
-sudo apt install -y gir1.2-gst-plugins-base-1.0 && echo 'install the radio extension through website for now...' && browser https://extensions.gnome.org/extension/836/internet-radio/ # https://github.com/hslbck/gnome-shell-extension-radio
-sudo apt install -y gnome-shell-pomodoro # show pomodoro extensinon
-logout # login logout of DE
-# then search "extensions" in settings and turn them on manually
 
 #########################
 ## install dropbox
@@ -482,9 +445,54 @@ codium --install-extension zokugun.sync-settings
 cp ~/git/more/dev-env-setup/codium/sync.settings.yml ~/.config/VSCodium/User/globalStorage/zokugun.sync-settings/settings.yml # install our sync settings
 codium && echo 'run the "Sync Settings: Download (repository -> user)" command' && echo 'open the Sync Settings output pane to see install progress'
 
-
+########################################################################################################################################################################################
+##########################################################################################################################################
+########################################################################################################################################################################################
+########################################################################################################################################## 
+########################################################################################################################################################################################
 
 ## todo: deprecate the rest below, now that we're on cosmic?
+
+
+#######################
+## install gnome extensions: https://support.system76.com/articles/customize-gnome
+#######################
+sudo apt install lm-sensors gir1.2-gtop-2.0 gir1.2-nm-1.0 gir1.2-clutter-1.0 gnome-system-monitor && echo 'install the system monitor extension through website for now...' && browser https://extensions.gnome.org/extension/3010/system-monitor-next/ # https://github.com/mgalgs/gnome-shell-system-monitor-applet ; # TODO: switch to not using `-next` version when its supported again
+sudo apt install -y gir1.2-gst-plugins-base-1.0 && echo 'install the radio extension through website for now...' && browser https://extensions.gnome.org/extension/836/internet-radio/ # https://github.com/hslbck/gnome-shell-extension-radio
+sudo apt install -y gnome-shell-pomodoro # show pomodoro extensinon
+logout # login logout of DE
+# then search "extensions" in settings and turn them on manually
+
+
+# note: if git icon looks weird, make sure to install font that supports it: https://github.com/tonsky/FiraCode :
+sudo apt install fonts-firacode
+
+# install Hack Nerd Font Mono (minimal, clean icons for neovim plugins like neo-tree)
+# ref: https://github.com/ryanoasis/nerd-fonts
+# note: "Mono" variant maintains strict monospace (icons don't break alignment)
+install_nerd_font() {
+  local font_dir="$HOME/.local/share/fonts"
+  if ls "$font_dir"/Hack*.ttf &>/dev/null; then
+    echo "• Hack Nerd Font already installed; skipped"
+    return
+  fi
+  mkdir -p "$font_dir"
+  local tmp_zip="/tmp/Hack-NerdFont.zip"
+  curl -fsSL -o "$tmp_zip" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip
+  unzip -o "$tmp_zip" -d "$font_dir"
+  rm "$tmp_zip"
+  fc-cache -fv
+  # set as system monospace font (required for VTE terminals like ptyxis)
+  gsettings set org.gnome.desktop.interface monospace-font-name 'Hack Nerd Font Mono 12'
+  echo "• Hack Nerd Font installed and set as system monospace"
+}
+install_nerd_font
+
+
+#########################
+## make sure your pop-os laptop always starts in battery saver mode
+#########################
+grep -qxF 'system76-power profile battery' ~/.profile || echo '\n# start in battery saver\nsystem76-power profile battery' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
 
 
 #######################
