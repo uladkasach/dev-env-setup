@@ -137,6 +137,18 @@ git config --global pull.ff only # make sure that pull only ever automatically f
 git config --global init.defaultBranch main # default root branch name to `main`
 
 ########################
+## add github cli tool; https://github.com/cli/cli/blob/trunk/docs/install_linux.md#debian-ubuntu-linux-raspberry-pi-os-apt
+#######################
+type -p curl >/dev/null || sudo apt install curl -y # install curl if not already installed
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+  && sudo apt update \
+  && sudo apt install gh -y
+# login to gh
+gh auth login
+
+########################
 ## clone this repo
 #########################
 mkdir -p ~/git/more;
@@ -193,18 +205,6 @@ sudo apt install -y tree # required for tree view of directories
 curl -fsSL https://fnm.vercel.app/install | bash -s
 source $HOME/.zshrc
 fnm install --lts # install latest lts version
-
-########################
-## add github cli tool; https://github.com/cli/cli/blob/trunk/docs/install_linux.md#debian-ubuntu-linux-raspberry-pi-os-apt
-#######################
-type -p curl >/dev/null || sudo apt install curl -y # install curl if not already installed
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-  && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
-  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-  && sudo apt update \
-  && sudo apt install gh -y
-# login to gh
-gh auth login
 
 #######################
 ## clone all repos in the organizations you care about
