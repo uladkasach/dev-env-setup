@@ -192,7 +192,7 @@ sudo add-apt-repository ppa:neovim-ppa/unstable -y && sudo apt update && sudo ap
 
 configure_neovim() {
   mkdir -p ~/.config/nvim
-  cp "~/git/more/dev-env-setup/init.lua" ~/.config/nvim/init.lua
+  cp "$HOME/git/more/dev-env-setup/src/init.lua" ~/.config/nvim/init.lua
   echo "• neovim config applied"
 }
 configure_neovim
