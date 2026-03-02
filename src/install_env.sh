@@ -70,7 +70,7 @@ upsert_keyd_config
 ##  - `semicolon` -> move to the selection
 #########################
 sudo apt-get install keynav
-grep -qxF 'keynav' ~/.profile || cat <<'EOF' >> ~/.profile
+grep -qF '(keynav && echo "keynav started"' ~/.profile || cat <<'EOF' >> ~/.profile
 
 # start keynav in background
 (keynav && echo "keynav started" || echo "keynav already running") &
