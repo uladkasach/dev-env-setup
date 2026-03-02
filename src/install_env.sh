@@ -1,77 +1,10 @@
+##########################
+## set a temporary alias for the browser and terminal (we lift this to bash aliases later)
 #########################
-## enable ctrl-c and ctrl-v as copy and paste in the terminal
-## ref: https://askubuntu.com/questions/53688/making-ctrlc-copy-text-in-gnome-terminal
-#########################
-sudo apt install gconf2
-gconftool-2 -t str -s /apps/gnome-terminal/keybindings/copy "<Control>c"
-gconftool-2 -t str -s /apps/gnome-terminal/keybindings/paste "<Control>v"
-
-#########################
-## rebind interrupt key to ctrl+x
-## ref: https://forums.justlinux.com/showthread.php?127575-Saving-stty-settings-permanently-with-automatic-read; https://stackoverflow.com/a/25391867/3068233; https://forums.justlinux.com/showthread.php?105417-stty-erase-in-bash*; https://askubuntu.com/questions/61543/stty-doesnt-work
-#########################
-stty intr ^X
-grep -qxF 'stty intr ^X' ~/.bashrc || echo '\n# bind interrupt key to ctrl-x\stty intr ^X' >> ~/.bashrc # writes to `~/.bashrc` if that line is not alrady there; Why add to `~/.bashrc` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
-
-#########################
-## install vim + neovim
-#########################
-sudo apt install vim -y # note: ~/.zshrc already defines that this is default
-sudo add-apt-repository ppa:neovim-ppa/unstable -y && sudo apt update && sudo apt install neovim -y
-
-configure_neovim() {
-  mkdir -p ~/.config/nvim
-  cp "$(dirname "$0")/init.lua" ~/.config/nvim/init.lua
-  echo "• neovim config applied"
-}
-configure_neovim
-
-#############################
-## for happiness, set swappiness
-## keeps os feel snappy faster. if you have 32gb ram or more, this is for you
-## ref: https://wiki.debian.org/swappiness
-#############################
-echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf # This tells linux: "prefer keeping stuff in RAM; only swap when truly necessary."
-
-#############################
-## add swapfile for overflow (complements zram)
-##
-## why: zram compresses cold pages in RAM (fast, ~16gb default)
-##      when zram fills, overflow goes to disk swap
-##      more disk swap = more headroom for cold pages
-##
-## hierarchy: RAM -> zram (compressed RAM) -> disk swap (SSD)
-#############################
-configure_swapfile() {
-  local swapfile="/swapfile"
-  local size="36G"
-
-  # skip if swapfile already exists and is active
-  if swapon --show | grep -q "$swapfile"; then
-    echo "• swapfile already active; skipped"
-    return 0
-  fi
-
-  # create swapfile if it doesn't exist
-  if [[ ! -f "$swapfile" ]]; then
-    echo "• create ${size} swapfile..."
-    sudo fallocate -l "$size" "$swapfile"
-    sudo chmod 600 "$swapfile"
-    sudo mkswap "$swapfile"
-  fi
-
-  # activate swapfile
-  sudo swapon "$swapfile"
-
-  # add to fstab if not already present
-  if ! grep -q "$swapfile" /etc/fstab; then
-    echo "$swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
-    echo "• swapfile added to /etc/fstab"
-  fi
-
-  echo "• swapfile configured: $size"
-}
-configure_swapfile
+alias browser='flatpak run org.mozilla.firefox'
+alias terminal='ptyxis 2>/dev/null || cosmic-term'
+alias machine.logout='loginctl terminate-user "$USER"'
+alias machine.reboot='systemctl reboot'
 
 #############################
 ## keyd - remap keys for optimal experience
@@ -137,7 +70,34 @@ upsert_keyd_config
 ##  - `semicolon` -> move to the selection
 #########################
 sudo apt-get install keynav
-grep -qxF 'keynav' ~/.profile || echo '\n# start keynav in background\n(keynav && echo "keynav started" || echo "keynav already running") &' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
+grep -qF '(keynav && echo "keynav started"' ~/.profile || cat <<'EOF' >> ~/.profile
+
+# start keynav in background
+(keynav && echo "keynav started" || echo "keynav already running") &
+EOF
+
+######################
+## dont suspend on lid close
+## ref: https://ubuntuhandbook.org/index.php/2020/05/lid-close-behavior-ubuntu-20-04/
+######################
+LOGIND_CONF="/etc/systemd/logind.conf"
+for key in HandlePowerKey HandleSuspendKey HandleHibernateKey HandleRebootKey HandleLidSwitch HandleLidSwitchExternalPower HandleLidSwitchDocked; do
+    sudo sed -i "/^#*${key}=/d" "$LOGIND_CONF"
+done
+sudo tee -a "$LOGIND_CONF" > /dev/null <<'EOF'
+
+# use terminal instead; keyboard misfire is too common
+HandlePowerKey=ignore
+HandleSuspendKey=ignore
+HandleHibernateKey=ignore
+HandleRebootKey=ignore
+
+# use terminal instead; display disconnect is too common
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+HandleLidSwitchDocked=ignore
+EOF
+echo "run 'machine.logout' or 'machine.reboot' to apply"
 
 
 ##########################
@@ -146,6 +106,252 @@ grep -qxF 'keynav' ~/.profile || echo '\n# start keynav in background\n(keynav &
 flatpak install flathub org.mozilla.firefox
 xdg-settings set default-web-browser org.mozilla.firefox.desktop
 sudo apt remove firefox
+
+########################
+## install 1password firefox
+########################
+browser https://addons.mozilla.org/en-US/firefox/addon/1password-x-password-manager/
+
+# #########################
+# ## install chrome
+# #########################
+# wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -P ~/Downloads;
+# sudo apt install ~/Downloads/google-chrome-stable_current_amd64.deb;
+# google-chrome; # open it; set it as your defualt
+
+#########################
+## install ssh + generate ssh key for your machine
+#########################
+sudo apt-get install ssh -y;
+ssh-keygen; # use the default path to save the key; create your own password
+
+########################
+## set git user
+#######################
+git config --global user.email "u...k...@gmail.com" # change me to your email
+git config --global user.name "U... K..." # change me to your name
+git config --global pull.ff only # make sure that pull only ever automatically fasts forward
+git config --global init.defaultBranch main # default root branch name to `main`
+
+########################
+## add github cli tool; https://github.com/cli/cli/blob/trunk/docs/install_linux.md#debian-ubuntu-linux-raspberry-pi-os-apt
+#######################
+type -p curl >/dev/null || sudo apt install curl -y # install curl if not already installed
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+  && sudo apt update \
+  && sudo apt install gh -y
+# login to gh
+gh auth login
+
+########################
+## clone this repo
+#########################
+mkdir -p ~/git/more;
+git clone git@github.com:uladkasach/dev-env-setup.git ~/git/more/dev-env-setup;
+
+#########################
+## install zsh + oh-my-zsh + spaceship theme
+#########################
+sudo apt install zsh
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
+git clone https://github.com/denysdovhan/spaceship-prompt.git "$ZSH_CUSTOM/themes/spaceship-prompt" && ln -s "$ZSH_CUSTOM/themes/spaceship-prompt/spaceship.zsh-theme" "$ZSH_CUSTOM/themes/spaceship.zsh-theme"
+cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases # reset from backup the aliases config
+cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc # reset from backup the zsh config
+
+# make sure we use zsh by default
+echo "
+exec zsh
+" >> ~/.bashrc
+
+# now open a new terminal
+terminal
+
+#########################
+## install vim + neovim
+#########################
+sudo apt install vim -y # note: ~/.zshrc already defines that this is default
+sudo add-apt-repository ppa:neovim-ppa/unstable -y && sudo apt update && sudo apt install neovim -y
+
+configure_neovim() {
+  mkdir -p ~/.config/nvim
+  THIS_DIR="$HOME/git/more/dev-env-setup/src" # todo: swap w/ command, later
+  cp "$THIS_DIR/init.lua" ~/.config/nvim/init.lua
+  echo "• neovim config applied"
+}
+configure_neovim
+
+#######################
+## set git aliases
+#######################
+THIS_DIR="$HOME/git/more/dev-env-setup/src" # todo: swap w/ command, later
+source "$THIS_DIR/install_env.git.aliases.sh"
+
+#######################
+## install bash alias dependencies
+#######################
+sudo apt install -y xclip # required for pbpaste, pbcopy
+sudo apt install -y jq # required for manipulating json in terminal
+sudo apt install -y tree # required for tree view of directories
+
+#########################
+## install node + npm via fnm (fast node manager)
+## ref: https://github.com/Schniz/fnm
+#########################
+curl -fsSL https://fnm.vercel.app/install | bash -s
+source $HOME/.zshrc
+fnm install --lts # install latest lts version
+
+#######################
+## clone all repos in the organizations you care about
+#######################
+for organization in {ehmpathy,ahbode}; do
+  gh repo list $organization --limit 1000 | while read -r repo _; do
+    gh repo clone "$repo" "$HOME/git/$repo"
+  done
+done
+
+#########################
+## install psql
+#########################
+sudo apt-get install -y postgresql-client
+
+##########################
+## install aws cli
+## https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+##########################
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+#########################
+## install terraform w/ tfenv
+#########################
+git clone https://github.com/tfutils/tfenv.git ~/.tfenv
+
+# add tfenv to $PATH
+mkdir -p ~/.local/bin/
+. ~/.profile
+ln -s ~/.tfenv/bin/* ~/.local/bin
+. ~/.profile
+
+# and test install
+which tfenv
+
+#########################
+## install docker + docker compose
+## ref: https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository
+#########################
+# add Docker's official GPG key:
+sudo apt-get update
+sudo apt-get install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+# add the repository to apt sources:
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+
+# install the packages
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# allow docker to run without root
+sudo systemctl enable --now docker
+sudo groupadd docker
+sudo usermod -aG docker $USER # run w/o root attempt 1
+sudo gpasswd -a $USER docker # run w/o root attempt 2
+
+# verify the installation
+docker --version # verify it was installed
+docker run hello-world # verify we can run without root
+docker compose version # verify we installed docker compose
+
+#########################
+## bump max files watched
+##
+## otherwise, we'll have errors watching files
+#########################
+# per https://stackoverflow.com/a/32600959/3068233
+echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+
+#############################
+## for happiness, set swappiness
+## keeps os feel snappy faster. if you have 32gb ram or more, this is for you
+## ref: https://wiki.debian.org/swappiness
+#############################
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf # This tells linux: "prefer keeping stuff in RAM; only swap when truly necessary."
+
+#############################
+## add swapfile for overflow (complements zram)
+##
+## why: zram compresses cold pages in RAM (fast, ~16gb default)
+##      when zram fills, overflow goes to disk swap
+##      more disk swap = more headroom for cold pages
+##
+## hierarchy: RAM -> zram (compressed RAM) -> disk swap (SSD)
+#############################
+configure_swapfile() {
+  local swapfile="/swapfile"
+  local size="36G"
+
+  # skip if swapfile already exists and is active
+  if swapon --show | grep -q "$swapfile"; then
+    echo "• swapfile already active; skipped"
+    return 0
+  fi
+
+  # create swapfile if it doesn't exist
+  if [[ ! -f "$swapfile" ]]; then
+    echo "• create ${size} swapfile..."
+    sudo fallocate -l "$size" "$swapfile"
+    sudo chmod 600 "$swapfile"
+    sudo mkswap "$swapfile"
+  fi
+
+  # activate swapfile
+  sudo swapon "$swapfile"
+
+  # add to fstab if not already present
+  if ! grep -q "$swapfile" /etc/fstab; then
+    echo "$swapfile none swap sw 0 0" | sudo tee -a /etc/fstab
+    echo "• swapfile added to /etc/fstab"
+  fi
+
+  echo "• swapfile configured: $size"
+}
+configure_swapfile
+
+#########################
+## install dropbox
+#########################
+browser https://www.dropbox.com/install-linux # see what the latest version is; update the link below if its changed
+wget https://www.dropbox.com/download?dl=packages/ubuntu/dropbox_2026.01.15_amd64.deb -P ~/Downloads;
+sudo apt install ~/Downloads/dropbox_2026.01.15_amd64.deb;
+dropbox start -i; # install the dropbox daemon and start it for the first time
+
+######################
+## install client apps
+######################
+flatpak install flathub com.spotify.Client
+flatpak install flathub com.jetbrains.DataGrip
+flatpak install flathub com.slack.Slack # flatpak update com.slack.Slack
+
+######################
+## install proton vpn
+## https://protonvpn.com/support/linux-ubuntu-vpn-setup/
+######################
+browser https://protonvpn.com/support/linux-ubuntu-vpn-setup/ # check for latest version, update the below versions as needed
+wget https://protonvpn.com/download/protonvpn-stable-release_1.0.3-2_all.deb -P ~/Downloads
+sudo apt install ~/Downloads/protonvpn-stable-release_1.0.3-2_all.deb;
+sudo apt update;
+sudo apt-get install -y protonvpn;
+sudo apt install -y gnome-shell-extension-appindicator gir1.2-appindicator3-0.1; # system tray icon
+
 
 ##########################
 ## install ptyxis terminal (rapid, gpu-accelerated, container-aware)
@@ -196,127 +402,6 @@ EOF
 }
 install_terminal_command
 
-# #########################
-# ## install chrome
-# #########################
-# wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -P ~/Downloads;
-# sudo apt install ~/Downloads/google-chrome-stable_current_amd64.deb;
-# google-chrome; # open it; set it as your defualt
-
-#########################
-## install ssh + generate ssh key for your machine
-#########################
-sudo apt-get install ssh -y;
-ssh-keygen; # use the default path to save the key; create your own password
-cat ~/.ssh/id_rsa.pub; # <- view your public key
-# add it to your github account manually
-browser https://github.com/settings/keys
-
-########################
-## install 1password chrome
-########################
-# install the chrome extension
-browser https://chrome.google.com/webstore/detail/1password-%E2%80%93-password-mana/aeblfdkhhhdcdjpifhhbdiojplfjncoa
-# update the extension keyboard shortcut
-browser chrome://extensions/shortcuts
-
-########################
-## clone this repo
-#########################
-mkdir -p ~/git/more;
-git clone git@github.com:uladkasach/dev-env-setup.git ~/git/more/dev-env-setup;
-
-#########################
-## install zsh + oh-my-zsh + spaceship theme
-#########################
-sudo apt install zsh
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
-git clone https://github.com/denysdovhan/spaceship-prompt.git "$ZSH_CUSTOM/themes/spaceship-prompt" && ln -s "$ZSH_CUSTOM/themes/spaceship-prompt/spaceship.zsh-theme" "$ZSH_CUSTOM/themes/spaceship.zsh-theme"
-cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases # reset from backup the aliases config
-cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc # reset from backup the zsh config
-
-# make sure we use zsh by default
-echo "
-exec zsh
-" >> ~/.bashrc
-
-# now open a new terminal
-gnome-terminal
-
-# note: if git icon looks weird, make sure to install font that supports it: https://github.com/tonsky/FiraCode :
-sudo apt install fonts-firacode
-
-# install Hack Nerd Font Mono (minimal, clean icons for neovim plugins like neo-tree)
-# ref: https://github.com/ryanoasis/nerd-fonts
-# note: "Mono" variant maintains strict monospace (icons don't break alignment)
-install_nerd_font() {
-  local font_dir="$HOME/.local/share/fonts"
-  if ls "$font_dir"/Hack*.ttf &>/dev/null; then
-    echo "• Hack Nerd Font already installed; skipped"
-    return
-  fi
-  mkdir -p "$font_dir"
-  local tmp_zip="/tmp/Hack-NerdFont.zip"
-  curl -fsSL -o "$tmp_zip" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip
-  unzip -o "$tmp_zip" -d "$font_dir"
-  rm "$tmp_zip"
-  fc-cache -fv
-  # set as system monospace font (required for VTE terminals like ptyxis)
-  gsettings set org.gnome.desktop.interface monospace-font-name 'Hack Nerd Font Mono 12'
-  echo "• Hack Nerd Font installed and set as system monospace"
-}
-install_nerd_font
-
-
-#########################
-## make sure your pop-os laptop always starts in battery saver mode
-#########################
-grep -qxF 'system76-power profile battery' ~/.profile || echo '\n# start in battery saver\nsystem76-power profile battery' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
-
-#########################
-## install one password (https://support.1password.com/command-line-getting-started/)
-#########################
-curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
-sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg && \
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
-sudo tee /etc/apt/sources.list.d/1password.list && \
-sudo mkdir -p /etc/debsig/policies/AC2D62742012EA22/ && \
-curl -sS https://downloads.1password.com/linux/debian/debsig/1password.pol | \
-sudo tee /etc/debsig/policies/AC2D62742012EA22/1password.pol && \
-sudo mkdir -p /usr/share/debsig/keyrings/AC2D62742012EA22 && \
-curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
-sudo gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg && \
-sudo apt update && sudo apt install 1password-cli
-op --version;
-
-# signin
-op account add --address my.1password.com --email user@example.org # swap with your email
-op.signin; # use this bash alias to signin subsequently; it runs `eval $(op signin my)` for us
-
-# see docs
-browser https://support.1password.com/command-line-getting-started/
-browser https://support.1password.com/command-line/
-# for example, you can backup aws config with `op create document ~/.aws/credentials --title .aws/credentials`
-
-########################
-## set git user
-#######################
-git config --global user.email "u...k...@gmail.com" # change me to your email
-git config --global user.name "U... K..." # change me to your name
-git config --global pull.ff only # make sure that pull only ever automatically fasts forward
-git config --global init.defaultBranch main # default root branch name to `main`
-
-#######################
-## set git aliases
-#######################
-source "$(dirname "$0")/install_env.git.aliases.sh"
-
-#######################
-## install bash alias dependencies
-#######################
-sudo apt install -y xclip # required for pbpaste, pbcopy
-sudo apt install -y jq # required for manipulating json in terminal
-sudo apt install -y tree # required for tree view of directories
 
 #########################
 ## install codium
@@ -357,260 +442,14 @@ codium --install-extension zokugun.sync-settings
 cp ~/git/more/dev-env-setup/codium/sync.settings.yml ~/.config/VSCodium/User/globalStorage/zokugun.sync-settings/settings.yml # install our sync settings
 codium && echo 'run the "Sync Settings: Download (repository -> user)" command' && echo 'open the Sync Settings output pane to see install progress'
 
+########################################################################################################################################################################################
+##########################################################################################################################################
+########################################################################################################################################################################################
+########################################################################################################################################## 
+########################################################################################################################################################################################
 
-#########################
-## install node + npm via fnm (fast node manager)
-## ref: https://github.com/Schniz/fnm
-#########################
-curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
-fnm install --lts # install latest lts version
+## todo: deprecate the rest below, now that we're on cosmic?
 
-#########################
-## install drop box
-#########################
-browser https://www.dropbox.com/install-linux # see what the latest version is; update the link below if its changed
-wget https://linux.dropbox.com/packages/ubuntu/dropbox_2020.03.04_amd64.deb -P ~/Downloads;
-sudo apt install ~/Downloads/dropbox_2020.03.04_amd64.deb;
-dropbox start -i; # install the dropbox daemon and start it for the first time
-
-##########################
-## install aws cli
-## https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
-##########################
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
-
-# restore config into '~/.aws`
-mkdir -p ~/.aws
-op get document .aws/config --output ~/.aws/config
-op get document .aws/credentials --output ~/.aws/credentials
-
-# test installation
-use.ahbode.dev # alias was defined by `./bash_aliases`
-aws sts get-caller-identity
-
-#########################
-## install terraform w/ tfenv
-#########################
-git clone https://github.com/tfutils/tfenv.git ~/.tfenv
-
-# add tfenv to $PATH
-mkdir -p ~/.local/bin/
-. ~/.profile
-ln -s ~/.tfenv/bin/* ~/.local/bin
-. ~/.profile
-
-# and test install
-which tfenv
-
-#########################
-## install docker + docker compose
-## ref: https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository
-#########################
-# add Docker's official GPG key:
-sudo apt-get update
-sudo apt-get install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-# add the repository to apt sources:
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-
-# install the packages
-sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# allow docker to run without root
-sudo systemctl enable --now docker
-sudo groupadd docker
-sudo usermod -aG docker $USER # run w/o root attempt 1
-sudo gpasswd -a $USER docker # run w/o root attempt 2
-
-# verify the installation
-docker --version # verify it was installed
-docker run hello-world # verify we can run without root
-docker compose version # verify we installed docker compose
-
-#########################
-## install psql
-#########################
-sudo apt-get install -y postgresql-client
-
-#########################
-## bump max files watched
-##
-## otherwise, we'll have errors watching files
-#########################
-# per https://stackoverflow.com/a/32600959/3068233
-echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
-
-#########################
-## vpn client (https://support.system76.com/articles/use-openvpn/)
-#########################
-sudo apt install openvpn network-manager-openvpn-gnome -y
-
-#########################
-## vpn connections
-#########################
-mkdir -p ~/.vpn \
-  && op get document .vpn/ahbode.dev.vpn.main.connection.ovpn --output ~/.vpn/ahbode.dev.vpn.main.connection.ovpn \
-  && op get document .vpn/ahbode.prod.vpn.main.connection.ovpn --output ~/.vpn/ahbode.prod.vpn.main.connection.ovpn;
-
-########################
-## add github cli tool; https://github.com/cli/cli/blob/trunk/docs/install_linux.md#debian-ubuntu-linux-raspberry-pi-os-apt
-#######################
-type -p curl >/dev/null || sudo apt install curl -y # install curl if not already installed
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-  && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
-  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-  && sudo apt update \
-  && sudo apt install gh -y
-# login to gh
-gh auth login
-
-#######################
-## install gitui (terminal tui for git)
-## ref: https://github.com/extrawurst/gitui
-#######################
-install_gitui() {
-  echo "⏳ install gitui..."
-
-  # get latest version tag via gh cli (avoids api rate limits)
-  local version
-  version=$(gh release view --repo extrawurst/gitui --json tagName -q '.tagName' | sed 's/^v//')
-  if [[ -z "$version" || "$version" == "null" ]]; then
-    echo "⛈️ failed to fetch latest gitui version"
-    return 1
-  fi
-  echo "  • version: v$version"
-
-  # download binary via gh cli
-  local extract_dir="/tmp/gitui-extract-${version}"
-  rm -rf "$extract_dir"
-  mkdir -p "$extract_dir"
-  echo "  • download: gitui-linux-x86_64.tar.gz"
-  gh release download "v${version}" \
-    --repo extrawurst/gitui \
-    --pattern "gitui-linux-x86_64.tar.gz" \
-    --dir "$extract_dir"
-
-  local tarball="$extract_dir/gitui-linux-x86_64.tar.gz"
-  if [[ ! -f "$tarball" ]]; then
-    echo "⛈️ download failed: $tarball not found"
-    return 1
-  fi
-  echo "  • downloaded: $(ls -lh "$tarball" | awk '{print $5}')"
-
-  # inspect tarball contents
-  echo "  • tarball contents:"
-  tar -tzf "$tarball" | sed 's/^/      /'
-
-  # extract
-  tar -xzf "$tarball" -C "$extract_dir"
-  echo "  • extracted:"
-  ls -la "$extract_dir" | grep -v '\.tar\.gz' | sed 's/^/      /'
-
-  # find the binary (might be nested or at root)
-  local binary
-  binary=$(find "$extract_dir" -name "gitui" -type f -executable | head -1)
-  if [[ -z "$binary" ]]; then
-    echo "⛈️ gitui binary not found in extracted files"
-    return 1
-  fi
-  echo "  • binary found: $binary"
-
-  # install to /usr/local/bin
-  sudo mv "$binary" /usr/local/bin/gitui
-  sudo chmod +x /usr/local/bin/gitui
-  if [[ ! -x /usr/local/bin/gitui ]]; then
-    echo "⛈️ failed to install gitui to /usr/local/bin"
-    return 1
-  fi
-
-  # cleanup
-  rm -rf "$extract_dir"
-
-  # verify
-  echo "✨ gitui $(gitui --version) installed"
-}
-install_gitui
-
-configure_gitui_theme() {
-  # install desert theme (matches ptyxis Desert palette)
-  # ref: https://github.com/Gogh-Co/Gogh/blob/master/themes/Desert.yml
-  mkdir -p ~/.config/gitui
-  tee ~/.config/gitui/theme.ron > /dev/null << 'EOF'
-(
-  selected_tab: Some("#FFFFFF"),
-  command_fg: Some("#F5DEB3"),
-  selection_bg: Some("#555555"),
-  selection_fg: Some("#FFFFFF"),
-  cmdbar_bg: Some("#333333"),
-  cmdbar_extra_lines_bg: Some("#333333"),
-  disabled_fg: Some("#4D4D4D"),
-  diff_line_add: Some("#98FB98"),
-  diff_line_delete: Some("#FF2B2B"),
-  diff_file_added: Some("#98FB98"),
-  diff_file_removed: Some("#FF5555"),
-  diff_file_moved: Some("#87CEFF"),
-  diff_file_modified: Some("#F0E68C"),
-  commit_hash: Some("#CD853F"),
-  commit_time: Some("#FFDEAD"),
-  commit_author: Some("#87CEFF"),
-  danger_fg: Some("#FF2B2B"),
-  push_gauge_bg: Some("#98FB98"),
-  push_gauge_fg: Some("#333333"),
-  tag_fg: Some("#F0E68C"),
-  branch_fg: Some("#FFA0A0")
-)
-EOF
-  echo "• gitui desert theme configured"
-}
-configure_gitui_theme
-
-configure_gitui_keybindings() {
-  # enable vim-style hjkl navigation
-  # ref: https://github.com/extrawurst/gitui/blob/master/KEY_CONFIG.md
-  mkdir -p ~/.config/gitui
-  tee ~/.config/gitui/key_bindings.ron > /dev/null << 'EOF'
-(
-  // vim-style navigation
-  move_left: Some(( code: Char('h'), modifiers: "")),
-  move_right: Some(( code: Char('l'), modifiers: "")),
-  move_up: Some(( code: Char('k'), modifiers: "")),
-  move_down: Some(( code: Char('j'), modifiers: "")),
-
-  // remap displaced defaults
-  stash_open: Some(( code: Char('l'), modifiers: "CONTROL")),
-  open_help: Some(( code: F(1), modifiers: "")),
-)
-EOF
-  echo "• gitui vim keybindings configured"
-}
-configure_gitui_keybindings
-
-#######################
-## clone all repos in the organizations you care about
-#######################
-for organization in {ehmpathy,ahbode}; do
-  gh repo list $organization --limit 1000 | while read -r repo _; do
-    gh repo clone "$repo" "$HOME/git/$repo"
-  done
-done
-
-#######################
-## install ngrok
-#######################
-wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -P ~/Downloads;
-unzip ~/Downloads/ngrok-stable-linux-amd64.zip -d ~/Downloads/ngrok-stable-linux-amd64;
-sudo mv ~/Downloads/ngrok-stable-linux-amd64/ngrok /usr/bin/ngrok
-ngrok authtoken __from_you_account_settings__
-ngrok help
 
 #######################
 ## install gnome extensions: https://support.system76.com/articles/customize-gnome
@@ -621,18 +460,37 @@ sudo apt install -y gnome-shell-pomodoro # show pomodoro extensinon
 logout # login logout of DE
 # then search "extensions" in settings and turn them on manually
 
-#######################
-## restore gnome-extension-radio channel-list
-#######################
-mkdir -p ~/.gse-radio \
-  && rm ~/.gse-radio/channelList.json \
-  && op get document .gse-radio/channelList.json --output ~/.gse-radio/channelList.json
 
-#######################
-## install support for AAC+ audio format codec (for comedy-radio.ru stream)
-#######################
-# comedy-radio.ru : https://pub0101.101.ru:8000/stream/air/aac/64/202
-sudo apt-get install -y ubuntu-restricted-extras libavcodec58 ffmpeg
+# note: if git icon looks weird, make sure to install font that supports it: https://github.com/tonsky/FiraCode :
+sudo apt install fonts-firacode
+
+# install Hack Nerd Font Mono (minimal, clean icons for neovim plugins like neo-tree)
+# ref: https://github.com/ryanoasis/nerd-fonts
+# note: "Mono" variant maintains strict monospace (icons don't break alignment)
+install_nerd_font() {
+  local font_dir="$HOME/.local/share/fonts"
+  if ls "$font_dir"/Hack*.ttf &>/dev/null; then
+    echo "• Hack Nerd Font already installed; skipped"
+    return
+  fi
+  mkdir -p "$font_dir"
+  local tmp_zip="/tmp/Hack-NerdFont.zip"
+  curl -fsSL -o "$tmp_zip" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip
+  unzip -o "$tmp_zip" -d "$font_dir"
+  rm "$tmp_zip"
+  fc-cache -fv
+  # set as system monospace font (required for VTE terminals like ptyxis)
+  gsettings set org.gnome.desktop.interface monospace-font-name 'Hack Nerd Font Mono 12'
+  echo "• Hack Nerd Font installed and set as system monospace"
+}
+install_nerd_font
+
+
+#########################
+## make sure your pop-os laptop always starts in battery saver mode
+#########################
+grep -qxF 'system76-power profile battery' ~/.profile || echo '\n# start in battery saver\nsystem76-power profile battery' >> ~/.profile # writes to `~/.profile` if that line is not alrady there; Why add to `~/.profile` specifically?: https://superuser.com/questions/183870/difference-between-bashrc-and-bash-profile/183980#183980
+
 
 #######################
 ## make sure that nightlight is enabled
@@ -656,65 +514,3 @@ gsettings set org.gnome.settings-daemon.plugins.power ambient-enabled false # ht
 gsettings set org.gnome.shell.keybindings show-screenshot-ui "['Print', '<Primary><Shift><Alt>P']"
 gsettings set org.gnome.shell.keybindings show-screen-recording-ui "['<Ctrl><Shift><Alt>R']"
 
-######################
-## install flatpak; https://flatpak.org/setup/Pop!_OS
-######################
-sudo apt install flatpak
-flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-
-######################
-## install client apps
-######################
-flatpak install flathub com.spotify.Client
-flatpak install flathub com.jetbrains.DataGrip
-flatpak install flathub com.slack.Slack # flatpak update com.slack.Slack
-
-######################
-## install proton vpn
-## https://protonvpn.com/support/linux-ubuntu-vpn-setup/
-######################
-browser https://protonvpn.com/support/linux-ubuntu-vpn-setup/ # check for latest version, update the below versions as needed
-wget https://protonvpn.com/download/protonvpn-stable-release_1.0.3-2_all.deb -P ~/Downloads
-sudo apt install ~/Downloads/protonvpn-stable-release_1.0.3-2_all.deb;
-sudo apt update;
-sudo apt-get install -y protonvpn;
-sudo apt install -y gnome-shell-extension-appindicator gir1.2-appindicator3-0.1; # system tray icon
-
-######################
-## install app image launcher
-## https://github.com/TheAssassin/AppImageLauncher
-######################
-sudo apt install software-properties-common
-sudo add-apt-repository ppa:appimagelauncher-team/stable
-sudo apt update
-sudo apt install appimagelauncher
-
-
-######################
-## dont suspend on lid close
-## ref: https://ubuntuhandbook.org/index.php/2020/05/lid-close-behavior-ubuntu-20-04/
-######################
-LOGIND_CONF="/etc/systemd/logind.conf"
-
-# Remove any existing lines for these settings (commented or not)
-for key in HandlePowerKey HandleSuspendKey HandleHibernateKey HandleRebootKey HandleLidSwitch HandleLidSwitchExternalPower HandleLidSwitchDocked; do
-    sudo sed -i "/^#*${key}=/d" "$LOGIND_CONF"
-done
-
-# Append the new settings
-sudo tee -a "$LOGIND_CONF" > /dev/null <<'EOF'
-
-# use terminal instead; keyboard misfire is too common
-HandlePowerKey=ignore
-HandleSuspendKey=ignore
-HandleHibernateKey=ignore
-HandleRebootKey=ignore
-
-# use terminal instead; display disconnect is too common
-HandleLidSwitch=ignore
-HandleLidSwitchExternalPower=ignore
-HandleLidSwitchDocked=ignore
-EOF
-
-# Note: Run 'sudo systemctl restart systemd-logind' to apply (will log you out)
-# Or just reboot after running this script
