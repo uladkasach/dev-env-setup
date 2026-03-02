@@ -330,8 +330,8 @@ configure_swapfile
 ## install dropbox
 #########################
 browser https://www.dropbox.com/install-linux # see what the latest version is; update the link below if its changed
-wget https://linux.dropbox.com/packages/ubuntu/dropbox_2020.03.04_amd64.deb -P ~/Downloads;
-sudo apt install ~/Downloads/dropbox_2020.03.04_amd64.deb;
+wget https://www.dropbox.com/download?dl=packages/ubuntu/dropbox_2026.01.15_amd64.deb -P ~/Downloads;
+sudo apt install ~/Downloads/dropbox_2026.01.15_amd64.deb;
 dropbox start -i; # install the dropbox daemon and start it for the first time
 
 ######################
