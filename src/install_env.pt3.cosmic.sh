@@ -82,10 +82,9 @@ ENTRIES
   local top_panel_dir="$HOME/.config/cosmic/com.system76.CosmicPanel.Panel/v1"
   mkdir -p "$top_panel_dir"
   cat > "$top_panel_dir/plugins_wings" << 'WINGS'
-Some(([], [
-    "com.system76.CosmicAppletInputSources",
+Some(([
     "com.system76.CosmicAppletStatusArea",
-    "com.system76.CosmicAppletA11y",
+], [
     "com.system76.CosmicAppletTiling",
     "com.system76.CosmicAppletAudio",
     "com.system76.CosmicAppletBluetooth",
@@ -95,5 +94,5 @@ Some(([], [
     "com.system76.CosmicAppletPower",
 ]))
 WINGS
-  echo "• top panel: workspaces/applications buttons removed"
+  echo "• top panel: status area left, controls right"
 }
