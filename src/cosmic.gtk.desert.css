@@ -1,0 +1,60 @@
+/* desert theme for GTK3/GTK4 apps (libadwaita / adw-gtk3) */
+
+/* core surfaces */
+@define-color window_bg_color #3B2F27;
+@define-color window_fg_color #F5DEB3;
+@define-color view_bg_color #4E3F35;
+@define-color view_fg_color #F5DEB3;
+@define-color headerbar_bg_color #3B2F27;
+@define-color headerbar_fg_color #F5DEB3;
+@define-color headerbar_backdrop_color @headerbar_bg_color;
+
+/* cards and sidebars */
+@define-color card_bg_color #4E3F35;
+@define-color card_fg_color #F5DEB3;
+@define-color sidebar_bg_color #3B2F27;
+@define-color sidebar_fg_color #F5DEB3;
+@define-color sidebar_backdrop_color @sidebar_bg_color;
+
+/* popovers and dialogs */
+@define-color popover_bg_color #3B2F27;
+@define-color popover_fg_color #F5DEB3;
+@define-color dialog_bg_color #3B2F27;
+@define-color dialog_fg_color #F5DEB3;
+
+/* accent */
+@define-color accent_bg_color #DEB887;
+@define-color accent_fg_color #3B2F27;
+@define-color accent_color #DEB887;
+
+/* borders and separators */
+@define-color borders alpha(#5C4A3D, 0.8);
+@define-color shade_color alpha(black, 0.25);
+
+/* status colors */
+@define-color success_bg_color #98FB98;
+@define-color success_fg_color #3B2F27;
+@define-color success_color #98FB98;
+@define-color warning_bg_color #F0E68C;
+@define-color warning_fg_color #3B2F27;
+@define-color warning_color #F0E68C;
+@define-color error_bg_color #FF2B2B;
+@define-color error_fg_color #FFFFFF;
+@define-color error_color #FF2B2B;
+@define-color destructive_bg_color #FF2B2B;
+@define-color destructive_fg_color #FFFFFF;
+@define-color destructive_color #FF2B2B;
+
+/* remove circular background from window control and headerbar buttons */
+windowcontrols button {
+  background: none;
+  box-shadow: none;
+  border: none;
+}
+
+headerbar button.circular,
+headerbar button.image-button {
+  background: none;
+  box-shadow: none;
+  border: none;
+}

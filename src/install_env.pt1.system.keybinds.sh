@@ -100,12 +100,3 @@ HandleLidSwitchDocked=ignore
 EOF
   echo "run 'machine.logout' or 'machine.reboot' to apply"
 }
-
-######################################################################
-# run
-######################################################################
-install_keyd
-configure_keyd
-install_keynav
-configure_profile_altswap_reset
-configure_logind

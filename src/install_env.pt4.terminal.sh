@@ -64,14 +64,3 @@ configure_neovim() {
   cp "$HOME/git/more/dev-env-setup/src/init.lua" ~/.config/nvim/init.lua
   echo "• neovim config applied"
 }
-
-######################################################################
-# run
-######################################################################
-source "$HOME/git/more/dev-env-setup/src/install_env.pt4.terminal.ptyxis.sh"
-install_ptyxis
-configure_ptyxis
-install_terminal_command
-install_vim
-install_neovim
-configure_neovim

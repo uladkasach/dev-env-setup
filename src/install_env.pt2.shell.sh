@@ -43,23 +43,8 @@ install_zsh() {
   chsh -s "$(which zsh)"
 }
 
-configure_git_aliases() {
-  source "$HOME/git/more/dev-env-setup/src/install_env.pt2.shell.git.aliases.sh"
-}
-
 install_cli_deps() {
   sudo apt install -y xclip # required for pbpaste, pbcopy
   sudo apt install -y jq # required for manipulating json in terminal
   sudo apt install -y tree # required for tree view of directories
 }
-
-######################################################################
-# run
-######################################################################
-install_ssh
-configure_git
-install_gh_cli
-clone_this_repo
-install_zsh
-configure_git_aliases
-install_cli_deps

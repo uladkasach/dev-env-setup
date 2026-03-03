@@ -36,6 +36,14 @@ EOF
 configure_cosmic_theme() {
   cosmic-settings appearance import "$HOME/git/more/dev-env-setup/src/cosmic.theme.ron"
   echo "• cosmic desert theme applied"
+
+  # apply desert colors to GTK3/GTK4 apps (firefox, etc)
+  local gtk4_dir="$HOME/.config/gtk-4.0/cosmic"
+  local gtk3_dir="$HOME/.config/gtk-3.0"
+  mkdir -p "$gtk4_dir" "$gtk3_dir"
+  cp "$HOME/git/more/dev-env-setup/src/cosmic.gtk.desert.css" "$gtk4_dir/dark.css"
+  ln -sf "$gtk4_dir/dark.css" "$gtk3_dir/gtk.css"
+  echo "• GTK desert theme applied (restart GTK apps to see changes)"
 }
 
 configure_cosmic_desktop() {
@@ -79,11 +87,3 @@ Some(([], [
 WINGS
   echo "• top panel: workspaces/applications buttons removed"
 }
-
-######################################################################
-# run
-######################################################################
-upgrade_cosmic_term
-configure_cosmic_term
-configure_cosmic_theme
-configure_cosmic_desktop
