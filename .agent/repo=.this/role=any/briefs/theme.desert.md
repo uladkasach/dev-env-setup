@@ -71,7 +71,7 @@ warm earth tones on a dark neutral background. high contrast where it matters (f
 - method: custom highlight groups set with `vim.api.nvim_set_hl()` — no external theme plugin
 - location: `~/.config/nvim/init.lua`
 - color map:
-  - bg → `#333333`, fg → `#FFFFFF`
+  - bg → `#3B2F27`, fg → `#FFFFFF`
   - comments → `#4D4D4D` (dim, italic)
   - strings → `#98FB98` (green)
   - keywords/statements → `#F0E68C` (yellow)

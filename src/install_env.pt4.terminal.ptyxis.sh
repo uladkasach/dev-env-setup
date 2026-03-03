@@ -4,7 +4,7 @@
 # .why  = vim-style navigation, desert theme, consistent shortcuts
 #
 # usage:
-#   source ~/git/more/dev-env-setup/src/install_env.ptyxis.sh
+#   source ~/git/more/dev-env-setup/src/install_env.pt4.terminal.ptyxis.sh
 #   # or via alias:
 #   sync.devenv.ptyxis
 #
