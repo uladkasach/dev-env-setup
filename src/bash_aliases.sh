@@ -228,7 +228,8 @@ alias sync.devenv.gitaliases='source ~/git/more/dev-env-setup/src/install_env.pt
 alias sync.devenv.nvim='mkdir -p ~/.config/nvim && cp ~/git/more/dev-env-setup/src/init.lua ~/.config/nvim/init.lua && echo "• neovim config synced"'
 alias sync.devenv.ptyxis='source ~/git/more/dev-env-setup/src/install_env.pt4.terminal.ptyxis.sh && configure_ptyxis'
 alias sync.devenv.cosmic='cosmic-settings appearance import ~/git/more/dev-env-setup/src/cosmic.theme.ron && echo "• cosmic desert theme applied"'
-alias sync.devenv='sync.devenv.bashaliases && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.cosmic'
+alias sync.devenv.firefox='source ~/git/more/dev-env-setup/src/install_env.pt1.system.performance.sh && configure_firefox_theme'
+alias sync.devenv='sync.devenv.bashaliases && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.cosmic && sync.devenv.firefox'
 
 # make it easy to pull down the devenv repo
 alias devenv.sync.repo='cd ~/git/more/dev-env-setup && git checkout main && git pull origin HEAD'

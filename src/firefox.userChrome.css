@@ -1,0 +1,57 @@
+/* desert theme for firefox */
+
+/* toolbar / tab bar background */
+:root {
+  --toolbar-bgcolor: #3B2F27 !important;
+  --toolbar-color: #F5DEB3 !important;
+  --tab-selected-bgcolor: #4E3F35 !important;
+  --tab-selected-textcolor: #FFFFFF !important;
+  --lwt-accent-color: #3B2F27 !important;
+  --lwt-text-color: #F5DEB3 !important;
+  --arrowpanel-background: #3B2F27 !important;
+  --arrowpanel-color: #F5DEB3 !important;
+  --urlbar-box-bgcolor: #4E3F35 !important;
+  --urlbar-box-text-color: #FFFFFF !important;
+  --sidebar-background-color: #3B2F27 !important;
+  --sidebar-text-color: #F5DEB3 !important;
+}
+
+/* tab bar */
+#TabsToolbar {
+  background-color: #3B2F27 !important;
+}
+
+/* inactive tabs */
+.tabbrowser-tab:not([selected]) .tab-background {
+  background-color: #3B2F27 !important;
+}
+.tabbrowser-tab:not([selected]) .tab-label {
+  color: #7A6B5D !important;
+}
+
+/* active tab */
+.tabbrowser-tab[selected] .tab-background {
+  background-color: #4E3F35 !important;
+}
+.tabbrowser-tab[selected] .tab-label {
+  color: #FFFFFF !important;
+}
+
+/* navigation bar (url bar area) */
+#nav-bar {
+  background-color: #3B2F27 !important;
+}
+
+/* url bar */
+#urlbar-background {
+  background-color: #4E3F35 !important;
+}
+#urlbar-input {
+  color: #FFFFFF !important;
+}
+
+/* bookmarks bar */
+#PersonalToolbar {
+  background-color: #3B2F27 !important;
+  color: #F5DEB3 !important;
+}

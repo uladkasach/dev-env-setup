@@ -52,3 +52,14 @@ install_cli_deps() {
   sudo apt install -y jq # required for manipulating json in terminal
   sudo apt install -y tree # required for tree view of directories
 }
+
+######################################################################
+# run
+######################################################################
+install_ssh
+configure_git
+install_gh_cli
+clone_this_repo
+install_zsh
+configure_git_aliases
+install_cli_deps

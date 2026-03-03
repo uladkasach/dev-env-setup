@@ -26,3 +26,12 @@ configure_screenshot_shortcuts() {
   gsettings set org.gnome.shell.keybindings show-screenshot-ui "['Print', '<Primary><Shift><Alt>P']"
   gsettings set org.gnome.shell.keybindings show-screen-recording-ui "['<Ctrl><Shift><Alt>R']"
 }
+
+######################################################################
+# run
+######################################################################
+install_gnome_extensions
+configure_battery_saver
+configure_nightlight
+configure_brightness
+configure_screenshot_shortcuts

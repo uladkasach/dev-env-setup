@@ -82,3 +82,13 @@ clone_org_repos() {
     done
   done
 }
+
+######################################################################
+# run
+######################################################################
+install_node
+install_psql
+install_aws_cli
+install_terraform
+install_docker
+clone_org_repos

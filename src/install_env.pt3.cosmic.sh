@@ -79,3 +79,11 @@ Some(([], [
 WINGS
   echo "• top panel: workspaces/applications buttons removed"
 }
+
+######################################################################
+# run
+######################################################################
+upgrade_cosmic_term
+configure_cosmic_term
+configure_cosmic_theme
+configure_cosmic_desktop

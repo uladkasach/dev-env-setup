@@ -69,3 +69,13 @@ configure_codium_sync() {
   cp ~/git/more/dev-env-setup/codium/sync.settings.yml ~/.config/VSCodium/User/globalStorage/zokugun.sync-settings/settings.yml
   codium && echo 'run the "Sync Settings: Download (repository -> user)" command' && echo 'open the Sync Settings output pane to see install progress'
 }
+
+######################################################################
+# run
+######################################################################
+install_dropbox
+install_flatpak_apps
+install_protonvpn
+install_codium
+configure_codium_copilot
+configure_codium_sync

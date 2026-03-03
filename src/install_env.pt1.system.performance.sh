@@ -14,6 +14,29 @@ install_1password_extension() {
   browser https://addons.mozilla.org/en-US/firefox/addon/1password-x-password-manager/
 }
 
+configure_firefox_theme() {
+  # find the default-release profile dir
+  local ff_root="$HOME/.var/app/org.mozilla.firefox/config/mozilla/firefox"
+  local profile_dir
+  profile_dir=$(grep -oP 'Path=\K.*default-release' "$ff_root/profiles.ini" 2>/dev/null)
+  if [[ -z "$profile_dir" ]]; then
+    echo "• firefox profile not found; skipped"
+    return 1
+  fi
+  local full_path="$ff_root/$profile_dir"
+
+  # copy userChrome.css
+  mkdir -p "$full_path/chrome"
+  cp "$HOME/git/more/dev-env-setup/src/firefox.userChrome.css" "$full_path/chrome/userChrome.css"
+
+  # enable userChrome.css loading (requires restart)
+  local prefs="$full_path/user.js"
+  grep -qF 'toolkit.legacyUserProfileCustomizations.stylesheets' "$prefs" 2>/dev/null || \
+    echo 'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);' >> "$prefs"
+
+  echo "• firefox desert theme installed (restart firefox to apply)"
+}
+
 configure_sysctl() {
   #########################
   ## bump max files watched
@@ -89,3 +112,13 @@ install_fonts() {
   gsettings set org.gnome.desktop.interface monospace-font-name 'Hack Nerd Font Mono 12'
   echo "• Hack Nerd Font installed and set as system monospace"
 }
+
+######################################################################
+# run
+######################################################################
+install_firefox
+install_1password_extension
+configure_firefox_theme
+configure_sysctl
+configure_swapfile
+install_fonts
