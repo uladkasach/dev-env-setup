@@ -64,6 +64,7 @@ terminal # open a new terminal
 # pt5: dev toolchain
 source "$THIS_DIR/install_env.pt5.devtools.sh"
 install_node
+install_robot_brains
 install_psql
 install_aws_cli
 install_terraform

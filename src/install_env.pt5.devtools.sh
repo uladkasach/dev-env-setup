@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ######################################################################
 # pt5: dev toolchain
-# node/fnm/pnpm, psql, aws cli, terraform/tfenv, docker
+# node/fnm/pnpm, claude-code/rhachet, psql, aws cli, terraform/tfenv, docker
 ######################################################################
 
 install_node() {
@@ -13,6 +13,14 @@ install_node() {
   source $HOME/.zshrc
   fnm install --lts
   corepack enable && corepack install -g pnpm@latest
+}
+
+install_robot_brains() {
+  #########################
+  ## claude-code + rhachet
+  #########################
+  pnpm install -g @anthropic-ai/claude-code
+  pnpm install -g rhachet
 }
 
 install_psql() {
