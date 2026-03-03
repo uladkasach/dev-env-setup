@@ -9,13 +9,19 @@ configure_sysctl() {
   ## bump max files watched
   ## per https://stackoverflow.com/a/32600959/3068233
   #########################
-  echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+  if ! grep -q '^fs.inotify.max_user_watches=' /etc/sysctl.conf; then
+    echo 'fs.inotify.max_user_watches=524288' | sudo tee -a /etc/sysctl.conf
+  fi
 
   #############################
   ## set swappiness — prefer RAM over swap
   ## ref: https://wiki.debian.org/swappiness
   #############################
-  echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+  if ! grep -q '^vm.swappiness=' /etc/sysctl.conf; then
+    echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+  fi
+
+  sudo sysctl -p
 }
 
 configure_swapfile() {

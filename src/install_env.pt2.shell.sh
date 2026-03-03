@@ -10,10 +10,22 @@ install_ssh() {
 }
 
 configure_git() {
-  git config --global user.email "u...k...@gmail.com" # change me to your email
-  git config --global user.name "U... K..." # change me to your name
-  git config --global pull.ff only # make sure that pull only ever automatically fasts forward
-  git config --global init.defaultBranch main # default root branch name to `main`
+  # require GIT_USER_EMAIL and GIT_USER_NAME (prompt if not set)
+  if [[ -z "${GIT_USER_EMAIL:-}" ]]; then
+    read -rp "git user.email (e.g., jane.doe@gmail.com): " GIT_USER_EMAIL
+  fi
+  if [[ -z "${GIT_USER_NAME:-}" ]]; then
+    read -rp "git user.name (e.g., Jane Doe): " GIT_USER_NAME
+  fi
+  if [[ -z "$GIT_USER_EMAIL" || -z "$GIT_USER_NAME" ]]; then
+    echo "✗ GIT_USER_EMAIL and GIT_USER_NAME required"
+    return 1
+  fi
+
+  git config --global user.email "$GIT_USER_EMAIL"
+  git config --global user.name "$GIT_USER_NAME"
+  git config --global pull.ff only
+  git config --global init.defaultBranch main
 }
 
 install_gh_cli() {
@@ -37,6 +49,14 @@ clone_this_repo() {
 install_zsh() {
   sudo apt install zsh
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)" "" --unattended
+
+  # set ZSH_CUSTOM (not set after --unattended install since shell wasn't re-sourced)
+  export ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+  if [[ ! -d "$ZSH_CUSTOM" ]]; then
+    echo "✗ ZSH_CUSTOM dir not found: $ZSH_CUSTOM"
+    return 1
+  fi
+
   git clone https://github.com/denysdovhan/spaceship-prompt.git "$ZSH_CUSTOM/themes/spaceship-prompt" && ln -s "$ZSH_CUSTOM/themes/spaceship-prompt/spaceship.zsh-theme" "$ZSH_CUSTOM/themes/spaceship.zsh-theme"
   cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases
   cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc

@@ -23,21 +23,40 @@ install_aws_cli() {
   ##########################
   ## ref: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
   ##########################
-  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-  unzip awscliv2.zip
-  sudo ./aws/install
+  local tmp_dir="/tmp/aws-cli-install"
+  rm -rf "$tmp_dir" && mkdir -p "$tmp_dir"
+  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "$tmp_dir/awscliv2.zip"
+  unzip -q "$tmp_dir/awscliv2.zip" -d "$tmp_dir"
+  sudo "$tmp_dir/aws/install"
+  rm -rf "$tmp_dir"
 }
 
 install_terraform() {
   #########################
   ## terraform via tfenv
   #########################
+  if [[ -d ~/.tfenv ]]; then
+    echo "• tfenv already installed; skipped"
+    return 0
+  fi
   git clone https://github.com/tfutils/tfenv.git ~/.tfenv
   mkdir -p ~/.local/bin/
-  . ~/.profile
-  ln -s ~/.tfenv/bin/* ~/.local/bin
-  . ~/.profile
-  which tfenv
+  ln -s ~/.tfenv/bin/* ~/.local/bin/
+
+  # verify symlink created
+  if [[ ! -L ~/.local/bin/tfenv ]]; then
+    echo "✗ tfenv symlink not created at ~/.local/bin/tfenv"
+    return 1
+  fi
+
+  # verify ~/.local/bin is in PATH (or will be after shell restart)
+  if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    if ! grep -qE 'PATH.*\.local/bin' ~/.profile ~/.zshrc ~/.bashrc 2>/dev/null; then
+      echo "✗ ~/.local/bin not in PATH; add it to ~/.profile or ~/.zshrc"
+      return 1
+    fi
+  fi
+  echo "• tfenv installed (restart shell to use)"
 }
 
 install_docker() {

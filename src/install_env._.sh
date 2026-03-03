@@ -24,7 +24,6 @@ source "$THIS_DIR/install_env.pt1.system.keybinds.sh"
 install_keyd
 configure_keyd
 install_keynav
-configure_profile_altswap_reset
 configure_logind
 
 # pt1c: system performance

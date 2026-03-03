@@ -67,24 +67,24 @@ install_keynav() {
 EOF
 }
 
-configure_profile_altswap_reset() {
-  # reset altswap on login (so it doesn't persist across sessions)
-  grep -qF '# altswap reset' ~/.profile || cat <<'EOF' >> ~/.profile
-
-# altswap reset
-sed -i 's/,altwin:swap_lalt_lwin//;s/altwin:swap_lalt_lwin,\?//' "$HOME/.config/cosmic/com.system76.CosmicComp/v1/xkb_config" 2>/dev/null
-EOF
-}
-
 configure_logind() {
   ######################
   ## dont suspend on lid close
   ## ref: https://ubuntuhandbook.org/index.php/2020/05/lid-close-behavior-ubuntu-20-04/
   ######################
   LOGIND_CONF="/etc/systemd/logind.conf"
+
+  # skip if already configured
+  if grep -q '^HandlePowerKey=ignore' "$LOGIND_CONF"; then
+    echo "• logind already configured; skipped"
+    return 0
+  fi
+
+  # remove any extant entries (commented or not)
   for key in HandlePowerKey HandleSuspendKey HandleHibernateKey HandleRebootKey HandleLidSwitch HandleLidSwitchExternalPower HandleLidSwitchDocked; do
       sudo sed -i "/^#*${key}=/d" "$LOGIND_CONF"
   done
+
   sudo tee -a "$LOGIND_CONF" > /dev/null <<'EOF'
 
 # use terminal instead; keyboard misfire is too common
