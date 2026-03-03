@@ -76,6 +76,14 @@ grep -qF '(keynav && echo "keynav started"' ~/.profile || cat <<'EOF' >> ~/.prof
 (keynav && echo "keynav started" || echo "keynav already running") &
 EOF
 
+# reset altswap on login (so it doesn't persist across sessions)
+grep -qF '# altswap reset' ~/.profile || cat <<'EOF' >> ~/.profile
+
+# altswap reset
+sed -i 's/,altwin:swap_lalt_lwin//;s/altwin:swap_lalt_lwin,\?//' "$HOME/.config/cosmic/com.system76.CosmicComp/v1/xkb_config" 2>/dev/null
+EOF
+
+
 ######################
 ## dont suspend on lid close
 ## ref: https://ubuntuhandbook.org/index.php/2020/05/lid-close-behavior-ubuntu-20-04/
@@ -155,15 +163,148 @@ git clone git@github.com:uladkasach/dev-env-setup.git ~/git/more/dev-env-setup;
 ## install zsh + oh-my-zsh + spaceship theme
 #########################
 sudo apt install zsh
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)" "" --unattended
 git clone https://github.com/denysdovhan/spaceship-prompt.git "$ZSH_CUSTOM/themes/spaceship-prompt" && ln -s "$ZSH_CUSTOM/themes/spaceship-prompt/spaceship.zsh-theme" "$ZSH_CUSTOM/themes/spaceship.zsh-theme"
 cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases # reset from backup the aliases config
 cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc # reset from backup the zsh config
 
 # make sure we use zsh by default
-echo "
-exec zsh
-" >> ~/.bashrc
+chsh -s "$(which zsh)"
+
+##########################
+## configure cosmic-term
+##########################
+
+# ensure cosmic-term >= 1.0.5 (configurable keybindings)
+upgrade_cosmic_term() {
+  local version
+  version=$(cosmic-term --version 2>/dev/null | grep -oP '[\d.]+')
+  if dpkg --compare-versions "${version:-0}" lt "1.0.5"; then
+    sudo apt update && sudo apt install -y cosmic-term
+    echo "• cosmic-term upgraded to $(cosmic-term --version 2>/dev/null)"
+  else
+    echo "• cosmic-term ${version} already meets minimum (1.0.5)"
+  fi
+}
+upgrade_cosmic_term
+
+# configure cosmic-term keybinds (ctrl+\ = new window)
+configure_cosmic_term() {
+  local config_dir="$HOME/.config/cosmic/com.system76.CosmicTerm/v1"
+  mkdir -p "$config_dir"
+  cat > "$config_dir/shortcuts_custom" << 'EOF'
+{
+    (
+        modifiers: [
+            Ctrl,
+        ],
+        key: "\\",
+    ): WindowNew,
+}
+EOF
+  echo "• cosmic-term keybinds configured"
+}
+configure_cosmic_term
+
+# apply cosmic desert theme
+configure_cosmic_theme() {
+  cosmic-settings appearance import "$HOME/git/more/dev-env-setup/src/cosmic.theme.ron"
+  echo "• cosmic desert theme applied"
+}
+configure_cosmic_theme
+
+# configure cosmic desktop: keybinds, panels, dock
+configure_cosmic_desktop() {
+  # remap super alone → workspace overview, super+/ → launcher (search)
+  local shortcuts_dir="$HOME/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1"
+  mkdir -p "$shortcuts_dir"
+  cat > "$shortcuts_dir/custom" << 'SHORTCUTS'
+{
+    (modifiers: [Super]): System(WorkspaceOverview),
+    (modifiers: [Super], key: "slash"): System(Launcher),
+}
+SHORTCUTS
+  echo "• keybinds: super → overview, super+/ → search"
+
+  # disable bottom dock
+  local panel_dir="$HOME/.config/cosmic/com.system76.CosmicPanel/v1"
+  mkdir -p "$panel_dir"
+  cat > "$panel_dir/entries" << 'ENTRIES'
+[
+    "Panel",
+]
+ENTRIES
+  echo "• dock disabled"
+
+  # remove workspaces/applications buttons from top panel
+  local top_panel_dir="$HOME/.config/cosmic/com.system76.CosmicPanel.Panel/v1"
+  mkdir -p "$top_panel_dir"
+  cat > "$top_panel_dir/plugins_wings" << 'WINGS'
+Some(([], [
+    "com.system76.CosmicAppletInputSources",
+    "com.system76.CosmicAppletStatusArea",
+    "com.system76.CosmicAppletA11y",
+    "com.system76.CosmicAppletTiling",
+    "com.system76.CosmicAppletAudio",
+    "com.system76.CosmicAppletBluetooth",
+    "com.system76.CosmicAppletNetwork",
+    "com.system76.CosmicAppletBattery",
+    "com.system76.CosmicAppletNotifications",
+    "com.system76.CosmicAppletPower",
+]))
+WINGS
+  echo "• top panel: workspaces/applications buttons removed"
+}
+configure_cosmic_desktop
+
+##########################
+## install ptyxis terminal (rapid, gpu-accelerated, container-aware)
+## ref: https://gitlab.gnome.org/chergert/ptyxis
+## ref: https://ubuntuhandbook.org/index.php/2025/08/install-set-ptyxis-as-default-terminal-in-ubuntu-24-04-22-04/
+## ref: https://documentation.ubuntu.com/desktop/en/latest/how-to/change-the-default-terminal/
+##########################
+install_ptyxis() {
+  # skip if ptyxis is already the default terminal (e.g., ubuntu 25.10+, gnome 47+)
+  local current_terminal
+  current_terminal=$(readlink -f /usr/bin/x-terminal-emulator 2>/dev/null || echo "")
+  if [[ "$current_terminal" == *ptyxis* ]]; then
+    echo "• ptyxis already default terminal; skipped"
+    return 0
+  fi
+
+  # install via flatpak if not already installed
+  if ! flatpak list | grep -q app.devsuite.Ptyxis; then
+    flatpak install -y flathub app.devsuite.Ptyxis
+  fi
+
+  # create wrapper executable for x-terminal-emulator compatibility
+  sudo tee /usr/bin/ptyxis.wrapper > /dev/null << 'EOF'
+#!/bin/sh
+flatpak run app.devsuite.Ptyxis --new-window
+EOF
+  sudo chmod +x /usr/bin/ptyxis.wrapper
+
+  # register and set as default terminal (ctrl+alt+t)
+  sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/ptyxis.wrapper 50
+  sudo update-alternatives --set x-terminal-emulator /usr/bin/ptyxis.wrapper
+}
+install_ptyxis
+
+source "$(dirname "$0")/install_env.ptyxis.sh"
+configure_ptyxis
+
+install_terminal_command() {
+  # .what = install 'terminal' command that opens terminal at specified directory
+  # .why  = 'terminal .' works in scripts, subshells, git tree, etc (unlike alias)
+  sudo tee /usr/bin/terminal > /dev/null << 'EOF'
+#!/usr/bin/env bash
+dir="${1:-.}"
+dir="$(realpath "$dir")"
+exec flatpak run app.devsuite.Ptyxis --new-window --working-directory "$dir"
+EOF
+  sudo chmod +x /usr/bin/terminal
+}
+install_terminal_command
 
 # now open a new terminal
 terminal
@@ -185,7 +326,7 @@ configure_neovim
 #######################
 ## set git aliases
 #######################
-THIS_DIR="$HOME/git/more/dev-env-setup/src" # todo: swap w/ command, later
+export THIS_DIR="$HOME/git/more/dev-env-setup/src" # todo: swap w/ command, later
 source "$THIS_DIR/install_env.git.aliases.sh"
 
 #######################
@@ -202,6 +343,7 @@ sudo apt install -y tree # required for tree view of directories
 curl -fsSL https://fnm.vercel.app/install | bash -s
 source $HOME/.zshrc
 fnm install --lts # install latest lts version
+corepack enable && corepack install -g pnpm@latest # install pnpm via corepack
 
 #######################
 ## clone all repos in the organizations you care about
@@ -352,55 +494,6 @@ sudo apt update;
 sudo apt-get install -y protonvpn;
 sudo apt install -y gnome-shell-extension-appindicator gir1.2-appindicator3-0.1; # system tray icon
 
-
-##########################
-## install ptyxis terminal (rapid, gpu-accelerated, container-aware)
-## ref: https://gitlab.gnome.org/chergert/ptyxis
-## ref: https://ubuntuhandbook.org/index.php/2025/08/install-set-ptyxis-as-default-terminal-in-ubuntu-24-04-22-04/
-## ref: https://documentation.ubuntu.com/desktop/en/latest/how-to/change-the-default-terminal/
-##########################
-install_ptyxis() {
-  # skip if ptyxis is already the default terminal (e.g., ubuntu 25.10+, gnome 47+)
-  local current_terminal
-  current_terminal=$(readlink -f /usr/bin/x-terminal-emulator 2>/dev/null || echo "")
-  if [[ "$current_terminal" == *ptyxis* ]]; then
-    echo "• ptyxis already default terminal; skipped"
-    return 0
-  fi
-
-  # install via flatpak if not already installed
-  if ! flatpak list | grep -q app.devsuite.Ptyxis; then
-    flatpak install -y flathub app.devsuite.Ptyxis
-  fi
-
-  # create wrapper executable for x-terminal-emulator compatibility
-  sudo tee /usr/bin/ptyxis.wrapper > /dev/null << 'EOF'
-#!/bin/sh
-flatpak run app.devsuite.Ptyxis --new-window
-EOF
-  sudo chmod +x /usr/bin/ptyxis.wrapper
-
-  # register and set as default terminal (ctrl+alt+t)
-  sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/ptyxis.wrapper 50
-  sudo update-alternatives --set x-terminal-emulator /usr/bin/ptyxis.wrapper
-}
-install_ptyxis
-
-source "$(dirname "$0")/install_env.ptyxis.sh"
-configure_ptyxis
-
-install_terminal_command() {
-  # .what = install 'terminal' command that opens terminal at specified directory
-  # .why  = 'terminal .' works in scripts, subshells, git tree, etc (unlike alias)
-  sudo tee /usr/bin/terminal > /dev/null << 'EOF'
-#!/usr/bin/env bash
-dir="${1:-.}"
-dir="$(realpath "$dir")"
-exec flatpak run app.devsuite.Ptyxis --new-window --working-directory "$dir"
-EOF
-  sudo chmod +x /usr/bin/terminal
-}
-install_terminal_command
 
 
 #########################

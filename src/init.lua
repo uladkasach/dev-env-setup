@@ -278,17 +278,17 @@ require('lazy').setup({
       options = {
         theme = {
           normal = {
-            a = { fg = '#333333', bg = '#F5DEB3', gui = 'bold' },
+            a = { fg = '#3B2F27', bg = '#F5DEB3', gui = 'bold' },
             b = { fg = '#FFFFFF', bg = '#555555' },
-            c = { fg = '#F5DEB3', bg = '#333333' },
+            c = { fg = '#F5DEB3', bg = '#3B2F27' },
           },
-          insert = { a = { fg = '#333333', bg = '#98FB98', gui = 'bold' } },
-          visual = { a = { fg = '#333333', bg = '#F0E68C', gui = 'bold' } },
-          replace = { a = { fg = '#333333', bg = '#FF2B2B', gui = 'bold' } },
+          insert = { a = { fg = '#3B2F27', bg = '#98FB98', gui = 'bold' } },
+          visual = { a = { fg = '#3B2F27', bg = '#F0E68C', gui = 'bold' } },
+          replace = { a = { fg = '#3B2F27', bg = '#FF2B2B', gui = 'bold' } },
           inactive = {
-            a = { fg = '#777777', bg = '#333333' },
-            b = { fg = '#777777', bg = '#333333' },
-            c = { fg = '#777777', bg = '#333333' },
+            a = { fg = '#777777', bg = '#3B2F27' },
+            b = { fg = '#777777', bg = '#3B2F27' },
+            c = { fg = '#777777', bg = '#3B2F27' },
           },
         },
         component_separators = { left = '│', right = '│' },
@@ -424,16 +424,16 @@ vim.cmd('highlight clear')
 local hi = function(group, opts) vim.api.nvim_set_hl(0, group, opts) end
 
 -- ui
-hi('Normal',       { fg = '#FFFFFF', bg = '#333333' })
+hi('Normal',       { fg = '#FFFFFF', bg = '#3B2F27' })
 hi('CursorLine',   { bg = '#4D4D4D' })
 hi('CursorLineNr', { fg = '#F0E68C', bold = true })
 hi('LineNr',       { fg = '#555555' })
 hi('Visual',       { bg = '#555555' })
 hi('Pmenu',        { fg = '#FFFFFF', bg = '#4D4D4D' })
-hi('PmenuSel',     { fg = '#333333', bg = '#F0E68C' })
-hi('StatusLine',   { fg = '#333333', bg = '#F5DEB3' })
-hi('StatusLineNC', { fg = '#333333', bg = '#4D4D4D' })
-hi('Search',       { fg = '#333333', bg = '#F0E68C' })
+hi('PmenuSel',     { fg = '#3B2F27', bg = '#F0E68C' })
+hi('StatusLine',   { fg = '#3B2F27', bg = '#F5DEB3' })
+hi('StatusLineNC', { fg = '#3B2F27', bg = '#4D4D4D' })
+hi('Search',       { fg = '#3B2F27', bg = '#F0E68C' })
 hi('MatchParen',   { fg = '#FFFFFF', bg = '#555555', bold = true })
 
 -- syntax
@@ -457,7 +457,7 @@ hi('Delimiter',    { fg = '#F5DEB3' })
 hi('Special',      { fg = '#FFA0A0' })
 hi('Error',        { fg = '#FF2B2B', bold = true })
 hi('WarnMsg',      { fg = '#FF5555' })
-hi('Todo',         { fg = '#333333', bg = '#F0E68C', bold = true })
+hi('Todo',         { fg = '#3B2F27', bg = '#F0E68C', bold = true })
 hi('Title',        { fg = '#C4A882', bold = true })
 hi('Directory',    { fg = '#C4A882' })
 
@@ -471,7 +471,7 @@ hi('NeoTreeGitModified',    { fg = '#F0E68C' })
 hi('NeoTreeGitUntracked',   { fg = '#555555' })
 hi('NeoTreeIndentMarker',   { fg = '#555555' })
 hi('NeoTreeRootName',       { fg = '#F0E68C', bold = true })
-hi('NeoTreeTitleBar',       { fg = '#333333', bg = '#F5DEB3' })
+hi('NeoTreeTitleBar',       { fg = '#3B2F27', bg = '#F5DEB3' })
 hi('NeoTreeFloatBorder',    { fg = '#555555' })
 hi('NeoTreeCursorLine',     { bg = '#4D4D4D' })
 

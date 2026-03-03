@@ -48,13 +48,31 @@ alias use.terraform.caching='mkdir -p $HOME/.terraform.d/plugin-cache && export 
 alias use.mtu.1400='sudo ifconfig wlp113s0 mtu 1400' # for when you're on older infra networks; https://serverfault.com/a/670081/276221; https://www.cloudflare.com/learning/network-layer/what-is-mtu/
 
 # make it easy to manually update the keymappings, in case they drop off for some reason
-alias use.keymap.altswap='setxkbmap -option altwin:swap_lalt_lwin' # https://unix.stackexchange.com/a/367016/77522
+# swap left-alt and left-super via cosmic xkb config (e.g., for external mac keyboards)
+# cosmic-config watches the file via inotify, so changes apply instantly
+XKB_CONFIG="$HOME/.config/cosmic/com.system76.CosmicComp/v1/xkb_config"
+use_keymap_altswap() {
+  if grep -q 'altwin:swap_lalt_lwin' "$XKB_CONFIG" 2>/dev/null; then
+    echo "• alt/super already swapped"
+    return 0
+  fi
+  sed -i 's/options: Some("\(.*\)")/options: Some("\1,altwin:swap_lalt_lwin")/' "$XKB_CONFIG"
+  echo "• alt/super swapped"
+}
+use_keymap_altboot() {
+  sed -i 's/,altwin:swap_lalt_lwin//;s/altwin:swap_lalt_lwin,\?//' "$XKB_CONFIG"
+  echo "• alt/super reset"
+}
+alias use.keymap.altswap='use_keymap_altswap'
+alias use.keymap.altboot='use_keymap_altboot'
 
 # make signing into onepass easier
 alias op.signin='eval $(op signin)'
 
 # make it easier to open the browser
-alias browser='google-chrome & disown'
+alias browser='flatpak run org.mozilla.firefox 2>/dev/null &!'
+alias machine.logout='loginctl terminate-user "$USER"'
+alias machine.reboot='systemctl reboot'
 
 # note: 'terminal' command installed via install_env.sh (supports 'terminal /path/to/dir')
 
@@ -209,7 +227,8 @@ alias sync.devenv.zshrc='cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc && so
 alias sync.devenv.gitaliases='source ~/git/more/dev-env-setup/src/install_env.git.aliases.sh'
 alias sync.devenv.nvim='mkdir -p ~/.config/nvim && cp ~/git/more/dev-env-setup/src/init.lua ~/.config/nvim/init.lua && echo "• neovim config synced"'
 alias sync.devenv.ptyxis='source ~/git/more/dev-env-setup/src/install_env.ptyxis.sh && configure_ptyxis'
-alias sync.devenv='sync.devenv.bashaliases && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis'
+alias sync.devenv.cosmic='cosmic-settings appearance import ~/git/more/dev-env-setup/src/cosmic.theme.ron && echo "• cosmic desert theme applied"'
+alias sync.devenv='sync.devenv.bashaliases && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.cosmic'
 
 # make it easy to pull down the devenv repo
 alias devenv.sync.repo='cd ~/git/more/dev-env-setup && git checkout main && git pull origin HEAD'
