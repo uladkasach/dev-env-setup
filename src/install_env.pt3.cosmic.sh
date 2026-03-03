@@ -47,9 +47,10 @@ configure_cosmic_theme() {
 }
 
 configure_cosmic_desktop() {
-  # remap super alone → workspace overview, super+/ → launcher (search)
   local shortcuts_dir="$HOME/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1"
   mkdir -p "$shortcuts_dir"
+
+  # custom keybinds: super → overview, super+/ → launcher
   cat > "$shortcuts_dir/custom" << 'SHORTCUTS'
 {
     (modifiers: [Super]): System(WorkspaceOverview),
@@ -57,6 +58,15 @@ configure_cosmic_desktop() {
 }
 SHORTCUTS
   echo "• keybinds: super → overview, super+/ → search"
+
+  # set ptyxis as default terminal (Super+T uses this)
+  # copy system defaults, override just the Terminal line
+  local system_actions="/usr/share/cosmic/com.system76.CosmicSettings.Shortcuts/v1/system_actions"
+  local user_actions="$shortcuts_dir/system_actions"
+  if [[ -f "$system_actions" ]]; then
+    sed 's|Terminal: "cosmic-term"|Terminal: "flatpak run app.devsuite.Ptyxis --new-window -d ~"|' "$system_actions" > "$user_actions"
+    echo "• default terminal: ptyxis"
+  fi
 
   # disable bottom dock
   local panel_dir="$HOME/.config/cosmic/com.system76.CosmicPanel/v1"
