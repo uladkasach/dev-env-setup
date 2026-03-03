@@ -11,6 +11,7 @@ neovim config with desert theme, file management, and vim-friendly keybinds.
 | `Ctrl+h/j/k/l` | move between windows |
 | `Alt+h/j/k/l` | resize windows |
 | `Ctrl+e` | toggle/focus neo-tree |
+| `Ctrl+m` | toggle minimap (birdseye view) |
 | `-` | open parent directory in oil |
 
 ### edit
@@ -91,6 +92,17 @@ workflow:
 6. `Ctrl+d a` / `Ctrl+d x` to stage/unstage/discard
 7. `o` in gitdiff.pane.tree to open file and close gitdiff.tab when done
 
+## minimap
+
+scrollbar/birdseye view on the right side. enabled by default, toggle with `Ctrl+m`.
+
+shows:
+- git hunks via gitsigns (green = add, red = delete, yellow = change)
+- lsp diagnostics
+- visible area indicator
+
+powered by mini.map. disabled for neo-tree, oil, help, and gitdiff.pane.tree.
+
 ## plugins
 
 | plugin | purpose |
@@ -101,7 +113,8 @@ workflow:
 | smart-splits | window navigation + resize |
 | lualine | status line |
 | gitsigns | git indicators in gutter |
-| diffview | git diff view with file tree |
+| codediff | git diff view with file tree |
+| mini.map | scrollbar with git hunks + diagnostics |
 
 ## theme
 

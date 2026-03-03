@@ -1,3 +1,9 @@
+-- wrap vim.treesitter.start to silently handle absent parsers
+local orig_ts_start = vim.treesitter.start
+vim.treesitter.start = function(bufnr, lang)
+  pcall(orig_ts_start, bufnr, lang)
+end
+
 -- bootstrap lazy.nvim plugin manager
 local lazypath = vim.fn.stdpath('data') .. '/lazy/lazy.nvim'
 if not vim.loop.fs_stat(lazypath) then
@@ -12,7 +18,10 @@ vim.opt.rtp:prepend(lazypath)
 -- shared diff boundary navigation
 local function navigate_diff_boundary(direction, get_chunks, fallback)
   local chunks = get_chunks()
-  if not chunks or #chunks == 0 then return end
+  if not chunks or #chunks == 0 then
+    if fallback then fallback() end
+    return
+  end
   local cursor = vim.api.nvim_win_get_cursor(0)[1]
   if direction == 'down' then
     for i, c in ipairs(chunks) do
@@ -27,6 +36,17 @@ local function navigate_diff_boundary(direction, get_chunks, fallback)
         return
       end
     end
+    -- not in chunk: find next chunk below cursor
+    for i, c in ipairs(chunks) do
+      if c.start > cursor then
+        vim.api.nvim_win_set_cursor(0, { c.start, 0 })
+        print('chunk ' .. i .. ' top')
+        return
+      end
+    end
+    -- wrap to first
+    vim.api.nvim_win_set_cursor(0, { chunks[1].start, 0 })
+    print('chunk 1 top')
   else -- up
     for i, c in ipairs(chunks) do
       if cursor > c.start and cursor <= c.fin then
@@ -40,39 +60,74 @@ local function navigate_diff_boundary(direction, get_chunks, fallback)
         return
       end
     end
+    -- not in chunk: find prev chunk above cursor
+    for i = #chunks, 1, -1 do
+      if chunks[i].fin < cursor then
+        vim.api.nvim_win_set_cursor(0, { chunks[i].fin, 0 })
+        print('chunk ' .. i .. ' bot')
+        return
+      end
+    end
+    -- wrap to last
+    vim.api.nvim_win_set_cursor(0, { chunks[#chunks].fin, 0 })
+    print('chunk ' .. #chunks .. ' bot')
   end
-  -- not in a chunk, use fallback
-  if fallback then fallback() end
 end
 
 -- find file path from codediff-explorer line (searches changed/staged files)
 local function get_codediff_explorer_file()
   local line = vim.api.nvim_get_current_line()
-  local filename = line:match('([%w_%-%.]+%.[%w]+)')
+  -- strip status indicator (M, A, D, etc) at end
+  line = line:gsub('%s+[MADRCU?!]%s*$', '')
+  -- match filename with brackets, dots, dashes, underscores
+  local filename = line:match('([%w_%-%.%[%]]+%.[%w]+)%s*$') or line:match('([%w_%-%.%[%]]+%.[%w]+)')
   if not filename then return nil end
-  local partial = line:match('[%w_%-%.]+%.[%w]+%s+([%w_%-%.%/]+)')
-  local search_partial = partial and partial:gsub('%.%.%.?$', '') or ''
   local cmd = 'git diff --name-only HEAD 2>/dev/null; git diff --cached --name-only 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null'
   local changed = vim.fn.systemlist(cmd)
   for _, p in ipairs(changed) do
     if p:match(vim.pesc(filename) .. '$') then
-      if search_partial == '' or p:find(search_partial, 1, true) then
-        return p
-      end
+      return p
     end
   end
   return filename  -- fallback to just filename
 end
 
--- get chunks from vim diff highlights (for codediff boundary nav)
+-- check if line has diff highlight (works for both vimdiff and codediff)
+local function line_has_diff_hl(lnum)
+  -- first try native diff_hlID (for vimdiff)
+  if vim.fn.diff_hlID(lnum, 1) > 0 then return true end
+  -- check extmarks (for codediff.nvim)
+  local bufnr = vim.api.nvim_get_current_buf()
+  local lnum0 = lnum - 1  -- 0-indexed
+  for _, ns_id in pairs(vim.api.nvim_get_namespaces()) do
+    local marks = vim.api.nvim_buf_get_extmarks(bufnr, ns_id, { lnum0, 0 }, { lnum0, -1 }, { details = true })
+    for _, mark in ipairs(marks) do
+      local details = mark[4]
+      if details and details.hl_group then
+        local hl = details.hl_group
+        if hl:match('Diff') or hl:match('Add') or hl:match('Remove') or hl:match('Change') then
+          return true
+        end
+      end
+    end
+  end
+  -- fallback: check syntax highlight
+  for col = 1, math.min(10, vim.fn.col({ lnum, '$' })) do
+    local hl_id = vim.fn.synID(lnum, col, true)
+    local name = vim.fn.synIDattr(hl_id, 'name')
+    if name:match('^Diff') then return true end
+  end
+  return false
+end
+
+-- get chunks from diff highlights (for codediff boundary nav)
 local function get_diff_hl_chunks()
   local chunks = {}
   local lines = vim.api.nvim_buf_line_count(0)
   local in_chunk = false
   local chunk_start = nil
   for lnum = 1, lines do
-    local hl = vim.fn.diff_hlID(lnum, 1)
-    local is_diff = hl > 0
+    local is_diff = line_has_diff_hl(lnum)
     if is_diff and not in_chunk then
       in_chunk = true
       chunk_start = lnum
@@ -94,10 +149,10 @@ require('lazy').setup({
     config = function()
       local gs = require('gitsigns')
       gs.setup({
-        signs_staged_enable = true,   -- show staged changes differently
-        attach_to_untracked = true,   -- show signs for new untracked files
+        signs_staged_enable = true,
+        attach_to_untracked = true,
         signs = {
-          untracked = { text = '┃' }, -- same as add, not dotted
+          untracked = { text = '┃' },
         },
       })
       -- get chunks from gitsigns hunks
@@ -156,6 +211,192 @@ require('lazy').setup({
     end,
   },
   {
+    'nvim-treesitter/nvim-treesitter',
+    version = false,
+    lazy = false,  -- CRITICAL: nvim-treesitter does NOT support lazy load
+    build = ':TSUpdate',
+    config = function()
+      local ok, configs = pcall(require, 'nvim-treesitter.configs')
+      if ok then
+        configs.setup({
+          ensure_installed = { 'lua', 'vim', 'vimdoc', 'query', 'markdown', 'bash' },
+          auto_install = true,
+          highlight = { enable = true },
+        })
+      end
+    end,
+  },
+  {
+    'Isrothy/neominimap.nvim',
+    lazy = false,
+    init = function()
+      vim.g.neominimap = {
+        auto_enable = true,
+        layout = 'split',  -- use split instead of float
+        split = {
+          direction = 'right',
+          minimap_width = 13,
+        },
+        exclude_filetypes = { 'neo-tree', 'oil', 'help', 'lazy', 'codediff-explorer' },
+        exclude_buftypes = {},  -- allow virtual buffers (for codediff)
+        git = {
+          enabled = true,
+          mode = 'line',
+        },
+        diagnostic = { enabled = false },
+      }
+    end,
+    config = function()
+      -- helper to update minimap from "after" pane
+      _G.update_minimap_from_after = function()
+        local after_win = nil
+        local max_col = -1
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+          local buf = vim.api.nvim_win_get_buf(win)
+          local name = vim.api.nvim_buf_get_name(buf)
+          if name:match('codediff:%d') then
+            local col = vim.api.nvim_win_get_position(win)[2]
+            if col > max_col then
+              max_col = col
+              after_win = win
+            end
+          end
+        end
+        if after_win then
+          local cur_win = vim.api.nvim_get_current_win()
+          vim.api.nvim_set_current_win(after_win)
+          vim.cmd('Neominimap refresh')
+          vim.defer_fn(function()
+            if vim.api.nvim_win_is_valid(cur_win) then
+              vim.api.nvim_set_current_win(cur_win)
+            end
+          end, 30)
+        end
+      end
+
+      -- attach gitsigns to codediff buffers for minimap git integration
+      vim.api.nvim_create_autocmd('BufEnter', {
+        pattern = 'codediff:*',
+        callback = function()
+          local bufnr = vim.api.nvim_get_current_buf()
+          local name = vim.api.nvim_buf_get_name(bufnr)
+          -- extract real path from codediff:N/path
+          local realpath = name:match('codediff:%d/(.+)$')
+          if realpath and vim.fn.filereadable(realpath) == 1 then
+            local gs = require('gitsigns')
+            -- attach gitsigns with the real file path
+            pcall(function()
+              gs.attach(bufnr, { file = realpath })
+            end)
+          end
+        end,
+      })
+
+      -- update minimap to show "after" pane when in tree
+      vim.api.nvim_create_autocmd('BufEnter', {
+        callback = function()
+          if vim.bo.filetype == 'codediff-explorer' then
+            vim.defer_fn(_G.update_minimap_from_after, 100)
+          end
+        end,
+      })
+      -- ctrl+m to toggle
+      vim.keymap.set('n', '<C-m>', '<cmd>Neominimap toggle<cr>', { desc = 'Toggle minimap' })
+
+      -- register custom handler for diff panes (vim diff + codediff extmarks)
+      vim.defer_fn(function()
+        local ok, handlers = pcall(require, 'neominimap.map.handlers')
+        if not ok then return end
+
+        local ns = vim.api.nvim_create_namespace('neominimap_vdiff')
+        handlers.register({
+          name = 'vdiff',
+          mode = 'line',
+          namespace = ns,
+          init = function() end,
+          autocmds = {
+            {
+              event = { 'BufEnter', 'DiffUpdated', 'TextChanged' },
+              opts = {
+                callback = function(apply, args)
+                  apply(args.buf)
+                end,
+              },
+            },
+          },
+          get_annotations = function(bufnr)
+            local annotations = {}
+            if not vim.api.nvim_buf_is_valid(bufnr) then return annotations end
+
+            -- check if this is a codediff buffer
+            local bufname = vim.api.nvim_buf_get_name(bufnr)
+            local is_codediff = bufname:match('codediff:')
+
+            -- for native vim diff, check window diff mode
+            local win = vim.fn.bufwinid(bufnr)
+            local is_vimdiff = win ~= -1 and vim.wo[win].diff
+
+            if not is_codediff and not is_vimdiff then return annotations end
+
+            local line_count = vim.api.nvim_buf_line_count(bufnr)
+            local id_map = { DiffAdd = 1, DiffChange = 2, DiffDelete = 3, DiffText = 2 }
+            local hl_map = {
+              DiffAdd = 'NeominimapDiffAddLine',
+              DiffChange = 'NeominimapDiffChangeLine',
+              DiffDelete = 'NeominimapDiffDeleteLine',
+              DiffText = 'NeominimapDiffChangeLine',
+            }
+
+            for lnum = 1, line_count do
+              local found_hl = nil
+
+              -- try native diff_hlID first
+              local hl_id = vim.fn.diff_hlID(lnum, 1)
+              if hl_id > 0 then
+                found_hl = vim.fn.synIDattr(hl_id, 'name')
+              end
+
+              -- if not found and codediff buffer, check extmarks
+              if not found_hl and is_codediff then
+                local lnum0 = lnum - 1
+                for _, ns_id in pairs(vim.api.nvim_get_namespaces()) do
+                  local marks = vim.api.nvim_buf_get_extmarks(bufnr, ns_id, { lnum0, 0 }, { lnum0, -1 }, { details = true })
+                  for _, mark in ipairs(marks) do
+                    local details = mark[4]
+                    if details and details.hl_group then
+                      local hl = details.hl_group
+                      -- codediff uses CodeDiffLineInsert/CodeDiffLineDelete
+                      if hl == 'CodeDiffLineInsert' or hl == 'DiffAdd' or hl:match('Insert') or hl:match('Add') then
+                        found_hl = 'DiffAdd'
+                      elseif hl == 'CodeDiffLineDelete' or hl == 'DiffDelete' or hl:match('Delete') then
+                        found_hl = 'DiffDelete'
+                      elseif hl:match('Change') or hl:match('Modify') then
+                        found_hl = 'DiffChange'
+                      end
+                      if found_hl then break end
+                    end
+                  end
+                  if found_hl then break end
+                end
+              end
+
+              if found_hl and hl_map[found_hl] then
+                table.insert(annotations, {
+                  lnum = lnum,
+                  end_lnum = lnum,
+                  id = id_map[found_hl],
+                  priority = 50,
+                  highlight = hl_map[found_hl],
+                })
+              end
+            end
+            return annotations
+          end,
+        })
+      end, 100)
+    end,
+  },
+  {
     'esmuellert/codediff.nvim',
     keys = {
       { '<C-g>', function()
@@ -175,6 +416,7 @@ require('lazy').setup({
           -- not in codediff: save current tab, find or open codediff
           _G.last_file_tab = vim.api.nvim_get_current_tabpage()
           -- find codediff tab
+          local found_tab = nil
           for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
             local wins = vim.api.nvim_tabpage_list_wins(tab)
             for _, win in ipairs(wins) do
@@ -182,13 +424,28 @@ require('lazy').setup({
               local name = vim.api.nvim_buf_get_name(buf)
               local bft = vim.api.nvim_get_option_value('filetype', { buf = buf })
               if name:match('codediff://') or bft:match('^codediff') then
-                vim.api.nvim_set_current_tabpage(tab)
-                return
+                found_tab = tab
+                break
               end
             end
+            if found_tab then break end
           end
-          -- no codediff tab, open new one
-          vim.cmd('CodeDiff')
+          if found_tab then
+            vim.api.nvim_set_current_tabpage(found_tab)
+          else
+            vim.cmd('CodeDiff')
+          end
+          -- focus the tree pane
+          vim.defer_fn(function()
+            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+              local buf = vim.api.nvim_win_get_buf(win)
+              local bft = vim.api.nvim_get_option_value('filetype', { buf = buf })
+              if bft == 'codediff-explorer' then
+                vim.api.nvim_set_current_win(win)
+                break
+              end
+            end
+          end, 50)
         end
       end, desc = 'Toggle diff view' },
     },
@@ -267,6 +524,30 @@ require('lazy').setup({
               print('no path')
             end
           end, { buffer = true, desc = 'Open file in new tab' })
+          -- resize old pane to 1/3, new pane to 2/3
+          vim.defer_fn(function()
+            local dominated = vim.api.nvim_tabpage_list_wins(0)
+            local diff_wins = {}
+            for _, win in ipairs(dominated) do
+              local wbuf = vim.api.nvim_win_get_buf(win)
+              local wname = vim.api.nvim_buf_get_name(wbuf)
+              -- codediff file panes have pattern codediff:N/path
+              if wname:match('codediff:%d') then
+                table.insert(diff_wins, { win = win, name = wname })
+              end
+            end
+            -- if we have 2 diff panes (old + new), resize
+            if #diff_wins == 2 then
+              table.sort(diff_wins, function(a, b)
+                return vim.api.nvim_win_get_position(a.win)[2] < vim.api.nvim_win_get_position(b.win)[2]
+              end)
+              local total = vim.o.columns
+              local explorer_width = 30  -- approximate
+              local avail = total - explorer_width
+              local old_width = math.floor(avail / 3)
+              vim.api.nvim_win_set_width(diff_wins[1].win, old_width)
+            end
+          end, 50)
         end,
       })
     end,
@@ -334,7 +615,7 @@ require('lazy').setup({
             return ft
           end,
         } },
-        lualine_y = { 'location' },
+        lualine_y = { { 'location', padding = { left = 2, right = 1 } } },
         lualine_z = { { 'progress', fmt = string.lower } },
       },
     },
@@ -408,6 +689,9 @@ require('lazy').setup({
 
 -- disable tabline
 vim.opt.showtabline = 0
+
+-- hide vertical window separators
+vim.opt.fillchars:append({ vert = ' ' })
 
 -- wrap lines for markdown files
 vim.api.nvim_create_autocmd('FileType', {
@@ -490,6 +774,25 @@ hi('DiffAdd',      { bg = '#3a4a3a' })  -- subtle green tint
 hi('DiffDelete',   { bg = '#4a3a3a' })  -- subtle red tint
 hi('DiffChange',   { bg = '#4a4a3a' })  -- subtle yellow tint
 hi('DiffText',     { bg = '#5a5a4a' })  -- changed text within line
+
+-- gitsigns unstaged (brighter - needs attention)
+hi('GitSignsAdd',          { fg = '#98FB98' })  -- bright green
+hi('GitSignsChange',       { fg = '#F0E68C' })  -- bright yellow
+hi('GitSignsDelete',       { fg = '#FF8080' })  -- bright red
+-- gitsigns staged (muted - already handled)
+hi('GitSignsStagedAdd',       { fg = '#7a9a7a' })  -- muted sage
+hi('GitSignsStagedChange',    { fg = '#a09a7a' })  -- muted khaki
+hi('GitSignsStagedDelete',    { fg = '#9a7a7a' })  -- muted mauve
+
+-- neominimap git unstaged (brighter bg - needs attention)
+hi('NeominimapGitAddLine',    { bg = '#5a7a5a' })  -- bright pastel green
+hi('NeominimapGitChangeLine', { bg = '#7a7a5a' })  -- bright pastel yellow
+hi('NeominimapGitDeleteLine', { bg = '#7a5a5a' })  -- bright pastel red
+-- neominimap vdiff handler (for gitdiff panes)
+hi('NeominimapDiffAddLine',    { bg = '#5a7a5a' })  -- bright pastel green
+hi('NeominimapDiffChangeLine', { bg = '#7a7a5a' })  -- bright pastel yellow
+hi('NeominimapDiffDeleteLine', { bg = '#7a5a5a' })  -- bright pastel red
+
 
 
 -- ctrl+c = copy (visual mode)
