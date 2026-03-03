@@ -78,6 +78,13 @@ SHORTCUTS
 ENTRIES
   echo "• dock disabled"
 
+  # enable tiling by default (all workspaces start tiled)
+  local comp_dir="$HOME/.config/cosmic/com.system76.CosmicComp/v1"
+  mkdir -p "$comp_dir"
+  echo "true" > "$comp_dir/autotile"
+  echo "Global" > "$comp_dir/autotile_behavior"
+  echo "• tiling enabled globally (all workspaces tiled by default)"
+
   # remove workspaces/applications buttons from top panel
   local top_panel_dir="$HOME/.config/cosmic/com.system76.CosmicPanel.Panel/v1"
   mkdir -p "$top_panel_dir"
