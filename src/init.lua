@@ -425,10 +425,10 @@ local hi = function(group, opts) vim.api.nvim_set_hl(0, group, opts) end
 
 -- ui
 hi('Normal',       { fg = '#FFFFFF', bg = '#3B2F27' })
-hi('CursorLine',   { bg = '#4D4D4D' })
+hi('CursorLine',   { bg = '#4E3F35' })
 hi('CursorLineNr', { fg = '#F0E68C', bold = true })
 hi('LineNr',       { fg = '#555555' })
-hi('Visual',       { bg = '#555555' })
+hi('Visual',       { bg = '#5C4A3D' })
 hi('Pmenu',        { fg = '#FFFFFF', bg = '#4D4D4D' })
 hi('PmenuSel',     { fg = '#3B2F27', bg = '#F0E68C' })
 hi('StatusLine',   { fg = '#3B2F27', bg = '#F5DEB3' })
@@ -437,7 +437,7 @@ hi('Search',       { fg = '#3B2F27', bg = '#F0E68C' })
 hi('MatchParen',   { fg = '#FFFFFF', bg = '#555555', bold = true })
 
 -- syntax
-hi('Comment',      { fg = '#777777', italic = true })
+hi('Comment',      { fg = '#7A6B5D', italic = true })
 hi('String',       { fg = '#98FB98' })
 hi('Number',       { fg = '#FFDEAD' })
 hi('Boolean',      { fg = '#FFDEAD' })
@@ -473,7 +473,7 @@ hi('NeoTreeIndentMarker',   { fg = '#555555' })
 hi('NeoTreeRootName',       { fg = '#F0E68C', bold = true })
 hi('NeoTreeTitleBar',       { fg = '#3B2F27', bg = '#F5DEB3' })
 hi('NeoTreeFloatBorder',    { fg = '#555555' })
-hi('NeoTreeCursorLine',     { bg = '#4D4D4D' })
+hi('NeoTreeCursorLine',     { bg = '#4E3F35' })
 
 -- oil
 hi('OilDir',               { fg = '#C4A882' })

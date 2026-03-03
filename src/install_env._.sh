@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+######################################################################
+# dev-env-setup dispatcher
+# sources each ptN file and calls functions in order
+######################################################################
+set -euo pipefail
+
+THIS_DIR="$HOME/git/more/dev-env-setup/src"
+
+# temp aliases used during install (lifted to bash_aliases later)
+alias browser='flatpak run org.mozilla.firefox'
+alias terminal='ptyxis 2>/dev/null || cosmic-term'
+alias machine.logout='loginctl terminate-user "$USER"'
+alias machine.reboot='systemctl reboot'
+
+# pt1a: system keybinds
+source "$THIS_DIR/install_env.pt1.system.keybinds.sh"
+install_keyd
+configure_keyd
+install_keynav
+configure_profile_altswap_reset
+configure_logind
+
+# pt1b: system performance
+source "$THIS_DIR/install_env.pt1.system.performance.sh"
+install_firefox
+install_1password_extension
+configure_sysctl
+configure_swapfile
+install_fonts
+
+# pt2: shell & git
+source "$THIS_DIR/install_env.pt2.shell.sh"
+install_ssh
+configure_git
+install_gh_cli
+clone_this_repo
+install_zsh
+configure_git_aliases
+install_cli_deps
+
+# pt3: cosmic desktop
+source "$THIS_DIR/install_env.pt3.cosmic.sh"
+upgrade_cosmic_term
+configure_cosmic_term
+configure_cosmic_theme
+configure_cosmic_desktop
+
+# pt4: terminal & editor
+source "$THIS_DIR/install_env.pt4.terminal.sh"
+source "$THIS_DIR/install_env.pt4.terminal.ptyxis.sh"
+install_ptyxis
+configure_ptyxis
+install_terminal_command
+install_vim
+install_neovim
+configure_neovim
+
+# now open a new terminal
+terminal
+
+# pt5: dev toolchain
+source "$THIS_DIR/install_env.pt5.devtools.sh"
+install_node
+install_psql
+install_aws_cli
+install_terraform
+install_docker
+clone_org_repos
+
+# pt6: client apps
+source "$THIS_DIR/install_env.pt6.apps.sh"
+install_dropbox
+install_flatpak_apps
+install_protonvpn
+install_codium
+configure_codium_copilot
+configure_codium_sync
+
+# pt7: legacy/gnome (deprecated — uncomment if needed)
+# source "$THIS_DIR/install_env.pt7.legacy.sh"
+# install_gnome_extensions
+# configure_battery_saver
+# configure_nightlight
+# configure_brightness
+# configure_screenshot_shortcuts
