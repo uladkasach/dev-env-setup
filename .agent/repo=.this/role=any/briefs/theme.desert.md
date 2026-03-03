@@ -37,7 +37,7 @@ warm earth tones on a dark neutral background. high contrast where it matters (f
 
 | element | hex |
 |---------|-----|
-| background | `#3B2F27` |
+| background | `#333333` |
 | foreground | `#FFFFFF` |
 | cursor | `#FFFFFF` |
 

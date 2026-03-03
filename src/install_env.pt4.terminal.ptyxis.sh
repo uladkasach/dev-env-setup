@@ -44,15 +44,9 @@ scroll-page-up='<Shift><Control>k'
 scroll-page-down='<Shift><Control>j'
 
 [org/gnome/Ptyxis/Profiles/48d4f1a48e2fa956aa1f108e697f9492]
-palette='Desert-Custom'
+palette='Desert'
 label='default'
 cell-height-scale=1.0
 EOF
-
-  # install custom Desert palette with #3B2F27 background
-  local palette_dir="$HOME/.var/app/app.devsuite.Ptyxis/data/app.devsuite.Ptyxis/palettes"
-  mkdir -p "$palette_dir"
-  cp "$HOME/git/more/dev-env-setup/src/install_env.ptyxis.desert.palette" "$palette_dir/Desert-Custom.palette"
-
   echo "• ptyxis config synced (restart ptyxis to apply)"
 }
