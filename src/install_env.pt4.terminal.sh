@@ -1,8 +1,31 @@
 #!/usr/bin/env bash
 ######################################################################
 # pt4: terminal & editor
-# ptyxis, terminal command, vim/neovim
+# fonts, ptyxis, terminal command, vim/neovim
 ######################################################################
+
+install_fonts() {
+  # firacode — ligatures for code
+  sudo apt install fonts-firacode
+
+  # Hack Nerd Font Mono — monospace with icons for neovim/neo-tree
+  # ref: https://github.com/ryanoasis/nerd-fonts
+  # note: "Mono" variant maintains strict monospace (icons don't break alignment)
+  local font_dir="$HOME/.local/share/fonts"
+  if ls "$font_dir"/Hack*.ttf &>/dev/null; then
+    echo "• Hack Nerd Font already installed; skipped"
+    return
+  fi
+  mkdir -p "$font_dir"
+  local tmp_zip="/tmp/Hack-NerdFont.zip"
+  curl -fsSL -o "$tmp_zip" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip
+  unzip -o "$tmp_zip" -d "$font_dir"
+  rm "$tmp_zip"
+  fc-cache -fv
+  # set as system monospace font (required for VTE terminals like ptyxis)
+  gsettings set org.gnome.desktop.interface monospace-font-name 'Hack Nerd Font Mono 12'
+  echo "• Hack Nerd Font installed and set as system monospace"
+}
 
 install_ptyxis() {
   ##########################
