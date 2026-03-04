@@ -9,20 +9,20 @@ importers:
   .:
     devDependencies:
       rhachet:
-        specifier: ^1.37.1
-        version: 1.37.1(zod@4.3.4)
+        specifier: ^1.37.7
+        version: 1.37.7(zod@4.3.4)
       rhachet-brains-anthropic:
         specifier: ^0.3.3
-        version: 0.3.3(rhachet@1.37.1(zod@4.3.4))
+        version: 0.3.3(rhachet@1.37.7(zod@4.3.4))
       rhachet-roles-bhrain:
-        specifier: ^0.15.3
-        version: 0.15.3(@types/node@25.3.0)
+        specifier: ^0.15.10
+        version: 0.15.10(@types/node@25.3.0)
       rhachet-roles-bhuild:
-        specifier: ^0.12.2
-        version: 0.12.2(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))(@types/node@25.3.0)(rhachet-roles-bhrain@0.15.3(@types/node@25.3.0))
+        specifier: ^0.12.3
+        version: 0.12.3(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))(@types/node@25.3.0)(rhachet-roles-bhrain@0.15.10(@types/node@25.3.0))
       rhachet-roles-ehmpathy:
-        specifier: ^1.26.7
-        version: 1.26.7(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))(@types/node@25.3.0)(rhachet@1.37.1(zod@4.3.4))
+        specifier: ^1.26.9
+        version: 1.26.9(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))(@types/node@25.3.0)(rhachet@1.37.7(zod@4.3.4))
 
 packages:
 
@@ -323,144 +323,170 @@ packages:
     resolution: {integrity: sha512-9B+taZ8DlyyqzZQnoeIvDVR/2F4EbMepXMc/NdVbkzsJbzkUjhXv/70GQJ7tdLA4YJgNP25zukcxpX2/SueNrA==}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-libvips-linux-arm64@1.2.4':
     resolution: {integrity: sha512-excjX8DfsIcJ10x1Kzr4RcWe1edC9PquDRRPx3YVCvQv+U5p7Yin2s32ftzikXojb1PIFc/9Mt28/y+iRklkrw==}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-libvips-linux-arm@1.0.5':
     resolution: {integrity: sha512-gvcC4ACAOPRNATg/ov8/MnbxFDJqf/pDePbBnuBDcjsI8PssmjoKMAz4LtLaVi+OnSb5FK/yIOamqDwGmXW32g==}
     cpu: [arm]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-libvips-linux-arm@1.2.4':
     resolution: {integrity: sha512-bFI7xcKFELdiNCVov8e44Ia4u2byA+l3XtsAj+Q8tfCwO6BQ8iDojYdvoPMqsKDkuoOo+X6HZA0s0q11ANMQ8A==}
     cpu: [arm]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-libvips-linux-ppc64@1.2.4':
     resolution: {integrity: sha512-FMuvGijLDYG6lW+b/UvyilUWu5Ayu+3r2d1S8notiGCIyYU/76eig1UfMmkZ7vwgOrzKzlQbFSuQfgm7GYUPpA==}
     cpu: [ppc64]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-libvips-linux-riscv64@1.2.4':
     resolution: {integrity: sha512-oVDbcR4zUC0ce82teubSm+x6ETixtKZBh/qbREIOcI3cULzDyb18Sr/Wcyx7NRQeQzOiHTNbZFF1UwPS2scyGA==}
     cpu: [riscv64]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-libvips-linux-s390x@1.2.4':
     resolution: {integrity: sha512-qmp9VrzgPgMoGZyPvrQHqk02uyjA0/QrTO26Tqk6l4ZV0MPWIW6LTkqOIov+J1yEu7MbFQaDpwdwJKhbJvuRxQ==}
     cpu: [s390x]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-libvips-linux-x64@1.0.4':
     resolution: {integrity: sha512-MmWmQ3iPFZr0Iev+BAgVMb3ZyC4KeFc3jFxnNbEPas60e1cIfevbtuyf9nDGIzOaW9PdnDciJm+wFFaTlj5xYw==}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-libvips-linux-x64@1.2.4':
     resolution: {integrity: sha512-tJxiiLsmHc9Ax1bz3oaOYBURTXGIRDODBqhveVHonrHJ9/+k89qbLl0bcJns+e4t4rvaNBxaEZsFtSfAdquPrw==}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-libvips-linuxmusl-arm64@1.0.4':
     resolution: {integrity: sha512-9Ti+BbTYDcsbp4wfYib8Ctm1ilkugkA/uscUn6UXK1ldpC1JjiXbLfFZtRlBhjPZ5o1NCLiDbg8fhUPKStHoTA==}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@img/sharp-libvips-linuxmusl-arm64@1.2.4':
     resolution: {integrity: sha512-FVQHuwx1IIuNow9QAbYUzJ+En8KcVm9Lk5+uGUQJHaZmMECZmOlix9HnH7n1TRkXMS0pGxIJokIVB9SuqZGGXw==}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@img/sharp-libvips-linuxmusl-x64@1.0.4':
     resolution: {integrity: sha512-viYN1KX9m+/hGkJtvYYp+CCLgnJXwiQB39damAO7WMdKWlIhmYTfHjwSbQeUK/20vY154mwezd9HflVFM1wVSw==}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@img/sharp-libvips-linuxmusl-x64@1.2.4':
     resolution: {integrity: sha512-+LpyBk7L44ZIXwz/VYfglaX/okxezESc6UxDSoyo2Ks6Jxc4Y7sGjpgU9s4PMgqgjj1gZCylTieNamqA1MF7Dg==}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@img/sharp-linux-arm64@0.33.5':
     resolution: {integrity: sha512-JMVv+AMRyGOHtO1RFBiJy/MBsgz0x4AWrT6QoEVVTyh1E39TrCUpTRI7mx9VksGX4awWASxqCYLCV4wBZHAYxA==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-linux-arm64@0.34.5':
     resolution: {integrity: sha512-bKQzaJRY/bkPOXyKx5EVup7qkaojECG6NLYswgktOZjaXecSAeCWiZwwiFf3/Y+O1HrauiE3FVsGxFg8c24rZg==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [arm64]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-linux-arm@0.33.5':
     resolution: {integrity: sha512-JTS1eldqZbJxjvKaAkxhZmBqPRGmxgu+qFKSInv8moZ2AmT5Yib3EQ1c6gp493HvrvV8QgdOXdyaIBrhvFhBMQ==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [arm]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-linux-arm@0.34.5':
     resolution: {integrity: sha512-9dLqsvwtg1uuXBGZKsxem9595+ujv0sJ6Vi8wcTANSFpwV/GONat5eCkzQo/1O6zRIkh0m/8+5BjrRr7jDUSZw==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [arm]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-linux-ppc64@0.34.5':
     resolution: {integrity: sha512-7zznwNaqW6YtsfrGGDA6BRkISKAAE1Jo0QdpNYXNMHu2+0dTrPflTLNkpc8l7MUP5M16ZJcUvysVWWrMefZquA==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [ppc64]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-linux-riscv64@0.34.5':
     resolution: {integrity: sha512-51gJuLPTKa7piYPaVs8GmByo7/U7/7TZOq+cnXJIHZKavIRHAP77e3N2HEl3dgiqdD/w0yUfiJnII77PuDDFdw==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [riscv64]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-linux-s390x@0.34.5':
     resolution: {integrity: sha512-nQtCk0PdKfho3eC5MrbQoigJ2gd1CgddUMkabUj+rBevs8tZ2cULOx46E7oyX+04WGfABgIwmMC0VqieTiR4jg==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [s390x]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-linux-x64@0.33.5':
     resolution: {integrity: sha512-opC+Ok5pRNAzuvq1AG0ar+1owsu842/Ab+4qvU879ippJBHvyY5n2mxF1izXqkPYlGuP/M556uh53jRLJmzTWA==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-linux-x64@0.34.5':
     resolution: {integrity: sha512-MEzd8HPKxVxVenwAa+JRPwEC7QFjoPWuS5NZnBt6B3pu7EG2Ge0id1oLHZpPJdn3OQK+BQDiw9zStiHBTJQQQQ==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [x64]
     os: [linux]
+    libc: [glibc]
 
   '@img/sharp-linuxmusl-arm64@0.33.5':
     resolution: {integrity: sha512-XrHMZwGQGvJg2V/oRSUfSAfjfPxO+4DkiRh6p2AFjLQztWUuY/o8Mq0eMQVIY7HJ1CDQUJlxGGZRw1a5bqmd1g==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@img/sharp-linuxmusl-arm64@0.34.5':
     resolution: {integrity: sha512-fprJR6GtRsMt6Kyfq44IsChVZeGN97gTD331weR1ex1c1rypDEABN6Tm2xa1wE6lYb5DdEnk03NZPqA7Id21yg==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [arm64]
     os: [linux]
+    libc: [musl]
 
   '@img/sharp-linuxmusl-x64@0.33.5':
     resolution: {integrity: sha512-WT+d/cgqKkkKySYmqoZ8y3pxx7lx9vVejxW/W4DOFMYVSkErR+w7mf2u8m/y4+xHe7yY9DAXQMWQhpnMuFfScw==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@img/sharp-linuxmusl-x64@0.34.5':
     resolution: {integrity: sha512-Jg8wNT1MUzIvhBFxViqrEhWDGzqymo3sV7z7ZsaWbZNDLXRJZoRGrjulp60YYtV4wfY8VIKcWidjojlLcWrd8Q==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     cpu: [x64]
     os: [linux]
+    libc: [musl]
 
   '@img/sharp-wasm32@0.34.5':
     resolution: {integrity: sha512-OdWTEiVkY2PHwqkbBI8frFxQQFekHaSSkUIJkwzclWZe64O1X4UlUjqqqLaPbUpMOQk6FBu/HtlGXNblIs0huw==}
@@ -1641,26 +1667,26 @@ packages:
     peerDependencies:
       rhachet: '>=1.21.4'
 
-  rhachet-roles-bhrain@0.15.3:
-    resolution: {integrity: sha512-pKpJH3ALxV/27bH6EnjKG+h4wQCojjZRBMJe8Dv4t2F4dhGYXXT6jXuOnmAENZAkwhh+oYgMInNGuwLTRiSIVw==}
+  rhachet-roles-bhrain@0.15.10:
+    resolution: {integrity: sha512-v4XsmT+CG+EWhUf6gWRk88VixGD1wwKhVwssCITuNfPTr0i99V8wfMz52GMvPVLqSkKcj0zZMjGPnzcy3d3tmg==}
     engines: {node: '>=8.0.0'}
 
   rhachet-roles-bhrain@0.7.5:
     resolution: {integrity: sha512-O2zRlITFHmpTHbS3E5PUODlqAWWVt+xV44uu3P3RSLygcgFrG8q9NekLMJTMBsnL2ug4S8mNU7Ji7wCwjkX7qg==}
     engines: {node: '>=8.0.0'}
 
-  rhachet-roles-bhuild@0.12.2:
-    resolution: {integrity: sha512-tqvsGQR2ji6z2hx40XdRTwzoeV6cvdcRzSruqBFigWb8FC+Knuf2Yxaq41fJQv3eT26VVGx0K7lOP5zASx6SNg==}
+  rhachet-roles-bhuild@0.12.3:
+    resolution: {integrity: sha512-xxgCRgS5Xv9pTyFfhtyZcmoFBQOxSH5kFnGhr4naW0oMEKVbP5lktAQeQh0TJ6827JyBRbpSys7D+unEhKBVXg==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       rhachet-roles-bhrain: '>=0.12.1'
 
-  rhachet-roles-ehmpathy@1.26.7:
-    resolution: {integrity: sha512-GLYt9JiM7zRSyiQLj0fxaMXJD8qodrnINYWm9Xb0v2/p2bjzFF1fOx7i3xl1tiM+nBpA2NLAb3D/fRSXWMaa0A==}
+  rhachet-roles-ehmpathy@1.26.9:
+    resolution: {integrity: sha512-MccgME5OknRh/gVtxq1UMpuF/4VsFn8+cJsx21eani18wcepBKjAKMns7KZQsL5pXIenmvDmgfryQieGr3Um9g==}
     engines: {node: '>=8.0.0'}
 
-  rhachet@1.37.1:
-    resolution: {integrity: sha512-RilmN9WiVHzztufb+nAFFSoaNBrR5t62Wxs/XUyWCdakzuqHJTPpeUgAktQlC307+u6u3nRoWIrof1RdIN4mHg==}
+  rhachet@1.37.7:
+    resolution: {integrity: sha512-EThuvT/OeuL8CQj/YRizTzh9fe/n0v2cmr/b+nLpaqdMxFetO7foyW3fYab7V/S99f9jZmkaWHH52VfifyafVw==}
     engines: {node: '>=22.0.0'}
     hasBin: true
     peerDependencies:
@@ -3558,8 +3584,8 @@ snapshots:
       domain-objects: 0.31.3
       helpful-errors: 1.5.3
       joi: 17.4.0
-      rhachet: 1.37.1(zod@4.3.4)
-      rhachet-roles-ehmpathy: 1.26.7(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))(@types/node@25.3.0)(rhachet@1.37.1(zod@4.3.4))
+      rhachet: 1.37.7(zod@4.3.4)
+      rhachet-roles-ehmpathy: 1.26.9(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))(@types/node@25.3.0)(rhachet@1.37.7(zod@4.3.4))
       type-fns: 1.21.0
       uuid-fns: 1.1.3
     transitivePeerDependencies:
@@ -4006,7 +4032,7 @@ snapshots:
       domain-objects: 0.31.9
       helpful-errors: 1.5.3
 
-  rhachet-brains-anthropic@0.3.3(rhachet@1.37.1(zod@4.3.4)):
+  rhachet-brains-anthropic@0.3.3(rhachet@1.37.7(zod@4.3.4)):
     dependencies:
       '@anthropic-ai/claude-agent-sdk': 0.1.76(zod@4.3.4)
       '@anthropic-ai/sdk': 0.71.2(zod@4.3.4)
@@ -4014,19 +4040,19 @@ snapshots:
       helpful-errors: 1.5.3
       iso-price: 1.1.1(domain-objects@0.31.9)
       iso-time: 1.11.1
-      rhachet: 1.37.1(zod@4.3.4)
+      rhachet: 1.37.7(zod@4.3.4)
       rhachet-artifact: 1.0.1
       rhachet-artifact-git: 1.1.5
       type-fns: 1.21.0
       zod: 4.3.4
 
-  rhachet-brains-xai@0.2.1(@types/node@25.3.0)(rhachet@1.37.1(zod@4.3.4)):
+  rhachet-brains-xai@0.2.1(@types/node@25.3.0)(rhachet@1.37.7(zod@4.3.4)):
     dependencies:
       domain-objects: 0.31.9
       helpful-errors: 1.5.3
       iso-price: 1.1.1(domain-objects@0.31.9)
       openai: 5.8.2(zod@4.3.4)
-      rhachet: 1.37.1(zod@4.3.4)
+      rhachet: 1.37.7(zod@4.3.4)
       rhachet-artifact: 1.0.1
       rhachet-artifact-git: 1.1.5
       rhachet-roles-bhrain: 0.7.5(@types/node@25.3.0)
@@ -4037,7 +4063,7 @@ snapshots:
       - aws-crt
       - ws
 
-  rhachet-roles-bhrain@0.15.3(@types/node@25.3.0):
+  rhachet-roles-bhrain@0.15.10(@types/node@25.3.0):
     dependencies:
       '@anthropic-ai/sdk': 0.51.0
       '@ehmpathy/as-command': 1.0.3
@@ -4091,13 +4117,13 @@ snapshots:
       - aws-crt
       - ws
 
-  rhachet-roles-bhuild@0.12.2(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))(@types/node@25.3.0)(rhachet-roles-bhrain@0.15.3(@types/node@25.3.0)):
+  rhachet-roles-bhuild@0.12.3(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))(@types/node@25.3.0)(rhachet-roles-bhrain@0.15.10(@types/node@25.3.0)):
     dependencies:
       domain-objects: 0.31.9
       emoji-space-shim: 0.0.0
       helpful-errors: 1.5.3
       iso-time: 1.11.3
-      rhachet-roles-bhrain: 0.15.3(@types/node@25.3.0)
+      rhachet-roles-bhrain: 0.15.10(@types/node@25.3.0)
       test-fns: 1.15.0(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))(@types/node@25.3.0)(zod@4.3.4)
       zod: 4.3.4
     transitivePeerDependencies:
@@ -4107,7 +4133,7 @@ snapshots:
       - aws-crt
       - ws
 
-  rhachet-roles-ehmpathy@1.26.7(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))(@types/node@25.3.0)(rhachet@1.37.1(zod@4.3.4)):
+  rhachet-roles-ehmpathy@1.26.9(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))(@types/node@25.3.0)(rhachet@1.37.7(zod@4.3.4)):
     dependencies:
       '@atjsh/llmlingua-2': 2.0.3(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))(js-tiktoken@1.0.21)
       '@ehmpathy/as-command': 1.0.3
@@ -4121,7 +4147,7 @@ snapshots:
       openai: 5.8.2(zod@4.3.4)
       rhachet-artifact: 1.0.0
       rhachet-artifact-git: 1.1.0
-      rhachet-brains-xai: 0.2.1(@types/node@25.3.0)(rhachet@1.37.1(zod@4.3.4))
+      rhachet-brains-xai: 0.2.1(@types/node@25.3.0)(rhachet@1.37.7(zod@4.3.4))
       serde-fns: 1.2.0
       simple-in-memory-cache: 0.4.0
       simple-on-disk-cache: 1.7.3
@@ -4138,7 +4164,7 @@ snapshots:
       - rhachet
       - ws
 
-  rhachet@1.37.1(zod@4.3.4):
+  rhachet@1.37.7(zod@4.3.4):
     dependencies:
       '@noble/curves': 2.0.1
       '@noble/hashes': 2.0.1
