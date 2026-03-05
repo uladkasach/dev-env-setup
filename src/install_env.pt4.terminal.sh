@@ -65,11 +65,12 @@ EOF
 install_terminal_command() {
   # .what = install 'terminal' command that opens terminal at specified directory
   # .why  = 'terminal .' works in scripts, subshells, git tree, etc (unlike alias)
+  # .note = setsid -f starts new session so child terminal survives parent close
   sudo tee /usr/bin/terminal > /dev/null << 'EOF'
 #!/usr/bin/env bash
 dir="${1:-.}"
 dir="$(realpath "$dir")"
-exec flatpak run app.devsuite.Ptyxis --new-window --working-directory "$dir"
+setsid -f flatpak run app.devsuite.Ptyxis --new-window --working-directory "$dir"
 EOF
   sudo chmod +x /usr/bin/terminal
 }
