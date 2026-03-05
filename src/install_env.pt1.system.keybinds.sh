@@ -69,23 +69,21 @@ EOF
 
 configure_logind() {
   ######################
-  ## dont suspend on lid close
-  ## ref: https://ubuntuhandbook.org/index.php/2020/05/lid-close-behavior-ubuntu-20-04/
+  ## disable all automatic suspend/sleep/lock
+  ## ref: .agent/repo=.this/role=any/briefs/system.power.spec.md
   ######################
-  LOGIND_CONF="/etc/systemd/logind.conf"
 
-  # skip if already configured
-  if grep -q '^HandlePowerKey=ignore' "$LOGIND_CONF"; then
-    echo "• logind already configured; skipped"
-    return 0
-  fi
+  # configure logind (hardware keys + lid)
+  local LOGIND_CONF="/etc/systemd/logind.conf"
+  if grep -q '^HandlePowerKey=ignore' "$LOGIND_CONF" && grep -q '^IdleAction=ignore' "$LOGIND_CONF"; then
+    echo "• logind already configured"
+  else
+    # remove any extant entries (commented or not)
+    for key in HandlePowerKey HandleSuspendKey HandleHibernateKey HandleRebootKey HandleLidSwitch HandleLidSwitchExternalPower HandleLidSwitchDocked IdleAction IdleActionSec; do
+        sudo sed -i "/^#*${key}=/d" "$LOGIND_CONF"
+    done
 
-  # remove any extant entries (commented or not)
-  for key in HandlePowerKey HandleSuspendKey HandleHibernateKey HandleRebootKey HandleLidSwitch HandleLidSwitchExternalPower HandleLidSwitchDocked; do
-      sudo sed -i "/^#*${key}=/d" "$LOGIND_CONF"
-  done
-
-  sudo tee -a "$LOGIND_CONF" > /dev/null <<'EOF'
+    sudo tee -a "$LOGIND_CONF" > /dev/null <<'EOF'
 
 # use terminal instead; keyboard misfire is too common
 HandlePowerKey=ignore
@@ -97,6 +95,39 @@ HandleRebootKey=ignore
 HandleLidSwitch=ignore
 HandleLidSwitchExternalPower=ignore
 HandleLidSwitchDocked=ignore
+
+# never idle-lock
+IdleAction=ignore
+IdleActionSec=infinity
 EOF
+    echo "• logind configured"
+  fi
+
+  # configure sleep (disable suspend/hibernate system-wide)
+  local SLEEP_CONF="/etc/systemd/sleep.conf"
+  if grep -q '^AllowSuspend=no' "$SLEEP_CONF" 2>/dev/null; then
+    echo "• sleep already configured"
+  else
+    # remove any extant entries (commented or not)
+    for key in AllowSuspend AllowHibernation AllowSuspendThenHibernate AllowHybridSleep; do
+        sudo sed -i "/^#*${key}=/d" "$SLEEP_CONF" 2>/dev/null || true
+    done
+
+    # ensure [Sleep] section exists
+    if ! grep -q '^\[Sleep\]' "$SLEEP_CONF" 2>/dev/null; then
+      echo "[Sleep]" | sudo tee "$SLEEP_CONF" > /dev/null
+    fi
+
+    sudo tee -a "$SLEEP_CONF" > /dev/null <<'EOF'
+
+# disable all sleep modes; use terminal for explicit suspend
+AllowSuspend=no
+AllowHibernation=no
+AllowSuspendThenHibernate=no
+AllowHybridSleep=no
+EOF
+    echo "• sleep configured"
+  fi
+
   echo "run 'machine.logout' or 'machine.reboot' to apply"
 }

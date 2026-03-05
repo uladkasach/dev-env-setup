@@ -303,6 +303,39 @@ require('lazy').setup({
       -- ctrl+m to toggle
       vim.keymap.set('n', '<C-m>', '<cmd>Neominimap toggle<cr>', { desc = 'Toggle minimap' })
 
+      -- make minimap unfocusable — immediately redirect focus away
+      vim.api.nvim_create_autocmd('WinEnter', {
+        callback = function()
+          local ft = vim.bo.filetype
+          if ft ~= 'neominimap' then return end
+          -- find previous window or any other valid window
+          local cur_win = vim.api.nvim_get_current_win()
+          local prev_win = vim.fn.win_getid(vim.fn.winnr('#'))
+          -- try previous window first
+          if prev_win ~= 0 and prev_win ~= cur_win and vim.api.nvim_win_is_valid(prev_win) then
+            local buf = vim.api.nvim_win_get_buf(prev_win)
+            local pft = vim.api.nvim_get_option_value('filetype', { buf = buf })
+            if pft ~= 'neominimap' then
+              vim.api.nvim_set_current_win(prev_win)
+              return
+            end
+          end
+          -- fallback: find any non-minimap window
+          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            if win ~= cur_win then
+              local buf = vim.api.nvim_win_get_buf(win)
+              local wft = vim.api.nvim_get_option_value('filetype', { buf = buf })
+              if wft ~= 'neominimap' then
+                vim.api.nvim_set_current_win(win)
+                return
+              end
+            end
+          end
+          -- no other windows — quit nvim
+          vim.cmd('quit!')
+        end,
+      })
+
       -- register custom handler for diff panes (vim diff + codediff extmarks)
       vim.defer_fn(function()
         local ok, handlers = pcall(require, 'neominimap.map.handlers')
@@ -625,7 +658,9 @@ require('lazy').setup({
     version = '>=1.0.0',
     config = function()
       local ss = require('smart-splits')
-      ss.setup({})
+      ss.setup({
+        at_edge = 'stop',  -- don't wrap navigation at window edges
+      })
       -- navigate between windows
       vim.keymap.set('n', '<C-h>', ss.move_cursor_left)
       vim.keymap.set('n', '<C-j>', ss.move_cursor_down)

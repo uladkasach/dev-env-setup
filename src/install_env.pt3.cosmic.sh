@@ -50,22 +50,29 @@ configure_cosmic_desktop() {
   local shortcuts_dir="$HOME/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1"
   mkdir -p "$shortcuts_dir"
 
-  # custom keybinds: super → overview, super+/ → launcher
+  # custom keybinds: super → overview, super+/ → launcher, screenshot shortcuts
   cat > "$shortcuts_dir/custom" << 'SHORTCUTS'
 {
     (modifiers: [Super]): System(WorkspaceOverview),
     (modifiers: [Super], key: "slash"): System(Launcher),
+    (modifiers: [], key: "Print"): System(Screenshot),
+    (modifiers: [Ctrl, Shift, Alt], key: "p"): System(Screenshot),
 }
 SHORTCUTS
-  echo "• keybinds: super → overview, super+/ → search"
+  echo "• keybinds: super → overview, super+/ → search, Print/ctrl+shift+alt+p → screenshot"
 
-  # set ptyxis as default terminal (Super+T uses this)
-  # copy system defaults, override just the Terminal line
+  # override system_actions: ptyxis terminal + disable power/lock/logout keybinds
   local system_actions="/usr/share/cosmic/com.system76.CosmicSettings.Shortcuts/v1/system_actions"
   local user_actions="$shortcuts_dir/system_actions"
   if [[ -f "$system_actions" ]]; then
-    sed 's|Terminal: "cosmic-term"|Terminal: "flatpak run app.devsuite.Ptyxis --new-window -d ~"|' "$system_actions" > "$user_actions"
+    sed -e 's|Terminal: "cosmic-term"|Terminal: "flatpak run app.devsuite.Ptyxis --new-window -d ~"|' \
+        -e 's|PowerOff: "cosmic-osd shutdown"|PowerOff: "true"|' \
+        -e 's|Suspend: "systemctl suspend"|Suspend: "true"|' \
+        -e 's|LogOut: "cosmic-osd log-out"|LogOut: "true"|' \
+        -e 's|LockScreen: "loginctl lock-session"|LockScreen: "true"|' \
+        "$system_actions" > "$user_actions"
     echo "• default terminal: ptyxis"
+    echo "• power/lock/logout keybinds disabled (use terminal commands)"
   fi
 
   # disable bottom dock
@@ -84,6 +91,14 @@ ENTRIES
   echo "true" > "$comp_dir/autotile"
   echo "Global" > "$comp_dir/autotile_behavior"
   echo "• tiling enabled globally (all workspaces tiled by default)"
+
+  # disable screen timeout (never turn off on idle timer)
+  local idle_dir="$HOME/.config/cosmic/com.system76.CosmicIdle/v1"
+  mkdir -p "$idle_dir"
+  echo "None" > "$idle_dir/screen_off_time"
+  echo "None" > "$idle_dir/suspend_on_ac_time"
+  echo "None" > "$idle_dir/suspend_on_battery_time"
+  echo "• screen timeout disabled (never turns off on idle)"
 
   # remove workspaces/applications buttons from top panel
   local top_panel_dir="$HOME/.config/cosmic/com.system76.CosmicPanel.Panel/v1"
