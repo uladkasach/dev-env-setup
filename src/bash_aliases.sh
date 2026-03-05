@@ -74,6 +74,26 @@ alias browser='flatpak run org.mozilla.firefox 2>/dev/null &!'
 alias machine.logout='loginctl terminate-user "$USER"'
 alias machine.reboot='systemctl reboot'
 
+# diagnose problem processes (installed via install_env.sh)
+
+_machine_usage_diagnose() {
+  echo ""
+  echo "🐈 lets hunt..."
+  # spinner (first)
+  echo "   │"
+  machine_resource_procs_find_spinner 2>/dev/null | tail -n +2 | sed '1s/└─/├─/; s/^  /│ /; s/^/   /'
+  # runaway (middle)
+  echo "   │"
+  machine_resource_procs_find_runaway 2>/dev/null | tail -n +2 | sed '1s/└─/├─/; s/^  /│ /; s/^/   /'
+  # orphan (last)
+  echo "   │"
+  machine_resource_procs_find_orphan 2>/dev/null | tail -n +2 | sed 's/^/   /'
+}
+alias machine.usage.diagnose='_machine_usage_diagnose'
+alias machine.usage.diagnose.spinner='machine_resource_procs_find_spinner'  # sustained high CPU 30+ min
+alias machine.usage.diagnose.runaway='machine_resource_procs_find_runaway'  # high CPU/memory right now
+alias machine.usage.diagnose.orphan='machine_resource_procs_find_orphan'    # cwd deleted (stale worktrees)
+
 # note: 'terminal' command installed via install_env.sh (supports 'terminal /path/to/dir')
 
 # make it easier to open the file manager

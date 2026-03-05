@@ -30,6 +30,9 @@ configure_firefox_prefs
 source "$THIS_DIR/install_env.pt1.system.performance.sh"
 configure_sysctl
 configure_swapfile
+install_machine_resource_procs_find_runaway
+install_machine_resource_procs_find_spinner
+install_machine_resource_procs_find_orphan
 install_runaway_monitor
 # install_earlyoom  # optional — auto-kills memory hogs before OOM freeze; see briefs/system.runaway-monitor.spec.md
 
