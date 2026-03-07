@@ -668,3 +668,92 @@ uninstall_runaway_monitor() {
 
   echo "• runaway_monitor uninstalled"
 }
+
+install_machine_resource_observe() {
+  #############################
+  ## machine_resource_observe command
+  ##
+  ## what: shows system resource snapshot
+  ## why: quick overview to spot issues diagnose might miss
+  ## usage: machine_resource_observe
+  #############################
+
+  local bin_path="$HOME/.local/bin/machine_resource_observe"
+
+  mkdir -p "$HOME/.local/bin"
+
+  cat > "$bin_path" << 'OBSERVE_SCRIPT'
+#!/bin/bash
+#############################
+# machine_resource_observe
+# system resource snapshot
+#############################
+
+echo ""
+echo "🐈 lets observe..."
+
+# system stats
+LOAD=$(cat /proc/loadavg | awk '{print $1, $2, $3}')
+LOAD_1=$(echo $LOAD | awk '{print $1}')
+LOAD_5=$(echo $LOAD | awk '{print $2}')
+LOAD_15=$(echo $LOAD | awk '{print $3}')
+CORES=$(nproc)
+MEM_INFO=$(free -h | awk '/^Mem:/ {print $2, $3, $4, $7}')
+MEM_TOTAL=$(echo $MEM_INFO | awk '{print $1}')
+MEM_USED=$(echo $MEM_INFO | awk '{print $2}')
+MEM_FREE=$(echo $MEM_INFO | awk '{print $3}')
+MEM_AVAIL=$(echo $MEM_INFO | awk '{print $4}')
+SWAP_INFO=$(free -h | awk '/^Swap:/ {print $2, $3, $4}')
+SWAP_TOTAL=$(echo $SWAP_INFO | awk '{print $1}')
+SWAP_USED=$(echo $SWAP_INFO | awk '{print $2}')
+SWAP_FREE=$(echo $SWAP_INFO | awk '{print $3}')
+
+echo "   │"
+echo "   ├─ 🌕 system"
+echo "   │     ├─ load: $LOAD_1 / $LOAD_5 / $LOAD_15 (1m / 5m / 15m)"
+echo "   │     ├─ cores: $CORES"
+echo "   │     ├─ mem: $MEM_USED used / $MEM_TOTAL total (avail: $MEM_AVAIL)"
+echo "   │     └─ swap: $SWAP_USED used / $SWAP_TOTAL total"
+
+# top cpu (5 procs)
+echo "   │"
+echo "   ├─ 🌕 top cpu"
+ps aux --sort=-%cpu | awk 'NR>1 && NR<=6 {
+  pid=$2; cpu=$3; mem=$4
+  cmd_file="/proc/"pid"/comm"
+  if ((getline cmd < cmd_file) > 0) { close(cmd_file) } else { cmd=$11 }
+  printf "   │     ├─ 🐛 %s (%.0f%% CPU, %.0f%% MEM, PID %s)\n", cmd, cpu, mem, pid
+}'
+
+# top mem (5 procs)
+echo "   │"
+echo "   ├─ 🌕 top mem"
+ps aux --sort=-%mem | awk 'NR>1 && NR<=6 {
+  pid=$2; cpu=$3; mem=$4; rss=$6
+  cmd_file="/proc/"pid"/comm"
+  if ((getline cmd < cmd_file) > 0) { close(cmd_file) } else { cmd=$11 }
+  # convert RSS from KB to human readable
+  if (rss >= 1048576) { rss_h = sprintf("%.1fG", rss/1048576) }
+  else if (rss >= 1024) { rss_h = sprintf("%.0fM", rss/1024) }
+  else { rss_h = sprintf("%dK", rss) }
+  printf "   │     ├─ 🐛 %s (%s, %.0f%% MEM, PID %s)\n", cmd, rss_h, mem, pid
+}'
+
+# io wait
+IOWAIT=$(top -bn1 | grep "Cpu(s)" | awk '{print $10}' | tr -d '%,wa')
+if [[ -n "$IOWAIT" ]]; then
+  echo "   │"
+  echo "   └─ 🌕 io"
+  echo "         └─ iowait: ${IOWAIT}%"
+else
+  echo "   │"
+  echo "   └─ 🌕 io"
+  echo "         └─ iowait: n/a"
+fi
+
+echo ""
+OBSERVE_SCRIPT
+
+  chmod +x "$bin_path"
+  echo "• machine_resource_observe installed ($bin_path)"
+}
