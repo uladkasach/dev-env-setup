@@ -93,6 +93,7 @@ alias machine.usage.diagnose='_machine_usage_diagnose'
 alias machine.usage.diagnose.spinner='machine_resource_procs_find_spinner'  # sustained high CPU 30+ min
 alias machine.usage.diagnose.runaway='machine_resource_procs_find_runaway'  # high CPU/memory right now
 alias machine.usage.diagnose.orphan='machine_resource_procs_find_orphan'    # cwd deleted (stale worktrees)
+alias machine.usage.observe='machine_resource_observe'                       # system snapshot
 
 # note: 'terminal' command installed via install_env.sh (supports 'terminal /path/to/dir')
 
