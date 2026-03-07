@@ -24,7 +24,10 @@ configure_logind
 source "$THIS_DIR/install_env.pt1.system.basics.sh"
 install_firefox
 install_1password_extension
+install_firefox_color_extension
+install_vimium_extension
 configure_firefox_prefs
+configure_firefox_theme
 
 # pt1c: system performance
 source "$THIS_DIR/install_env.pt1.system.performance.sh"
@@ -57,11 +60,13 @@ configure_cosmic_desktop
 # pt4: terminal & editor
 source "$THIS_DIR/install_env.pt4.terminal.sh"
 source "$THIS_DIR/install_env.pt4.terminal.ptyxis.sh"
+source "$THIS_DIR/install_env.pt5.devtools.sh"  # sourced early for install_rust
 install_fonts
 install_ptyxis
 configure_ptyxis
 install_terminal_command
 install_vim
+install_rust  # must run before install_neovim (cargo needed for tree-sitter-cli)
 install_neovim
 configure_neovim
 terminal # open a new terminal

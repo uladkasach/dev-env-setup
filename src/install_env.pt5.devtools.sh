@@ -15,6 +15,16 @@ install_node() {
   corepack enable && corepack install -g pnpm@latest
 }
 
+install_rust() {
+  #########################
+  ## rust via rustup
+  ## ref: https://rustup.rs/
+  #########################
+  sudo apt install -y libclang-dev  # required for cargo bindgen (e.g., tree-sitter-cli)
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  source "$HOME/.cargo/env"
+}
+
 install_robot_brains() {
   #########################
   ## claude-code + rhachet

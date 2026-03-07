@@ -213,17 +213,24 @@ require('lazy').setup({
   {
     'nvim-treesitter/nvim-treesitter',
     version = false,
-    lazy = false,  -- CRITICAL: nvim-treesitter does NOT support lazy load
+    lazy = false,
     build = ':TSUpdate',
     config = function()
-      local ok, configs = pcall(require, 'nvim-treesitter.configs')
-      if ok then
-        configs.setup({
-          ensure_installed = { 'lua', 'vim', 'vimdoc', 'query', 'markdown', 'bash' },
-          auto_install = true,
-          highlight = { enable = true },
-        })
+      local ts = require('nvim-treesitter')
+      -- install parsers
+      local parsers = { 'lua', 'vim', 'vimdoc', 'query', 'markdown', 'markdown_inline', 'typescript', 'json', 'yaml', 'sql', 'bash' }
+      for _, parser in ipairs(parsers) do
+        pcall(ts.install, parser)
       end
+      -- register language aliases for markdown code block injection
+      vim.treesitter.language.register('typescript', 'ts')
+      vim.treesitter.language.register('bash', 'sh')
+      -- enable treesitter highlight on all filetypes
+      vim.api.nvim_create_autocmd('FileType', {
+        callback = function()
+          pcall(vim.treesitter.start)
+        end,
+      })
     end,
   },
   {
