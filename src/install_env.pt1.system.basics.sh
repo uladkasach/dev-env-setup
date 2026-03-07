@@ -14,6 +14,22 @@ install_1password_extension() {
   browser https://addons.mozilla.org/en-US/firefox/addon/1password-x-password-manager/
 }
 
+install_firefox_color_extension() {
+  browser https://addons.mozilla.org/en-US/firefox/addon/firefox-color/
+}
+
+install_vimium_extension() {
+  browser https://addons.mozilla.org/en-US/firefox/addon/vimium-ff/
+}
+
+configure_firefox_theme() {
+  # desert theme for firefox color extension
+  # matches ptyxis/gitui/nvim desert palette
+  local theme_url="https://color.firefox.com/?theme=XQAAAAIQAQAAAAAAAABBKYhm849SCia2CaaEGccwS-xMDPr_qlXDOMsy5fmNc7qTuOgZgZdB1JimDBY6_wyFhPNbQTHUNdhC5aOH-hbXzzZFdz54UfdCX_Q0U6BYOxbB4cKbN3-x8JbJB-nSYQTDMnJWVFqwFxW6UsMywRqsEjH6xrdahroi3D8vQwbLUkWN2HPFTCEwFJ-BNUTe2qbjSkITKQzctI3TSSXE5trErmv_7LBNAA"
+  browser "$theme_url"
+  echo "• firefox color theme opened (click 'Yes, apply theme' in browser)"
+}
+
 configure_firefox_prefs() {
   # find the default-release profile dir
   local ff_root="$HOME/.var/app/org.mozilla.firefox/config/mozilla/firefox"

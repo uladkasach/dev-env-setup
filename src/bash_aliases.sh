@@ -70,7 +70,10 @@ alias use.keymap.altboot='use_keymap_altboot'
 alias op.signin='eval $(op signin)'
 
 # make it easier to open the browser
-alias browser='flatpak run org.mozilla.firefox 2>/dev/null &!'
+function browser() {
+  flatpak run org.mozilla.firefox "$@" 2>/dev/null &!
+  echo "• opened in extant browser window"
+}
 alias machine.logout='loginctl terminate-user "$USER"'
 alias machine.reboot='systemctl reboot'
 
@@ -248,8 +251,7 @@ alias sync.devenv.gitaliases='source ~/git/more/dev-env-setup/src/install_env.pt
 alias sync.devenv.nvim='mkdir -p ~/.config/nvim && cp ~/git/more/dev-env-setup/src/init.lua ~/.config/nvim/init.lua && echo "• neovim config synced"'
 alias sync.devenv.ptyxis='source ~/git/more/dev-env-setup/src/install_env.pt4.terminal.ptyxis.sh && configure_ptyxis'
 alias sync.devenv.cosmic='source ~/git/more/dev-env-setup/src/install_env.pt3.cosmic.sh && configure_cosmic_theme'
-alias sync.devenv.firefox='source ~/git/more/dev-env-setup/src/install_env.pt1.system.basics.sh && configure_firefox_prefs'
-alias sync.devenv='sync.devenv.bashaliases && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.cosmic && sync.devenv.firefox'
+alias sync.devenv='sync.devenv.bashaliases && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.cosmic'
 
 # make it easy to pull down the devenv repo
 alias devenv.sync.repo='cd ~/git/more/dev-env-setup && git checkout main && git pull origin HEAD'

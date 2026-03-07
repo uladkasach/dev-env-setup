@@ -81,6 +81,8 @@ install_vim() {
 
 install_neovim() {
   sudo add-apt-repository ppa:neovim-ppa/unstable -y && sudo apt update && sudo apt install neovim -y
+  # tree-sitter-cli required for nvim-treesitter parser compilation
+  cargo install tree-sitter-cli
 }
 
 configure_neovim() {

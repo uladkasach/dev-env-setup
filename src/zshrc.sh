@@ -87,16 +87,31 @@ if [ -d "$HOME/.local/bin" ] ; then
  PATH="$HOME/.local/bin:$PATH"
 fi
 
-# fnm (fast node manager) - no lazy loading needed, it's fast
+# fnm (fast node manager) - no lazy load needed, it's fast
 export PATH="$HOME/.local/share/fnm:$PATH"
 if command -v fnm &>/dev/null; then
   eval "$(fnm env --use-on-cd)"
 
-  # ensure corepack is available (node 25+ doesn't bundle it)
-  if ! command -v corepack &>/dev/null; then
-    echo "• corepack not found, will install via npm..." >&2
-    command npm install -g corepack && corepack enable
-  fi
+  # ensure pnpm available after fnm version switches
+  _FNM_PNPM_CHECKED_VERSION=""
+  _ensure_pnpm_after_fnm() {
+    # only check when node version changes
+    local current_version="${FNM_VERSION:-}"
+    [[ "$current_version" == "$_FNM_PNPM_CHECKED_VERSION" ]] && return
+    _FNM_PNPM_CHECKED_VERSION="$current_version"
+
+    # fast path: pnpm works
+    # CI=1 prevents corepack shim prompt (hangs in non-interactive context)
+    CI=1 pnpm --version &>/dev/null && return
+
+    # install pnpm globally (works on node <25 and 25+)
+    echo "• pnpm not found, install via npm..." > /dev/tty
+    CI=1 npm install -g pnpm > /dev/tty 2>&1
+  }
+
+  # run on shell start + after every cd (when fnm may switch versions)
+  _ensure_pnpm_after_fnm
+  chpwd_functions+=(_ensure_pnpm_after_fnm)
 
   # pnpm completions
   [[ -t 1 ]] && command -v pnpm &>/dev/null && eval "$(pnpm completion zsh 2>/dev/null || pnpm completion bash)"
