@@ -744,6 +744,15 @@ vim.api.nvim_create_autocmd('FileType', {
   end,
 })
 
+-- wrap lines for markdown in codediff buffers (no filetype set)
+vim.api.nvim_create_autocmd('BufEnter', {
+  pattern = { 'codediff:*/*.md', '*.md' },
+  callback = function()
+    vim.opt_local.wrap = true
+    vim.opt_local.linebreak = true
+  end,
+})
+
 -- colorscheme: ptyxis Desert palette
 -- ref: https://github.com/Gogh-Co/Gogh/blob/master/themes/Desert.yml
 vim.cmd('highlight clear')
