@@ -491,7 +491,11 @@ require('lazy').setup({
     },
     cmd = 'CodeDiff',
     config = function()
+      local explorer_width = 30
       require('codediff').setup({
+        explorer = {
+          width = explorer_width,
+        },
         keymaps = {
           -- navigation
           next_change = ']c',
@@ -503,6 +507,42 @@ require('lazy').setup({
           quit = 'q',
         },
       })
+
+      -- restore explorer width after file select (codediff resets layout)
+      _G.codediff_explorer_width = _G.codediff_explorer_width or {}
+      vim.api.nvim_create_autocmd('User', {
+        pattern = 'CodeDiffFileSelect',
+        callback = function()
+          local tab = vim.api.nvim_get_current_tabpage()
+          local saved = _G.codediff_explorer_width[tab] or explorer_width
+          vim.defer_fn(function()
+            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+              local buf = vim.api.nvim_win_get_buf(win)
+              local wft = vim.api.nvim_get_option_value('filetype', { buf = buf })
+              if wft == 'codediff-explorer' and vim.api.nvim_win_is_valid(win) then
+                vim.api.nvim_win_set_width(win, saved)
+                break
+              end
+            end
+          end, 10)
+        end,
+      })
+
+      -- save explorer width when user resizes
+      vim.api.nvim_create_autocmd('WinResized', {
+        callback = function()
+          local tab = vim.api.nvim_get_current_tabpage()
+          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            local wft = vim.api.nvim_get_option_value('filetype', { buf = buf })
+            if wft == 'codediff-explorer' and vim.api.nvim_win_is_valid(win) then
+              _G.codediff_explorer_width[tab] = vim.api.nvim_win_get_width(win)
+              break
+            end
+          end
+        end,
+      })
+
       -- codediff buffer keymaps
       vim.api.nvim_create_autocmd('BufEnter', {
         pattern = '*',
@@ -564,30 +604,32 @@ require('lazy').setup({
               print('no path')
             end
           end, { buffer = true, desc = 'Open file in new tab' })
-          -- resize old pane to 1/3, new pane to 2/3
-          vim.defer_fn(function()
-            local dominated = vim.api.nvim_tabpage_list_wins(0)
-            local diff_wins = {}
-            for _, win in ipairs(dominated) do
-              local wbuf = vim.api.nvim_win_get_buf(win)
-              local wname = vim.api.nvim_buf_get_name(wbuf)
-              -- codediff file panes have pattern codediff:N/path
-              if wname:match('codediff:%d') then
-                table.insert(diff_wins, { win = win, name = wname })
+          -- resize old pane to 1/3, new pane to 2/3 (only on first open)
+          local tab = vim.api.nvim_get_current_tabpage()
+          _G.codediff_initialized = _G.codediff_initialized or {}
+          if not _G.codediff_initialized[tab] then
+            _G.codediff_initialized[tab] = true
+            vim.defer_fn(function()
+              local diff_wins = {}
+              for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+                local wbuf = vim.api.nvim_win_get_buf(win)
+                local wname = vim.api.nvim_buf_get_name(wbuf)
+                if wname:match('codediff:%d') then
+                  table.insert(diff_wins, { win = win, name = wname })
+                end
               end
-            end
-            -- if we have 2 diff panes (old + new), resize
-            if #diff_wins == 2 then
-              table.sort(diff_wins, function(a, b)
-                return vim.api.nvim_win_get_position(a.win)[2] < vim.api.nvim_win_get_position(b.win)[2]
-              end)
-              local total = vim.o.columns
-              local explorer_width = 30  -- approximate
-              local avail = total - explorer_width
-              local old_width = math.floor(avail / 3)
-              vim.api.nvim_win_set_width(diff_wins[1].win, old_width)
-            end
-          end, 50)
+              if #diff_wins == 2 then
+                table.sort(diff_wins, function(a, b)
+                  return vim.api.nvim_win_get_position(a.win)[2] < vim.api.nvim_win_get_position(b.win)[2]
+                end)
+                local total = vim.o.columns
+                local explorer_width = 30
+                local avail = total - explorer_width
+                local old_width = math.floor(avail / 3)
+                vim.api.nvim_win_set_width(diff_wins[1].win, old_width)
+              end
+            end, 50)
+          end
         end,
       })
     end,
