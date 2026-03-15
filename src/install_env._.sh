@@ -7,8 +7,8 @@ set -euo pipefail
 
 THIS_DIR="$HOME/git/more/dev-env-setup/src"
 
-# temp aliases used during install (lifted to bash_aliases later)
-browser() { setsid flatpak run org.mozilla.firefox "$@" >/dev/null 2>&1 & }
+# temp aliases for bootstrap (lifted to bash_aliases later)
+browser() { setsid flatpak run org.mozilla.firefox "$@" >/dev/null 2>&1 & }  # until install_browser_command runs
 alias terminal='ptyxis 2>/dev/null || cosmic-term'
 alias machine.logout='loginctl terminate-user "$USER"'
 alias machine.reboot='systemctl reboot'
@@ -23,6 +23,7 @@ configure_logind
 # pt1b: system basics
 source "$THIS_DIR/install_env.pt1.system.basics.sh"
 install_firefox
+install_browser_command
 install_1password_extension
 install_firefox_color_extension
 install_vimium_extension

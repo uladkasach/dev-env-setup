@@ -30,6 +30,18 @@ configure_firefox_theme() {
   echo "• firefox color theme opened (click 'Yes, apply theme' in browser)"
 }
 
+install_browser_command() {
+  # quiet browser launcher for xdg-open, gh, etc
+  # suppresses firefox flatpak sandbox noise
+  mkdir -p ~/.local/bin
+  cat > ~/.local/bin/browser << 'EOF'
+#!/bin/sh
+setsid -f flatpak run org.mozilla.firefox "$@" >/dev/null 2>&1
+EOF
+  chmod +x ~/.local/bin/browser
+  echo "• browser command installed (~/.local/bin/browser)"
+}
+
 configure_firefox_prefs() {
   # find the default-release profile dir
   local ff_root="$HOME/.var/app/org.mozilla.firefox/config/mozilla/firefox"

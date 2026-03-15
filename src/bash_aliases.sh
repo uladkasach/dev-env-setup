@@ -69,11 +69,8 @@ alias use.keymap.altboot='use_keymap_altboot'
 # make signing into onepass easier
 alias op.signin='eval $(op signin)'
 
-# make it easier to open the browser
-function browser() {
-  setsid flatpak run org.mozilla.firefox "$@" >/dev/null 2>&1 &
-  echo "• opened in extant browser window"
-}
+# quiet browser for xdg-open, gh, etc (installed via install_browser_command)
+export BROWSER="$HOME/.local/bin/browser"
 alias machine.logout='loginctl terminate-user "$USER"'
 alias machine.reboot='systemctl reboot'
 
