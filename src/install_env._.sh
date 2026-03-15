@@ -8,7 +8,7 @@ set -euo pipefail
 THIS_DIR="$HOME/git/more/dev-env-setup/src"
 
 # temp aliases used during install (lifted to bash_aliases later)
-alias browser='flatpak run org.mozilla.firefox'
+browser() { setsid flatpak run org.mozilla.firefox "$@" >/dev/null 2>&1 & }
 alias terminal='ptyxis 2>/dev/null || cosmic-term'
 alias machine.logout='loginctl terminate-user "$USER"'
 alias machine.reboot='systemctl reboot'

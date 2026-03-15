@@ -71,7 +71,7 @@ alias op.signin='eval $(op signin)'
 
 # make it easier to open the browser
 function browser() {
-  flatpak run org.mozilla.firefox "$@" 2>/dev/null &!
+  setsid flatpak run org.mozilla.firefox "$@" >/dev/null 2>&1 &
   echo "• opened in extant browser window"
 }
 alias machine.logout='loginctl terminate-user "$USER"'
