@@ -495,6 +495,8 @@ require('lazy').setup({
       require('codediff').setup({
         explorer = {
           width = explorer_width,
+          view_mode = "tree",
+          flatten_dirs = true,
         },
         keymaps = {
           -- navigation
