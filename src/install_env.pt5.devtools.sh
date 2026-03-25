@@ -112,6 +112,28 @@ install_docker() {
   docker compose version
 }
 
+install_1password() {
+  #########################
+  ## ref: https://support.1password.com/install-linux/
+  #########################
+
+  # add 1password apt repo
+  curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
+    sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
+    sudo tee /etc/apt/sources.list.d/1password.list
+
+  # install app + cli
+  sudo apt update && sudo apt install -y 1password 1password-cli
+
+  # verify
+  op --version
+
+  echo "configure 1password app manually:"
+  echo "  1. settings > developer > enable 'integrate with 1password cli'"
+  echo "  2. settings > security > set auto-lock to 'on system lock'"
+}
+
 clone_org_repos() {
   for organization in {ehmpathy,ahbode}; do
     gh repo list $organization --limit 1000 | while read -r repo _; do
