@@ -117,21 +117,52 @@ install_1password() {
   ## ref: https://support.1password.com/install-linux/
   #########################
 
-  # add 1password apt repo
-  curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
-    sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
-    sudo tee /etc/apt/sources.list.d/1password.list
+  # findsert apt repo
+  [ -f /usr/share/keyrings/1password-archive-keyring.gpg ] || \
+    curl -sS https://downloads.1password.com/linux/keys/1password.asc | \
+      sudo gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
+  [ -f /etc/apt/sources.list.d/1password.list ] || \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
+      sudo tee /etc/apt/sources.list.d/1password.list
 
-  # install app + cli
-  sudo apt update && sudo apt install -y 1password 1password-cli
+  # findsert app
+  command -v 1password &> /dev/null || \
+    (sudo apt update && sudo apt install -y 1password)
 
-  # verify
-  op --version
+  # findsert cli
+  command -v op &> /dev/null || \
+    (sudo apt update && sudo apt install -y 1password-cli && op --version)
+
+  # upsert auto-lock timer (cosmic desktop doesn't support native idle detection)
+  # ref: https://1password.community/discussion/121078
+  mkdir -p ~/.config/systemd/user
+
+  cat > ~/.config/systemd/user/1password-lock.service << 'EOF'
+[Unit]
+Description=Lock 1Password
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/1password --lock
+EOF
+
+  cat > ~/.config/systemd/user/1password-lock.timer << 'EOF'
+[Unit]
+Description=Lock 1Password every 5 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+EOF
+
+  systemctl --user daemon-reload
+  systemctl --user enable --now 1password-lock.timer
 
   echo "configure 1password app manually:"
   echo "  1. settings > developer > enable 'integrate with 1password cli'"
-  echo "  2. settings > security > set auto-lock to 'on system lock'"
 }
 
 clone_org_repos() {
