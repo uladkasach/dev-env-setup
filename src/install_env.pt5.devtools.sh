@@ -165,6 +165,49 @@ EOF
   echo "  1. settings > developer > enable 'integrate with 1password cli'"
 }
 
+install_yubikey_agent() {
+  #########################
+  ## yubikey-agent: seamless ssh-agent backed by YubiKey PIV
+  ## ref: https://github.com/FiloSottile/yubikey-agent
+  ## author: Filippo Valsorda (Go crypto maintainer, ex-Google Security)
+  #########################
+
+  # findsert yubikey-agent + ykman
+  command -v yubikey-agent &> /dev/null || sudo apt install -y yubikey-agent
+  command -v ykman &> /dev/null || sudo apt install -y yubikey-manager
+
+  # enable systemd services (apt package provides service file)
+  systemctl --user daemon-reload
+  systemctl --user enable --now pcscd.socket
+  systemctl --user enable --now yubikey-agent.service
+
+  # add SSH_AUTH_SOCK to bash_aliases if not present
+  if ! grep -q "yubikey-agent" ~/git/more/dev-env-setup/src/bash_aliases.sh 2>/dev/null; then
+    echo "" >> ~/git/more/dev-env-setup/src/bash_aliases.sh
+    echo "# yubikey-agent ssh socket" >> ~/git/more/dev-env-setup/src/bash_aliases.sh
+    echo 'export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/yubikey-agent/yubikey-agent.sock"' >> ~/git/more/dev-env-setup/src/bash_aliases.sh
+  fi
+
+  echo ""
+  echo "yubikey-agent installed."
+  echo ""
+  echo "next steps:"
+  echo "  1. sync.devenv.bashaliases  # apply SSH_AUTH_SOCK"
+  echo ""
+  echo "to load key onto yubikey (first time or new yubikey):"
+  echo "  source ~/git/more/dev-env-setup/src/util.yubikey.ssh.sh"
+  echo "  openssl ecparam -name prime256v1 -genkey -noout -out ~/.ssh/yubikey.pem"
+  echo "  set_sshkey_into_yubikey --from ~/.ssh/yubikey.pem --name my-ssh-key"
+  echo ""
+  echo "to load same key onto another yubikey (from 1password backup):"
+  echo "  set_sshkey_into_yubikey --from 'op://Private/my-ssh-key'"
+  echo ""
+  echo "to get public key (new machine setup):"
+  echo "  get_sshkey_from_yubikey                          # print pubkey"
+  echo "  get_sshkey_from_yubikey --into ~/.ssh            # write to ~/.ssh/yubikey.pub"
+  echo "  get_sshkey_from_yubikey --into ~/.ssh --name work  # write to ~/.ssh/work.pub"
+}
+
 clone_org_repos() {
   for organization in {ehmpathy,ahbode}; do
     gh repo list $organization --limit 1000 | while read -r repo _; do
