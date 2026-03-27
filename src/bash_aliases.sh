@@ -812,7 +812,7 @@ _git_release_tag_runs() {
 }
 
 ######################
-## git worktree helpers (invoked by git alias.tree)
+## git tree (invoked by git alias.tree)
 ##
 ## what: manage git worktrees with repo-prefixed directory names
 ##
@@ -823,8 +823,28 @@ _git_release_tag_runs() {
 ##   git tree get                            # list worktrees for current repo
 ##   git tree set <branch> --from main|this  # create/find worktree for branch
 ##   git tree del <branch>                   # remove worktree for branch
+##   git tree del --repo <name> --name <b>   # remove worktree by repo/branch
+##   git tree status                         # show worktree status for current repo
+##   git tree status --repo @all             # show worktree status across all repos
 ##
 ## worktree location: @gitroot/../_worktrees/$reponame.$branch/
+##
+## status demo:
+##   🏔️  my-repo
+##      │
+##      ├─ 🌲 feat/yubikey-setup
+##      │     └─ 👌 merged
+##      │
+##      ├─ 🌲 fix/typo
+##      │     ├─ ✋ unpushed (2)
+##      │     └─ 🌱 fix(readme): correct typo
+##      │
+##      ├─ 🌲 vlad/wip-idea
+##      │     ├─ ✋ unstaged, unmerged pr
+##      │     └─ 🌱 wip(auth): explore new approach
+##      │
+##      └─ 🌲 vlad/fresh
+##            └─ 🫧 no work
 ######################
 
 # .what: get the repo name from git root
@@ -872,6 +892,7 @@ git_alias_tree() {
       echo "  get          list worktrees for current repo"
       echo "  set <branch> create or find worktree for branch"
       echo "  del <branch> remove worktree for branch"
+      echo "  status       show worktree status (deletable, dirty, etc)"
       echo ""
       echo "run 'git tree <command> --help' for command-specific options"
       return 0
@@ -879,8 +900,9 @@ git_alias_tree() {
     get) _git_tree_get "$@" ;;
     set) _git_tree_set "$@" ;;
     del) _git_tree_del "$@" ;;
+    status) _git_tree_status "$@" ;;
     *)
-      echo "usage: git tree <get|set|del> [branch]"
+      echo "usage: git tree <get|set|del|status> [branch]"
       echo "run 'git tree --help' for more info"
       return 1
       ;;
@@ -1178,9 +1200,12 @@ _git_tree_del() {
     echo ""
     echo "usage: git tree del <branch>"
     echo "       git tree del --this"
+    echo "       git tree del --repo <name> --name <branch>"
     echo ""
     echo "options:"
-    echo "  --this  delete current branch (with safety guards)"
+    echo "  --this           delete current branch (with safety guards)"
+    echo "  --repo <name>    specify repo (scans ~/git/*/_worktrees/)"
+    echo "  --name <branch>  specify branch (use with --repo)"
     echo ""
     echo "removes the worktree directory and prunes git references"
     echo "safe to run if worktree doesn't exist (no-op)"
@@ -1193,8 +1218,32 @@ _git_tree_del() {
     return 0
   fi
 
-  local branch="$1"
+  local branch=""
+  local repo_filter=""
   local delete_branch=false
+
+  # parse args
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --this)
+        branch="--this"
+        shift
+        ;;
+      --repo)
+        repo_filter="$2"
+        shift 2
+        ;;
+      --name)
+        branch="$2"
+        shift 2
+        ;;
+      *)
+        # positional: treat as branch name (backwards compat)
+        branch="$1"
+        shift
+        ;;
+    esac
+  done
 
   # handle --this: delete current branch with guards
   if [[ "$branch" == "--this" ]]; then
@@ -1256,37 +1305,71 @@ _git_tree_del() {
 
   if [[ -z "$branch" ]]; then
     echo "usage: git tree del <branch>"
+    echo "       git tree del --repo <name> --name <branch>"
     return 1
   fi
 
   local repo_name worktrees_dir sanitized worktree_path
-  repo_name="$(_git_tree_repo_name)"
-  worktrees_dir="$(_git_tree_worktrees_dir)"
-  sanitized="$(_git_tree_sanitize_branch "$branch")"
-  worktree_path="$worktrees_dir/$repo_name.$sanitized"
+
+  if [[ -n "$repo_filter" ]]; then
+    # find repo via scan of ~/git/*/_worktrees/
+    for wdir in ~/git/*/_worktrees; do
+      [[ -d "$wdir" ]] || continue
+      sanitized="$(_git_tree_sanitize_branch "$branch")"
+      if [[ -d "$wdir/$repo_filter.$sanitized" ]]; then
+        repo_name="$repo_filter"
+        worktrees_dir="$wdir"
+        worktree_path="$wdir/$repo_filter.$sanitized"
+        break
+      fi
+    done
+    if [[ -z "$worktree_path" ]]; then
+      echo "🍃 $repo_filter.$sanitized"
+      echo "   ├─ status: not found"
+      echo -e "   └─ \033[2mno worktree for this repo/branch\033[0m"
+      return 0
+    fi
+  else
+    repo_name="$(_git_tree_repo_name)"
+    worktrees_dir="$(_git_tree_worktrees_dir)"
+    sanitized="$(_git_tree_sanitize_branch "$branch")"
+    worktree_path="$worktrees_dir/$repo_name.$sanitized"
+  fi
 
   echo ""
+
+  # guard: only delete paths inside _worktrees
+  if [[ ! "$worktree_path" == *"_worktrees"* ]]; then
+    echo "⛈️  safety: path not inside _worktrees, abort"
+    echo "   └─ path: $worktree_path"
+    return 1
+  fi
+
   if [[ -d "$worktree_path" ]]; then
     local commit_info
     commit_info=$(git -C "$worktree_path" log -1 --format="%h %s" 2>/dev/null || echo "(unknown)")
 
-    # ensure all files are deletable (pnpm, test runners, etc can create restricted permissions)
-    chmod -R u+rwX "$worktree_path" 2>/dev/null || {
-      echo "⚠️  cannot chmod worktree (permission denied without sudo)"
-      echo "   └─ fix: sudo chmod -R u+rwX \"$worktree_path\""
-      return 1
-    }
+    local main_repo
+    # extract main repo from worktree .git file (gitdir pointer)
+    main_repo=$(git -C "$worktree_path" rev-parse --show-superproject-working-tree 2>/dev/null)
+    [[ -z "$main_repo" ]] && main_repo=$(git -C "$worktree_path" rev-parse --git-common-dir 2>/dev/null | sed 's|/\.git$||; s|/\.git/worktrees/.*||')
 
-    git worktree remove "$worktree_path" --force 2>/dev/null || {
+    git -C "$main_repo" worktree remove "$worktree_path" --force 2>/dev/null || {
+      # chmod only in fallback (pnpm/jest can create restricted permissions)
+      chmod -R u+rwX "$worktree_path" 2>/dev/null || {
+        echo "⚠️  cannot chmod worktree (permission denied without sudo)"
+        echo "   └─ fix: sudo chmod -R u+rwX \"$worktree_path\""
+        return 1
+      }
       rm -rf "$worktree_path"
-      git worktree prune
+      git -C "$main_repo" worktree prune >/dev/null 2>&1
     }
     echo "🍂 $repo_name.$sanitized"
     echo "   ├─ status: removed"
     echo "   ├─ branch: $branch"
     if [[ "$delete_branch" == "true" ]]; then
-      git branch -D "$branch" 2>/dev/null
-      git push origin --delete "$branch" 2>/dev/null
+      git -C "$main_repo" branch -D "$branch" 2>/dev/null
+      git -C "$main_repo" push origin --delete "$branch" 2>/dev/null
       echo "   ├─ was at: $commit_info"
       echo "   └─ branch deleted (local + remote)"
     else
@@ -1294,9 +1377,12 @@ _git_tree_del() {
     fi
   else
     if [[ "$delete_branch" == "true" ]]; then
-      # no worktree but still delete the branch
-      git branch -D "$branch" 2>/dev/null
-      git push origin --delete "$branch" 2>/dev/null
+      # no worktree but still delete the branch - need to find repo another way
+      local main_repo
+      main_repo="$(dirname "$worktrees_dir")"
+      [[ ! -d "$main_repo/.git" ]] && main_repo="$main_repo/$repo_name"
+      git -C "$main_repo" branch -D "$branch" 2>/dev/null
+      git -C "$main_repo" push origin --delete "$branch" 2>/dev/null
       echo "🍂 $branch"
       echo "   └─ branch deleted (local + remote)"
     else
@@ -1305,6 +1391,227 @@ _git_tree_del() {
       echo -e "   └─ \033[2mmay have already been deleted\033[0m"
     fi
   fi
+  echo ""
+}
+
+# .what: print status for a single worktree directory
+# args: dir, repo_name, is_last (true/false)
+_git_tree_status_one() {
+  local dir="$1"
+  local repo_name="$2"
+  local is_last="$3"
+  local name branch_name display_branch
+  name=$(basename "$dir")
+  branch_name=$(echo "$name" | sed "s/^${repo_name}\\.//")
+  display_branch=$(echo "$branch_name" | tr '.' '/')
+
+  # tree connectors
+  local tree_conn="├─"
+  local child_prefix="│  "
+  if [[ "$is_last" == "true" ]]; then
+    tree_conn="└─"
+    child_prefix="   "
+  fi
+
+  echo "   $tree_conn 🌲 $display_branch"
+
+  # check local state
+  local has_staged has_unstaged has_untracked
+  has_staged=$(git -C "$dir" diff --cached --quiet 2>/dev/null; echo $?)
+  has_unstaged=$(git -C "$dir" diff --quiet 2>/dev/null; echo $?)
+  has_untracked=$(git -C "$dir" ls-files --others --exclude-standard 2>/dev/null | head -1)
+
+  # count commits beyond merge-base with main
+  local merge_base commit_count first_commit_msg
+  merge_base=$(git -C "$dir" merge-base HEAD origin/main 2>/dev/null || git -C "$dir" merge-base HEAD origin/master 2>/dev/null || echo "")
+  if [[ -n "$merge_base" ]]; then
+    commit_count=$(git -C "$dir" rev-list --count "$merge_base"..HEAD 2>/dev/null || echo "0")
+    if [[ "$commit_count" != "0" ]]; then
+      first_commit_msg=$(git -C "$dir" log --reverse --format="%s" "$merge_base"..HEAD 2>/dev/null | head -1)
+    fi
+  else
+    commit_count="0"
+  fi
+
+  # check remote state
+  local ahead_count behind_count pr_state repo_remote
+  ahead_count=$(git -C "$dir" rev-list --count @{upstream}..HEAD 2>/dev/null || echo "0")
+  behind_count=$(git -C "$dir" rev-list --count HEAD..@{upstream} 2>/dev/null || echo "0")
+  repo_remote=$(git -C "$dir" remote get-url origin 2>/dev/null | sed 's|.*github.com[:/]||; s|\.git$||')
+  pr_state=$(gh pr view "$display_branch" --repo "$repo_remote" --json state --jq '.state' 2>/dev/null || echo "")
+
+  # build issues list
+  local issues=()
+  [[ "$has_staged" != "0" || "$has_unstaged" != "0" || -n "$has_untracked" ]] && issues+=("unstaged")
+  [[ "$ahead_count" != "0" && "$ahead_count" != "" ]] && issues+=("unpushed ($ahead_count)")
+  [[ "$behind_count" != "0" && "$behind_count" != "" ]] && issues+=("unpulled ($behind_count)")
+  [[ "$pr_state" == "OPEN" ]] && issues+=("unmerged")
+  [[ "$pr_state" == "CLOSED" ]] && issues+=("closed")
+
+  # determine status output
+  if [[ "$pr_state" == "MERGED" ]]; then
+    echo "   $child_prefix  └─ 👌 merged"
+  elif [[ "$commit_count" == "0" && ${#issues[@]} -eq 0 ]]; then
+    echo "   $child_prefix  └─ 🫧 no work"
+  elif [[ ${#issues[@]} -gt 0 ]]; then
+    local issues_str
+    issues_str=$(IFS=,; echo "${issues[*]}" | sed 's/,/, /g')
+    if [[ -n "$first_commit_msg" ]]; then
+      echo "   $child_prefix  ├─ ✋ $issues_str"
+      echo "   $child_prefix  └─ 🌱 $first_commit_msg"
+    else
+      echo "   $child_prefix  └─ ✋ $issues_str"
+    fi
+  else
+    # has commits, no issues, no pr
+    if [[ -n "$first_commit_msg" ]]; then
+      echo "   $child_prefix  ├─ ✋ no pr"
+      echo "   $child_prefix  └─ 🌱 $first_commit_msg"
+    else
+      echo "   $child_prefix  └─ ✋ no pr"
+    fi
+  fi
+}
+
+# .what: show status of all worktrees (deletable, dirty, ahead, etc)
+_git_tree_status() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "git tree status - show worktree status and deletability"
+    echo ""
+    echo "usage: git tree status [--repo <name|@all>]"
+    echo ""
+    echo "options:"
+    echo "  --repo @all    show worktrees across all repos on machine"
+    echo "  --repo <name>  show worktrees for specific repo"
+    echo ""
+    echo "status icons:"
+    echo "  👌 merged      safe to delete"
+    echo "  🫧 no work     no commits on branch"
+    echo "  ✋ issues      unstaged, unpushed, unmerged, etc"
+    echo "  🌱 first commit message on branch"
+    return 0
+  fi
+
+  local repo_filter=""
+  if [[ "$1" == "--repo" && -n "$2" ]]; then
+    repo_filter="$2"
+  fi
+
+  if [[ -n "$repo_filter" ]]; then
+    # scan all ~/git/*/_worktrees/ directories
+    local found_any=false
+
+    for worktrees_dir in ~/git/*/_worktrees; do
+      [[ -d "$worktrees_dir" ]] || continue
+
+      # collect unique repo names in this worktrees dir
+      local repos=()
+      for dir in "$worktrees_dir"/*; do
+        [[ -d "$dir" ]] || continue
+        [[ "$(basename "$dir")" == "_patches" ]] && continue
+        local rname
+        rname=$(basename "$dir" | cut -d. -f1)
+        # filter by repo name unless @all
+        if [[ "$repo_filter" != "@all" && "$rname" != "$repo_filter" ]]; then
+          continue
+        fi
+        if [[ ! " ${repos[*]} " =~ " ${rname} " ]]; then
+          repos+=("$rname")
+        fi
+      done
+
+      for repo_name in "${repos[@]}"; do
+        local entries=()
+        for dir in "$worktrees_dir"/"$repo_name".*; do
+          [[ -d "$dir" ]] || continue
+          local timestamp
+          timestamp=$(git -C "$dir" log -1 --format="%ct" 2>/dev/null || echo "0")
+          entries+=("$timestamp:$dir")
+        done
+
+        [[ ${#entries[@]} -eq 0 ]] && continue
+
+        found_any=true
+
+        # sort by timestamp (oldest first)
+        IFS=$'\n' sorted=($(printf '%s\n' "${entries[@]}" | sort -t: -k1 -n)); unset IFS
+
+        echo ""
+        echo "🏔️  $repo_name"
+        echo "   │"
+
+        local idx=0 total=${#sorted[@]}
+        for entry in "${sorted[@]}"; do
+          ((idx++))
+          local dir="${entry#*:}"
+          local is_last="false"
+          [[ $idx -eq $total ]] && is_last="true"
+          _git_tree_status_one "$dir" "$repo_name" "$is_last"
+          [[ "$is_last" == "false" ]] && echo "   │"
+        done
+      done
+    done
+
+    if [[ "$found_any" == "false" ]]; then
+      echo ""
+      if [[ "$repo_filter" == "@all" ]]; then
+        echo "🏔️  (no worktrees on machine)"
+      else
+        echo "🏔️  $repo_filter"
+        echo "   └─ (no worktrees)"
+      fi
+    fi
+
+    echo ""
+    return 0
+  fi
+
+  # current repo only
+  local worktrees_dir repo_name
+  worktrees_dir="$(_git_tree_worktrees_dir)"
+  repo_name="$(_git_tree_repo_name)"
+
+  if [[ ! -d "$worktrees_dir" ]]; then
+    echo ""
+    echo "🏔️  $repo_name"
+    echo "   └─ (no worktrees)"
+    echo ""
+    return 0
+  fi
+
+  local entries=()
+  for dir in "$worktrees_dir"/"$repo_name".*; do
+    [[ -d "$dir" ]] || continue
+    local timestamp
+    timestamp=$(git -C "$dir" log -1 --format="%ct" 2>/dev/null || echo "0")
+    entries+=("$timestamp:$dir")
+  done
+
+  if [[ ${#entries[@]} -eq 0 ]]; then
+    echo ""
+    echo "🏔️  $repo_name"
+    echo "   └─ (no worktrees)"
+    echo ""
+    return 0
+  fi
+
+  # sort by timestamp (oldest first)
+  IFS=$'\n' sorted=($(printf '%s\n' "${entries[@]}" | sort -t: -k1 -n)); unset IFS
+
+  echo ""
+  echo "🏔️  $repo_name"
+  echo "   │"
+
+  local idx=0 total=${#sorted[@]}
+  for entry in "${sorted[@]}"; do
+    ((idx++))
+    local dir="${entry#*:}"
+    local is_last="false"
+    [[ $idx -eq $total ]] && is_last="true"
+    _git_tree_status_one "$dir" "$repo_name" "$is_last"
+    [[ "$is_last" == "false" ]] && echo "   │"
+  done
+
   echo ""
 }
 
