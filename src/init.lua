@@ -510,6 +510,232 @@ require('lazy').setup({
         },
       })
 
+      -- todo: contribute upstream — fix tree jitter on refresh
+      -- issue: codediff calls expand_all_dirs() on every refresh/render, user collapses lost
+      -- root cause: expand_all_dirs has no memory of user intent
+      -- fix: re-collapse user-collapsed nodes before each render
+      -- ref: https://github.com/sindrets/diffview.nvim/issues/582
+      _G.codediff_user_collapsed = _G.codediff_user_collapsed or {}
+
+      -- build group-prefixed key to avoid collision between staged/unstaged
+      local function get_collapse_key(tree, node)
+        if not node or not node.data then return nil end
+        local base = node.data.path or node.data.name
+        if not base then return nil end
+        -- groups are roots, no prefix needed
+        if node.data.type == 'group' then return base end
+        -- for directories, walk up to find parent group
+        local parent_id = node._parent_id
+        while parent_id do
+          local parent = tree:get_node(parent_id)
+          if not parent then break end
+          if parent.data and parent.data.type == 'group' then
+            return (parent.data.name or 'unknown') .. ':' .. base
+          end
+          parent_id = parent._parent_id
+        end
+        return base
+      end
+
+      -- re-collapse nodes that user had collapsed
+      local function apply_user_collapses(tree)
+        local function process_node(node)
+          if not node or not node.data then return end
+          local node_type = node.data.type
+          if node_type == 'group' or node_type == 'directory' then
+            local key = get_collapse_key(tree, node)
+            if key and _G.codediff_user_collapsed[key] then
+              node:collapse()
+            end
+            -- recurse into children
+            if node:has_children() then
+              for _, child_id in ipairs(node:get_child_ids()) do
+                local child = tree:get_node(child_id)
+                if child then process_node(child) end
+              end
+            end
+          end
+        end
+        for _, root in ipairs(tree:get_nodes()) do
+          process_node(root)
+        end
+      end
+
+      vim.defer_fn(function()
+        local ok, Tree = pcall(require, 'codediff.ui.lib.tree')
+        if not ok then return end
+
+        -- patch Tree:render() to re-collapse before buffer write
+        local original_render = Tree.render
+        Tree.render = function(self)
+          apply_user_collapses(self)
+          return original_render(self)
+        end
+
+        -- patch flatten_tree to use sorted iteration
+        -- root cause: pairs() has undefined order, causes inconsistent dir merge
+        local nodes_ok, nodes_mod = pcall(require, 'codediff.ui.explorer.nodes')
+        if not nodes_ok then return end
+
+        local config_ok, cfg = pcall(require, 'codediff.config')
+        if not config_ok then return end
+
+        -- replace create_tree_file_nodes with sorted flatten version
+        nodes_mod.create_tree_file_nodes = function(files, git_root, group_name)
+          -- build directory structure (same as original)
+          local dir_tree = {}
+          for _, file in ipairs(files) do
+            local parts = {}
+            for part in file.path:gmatch('[^/]+') do
+              parts[#parts + 1] = part
+            end
+            local current = dir_tree
+            for i = 1, #parts - 1 do
+              local dir_name = parts[i]
+              if not current[dir_name] then
+                current[dir_name] = { _is_dir = true, _children = {} }
+              end
+              current = current[dir_name]._children
+            end
+            local filename = parts[#parts]
+            current[filename] = { _is_dir = false, _file = file }
+          end
+
+          -- flatten with SORTED iteration (fix for pairs() order issue)
+          local function flatten_tree_sorted(subtree)
+            local keys = {}
+            for k in pairs(subtree) do keys[#keys + 1] = k end
+            table.sort(keys)
+            for _, key in ipairs(keys) do
+              local item = subtree[key]
+              if item._is_dir then
+                flatten_tree_sorted(item._children)
+                local child_keys = {}
+                for k in pairs(item._children) do child_keys[#child_keys + 1] = k end
+                if #child_keys == 1 and item._children[child_keys[1]]._is_dir then
+                  local child_key = child_keys[1]
+                  local child = item._children[child_key]
+                  local merged_key = key .. '/' .. child_key
+                  subtree[merged_key] = child
+                  subtree[key] = nil
+                end
+              end
+            end
+          end
+
+          local explorer_config = cfg.options.explorer or {}
+          if explorer_config.flatten_dirs ~= false then
+            flatten_tree_sorted(dir_tree)
+          end
+
+          -- build nodes (same as original)
+          local function build_nodes(subtree, parent_path, indent_state)
+            local nodes_list = {}
+            local sorted_keys = {}
+            for key in pairs(subtree) do sorted_keys[#sorted_keys + 1] = key end
+            table.sort(sorted_keys, function(a, b)
+              local a_dir = subtree[a]._is_dir
+              local b_dir = subtree[b]._is_dir
+              if a_dir ~= b_dir then return a_dir end
+              return a < b
+            end)
+
+            local total = #sorted_keys
+            for idx, key in ipairs(sorted_keys) do
+              local item = subtree[key]
+              local full_path = parent_path ~= '' and (parent_path .. '/' .. key) or key
+              local is_last = (idx == total)
+              local node_indent = {}
+              for i, v in ipairs(indent_state) do node_indent[i] = v end
+              node_indent[#node_indent + 1] = is_last
+
+              if item._is_dir then
+                local children = build_nodes(item._children, full_path, node_indent)
+                nodes_list[#nodes_list + 1] = Tree.Node({
+                  text = key,
+                  data = {
+                    type = 'directory',
+                    name = key,
+                    path = full_path,
+                    dir_path = full_path,
+                    group = group_name,
+                    indent_state = node_indent,
+                  },
+                }, children)
+              else
+                local file = item._file
+                local icon, icon_color = nodes_mod.get_file_icon(file.path)
+                local STATUS_SYMBOLS = {
+                  M = { symbol = 'M', color = 'CodeDiffStatusModified' },
+                  A = { symbol = 'A', color = 'CodeDiffStatusAdded' },
+                  D = { symbol = 'D', color = 'CodeDiffStatusDeleted' },
+                  ['??'] = { symbol = '??', color = 'CodeDiffStatusUntracked' },
+                  ['!'] = { symbol = '!', color = 'CodeDiffStatusConflict' },
+                }
+                local status_info = STATUS_SYMBOLS[file.status] or { symbol = file.status, color = 'Normal' }
+                nodes_list[#nodes_list + 1] = Tree.Node({
+                  text = key,
+                  data = {
+                    path = file.path,
+                    status = file.status,
+                    old_path = file.old_path,
+                    icon = icon,
+                    icon_color = icon_color,
+                    status_symbol = status_info.symbol,
+                    status_color = status_info.color,
+                    git_root = git_root,
+                    group = group_name,
+                    indent_state = node_indent,
+                  },
+                })
+              end
+            end
+            return nodes_list
+          end
+
+          return build_nodes(dir_tree, '', {})
+        end
+      end, 50)
+
+      -- track user collapse/expand via custom Enter keymap
+      vim.api.nvim_create_autocmd('FileType', {
+        pattern = 'codediff-explorer',
+        callback = function()
+          vim.keymap.set('n', '<CR>', function()
+            local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
+            if not lc_ok then return end
+            local tabpage = vim.api.nvim_get_current_tabpage()
+            local explorer = lifecycle.get_explorer and lifecycle.get_explorer(tabpage)
+            if not explorer or not explorer.tree then return end
+
+            local node = explorer.tree:get_node()
+            if not node or not node.data then return end
+
+            local node_type = node.data.type
+            if node_type == 'group' or node_type == 'directory' then
+              local key = get_collapse_key(explorer.tree, node)
+              if key then
+                if node:is_expanded() then
+                  -- user collapse — record
+                  _G.codediff_user_collapsed[key] = true
+                  node:collapse()
+                else
+                  -- user expand — clear record
+                  _G.codediff_user_collapsed[key] = nil
+                  node:expand()
+                end
+                explorer.tree:render()
+              end
+            else
+              -- file node — default select
+              if explorer.on_file_select then
+                explorer.on_file_select(node.data)
+              end
+            end
+          end, { buffer = true, desc = 'Toggle/select with collapse track' })
+        end,
+      })
+
       -- restore explorer width after file select (codediff resets layout)
       _G.codediff_explorer_width = _G.codediff_explorer_width or {}
       vim.api.nvim_create_autocmd('User', {
