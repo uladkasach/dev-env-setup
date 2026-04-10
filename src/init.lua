@@ -145,6 +145,42 @@ end
 -- plugins
 require('lazy').setup({
   {
+    'nvim-telescope/telescope.nvim',
+    dependencies = { 'nvim-lua/plenary.nvim' },
+    keys = {
+      { '<C-p>', '<cmd>Telescope find_files<cr>', desc = 'Find files' },
+      { '<C-f>', '<cmd>Telescope live_grep<cr>', desc = 'Search in files' },
+      { '<C-S-f>', '<cmd>Telescope live_grep<cr>', desc = 'Search in files' },
+    },
+    config = function()
+      local actions = require('telescope.actions')
+      require('telescope').setup({
+        defaults = {
+          mappings = {
+            i = {
+              ['<Esc>'] = actions.close,
+              ['<C-c>'] = actions.close,
+            },
+            n = {
+              ['q'] = actions.close,
+              ['<Esc>'] = actions.close,
+            },
+          },
+        },
+      })
+      -- intercept :q and :qa in telescope buffers via abbreviation
+      vim.api.nvim_create_autocmd('FileType', {
+        pattern = 'TelescopePrompt',
+        callback = function()
+          vim.cmd('cnoreabbrev <buffer> q lua require("telescope.actions").close(vim.api.nvim_get_current_buf())')
+          vim.cmd('cnoreabbrev <buffer> q! lua require("telescope.actions").close(vim.api.nvim_get_current_buf())')
+          vim.cmd('cnoreabbrev <buffer> qa lua require("telescope.actions").close(vim.api.nvim_get_current_buf())')
+          vim.cmd('cnoreabbrev <buffer> qa! lua require("telescope.actions").close(vim.api.nvim_get_current_buf())')
+        end,
+      })
+    end,
+  },
+  {
     'lewis6991/gitsigns.nvim',
     config = function()
       local gs = require('gitsigns')

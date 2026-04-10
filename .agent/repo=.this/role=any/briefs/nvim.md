@@ -4,6 +4,14 @@ neovim config with desert theme, file management, and vim-friendly keybinds.
 
 ## keybindings
 
+### search
+
+| key | action |
+|-----|--------|
+| `Ctrl+p` | find files (fuzzy search popup) |
+| `Ctrl+f` or `Ctrl+Shift+f` | search across all files (live grep) |
+| `/` | search in current file (vim native) |
+
 ### navigation
 
 | key | action |
@@ -108,6 +116,7 @@ powered by mini.map. disabled for neo-tree, oil, help, and gitdiff.pane.tree.
 | plugin | purpose |
 |--------|---------|
 | lazy.nvim | plugin manager |
+| telescope.nvim | fuzzy finder for files and content |
 | neo-tree | sidebar file tree |
 | oil.nvim | edit directories as buffers |
 | smart-splits | window navigation + resize |

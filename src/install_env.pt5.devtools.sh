@@ -33,6 +33,14 @@ install_robot_brains() {
   pnpm install -g rhachet
 }
 
+install_ripgrep() {
+  #########################
+  ## ripgrep - fast grep alternative
+  ## used by: telescope.nvim live_grep
+  #########################
+  sudo apt install -y ripgrep
+}
+
 install_psql() {
   sudo apt-get install -y postgresql-client
 }
