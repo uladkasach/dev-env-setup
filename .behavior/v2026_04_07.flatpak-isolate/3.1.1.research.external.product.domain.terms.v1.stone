@@ -1,0 +1,70 @@
+research the domain available in order to fulfill
+- this wish .behavior/v2026_04_07.flatpak-isolate/0.wish.md
+- this vision .behavior/v2026_04_07.flatpak-isolate/1.vision.md (if declared)
+- this criteria .behavior/v2026_04_07.flatpak-isolate/2.1.criteria.blackbox.md (if declared)
+
+specifically
+- what are the terms that we need to coin for the new domain.objects required to fulfill the above?
+  - entities
+  - events
+  - literals
+- what are the relationships between the domain objects?
+  - is there a treestruct of decoration?
+  - is there a treestruct of common subdomains?
+  - are there dependencies?
+- how do folks commonly talk about these domain.objects?
+  - use citations from websearch
+
+
+ultimatelly,
+- propose options for each of the new domain.objects, what should we call them?
+
+our objective is to
+- maximize specificity => eliminate ambiguity & minimize confusion
+- maximize intuition => eliminate friction & maximize adoption
+
+to create a ubiquitous language
+
+---
+
+use web search to discover and research
+- cite every claim
+- number each citation
+- clone exact quotes from each citation
+
+cite atleast 21 sources, with links and quotes
+
+source diversity
+- require mix of source types: official docs, academic papers, practitioner blogs, conference talks
+- prevents echo chamber from only one type
+
+for each citation include
+- publication date (to assess recency)
+- credibility tag: [official] [academic] [practitioner] [tutorial] [blog] [video] [book]
+
+conflict detection
+- explicitly note when sources disagree
+- "sources [3] and [7] conflict on X — [3] says A, [7] says B"
+
+convergence signal
+- note when multiple independent sources agree
+- stronger confidence when 3+ sources say the same thing
+
+anti-patterns
+- research what NOT to do, not just what to do
+- "sources [4], [9], [12] warn against X because..."
+
+---
+
+explicitly consider parallel concepts from other domains
+- bluecollar
+- healthcare
+- recreation
+- cullinary
+etc
+
+the older the domain, the deeper the words
+
+---
+
+emit into .behavior/v2026_04_07.flatpak-isolate/3.1.1.research.external.product.domain.terms.v1.i1.md
