@@ -35,6 +35,17 @@
             "author": "repo=bhrain/role=driver"
           }
         ]
+      },
+      {
+        "matcher": "PostCompact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./node_modules/.bin/rhachet run --repo ehmpathy --role mechanic --init claude.hooks/postcompact.trust-but-verify",
+            "timeout": 30,
+            "author": "repo=ehmpathy/role=mechanic"
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -56,6 +67,12 @@
           {
             "type": "command",
             "command": "./node_modules/.bin/rhachet run --repo ehmpathy --role mechanic --init claude.hooks/pretooluse.forbid-suspicious-shell-syntax",
+            "timeout": 5,
+            "author": "repo=ehmpathy/role=mechanic"
+          },
+          {
+            "type": "command",
+            "command": "./node_modules/.bin/rhachet run --repo ehmpathy --role mechanic --init claude.hooks/pretooluse.forbid-sedreplace-special-chars",
             "timeout": 5,
             "author": "repo=ehmpathy/role=mechanic"
           }
@@ -116,6 +133,17 @@
             "author": "repo=bhrain/role=driver"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|Read|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./node_modules/.bin/rhachet run --repo ehmpathy --role mechanic --init claude.hooks/pretooluse.forbid-tmp-writes",
+            "timeout": 5,
+            "author": "repo=ehmpathy/role=mechanic"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -124,15 +152,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pnpm run --if-present fix",
-            "timeout": 30,
-            "author": "repo=ehmpathy/role=mechanic"
-          },
-          {
-            "type": "command",
             "command": "./node_modules/.bin/rhx route.drive --mode hook",
             "timeout": 5,
             "author": "repo=bhrain/role=driver"
+          },
+          {
+            "type": "command",
+            "command": "./node_modules/.bin/rhx git.repo.test --what lint --when hook.onStop",
+            "timeout": 60,
+            "author": "repo=ehmpathy/role=mechanic"
           }
         ]
       }
@@ -175,9 +203,25 @@
       "Bash(git cat-file:*)",
       "Bash(npx rhachet run --skill git.release:*)",
       "Bash(rhx git.release:*)",
+      "Bash(npx rhachet run --skill git.repo.test:*)",
+      "Bash(rhx git.repo.test:*)",
+      "Bash(rhx git.repo.test --what types)",
+      "Bash(rhx git.repo.test --what format)",
+      "Bash(rhx git.repo.test --what lint)",
+      "Bash(rhx git.repo.test --what unit)",
+      "Bash(rhx git.repo.test --what integration)",
+      "Bash(rhx git.repo.test --what acceptance)",
+      "Bash(rhx git.repo.test --what unit --scope getUserById)",
+      "Bash(rhx git.repo.test --what integration --scope invoice)",
+      "Bash(rhx git.repo.test --what unit --scope src/domain.operations/customer)",
+      "Bash(rhx git.repo.test --what unit --resnap)",
+      "Bash(rhx git.repo.test --what integration --resnap)",
+      "Bash(rhx git.repo.test --what unit --scope getUserById --resnap)",
       "Bash(npx rhachet run --skill sedreplace:*)",
       "Bash(npx rhachet run --skill sedreplace --old 'oldName' --new 'newName' --glob 'src/**/*.ts')",
       "Bash(npx rhachet run --skill sedreplace --old 'oldName' --new 'newName' --glob 'src/**/*.ts' --mode apply)",
+      "Bash(echo '{ pattern }' | npx rhachet run --skill sedreplace --old @stdin --new 'replacement' --glob 'src/**/*.ts')",
+      "Bash(printf '{ old }\\0{ new }' | npx rhachet run --skill sedreplace --old @stdin --new @stdin --glob 'src/**/*.ts')",
       "Bash(npx rhachet run --skill cpsafe:*)",
       "Bash(npx rhachet run --skill mvsafe:*)",
       "Bash(npx rhachet run --skill rmsafe:*)",
@@ -244,8 +288,8 @@
       "Bash(rhx git.repo.get lines --in ehmpathy/domain-objects --words 'DomainEntity')",
       "Bash(rhx git.repo.get lines --in ehmpathy/domain-objects --paths 'src/index.ts')",
       "Bash(rhx git.repo.get files --repos 'ehmpathy/*' --words 'DomainEntity')",
-      "Bash(rhx keyrack unlock --owner ehmpath --prikey ~/.ssh/ehmpath --env all)",
-      "Bash(npx rhx keyrack unlock --owner ehmpath --prikey ~/.ssh/ehmpath --env all)",
+      "Bash(rhx keyrack unlock --owner ehmpath --env:*)",
+      "Bash(npx rhx keyrack unlock --owner ehmpath --env:*)",
       "Bash(npx rhachet run --skill show.gh.action.logs:*)",
       "Bash(npx rhachet run --skill show.gh.test.errors:*)",
       "Bash(npx rhachet run --skill show.gh.test.errors --scope test-integration)",
@@ -281,39 +325,10 @@
       "Bash(pnpm help:*)",
       "Bash(pnpm why:*)",
       "Bash(npm ci)",
-      "Bash(pnpm install --frozen-lockfile)",
       "Bash(npx tsx ./bin/run:*)",
       "Bash(npm run build:*)",
       "Bash(npm run build:compile)",
       "Bash(npm run start:testdb:*)",
-      "Bash(npm run test:*)",
-      "Bash(npm run test:types:*)",
-      "Bash(npm run test:format:*)",
-      "Bash(npm run test:lint:*)",
-      "Bash(npm run test:unit:*)",
-      "Bash(npm run test:integration:*)",
-      "Bash(npm run test:acceptance:*)",
-      "Bash(npm run test:acceptance:locally:*)",
-      "Bash(npm run test:unit -- path/to/file/example.ts)",
-      "Bash(npm run test:integration -- path/to/file/example.ts)",
-      "Bash(npm run test:acceptance -- path/to/file/example.ts)",
-      "Bash(npm run test:acceptance:locally -- path/to/file/example.ts)",
-      "Bash(THOROUGH=true npm run test:*)",
-      "Bash(THOROUGH=true npm run test:types:*)",
-      "Bash(THOROUGH=true npm run test:format:*)",
-      "Bash(THOROUGH=true npm run test:lint:*)",
-      "Bash(THOROUGH=true npm run test:unit:*)",
-      "Bash(THOROUGH=true npm run test:integration:*)",
-      "Bash(THOROUGH=true npm run test:acceptance:*)",
-      "Bash(THOROUGH=true npm run test:acceptance:locally:*)",
-      "Bash(RESNAP=true npm run test:unit:*)",
-      "Bash(RESNAP=true npm run test:integration:*)",
-      "Bash(RESNAP=true npm run test:acceptance:*)",
-      "Bash(RESNAP=true npm run test:acceptance:locally:*)",
-      "Bash(RESNAP=true THOROUGH=true npm run test:unit:*)",
-      "Bash(RESNAP=true THOROUGH=true npm run test:integration:*)",
-      "Bash(RESNAP=true THOROUGH=true npm run test:acceptance:*)",
-      "Bash(RESNAP=true THOROUGH=true npm run test:acceptance:locally:*)",
       "Bash(npx jest --listTests:*)",
       "Bash(npm run fix:*)",
       "Bash(npm run fix:format:*)",

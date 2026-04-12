@@ -1,0 +1,86 @@
+research what test frameworks enable rapid verification feedback for
+- this wish .behavior/v2026_04_11.cosmic-worktopics/0.wish.md
+- this vision .behavior/v2026_04_11.cosmic-worktopics/1.vision.md (if declared)
+- this criteria .behavior/v2026_04_11.cosmic-worktopics/2.1.criteria.blackbox.md (if declared)
+
+---
+
+first, identify the project type and what experience needs to be reproduced
+
+| project type   | fundamental experience to reproduce |
+|----------------|-------------------------------------|
+| frontend/web   | browser dom, page navigation, user interactions |
+| frontend/native| device screens, gestures, platform behaviors |
+| frontend/expo  | cross-platform screens, expo-specific apis |
+| cli            | terminal output, interactive prompts, command sequences |
+| backend/api    | request/response chains, state transitions, side effects |
+| package        | api surface, return values, error conditions |
+
+---
+
+then, check what the repo already has
+
+- does the repo have acceptance test patterns?
+- are there tools already configured for this project type?
+  - frontend/web: browser automation, screenshot capture, dom queries?
+  - frontend/native: device emulators, gesture simulation, native snapshots?
+  - frontend/expo: expo test tools, cross-platform runners?
+  - cli: output capture, stdin simulation, terminal emulation?
+  - backend: http client, database seed data, deployment helpers?
+  - package: fixture management, assertion helpers?
+
+---
+
+then, identify gaps and research solutions
+
+for each gap, use websearch to find best options
+- what tools enable reproduction of the specific experience?
+- what do other projects of this type use?
+- what integrates well with jest/vitest?
+
+for each tool found, demonstrate how it reproduces the experience
+- how does it capture the user's entry point?
+- how does it simulate user actions?
+- how does it assert on what the user sees/gets?
+
+note: assume test runner (jest/vitest) is already chosen. focus on what additional tools enable experience reproduction.
+
+---
+
+use web search to discover and research
+- cite every claim
+- number each citation
+- clone exact quotes from each citation
+
+cite atleast 21 sources, with links and quotes
+
+source diversity
+- require mix of source types: official docs, academic papers, practitioner blogs, conference talks
+- prevents echo chamber from only one type
+
+for each citation include
+- publication date (to assess recency)
+- credibility tag: [official] [academic] [practitioner] [tutorial] [blog] [video] [book]
+
+conflict detection
+- explicitly note when sources disagree
+- "sources [3] and [7] conflict on X — [3] says A, [7] says B"
+
+convergence signal
+- note when multiple independent sources agree
+- stronger confidence when 3+ sources say the same thing
+
+anti-patterns
+- research what NOT to do, not just what to do
+- "sources [4], [9], [12] warn against X because..."
+
+---
+
+remember
+- this is to research what test frameworks enable rapid verification feedback
+- focus on the fundamental experience that needs reproduction
+- the goal is to inform the factory blueprint
+
+---
+
+emit into .behavior/v2026_04_11.cosmic-worktopics/3.1.2.research.external.factory.testloops._.v1.i1.md
