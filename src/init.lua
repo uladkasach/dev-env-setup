@@ -82,6 +82,9 @@ local function get_codediff_explorer_file()
   -- match filename with brackets, dots, dashes, underscores
   local filename = line:match('([%w_%-%.%[%]]+%.[%w]+)%s*$') or line:match('([%w_%-%.%[%]]+%.[%w]+)')
   if not filename then return nil end
+  -- strip trailing status indicator directly attached to filename
+  -- e.g., "file.snapA" -> "file.snap" (extensions are lowercase, status is uppercase)
+  filename = filename:gsub('([%l])([MADRCU])$', '%1')
   local cmd = 'git diff --name-only HEAD 2>/dev/null; git diff --cached --name-only 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null'
   local changed = vim.fn.systemlist(cmd)
   for _, p in ipairs(changed) do
