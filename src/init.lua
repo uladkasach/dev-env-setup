@@ -15,6 +15,23 @@ if not vim.loop.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
+-- cache git root per buffer (avoids subprocess on every statusline render)
+local git_root_cache = {}
+local function get_git_root(bufnr)
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  if git_root_cache[bufnr] == nil then
+    local bufname = vim.api.nvim_buf_get_name(bufnr)
+    local dir = vim.fn.fnamemodify(bufname, ':h')
+    if dir == '' or not vim.fn.isdirectory(dir) then
+      git_root_cache[bufnr] = false
+    else
+      local result = vim.fn.system('git -C ' .. vim.fn.shellescape(dir) .. ' rev-parse --show-toplevel 2>/dev/null'):gsub('\n', '')
+      git_root_cache[bufnr] = (result ~= '' and result) or false
+    end
+  end
+  return git_root_cache[bufnr]
+end
+
 -- shared diff boundary navigation
 local function navigate_diff_boundary(direction, get_chunks, fallback)
   local chunks = get_chunks()
@@ -74,25 +91,18 @@ local function navigate_diff_boundary(direction, get_chunks, fallback)
   end
 end
 
--- find file path from codediff-explorer line (searches changed/staged files)
+-- get file path from codediff explorer node data (no git subprocess needed)
 local function get_codediff_explorer_file()
-  local line = vim.api.nvim_get_current_line()
-  -- strip status indicator (M, A, D, etc) at end
-  line = line:gsub('%s+[MADRCU?!]%s*$', '')
-  -- match filename with brackets, dots, dashes, underscores
-  local filename = line:match('([%w_%-%.%[%]]+%.[%w]+)%s*$') or line:match('([%w_%-%.%[%]]+%.[%w]+)')
-  if not filename then return nil end
-  -- strip trailing status indicator directly attached to filename
-  -- e.g., "file.snapA" -> "file.snap" (extensions are lowercase, status is uppercase)
-  filename = filename:gsub('([%l])([MADRCU])$', '%1')
-  local cmd = 'git diff --name-only HEAD 2>/dev/null; git diff --cached --name-only 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null'
-  local changed = vim.fn.systemlist(cmd)
-  for _, p in ipairs(changed) do
-    if p:match(vim.pesc(filename) .. '$') then
-      return p
-    end
+  local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
+  if not lc_ok then return nil end
+  local tab = vim.api.nvim_get_current_tabpage()
+  local explorer = lifecycle.get_explorer and lifecycle.get_explorer(tab)
+  if not explorer or not explorer.tree then return nil end
+  local node = explorer.tree:get_node()
+  if node and node.data and node.data.path then
+    return node.data.path
   end
-  return filename  -- fallback to just filename
+  return nil
 end
 
 -- check if line has diff highlight (works for both vimdiff and codediff)
@@ -477,6 +487,7 @@ require('lazy').setup({
   },
   {
     'esmuellert/codediff.nvim',
+    event = 'VeryLazy',  -- preload on startup so ctrl+g is instant
     keys = {
       { '<C-g>', function()
         local codediff_loaded, codediff = pcall(require, 'codediff')
@@ -948,8 +959,8 @@ require('lazy').setup({
             if ft == 'neo-tree' then return 'files' end
             if ft == 'oil' then return 'oil' end
             -- regular files: show path relative to git root or cwd
-            local gitroot = vim.fn.system('git rev-parse --show-toplevel 2>/dev/null'):gsub('\n', '')
-            if gitroot ~= '' and bufname:find(gitroot, 1, true) == 1 then
+            local gitroot = get_git_root()
+            if gitroot and bufname:find(gitroot, 1, true) == 1 then
               return bufname:sub(#gitroot + 2)
             end
             return vim.fn.expand('%:.')
