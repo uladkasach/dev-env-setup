@@ -1,14 +1,18 @@
 {
   "organization": "uladkasach",
   "devDependencies": {
-    "rhachet": "^1.38.0",
+    "rhachet": "^1.39.14",
     "rhachet-brains-anthropic": "^0.4.0",
-    "rhachet-roles-bhrain": "^0.23.8",
-    "rhachet-roles-bhuild": "^0.14.4",
-    "rhachet-roles-ehmpathy": "^1.34.9"
+    "rhachet-roles-bhrain": "^0.24.2",
+    "rhachet-roles-bhuild": "^0.17.2",
+    "rhachet-roles-ehmpathy": "^1.34.29"
   },
   "scripts": {
     "prepare:rhachet": "rhachet init --hooks --roles mechanic behaver driver reviewer",
-    "prepare": "npm run prepare:rhachet"
+    "prepare": "npm run prepare:rhachet",
+    "test:lint": "echo 'no lint configured for config repo'"
+  },
+  "dependencies": {
+    "rhachet-brains-xai": "^0.3.3"
   }
 }
