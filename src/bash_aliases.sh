@@ -1414,20 +1414,21 @@ _git_tree_status_one() {
   fi
 
   echo "   $tree_conn 🌲 $display_branch"
+  echo -e "   $child_prefix  ├─ \033[2mat $dir\033[0m"
 
-  # check local state
+  # check local state (env -i to fully isolate from current repo's git env)
   local has_staged has_unstaged has_untracked
-  has_staged=$(git -C "$dir" diff --cached --quiet 2>/dev/null; echo $?)
-  has_unstaged=$(git -C "$dir" diff --quiet 2>/dev/null; echo $?)
-  has_untracked=$(git -C "$dir" ls-files --others --exclude-standard 2>/dev/null | head -1)
+  has_staged=$(env -i PATH="$PATH" git -C "$dir" diff --cached --quiet 2>/dev/null; echo $?)
+  has_unstaged=$(env -i PATH="$PATH" git -C "$dir" diff --quiet 2>/dev/null; echo $?)
+  has_untracked=$(env -i PATH="$PATH" git -C "$dir" ls-files --others --exclude-standard 2>/dev/null | head -1)
 
   # count commits beyond merge-base with main
   local merge_base commit_count first_commit_msg
-  merge_base=$(git -C "$dir" merge-base HEAD origin/main 2>/dev/null || git -C "$dir" merge-base HEAD origin/master 2>/dev/null || echo "")
+  merge_base=$(env -i PATH="$PATH" git -C "$dir" merge-base HEAD origin/main 2>/dev/null || env -i PATH="$PATH" git -C "$dir" merge-base HEAD origin/master 2>/dev/null || echo "")
   if [[ -n "$merge_base" ]]; then
-    commit_count=$(git -C "$dir" rev-list --count "$merge_base"..HEAD 2>/dev/null || echo "0")
+    commit_count=$(env -i PATH="$PATH" git -C "$dir" rev-list --count "$merge_base"..HEAD 2>/dev/null || echo "0")
     if [[ "$commit_count" != "0" ]]; then
-      first_commit_msg=$(git -C "$dir" log --reverse --format="%s" "$merge_base"..HEAD 2>/dev/null | head -1)
+      first_commit_msg=$(env -i PATH="$PATH" git -C "$dir" log --reverse --format="%s" "$merge_base"..HEAD 2>/dev/null | head -1)
     fi
   else
     commit_count="0"
@@ -1435,9 +1436,9 @@ _git_tree_status_one() {
 
   # check remote state
   local ahead_count behind_count pr_state repo_remote
-  ahead_count=$(git -C "$dir" rev-list --count @{upstream}..HEAD 2>/dev/null || echo "0")
-  behind_count=$(git -C "$dir" rev-list --count HEAD..@{upstream} 2>/dev/null || echo "0")
-  repo_remote=$(git -C "$dir" remote get-url origin 2>/dev/null | sed 's|.*github.com[:/]||; s|\.git$||')
+  ahead_count=$(env -i PATH="$PATH" git -C "$dir" rev-list --count @{upstream}..HEAD 2>/dev/null || echo "0")
+  behind_count=$(env -i PATH="$PATH" git -C "$dir" rev-list --count HEAD..@{upstream} 2>/dev/null || echo "0")
+  repo_remote=$(env -i PATH="$PATH" git -C "$dir" remote get-url origin 2>/dev/null | sed 's|.*github.com[:/]||; s|\.git$||')
   pr_state=$(gh pr view "$display_branch" --repo "$repo_remote" --json state --jq '.state' 2>/dev/null || echo "")
 
   # build issues list
