@@ -53,6 +53,7 @@ configure_firefox_prefs() {
   fi
 
   # clean new tab page: no topsites, no pocket, no sponsored, no highlights
+  # disable autofill: passwords, addresses, credit cards (use 1password instead)
   local prefs="$ff_root/$profile_dir/user.js"
   cat > "$prefs" << 'EOF'
 // clean new tab page
@@ -64,6 +65,12 @@ user_pref("browser.newtabpage.activity-stream.showSponsored", false);
 user_pref("browser.newtabpage.activity-stream.showSponsoredTopSites", false);
 user_pref("browser.newtabpage.activity-stream.section.highlights.includePocket", false);
 user_pref("browser.newtabpage.activity-stream.discoverystream.enabled", false);
+
+// disable password, address, credit card autofill (use 1password)
+user_pref("signon.rememberSignons", false);
+user_pref("signon.autofillForms", false);
+user_pref("extensions.formautofill.addresses.enabled", false);
+user_pref("extensions.formautofill.creditCards.enabled", false);
 EOF
 
   echo "• firefox prefs configured (restart firefox to apply)"
