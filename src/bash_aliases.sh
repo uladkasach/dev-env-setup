@@ -2237,3 +2237,57 @@ _git_grab_del() {
   fi
   echo ""
 }
+
+######################
+## usql secure wrapper
+##
+## what: wrapper for usql that adds --key flag for secure credential fetch
+##
+## why: credentials never exposed in process list or shell history
+##      uses tmpfs (RAM) for ephemeral config, auto-cleanup on exit
+##
+## how:
+##   usql --key POSTGRES_URL              # connect via keyrack secret
+##   usql --key ATHENA_URL -c "SELECT 1"  # run query with keyrack secret
+##   usql postgres://localhost/mydb       # regular usql (passthrough)
+##
+## prereq: rhx keyrack must be configured with the key
+######################
+
+usql() {
+  if [[ "$1" == "--key" ]]; then
+    local key="$2"
+    shift 2
+
+    if [[ -z "$key" ]]; then
+      echo "error: --key requires a keyrack key name"
+      echo "usage: usql --key <KEY_NAME> [usql options]"
+      return 1
+    fi
+
+    local tmp="/dev/shm/usql-$$"
+    trap "rm -rf '$tmp'" EXIT
+
+    mkdir -p "$tmp" && chmod 700 "$tmp"
+
+    local dsn
+    dsn="$(rhx keyrack get --key "$key" --value 2>/dev/null)"
+    if [[ -z "$dsn" ]]; then
+      echo "error: failed to fetch key '$key' from keyrack"
+      rm -rf "$tmp"
+      return 1
+    fi
+
+    printf 'connections:\n  c: %s\n' "$dsn" > "$tmp/config.yaml"
+    chmod 600 "$tmp/config.yaml"
+
+    XDG_CONFIG_HOME="$tmp" command usql c "$@"
+    local rc=$?
+
+    rm -rf "$tmp"
+    trap - EXIT
+    return $rc
+  else
+    command usql "$@"
+  fi
+}

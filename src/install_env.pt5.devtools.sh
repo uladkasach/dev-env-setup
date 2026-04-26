@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ######################################################################
 # pt5: dev toolchain
-# node/fnm/pnpm, claude-code/rhachet, psql, aws cli, terraform/tfenv, docker
+# node/fnm/pnpm, claude-code/rhachet, psql, usql, aws cli, terraform/tfenv, docker
 ######################################################################
 
 install_node() {
@@ -43,6 +43,29 @@ install_ripgrep() {
 
 install_psql() {
   sudo apt-get install -y postgresql-client
+}
+
+install_usql() {
+  #########################
+  ## usql: universal CLI for 40+ databases (postgres, duckdb, athena, etc)
+  ## ref: https://github.com/xo/usql
+  #########################
+  local version="0.19.14"
+  local tmp_dir="/tmp/usql-install"
+  local archive="usql_static-${version}-linux-amd64.tar.bz2"
+  local url="https://github.com/xo/usql/releases/download/v${version}/${archive}"
+
+  rm -rf "$tmp_dir" && mkdir -p "$tmp_dir"
+  curl -fsSL "$url" -o "$tmp_dir/$archive"
+  tar -xjf "$tmp_dir/$archive" -C "$tmp_dir"
+
+  mkdir -p ~/.local/bin
+  mv "$tmp_dir/usql_static" ~/.local/bin/usql
+  chmod +x ~/.local/bin/usql
+  rm -rf "$tmp_dir"
+
+  echo "• usql installed to ~/.local/bin/usql"
+  usql --version
 }
 
 install_aws_cli() {
