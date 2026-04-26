@@ -23,13 +23,23 @@ alias tf='terraform'
 # claude code default model
 export ANTHROPIC_MODEL='claude-opus-4-5-20251101'
 
-# aws profiles
-alias use.tugether='export AWS_PROFILE=tugether'
-alias use.ahbode.dev='export AWS_PROFILE=ahbode.dev'
-alias use.ahbode.prod='export AWS_PROFILE=ahbode.prod'
-alias use.ahction='export AWS_PROFILE=ahction'
-alias use.whodis.prod='export AWS_PROFILE=whodis.prod'
-alias use.alistokrad.prod='export AWS_PROFILE=alistokrad.prod'
+# aws profiles via keyrack
+# usage: use.ahbode.prep [--owner <owner>]
+_use_aws_profile() {
+  local env="$1"
+  shift
+  local -a extra_args=()
+  if [[ "$1" == "--owner" ]]; then
+    extra_args=(--owner "$2")
+  fi
+  unset AWS_PROFILE
+  export AWS_PROFILE=$(rhx keyrack get --key AWS_PROFILE --env "$env" "${extra_args[@]}" --output value)
+}
+function use.ahbode.prep { _use_aws_profile prep "$@"; }
+function use.ahbode.prod { _use_aws_profile prod "$@"; }
+function use.ahbode.root { _use_aws_profile root "$@"; }
+function use.ahction.prod { _use_aws_profile prod "$@"; }
+function use.whodis.prod { _use_aws_profile prod "$@"; }
 
 # ahbode 3rd-party credentials
 alias use.ahbode.fastly='export FASTLY_API_KEY=$(op get item fastly.ahbode.apikey | jq -r .details.password)'
@@ -274,7 +284,7 @@ alias weather.in.here='curl wttr.in'
 alias weather.in.indianapolis='curl wttr.in/Indianapolis'
 
 # ahbode use.vpc.tunnel aliases
-alias use.ahbode.dev.vpc='use.ahbode.dev && /home/vlad/.local/bin/use.vpc.tunnel'
+alias use.ahbode.prep.vpc='use.ahbode.prep && /home/vlad/.local/bin/use.vpc.tunnel'
 alias use.ahbode.prod.vpc='use.ahbode.prod && /home/vlad/.local/bin/use.vpc.tunnel'
 
 # smart npm: use npm if package-lock.json exists, otherwise pnpm
