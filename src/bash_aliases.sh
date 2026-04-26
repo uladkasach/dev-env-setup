@@ -33,6 +33,7 @@ _use_aws_profile() {
     extra_args=(--owner "$2")
   fi
   unset AWS_PROFILE
+  rhx keyrack unlock --key AWS_PROFILE --env "$env" "${extra_args[@]}" || return 1
   export AWS_PROFILE=$(rhx keyrack get --key AWS_PROFILE --env "$env" "${extra_args[@]}" --output value)
 }
 function use.ahbode.prep { _use_aws_profile prep "$@"; }
