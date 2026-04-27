@@ -1,5 +1,6 @@
-# prefer nvim over vim
+# prefer nvim over vim/vi
 alias vim='nvim'
+alias vi='nvim'
 
 # open notes
 alias notes='nvim ~/git/notes/main.txt'

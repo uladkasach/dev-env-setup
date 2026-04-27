@@ -6,33 +6,6 @@ export ZSH="$HOME/.oh-my-zsh"
 
 # theme: starship (cross-shell prompt in rust)
 # config: ~/.config/starship.toml (synced from src/starship.toml)
-# to revert to spaceship: uncomment spaceship block below, comment out starship init at bottom
-
-# # spaceship theme (commented out - kept for easy revert)
-# ZSH_THEME="spaceship"
-# export SPACESHIP_TIME_SHOW=true
-# export SPACESHIP_PROMPT_ORDER=(
-#   user dir host git package node rust docker aws venv exec_time time line_sep battery jobs exit_code char
-# )
-# export COLOR_PASTEL_YELLOW="#ffffba"
-# export COLOR_PASTEL_BLUE="#bae1ff"
-# export COLOR_PASTEL_GREEN="#baffc9"
-# export COLOR_PASTEL_PURPLE="#E0BBE4"
-# export COLOR_PASTEL_ORANGE="#ffdfba"
-# export SPACESHIP_CHAR_COLOR_SUCCESS=$COLOR_PASTEL_GREEN
-# export SPACESHIP_TIME_COLOR=$COLOR_PASTEL_YELLOW
-# export SPACESHIP_EXEC_TIME_COLOR=$COLOR_PASTEL_YELLOW
-# export SPACESHIP_DIR_COLOR=$COLOR_PASTEL_BLUE
-# export SPACESHIP_GIT_SYMBOL=""
-# export SPACESHIP_GIT_BRANCH_COLOR=$COLOR_PASTEL_PURPLE
-# export SPACESHIP_PACKAGE_SYMBOL=""
-# export SPACESHIP_PACKAGE_COLOR=$COLOR_PASTEL_YELLOW
-# export SPACESHIP_NODE_COLOR=$COLOR_PASTEL_GREEN
-# export SPACESHIP_AWS_SHOW=true
-# export SPACESHIP_AWS_COLOR=$COLOR_PASTEL_ORANGE
-# export SPACESHIP_AWS_SYMBOL="☁️  "
-
-# disable oh-my-zsh theme (starship handles prompt)
 ZSH_THEME=""
 
 
@@ -108,9 +81,9 @@ fi
 export DENO_INSTALL="$HOME/.deno"
 export PATH="$DENO_INSTALL/bin:$PATH"
 
-# use vim by default in terminal
-export VISUAL=vim
-export EDITOR="vim"
+# use nvim by default in terminal
+export VISUAL=nvim
+export EDITOR="nvim"
 
 # allow aws-sdks to load config (e.g., node.aws-sdk grab region from ~/.aws)
 export AWS_SDK_LOAD_CONFIG=1
@@ -127,5 +100,4 @@ esac
 
 # starship prompt (only for interactive TTY sessions)
 # skipped for: Claude Code, scripts, pipes — they don't need a prompt
-# to revert to spaceship: comment this out and uncomment spaceship block at top
 [[ -t 1 ]] && eval "$(starship init zsh)"
