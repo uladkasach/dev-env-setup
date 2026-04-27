@@ -57,7 +57,6 @@ install_zsh() {
     return 1
   fi
 
-  git clone https://github.com/denysdovhan/spaceship-prompt.git "$ZSH_CUSTOM/themes/spaceship-prompt" && ln -s "$ZSH_CUSTOM/themes/spaceship-prompt/spaceship.zsh-theme" "$ZSH_CUSTOM/themes/spaceship.zsh-theme"
   cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases
   cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc
   chsh -s "$(which zsh)"
