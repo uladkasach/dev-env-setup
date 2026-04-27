@@ -1,0 +1,77 @@
+# starship prompt config
+# ref: https://starship.rs/config/
+# migrated from spaceship-prompt
+
+# prompt format (matches spaceship order)
+format = """
+$username\
+$directory\
+$hostname\
+$git_branch\
+$git_status\
+$package\
+$nodejs\
+$rust\
+$docker_context\
+$aws\
+$python\
+$cmd_duration\
+$time\
+$line_break\
+$battery\
+$jobs\
+$status\
+$character"""
+
+[character]
+success_symbol = "[➜](bold #baffc9)"
+error_symbol = "[➜](bold red)"
+
+[time]
+disabled = false
+format = "at [$time]($style) "
+style = "#ffffba"
+
+[cmd_duration]
+format = "took [$duration]($style) "
+style = "#ffffba"
+
+[directory]
+style = "#bae1ff"
+
+[git_branch]
+symbol = ""
+style = "#E0BBE4"
+
+[git_status]
+style = "#E0BBE4"
+
+[package]
+symbol = ""
+style = "#ffffba"
+
+[nodejs]
+style = "#baffc9"
+
+[aws]
+format = "on [$symbol($profile )]($style)"
+symbol = "☁️  "
+style = "#ffdfba"
+
+[rust]
+style = "#ffdfba"
+
+[python]
+style = "#baffc9"
+
+[docker_context]
+style = "#bae1ff"
+
+[battery]
+disabled = false
+
+[jobs]
+disabled = false
+
+[status]
+disabled = false

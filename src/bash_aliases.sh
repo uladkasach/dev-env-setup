@@ -256,11 +256,12 @@ alias restart.wifi='systemctl restart NetworkManager.service'
 # make it easy to update shell configs
 alias sync.devenv.bashaliases='cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases && source ~/.bash_aliases'
 alias sync.devenv.zshrc='cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc && source ~/.zshrc'
+alias sync.devenv.starship='mkdir -p ~/.config && cp ~/git/more/dev-env-setup/src/starship.toml ~/.config/starship.toml && echo "• starship config synced"'
 alias sync.devenv.gitaliases='source ~/git/more/dev-env-setup/src/install_env.pt2.shell.git.aliases.sh && configure_git_aliases'
 alias sync.devenv.nvim='mkdir -p ~/.config/nvim && cp ~/git/more/dev-env-setup/src/init.lua ~/.config/nvim/init.lua && echo "• neovim config synced"'
 alias sync.devenv.ptyxis='source ~/git/more/dev-env-setup/src/install_env.pt4.terminal.ptyxis.sh && configure_ptyxis'
 alias sync.devenv.cosmic='source ~/git/more/dev-env-setup/src/install_env.pt3.cosmic.sh && configure_cosmic_theme'
-alias sync.devenv='sync.devenv.bashaliases && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.cosmic'
+alias sync.devenv='sync.devenv.bashaliases && sync.devenv.starship && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.cosmic'
 
 # make it easy to pull down the devenv repo
 alias devenv.sync.repo='cd ~/git/more/dev-env-setup && git checkout main && git pull origin HEAD'
@@ -297,7 +298,7 @@ npm() {
   fi
 }
 
-# smart npx: prefer local bin, then npx/pnpm dlx based on lockfile
+# smart npx: prefer local bin, then npx/pnpm exec based on lockfile
 npx() {
   local cmd="$1"
   if [[ -n "$cmd" && -x "./node_modules/.bin/$cmd" ]]; then
@@ -306,11 +307,11 @@ npx() {
   elif [[ -f "package-lock.json" ]]; then
     npx_real "$@"
   else
-    pnpm dlx "$@"
+    pnpm exec "$@"
   fi
 }
 
-# tsx: always resolve via smart npx (which routes to npx or pnpm dlx)
+# tsx: run via smart npx (routes to npx or pnpm exec)
 tsx() { npx tsx "$@"; }
 
 # npm_real/npx_real for smart npm/npx wrappers (fnm setup is in .zshrc)
