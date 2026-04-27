@@ -68,3 +68,29 @@ install_cli_deps() {
   sudo apt install -y jq # required for manipulating json in terminal
   sudo apt install -y tree # required for tree view of directories
 }
+
+install_starship() {
+  #########################
+  ## starship: cross-shell prompt in rust
+  ## ref: https://starship.rs/
+  #########################
+  local version="1.24.2"
+  local archive="starship-x86_64-unknown-linux-musl.tar.gz"
+  local url="https://github.com/starship/starship/releases/download/v${version}/${archive}"
+  local tmp_dir="/tmp/starship-install"
+
+  rm -rf "$tmp_dir" && mkdir -p "$tmp_dir"
+  curl -fsSL "$url" -o "$tmp_dir/$archive"
+  tar -xzf "$tmp_dir/$archive" -C "$tmp_dir"
+
+  mkdir -p ~/.local/bin
+  mv "$tmp_dir/starship" ~/.local/bin/starship
+  chmod +x ~/.local/bin/starship
+  rm -rf "$tmp_dir"
+
+  mkdir -p ~/.config
+  cp ~/git/more/dev-env-setup/src/starship.toml ~/.config/starship.toml
+
+  echo "• starship v${version} installed to ~/.local/bin/starship"
+  starship --version
+}

@@ -4,50 +4,36 @@
 # Path to your oh-my-zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 
-# theme
-ZSH_THEME="spaceship"
+# theme: starship (cross-shell prompt in rust)
+# config: ~/.config/starship.toml (synced from src/starship.toml)
+# to revert to spaceship: uncomment spaceship block below, comment out starship init at bottom
 
-export SPACESHIP_TIME_SHOW=true
-# export SPACESHIP_BATTERY_SHOW=always
-export SPACESHIP_PROMPT_ORDER=(
-  user          # Username section
-  dir           # Current directory section
-  host          # Hostname section
-  git           # Git section (git_branch + git_status)
-  package       # Package version
-  node          # Node.js section
-  rust          # Rust section
-  docker        # Docker section
-  aws           # Amazon Web Services section
-  venv          # virtualenv section
-  exec_time     # Execution time
-  time          # Time stampts section
-  line_sep      # Line break
-  battery       # Battery level and status
-  jobs          # Background jobs indicator
-  exit_code     # Exit code section
-  char          # Prompt character
-)
+# # spaceship theme (commented out - kept for easy revert)
+# ZSH_THEME="spaceship"
+# export SPACESHIP_TIME_SHOW=true
+# export SPACESHIP_PROMPT_ORDER=(
+#   user dir host git package node rust docker aws venv exec_time time line_sep battery jobs exit_code char
+# )
+# export COLOR_PASTEL_YELLOW="#ffffba"
+# export COLOR_PASTEL_BLUE="#bae1ff"
+# export COLOR_PASTEL_GREEN="#baffc9"
+# export COLOR_PASTEL_PURPLE="#E0BBE4"
+# export COLOR_PASTEL_ORANGE="#ffdfba"
+# export SPACESHIP_CHAR_COLOR_SUCCESS=$COLOR_PASTEL_GREEN
+# export SPACESHIP_TIME_COLOR=$COLOR_PASTEL_YELLOW
+# export SPACESHIP_EXEC_TIME_COLOR=$COLOR_PASTEL_YELLOW
+# export SPACESHIP_DIR_COLOR=$COLOR_PASTEL_BLUE
+# export SPACESHIP_GIT_SYMBOL=""
+# export SPACESHIP_GIT_BRANCH_COLOR=$COLOR_PASTEL_PURPLE
+# export SPACESHIP_PACKAGE_SYMBOL=""
+# export SPACESHIP_PACKAGE_COLOR=$COLOR_PASTEL_YELLOW
+# export SPACESHIP_NODE_COLOR=$COLOR_PASTEL_GREEN
+# export SPACESHIP_AWS_SHOW=true
+# export SPACESHIP_AWS_COLOR=$COLOR_PASTEL_ORANGE
+# export SPACESHIP_AWS_SYMBOL="☁️  "
 
-# theme colors
-export COLOR_PASTEL_YELLOW="#ffffba" # https://www.color-hex.com/color-palette/5361
-export COLOR_PASTEL_BLUE="#bae1ff" # https://www.color-hex.com/color-palette/5361
-export COLOR_PASTEL_GREEN="#baffc9" # https://www.color-hex.com/color-palette/5361
-export COLOR_PASTEL_PURPLE="#E0BBE4" # https://www.schemecolor.com/pastel-color-tones.php
-export COLOR_PASTEL_ORANGE="#ffdfba" # https://www.color-hex.com/color-palette/5361
-
-export SPACESHIP_CHAR_COLOR_SUCCESS=$COLOR_PASTEL_GREEN
-export SPACESHIP_TIME_COLOR=$COLOR_PASTEL_YELLOW
-export SPACESHIP_EXEC_TIME_COLOR=$COLOR_PASTEL_YELLOW
-export SPACESHIP_DIR_COLOR=$COLOR_PASTEL_BLUE
-export SPACESHIP_GIT_SYMBOL=""
-export SPACESHIP_GIT_BRANCH_COLOR=$COLOR_PASTEL_PURPLE
-export SPACESHIP_PACKAGE_SYMBOL=""
-export SPACESHIP_PACKAGE_COLOR=$COLOR_PASTEL_YELLOW
-export SPACESHIP_NODE_COLOR=$COLOR_PASTEL_GREEN
-export SPACESHIP_AWS_SHOW=true
-export SPACESHIP_AWS_COLOR=$COLOR_PASTEL_ORANGE
-export SPACESHIP_AWS_SYMBOL="☁️  "
+# disable oh-my-zsh theme (starship handles prompt)
+ZSH_THEME=""
 
 
 # Which plugins would you like to load?
@@ -138,3 +124,7 @@ case ":$PATH:" in
   *":$PNPM_HOME:"*) ;;
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
+
+# starship prompt (must be at end)
+# to revert to spaceship: comment this out and uncomment spaceship block at top
+eval "$(starship init zsh)"
