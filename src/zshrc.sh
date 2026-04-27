@@ -125,6 +125,7 @@ case ":$PATH:" in
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
 
-# starship prompt (must be at end)
+# starship prompt (only for interactive TTY sessions)
+# skipped for: Claude Code, scripts, pipes — they don't need a prompt
 # to revert to spaceship: comment this out and uncomment spaceship block at top
-eval "$(starship init zsh)"
+[[ -t 1 ]] && eval "$(starship init zsh)"
