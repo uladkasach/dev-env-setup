@@ -75,3 +75,5 @@ disabled = false
 
 [status]
 disabled = false
+symbol = "💥"
+format = "[$symbol$int]($style) "
