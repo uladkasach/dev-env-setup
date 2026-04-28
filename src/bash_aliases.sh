@@ -39,7 +39,7 @@ _use_aws_profile() {
 }
 function use.ahbode.prep { _use_aws_profile prep "$@"; }
 function use.ahbode.prod { _use_aws_profile prod "$@"; }
-function use.ahbode.root { _use_aws_profile root "$@"; }
+function use.ahbode.root { _use_aws_profile sudo "$@"; }
 function use.ahction.prod { _use_aws_profile prod "$@"; }
 function use.whodis.prod { _use_aws_profile prod "$@"; }
 
@@ -2263,6 +2263,29 @@ _git_grab_del() {
 ##   usql --key POSTGRES_URL              # connect via keyrack secret
 ##   usql --key ATHENA_URL -c "SELECT 1"  # run query with keyrack secret
 ##   usql postgres://localhost/mydb       # regular usql (passthrough)
+##
+## setup:
+##   1. install usql binary:
+##      source ~/git/more/dev-env-setup/src/install_env.pt5.devtools.sh && install_usql
+##
+##   2. store database DSN in keyrack:
+##      rhx keyrack set --key POSTGRES_URL --value 'postgres://user:pass@host:5432/db'
+##
+##   3. connect via wrapper:
+##      usql --key POSTGRES_URL
+##
+## keyrack flow:
+##   - wrapper calls `rhx keyrack get --key <KEY> --value` to fetch DSN
+##   - DSN is written to ephemeral config in /dev/shm (tmpfs, RAM-only)
+##   - usql reads config via XDG_CONFIG_HOME override
+##   - config is deleted immediately after usql exits
+##   - trap ensures cleanup even on ctrl+c or error
+##
+## security:
+##   - DSN never appears in shell history (no inline password)
+##   - DSN never visible in `ps aux` process list
+##   - config exists only in RAM, never touches disk
+##   - per-process isolation via PID in tmpfs path
 ##
 ## prereq: rhx keyrack must be configured with the key
 ######################
