@@ -36,7 +36,10 @@ _use_aws_profile() {
   unset AWS_PROFILE
   rhx keyrack unlock --key AWS_PROFILE --env "$env" "${extra_args[@]}" || return 1
   export AWS_PROFILE=$(rhx keyrack get --key AWS_PROFILE --env "$env" "${extra_args[@]}" --output value)
+  echo "• AWS_PROFILE=$AWS_PROFILE"
+  echo "• for sdk v2 (no sso support), export creds: eval \$(aws configure export-credentials --profile $AWS_PROFILE --format env)"
 }
+function use.ahbode.test { _use_aws_profile test "$@"; }
 function use.ahbode.prep { _use_aws_profile prep "$@"; }
 function use.ahbode.prod { _use_aws_profile prod "$@"; }
 function use.ahbode.root { _use_aws_profile sudo "$@"; }

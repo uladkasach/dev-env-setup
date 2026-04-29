@@ -78,6 +78,7 @@ install_node
 install_robot_brains
 install_psql
 install_aws_cli
+install_aws_ssm
 install_terraform
 install_docker
 clone_org_repos
