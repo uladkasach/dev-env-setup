@@ -80,6 +80,23 @@ install_aws_cli() {
   rm -rf "$tmp_dir"
 }
 
+install_aws_ssm() {
+  #########################
+  ## aws ssm session manager plugin
+  ## required for: aws ssm start-session, rds port forwarding, etc.
+  ## ref: https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+  #########################
+  if command -v session-manager-plugin &>/dev/null; then
+    echo "• ssm plugin already installed; skipped"
+    return 0
+  fi
+  local tmp_deb="/tmp/session-manager-plugin.deb"
+  curl -fsSL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "$tmp_deb"
+  sudo dpkg -i "$tmp_deb"
+  rm -f "$tmp_deb"
+  session-manager-plugin --version
+}
+
 install_terraform() {
   #########################
   ## terraform via tfenv
@@ -136,7 +153,7 @@ install_docker() {
   sudo groupadd docker
   sudo usermod -aG docker $USER
   sudo gpasswd -a $USER docker
-  newgrp docker
+  echo "• docker group added. to use docker without logout, run: newgrp docker && exec zsh -l && zsh"
 
   # verify the installation
   docker --version

@@ -48,14 +48,6 @@ clone_this_repo() {
 
 install_zsh() {
   sudo apt install zsh
-  sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)" "" --unattended
-
-  # set ZSH_CUSTOM (not set after --unattended install since shell wasn't re-sourced)
-  export ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
-  if [[ ! -d "$ZSH_CUSTOM" ]]; then
-    echo "✗ ZSH_CUSTOM dir not found: $ZSH_CUSTOM"
-    return 1
-  fi
 
   cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases
   cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc
@@ -66,6 +58,7 @@ install_cli_deps() {
   sudo apt install -y xclip # required for pbpaste, pbcopy
   sudo apt install -y jq # required for manipulating json in terminal
   sudo apt install -y tree # required for tree view of directories
+  sudo apt install -y fzf # fuzzy finder for history, files, etc
 }
 
 install_starship() {
