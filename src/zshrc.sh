@@ -24,6 +24,11 @@ bindkey '^[[1;5C' forward-word                    # Ctrl+Right
 bindkey '^[[1;5D' backward-word                   # Ctrl+Left
 bindkey '^H' kill-whole-line                      # Ctrl+Backspace
 
+# edit command line in $EDITOR (ctrl+x ctrl+e)
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey '^X^E' edit-command-line
+
 # interactive session setup
 if [[ -t 1 ]]; then
   # disable ctrl+z job suspend (lets apps like nvim use ctrl+z for undo)
