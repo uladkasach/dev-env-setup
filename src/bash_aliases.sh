@@ -46,6 +46,7 @@ function use.ahbode.root { _use_aws_profile sudo "$@"; }
 function use.ahction.prod { _use_aws_profile prod "$@"; }
 function use.whodis.prod { _use_aws_profile prod "$@"; }
 function use.ehmpathy.test { _use_aws_profile test "$@"; }
+function use.ehmpathy.demo { _use_aws_profile test "$@"; }
 function use.ehmpathy.root { _use_aws_profile sudo "$@"; }
 
 # ahbode 3rd-party credentials
