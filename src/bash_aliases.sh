@@ -45,6 +45,8 @@ function use.ahbode.prod { _use_aws_profile prod "$@"; }
 function use.ahbode.root { _use_aws_profile sudo "$@"; }
 function use.ahction.prod { _use_aws_profile prod "$@"; }
 function use.whodis.prod { _use_aws_profile prod "$@"; }
+function use.ehmpathy.test { _use_aws_profile test "$@"; }
+function use.ehmpathy.root { _use_aws_profile sudo "$@"; }
 
 # ahbode 3rd-party credentials
 alias use.ahbode.fastly='export FASTLY_API_KEY=$(op get item fastly.ahbode.apikey | jq -r .details.password)'
