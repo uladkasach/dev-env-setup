@@ -75,6 +75,11 @@ fi
 # aliases
 source ~/.bash_aliases
 
+# make bash subshells (e.g., scripts, git aliases, makefiles) also load aliases
+# zsh sources ~/.bash_aliases above, but bash subshells spawned from zsh won't
+# BASH_ENV tells bash to source this file on startup for non-interactive shells
+export BASH_ENV=~/.bash_aliases
+
 # user private bins
 if [ -d "$HOME/.local/bin" ] ; then
  PATH="$HOME/.local/bin:$PATH"
