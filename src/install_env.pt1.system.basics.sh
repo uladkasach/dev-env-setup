@@ -71,6 +71,9 @@ user_pref("signon.rememberSignons", false);
 user_pref("signon.autofillForms", false);
 user_pref("extensions.formautofill.addresses.enabled", false);
 user_pref("extensions.formautofill.creditCards.enabled", false);
+
+// disable gtk emoji picker (ctrl+. conflicts with 1password)
+user_pref("widget.gtk.native-emoji-dialog", false);
 EOF
 
   echo "• firefox prefs configured (restart firefox to apply)"

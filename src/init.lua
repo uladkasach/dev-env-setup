@@ -292,6 +292,7 @@ require('lazy').setup({
         split = {
           direction = 'right',
           minimap_width = 13,
+          fix_width = true,
         },
         exclude_filetypes = { 'neo-tree', 'oil', 'help', 'lazy', 'codediff-explorer' },
         exclude_buftypes = {},  -- allow virtual buffers (for codediff)
@@ -560,6 +561,39 @@ require('lazy').setup({
         },
       })
 
+      -- workaround: preserve user-set explorer width when codediff resets it
+      -- root cause: codediff's layout.arrange() resets explorer width to config value
+      --             on single-pane mode (new files without prior version to diff)
+      -- fix: track width via resize keymaps (smart-splits), restore after arrange
+      -- todo: contribute upstream — layout.arrange should preserve user-set widths
+      _G.codediff_saved_explorer_width = explorer_width
+
+      vim.defer_fn(function()
+        local layout_ok, layout = pcall(require, 'codediff.ui.layout')
+        if not layout_ok then return end
+
+        local original_arrange = layout.arrange
+        layout.arrange = function(tabpage)
+          -- find explorer window
+          local explorer_win = nil
+          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            local ft = vim.api.nvim_get_option_value('filetype', { buf = buf })
+            if ft == 'codediff-explorer' then
+              explorer_win = win
+              break
+            end
+          end
+
+          original_arrange(tabpage)
+
+          -- restore saved width after arrange resets it
+          if explorer_win and vim.api.nvim_win_is_valid(explorer_win) then
+            vim.api.nvim_win_set_width(explorer_win, _G.codediff_saved_explorer_width)
+          end
+        end
+      end, 100)
+
       -- todo: contribute upstream — fix tree jitter on refresh
       -- issue: codediff calls expand_all_dirs() on every refresh/render, user collapses lost
       -- root cause: expand_all_dirs has no memory of user intent
@@ -615,11 +649,109 @@ require('lazy').setup({
         local ok, Tree = pcall(require, 'codediff.ui.lib.tree')
         if not ok then return end
 
-        -- patch Tree:render() to re-collapse before buffer write
-        local original_render = Tree.render
-        Tree.render = function(self)
-          apply_user_collapses(self)
-          return original_render(self)
+        -- patch refresh module to use group-prefixed keys
+        -- bug: codediff uses path alone as key, so staged/unstaged src/ collide
+        local refresh_ok, refresh_mod = pcall(require, 'codediff.ui.explorer.refresh')
+        if refresh_ok then
+          -- store collapsed state globally by explorer tabpage with prefixed keys
+          _G.codediff_collapsed_state = _G.codediff_collapsed_state or {}
+
+          -- collect collapsed state (groups by name, dirs by path for sync)
+          local function collect_state(tree)
+            local collapsed = { groups = {}, dirs = {} }
+            local function collect(node)
+              if not node or not node.data then return end
+              local t = node.data.type
+              if t == 'group' then
+                if not node:is_expanded() then
+                  collapsed.groups[node.data.name] = true
+                end
+              elseif t == 'directory' then
+                -- use path only (syncs across groups)
+                if not node:is_expanded() then
+                  collapsed.dirs[node.data.path] = true
+                end
+              end
+              if node:has_children() then
+                for _, cid in ipairs(node:get_child_ids()) do
+                  collect(tree:get_node(cid))
+                end
+              end
+            end
+            for _, root in ipairs(tree:get_nodes()) do
+              collect(root)
+            end
+            return collapsed
+          end
+
+          -- restore collapsed state (syncs dirs across groups)
+          local function restore_state(tree, collapsed)
+            local function restore(node)
+              if not node or not node.data then return end
+              local t = node.data.type
+              if t == 'group' then
+                if collapsed.groups[node.data.name] then
+                  node:collapse()
+                else
+                  node:expand()
+                end
+              elseif t == 'directory' then
+                if collapsed.dirs[node.data.path] then
+                  node:collapse()
+                else
+                  node:expand()
+                end
+              end
+              if node:has_children() then
+                for _, cid in ipairs(node:get_child_ids()) do
+                  restore(tree:get_node(cid))
+                end
+              end
+            end
+            for _, root in ipairs(tree:get_nodes()) do
+              restore(root)
+            end
+          end
+
+          -- track which tabs need restore after refresh
+          _G.codediff_pending_restore = _G.codediff_pending_restore or {}
+
+          -- replace refresh to use our collect/restore (original has bugs)
+          local original_refresh = refresh_mod.refresh
+          refresh_mod.refresh = function(explorer)
+            if explorer.is_hidden or not vim.api.nvim_win_is_valid(explorer.winid) then
+              return
+            end
+            -- collect state BEFORE refresh rebuilds tree
+            local tab = explorer.tabpage
+            _G.codediff_collapsed_state[tab] = collect_state(explorer.tree)
+            _G.codediff_pending_restore[tab] = true
+            -- call original (its restore is buggy, we fix after)
+            return original_refresh(explorer)
+          end
+
+          -- patch Tree:render to apply our restore AFTER original render (only after refresh)
+          local original_render = Tree.render
+          Tree.render = function(self)
+            -- render first
+            local result = original_render(self)
+            -- only restore if we just did a refresh (not on manual toggle)
+            local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
+            if lc_ok then
+              for tab, _ in pairs(_G.codediff_pending_restore) do
+                local exp = lifecycle.get_explorer and lifecycle.get_explorer(tab)
+                if exp and exp.tree == self then
+                  local collapsed = _G.codediff_collapsed_state[tab] or { groups = {}, dirs = {} }
+                  restore_state(self, collapsed)
+                  _G.codediff_pending_restore[tab] = nil
+                  -- re-render to show correct collapsed state
+                  original_render(self)
+                  break
+                end
+              end
+            end
+            return result
+          end
         end
 
         -- patch flatten_tree to use sorted iteration
@@ -747,79 +879,67 @@ require('lazy').setup({
         end
       end, 50)
 
-      -- track user collapse/expand via custom Enter keymap
-      vim.api.nvim_create_autocmd('FileType', {
-        pattern = 'codediff-explorer',
-        callback = function()
-          vim.keymap.set('n', '<CR>', function()
-            local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
-            if not lc_ok then return end
-            local tabpage = vim.api.nvim_get_current_tabpage()
-            local explorer = lifecycle.get_explorer and lifecycle.get_explorer(tabpage)
-            if not explorer or not explorer.tree then return end
+      -- patch codediff explorer keymaps to use our collapse state
+      vim.defer_fn(function()
+        local ok, keymaps_mod = pcall(require, 'codediff.ui.explorer.keymaps')
+        if not ok then return end
 
-            local node = explorer.tree:get_node()
+        local original_setup = keymaps_mod.setup
+        keymaps_mod.setup = function(explorer)
+          -- call original to set up all keymaps
+          original_setup(explorer)
+
+          -- override the Enter keymap to sync collapse across groups for same path
+          local tree = explorer.tree
+          local split = explorer.split
+          vim.keymap.set('n', '<CR>', function()
+            local node = tree:get_node()
             if not node or not node.data then return end
 
             local node_type = node.data.type
-            if node_type == 'group' or node_type == 'directory' then
-              local key = get_collapse_key(explorer.tree, node)
-              if key then
-                if node:is_expanded() then
-                  -- user collapse — record
-                  _G.codediff_user_collapsed[key] = true
-                  node:collapse()
-                else
-                  -- user expand — clear record
-                  _G.codediff_user_collapsed[key] = nil
-                  node:expand()
-                end
-                explorer.tree:render()
+            if node_type == 'group' then
+              -- toggle group (no sync across groups)
+              if node:is_expanded() then
+                node:collapse()
+              else
+                node:expand()
               end
+              tree:render()
+            elseif node_type == 'directory' then
+              -- toggle directory and sync same path across all groups
+              local target_path = node.data.path
+              local should_expand = not node:is_expanded()
+
+              -- find all directory nodes with same path across all groups
+              local function sync_dirs(n)
+                if not n or not n.data then return end
+                if n.data.type == 'directory' and n.data.path == target_path then
+                  if should_expand then
+                    n:expand()
+                  else
+                    n:collapse()
+                  end
+                end
+                if n:has_children() then
+                  for _, cid in ipairs(n:get_child_ids()) do
+                    sync_dirs(tree:get_node(cid))
+                  end
+                end
+              end
+              for _, root in ipairs(tree:get_nodes()) do
+                sync_dirs(root)
+              end
+              tree:render()
             else
               -- file node — default select
               if explorer.on_file_select then
                 explorer.on_file_select(node.data)
               end
             end
-          end, { buffer = true, desc = 'Toggle/select with collapse track' })
-        end,
-      })
+          end, { buffer = split.bufnr, noremap = true, silent = true, nowait = true, desc = 'Toggle/select' })
+        end
+      end, 50)
 
-      -- restore explorer width after file select (codediff resets layout)
-      _G.codediff_explorer_width = _G.codediff_explorer_width or {}
-      vim.api.nvim_create_autocmd('User', {
-        pattern = 'CodeDiffFileSelect',
-        callback = function()
-          local tab = vim.api.nvim_get_current_tabpage()
-          local saved = _G.codediff_explorer_width[tab] or explorer_width
-          vim.defer_fn(function()
-            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-              local buf = vim.api.nvim_win_get_buf(win)
-              local wft = vim.api.nvim_get_option_value('filetype', { buf = buf })
-              if wft == 'codediff-explorer' and vim.api.nvim_win_is_valid(win) then
-                vim.api.nvim_win_set_width(win, saved)
-                break
-              end
-            end
-          end, 10)
-        end,
-      })
-
-      -- save explorer width when user resizes
-      vim.api.nvim_create_autocmd('WinResized', {
-        callback = function()
-          local tab = vim.api.nvim_get_current_tabpage()
-          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-            local buf = vim.api.nvim_win_get_buf(win)
-            local wft = vim.api.nvim_get_option_value('filetype', { buf = buf })
-            if wft == 'codediff-explorer' and vim.api.nvim_win_is_valid(win) then
-              _G.codediff_explorer_width[tab] = vim.api.nvim_win_get_width(win)
-              break
-            end
-          end
-        end,
-      })
 
       -- codediff buffer keymaps
       vim.api.nvim_create_autocmd('BufEnter', {
@@ -993,11 +1113,40 @@ require('lazy').setup({
       vim.keymap.set('n', '<C-j>', ss.move_cursor_down)
       vim.keymap.set('n', '<C-k>', ss.move_cursor_up)
       vim.keymap.set('n', '<C-l>', ss.move_cursor_right)
-      -- resize windows with alt+hjkl
-      vim.keymap.set('n', '<A-h>', ss.resize_left)
-      vim.keymap.set('n', '<A-j>', ss.resize_down)
-      vim.keymap.set('n', '<A-k>', ss.resize_up)
-      vim.keymap.set('n', '<A-l>', ss.resize_right)
+      -- helper: update codediff explorer width after manual resize
+      local function update_codediff_explorer_width()
+        if not _G.codediff_saved_explorer_width then return end
+        -- only check if current buffer is in codediff context
+        local ft = vim.bo.filetype
+        local bufname = vim.api.nvim_buf_get_name(0)
+        if not (ft:match('codediff') or bufname:match('codediff')) then return end
+        -- find explorer and save its width
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+          local buf = vim.api.nvim_win_get_buf(win)
+          local wft = vim.api.nvim_get_option_value('filetype', { buf = buf })
+          if wft == 'codediff-explorer' then
+            _G.codediff_saved_explorer_width = vim.api.nvim_win_get_width(win)
+            break
+          end
+        end
+      end
+      -- resize windows with alt+hjkl (also track codediff explorer width)
+      vim.keymap.set('n', '<A-h>', function()
+        ss.resize_left()
+        update_codediff_explorer_width()
+      end)
+      vim.keymap.set('n', '<A-j>', function()
+        ss.resize_down()
+        update_codediff_explorer_width()
+      end)
+      vim.keymap.set('n', '<A-k>', function()
+        ss.resize_up()
+        update_codediff_explorer_width()
+      end)
+      vim.keymap.set('n', '<A-l>', function()
+        ss.resize_right()
+        update_codediff_explorer_width()
+      end)
     end,
   },
   {
@@ -1052,6 +1201,9 @@ require('lazy').setup({
 -- disable tabline
 vim.opt.showtabline = 0
 
+-- prevent automatic window equalization on split/close
+vim.opt.equalalways = false
+
 -- hide vertical window separators
 vim.opt.fillchars:append({ vert = ' ' })
 
@@ -1065,11 +1217,14 @@ vim.api.nvim_create_autocmd('FileType', {
 })
 
 -- wrap lines for markdown in codediff buffers (no filetype set)
+-- skip if already set to avoid layout recalculation
 vim.api.nvim_create_autocmd('BufEnter', {
   pattern = { 'codediff:*/*.md', '*.md' },
   callback = function()
-    vim.opt_local.wrap = true
-    vim.opt_local.linebreak = true
+    if not vim.wo.wrap then
+      vim.opt_local.wrap = true
+      vim.opt_local.linebreak = true
+    end
   end,
 })
 
