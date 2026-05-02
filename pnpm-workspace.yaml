@@ -1,0 +1,26 @@
+allowBuilds:
+  '@ehmpathy/as-command': set this to true or false
+  '@ehmpathy/error-fns': set this to true or false
+  '@ehmpathy/uni-time': set this to true or false
+  as-procedure: set this to true or false
+  core-js: set this to true or false
+  domain-glossaries: set this to true or false
+  domain-glossary-procedure: set this to true or false
+  domain-objects: set this to true or false
+  hash-fns: set this to true or false
+  helpful-errors: set this to true or false
+  onnxruntime-node: set this to true or false
+  procedure-fns: set this to true or false
+  protobufjs: set this to true or false
+  rhachet-artifact: set this to true or false
+  rhachet-artifact-git: set this to true or false
+  serde-fns: set this to true or false
+  sharp: set this to true or false
+  simple-in-memory-cache: set this to true or false
+  simple-log-methods: set this to true or false
+  test-fns: set this to true or false
+  type-fns: set this to true or false
+  uuid-fns: set this to true or false
+  visualogic: set this to true or false
+  with-simple-caching: set this to true or false
+  wrapper-fns: set this to true or false
