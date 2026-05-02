@@ -33,9 +33,13 @@ configure_swapfile() {
   ##      more disk swap = more headroom for cold pages
   ##
   ## hierarchy: RAM -> zram (compressed RAM) -> disk swap (SSD)
+  ##
+  ## sizing: used as a brain-cli idlelot. those things hog memory
+  ##         and we often keep them idle, so this lets them spill
+  ##         over and give way to priorities without need to close them
   #############################
   local swapfile="/swapfile"
-  local size="36G"
+  local size="72G"
 
   # skip if swapfile already exists and is active
   if swapon --show | grep -q "$swapfile"; then
@@ -259,12 +263,14 @@ install_machine_resource_procs_find_runaway() {
 #############################
 
 JSON_MODE=0
+FULL_MODE=0
 KILL_MODE=""
 KILL_TYPE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --json) JSON_MODE=1; shift ;;
+    --full) FULL_MODE=1; shift ;;
     --kill)
       if [[ -n "$2" && "$2" != --* ]]; then
         KILL_MODE="$2"
@@ -275,12 +281,12 @@ while [[ $# -gt 0 ]]; do
           shift
         fi
       else
-        echo "Usage: machine_resource_procs_find_runaway [--json | --kill cpu | --kill mem | --kill <prefix> [cpu|mem]]" >&2
+        echo "Usage: machine_resource_procs_find_runaway [--full | --json | --kill cpu | --kill mem | --kill <prefix> [cpu|mem]]" >&2
         exit 1
       fi
       ;;
     *)
-      echo "Usage: machine_resource_procs_find_runaway [--json | --kill cpu | --kill mem | --kill <prefix> [cpu|mem]]" >&2
+      echo "Usage: machine_resource_procs_find_runaway [--full | --json | --kill cpu | --kill mem | --kill <prefix> [cpu|mem]]" >&2
       exit 1
       ;;
   esac
@@ -292,6 +298,23 @@ LOAD_THRESHOLD=$(echo "$CORES * 1.5" | bc)
 
 MEM_AVAIL_PCT=$(awk '/MemAvailable/{a=$2} /MemTotal/{t=$2} END{printf "%.0f", (a/t)*100}' /proc/meminfo)
 MEM_THRESHOLD=15
+
+# swap info
+SWAP_INFO=$(awk '/SwapTotal/{t=$2} /SwapFree/{f=$2} END{printf "%d %d", t, f}' /proc/meminfo)
+SWAP_TOTAL_KB=$(echo "$SWAP_INFO" | awk '{print $1}')
+SWAP_FREE_KB=$(echo "$SWAP_INFO" | awk '{print $2}')
+SWAP_USED_KB=$((SWAP_TOTAL_KB - SWAP_FREE_KB))
+if [[ "$SWAP_TOTAL_KB" -gt 0 ]]; then
+  SWAP_USED_PCT=$(( (SWAP_USED_KB * 100) / SWAP_TOTAL_KB ))
+  SWAP_TOTAL_GB=$(echo "scale=1; $SWAP_TOTAL_KB / 1048576" | bc)
+  SWAP_USED_GB=$(echo "scale=1; $SWAP_USED_KB / 1048576" | bc)
+  SWAP_FREE_GB=$(echo "scale=1; $SWAP_FREE_KB / 1048576" | bc)
+else
+  SWAP_USED_PCT=0
+  SWAP_TOTAL_GB="0"
+  SWAP_USED_GB="0"
+  SWAP_FREE_GB="0"
+fi
 
 LOAD_HIGH=0
 if (( $(echo "$LOAD > $LOAD_THRESHOLD" | bc -l) )); then
@@ -323,13 +346,14 @@ format_top_procs() {
 }
 
 extract_pids() {
-  echo "$1" | awk 'NR>1 && NR<=4 {print $2}' | tr '\n' ' '
+  local limit="${2:-4}"  # default top 3 (NR>1 means skip header)
+  echo "$1" | awk -v limit="$limit" 'NR>1 && NR<=limit {print $2}' | tr '\n' ' '
 }
 
 TOP_CPU=$(format_top_procs "$PS_BY_CPU" "cpu")
 TOP_MEM=$(format_top_procs "$PS_BY_MEM" "mem")
-CPU_PIDS=$(extract_pids "$PS_BY_CPU")
-MEM_PIDS=$(extract_pids "$PS_BY_MEM")
+CPU_PIDS=$(extract_pids "$PS_BY_CPU" 4)
+MEM_PIDS=$(extract_pids "$PS_BY_MEM" 11)  # top 10 for memory
 
 if [[ $JSON_MODE -eq 1 ]]; then
   echo "{"
@@ -345,7 +369,7 @@ if [[ $JSON_MODE -eq 1 ]]; then
   exit 0
 fi
 
-if [[ $LOAD_HIGH -eq 0 && $MEM_LOW -eq 0 ]]; then
+if [[ $LOAD_HIGH -eq 0 && $MEM_LOW -eq 0 && $FULL_MODE -eq 0 ]]; then
   echo "🐈 lets prowl..."
   echo "└─🌕 runaway"
   echo "  └─✨ system smooth (load=$LOAD, mem=${MEM_AVAIL_PCT}%)"
@@ -374,9 +398,67 @@ if [[ $LOAD_HIGH -eq 1 ]]; then
   done
   echo "  │    └─ 🪄 kill -9 $CPU_PIDS"
 fi
-if [[ $MEM_LOW -eq 1 ]]; then
-  echo "  ├─🕯️ low memory: ${MEM_AVAIL_PCT}% available"
-  echo "$PS_BY_MEM" | awk 'NR>1 && NR<=4 {printf "%s %s %s\n", $2, $3, $4}' | while read pid cpu mem; do
+if [[ $MEM_LOW -eq 1 || $FULL_MODE -eq 1 ]]; then
+  # get memory stats for display
+  MEM_TOTAL_KB=$(awk '/MemTotal/{print $2}' /proc/meminfo)
+  MEM_AVAIL_KB=$(awk '/MemAvailable/{print $2}' /proc/meminfo)
+  MEM_USED_KB=$((MEM_TOTAL_KB - MEM_AVAIL_KB))
+  MEM_TOTAL_GB=$(echo "scale=1; $MEM_TOTAL_KB / 1048576" | bc)
+  MEM_USED_GB=$(echo "scale=1; $MEM_USED_KB / 1048576" | bc)
+  MEM_AVAIL_GB=$(echo "scale=1; $MEM_AVAIL_KB / 1048576" | bc)
+  MEM_TOTAL_MB=$((MEM_TOTAL_KB / 1024))
+
+  if [[ $MEM_LOW -eq 1 ]]; then
+    echo "  ├─🕯️ low memory"
+  else
+    echo "  ├─✨ memory"
+  fi
+  echo "  │     ram:  ${MEM_USED_GB}G / ${MEM_TOTAL_GB}G used (${MEM_AVAIL_GB}G free, ${MEM_AVAIL_PCT}% avail)"
+  echo "  │     swap: ${SWAP_USED_GB}G / ${SWAP_TOTAL_GB}G used (${SWAP_FREE_GB}G free)"
+  echo "  │"
+  echo "  │    📊 RAM by process (aggregated):"
+  # aggregate RSS by process name with count, sort by size, show top 8
+  ps aux | awk 'NR>1 {
+    pid=$2; rss=$6
+    cmd_file="/proc/"pid"/comm"
+    if ((getline cmd < cmd_file) > 0) { close(cmd_file) } else { cmd=$11 }
+    mem[cmd] += rss
+    cnt[cmd]++
+  }
+  END {
+    for (name in mem) print mem[name], cnt[name], name
+  }' | sort -rn | head -8 | awk -v total_mb="$MEM_TOTAL_MB" '{
+    kb=$1; count=$2; name=$3
+    mb = kb / 1024
+    pct = (kb / 1024 / total_mb) * 100
+    if (mb >= 1024) {
+      printf "  │       ├─ %5.1fG (%4.1f%%)  %s  ×%d\n", mb/1024, pct, name, count
+    } else {
+      printf "  │       ├─ %5.0fM (%4.1f%%)  %s  ×%d\n", mb, pct, name, count
+    }
+  }'
+  echo "  │"
+  echo "  │    📊 SWAP by process (aggregated):"
+  # aggregate VmSwap by process name with count
+  for pid_dir in /proc/[0-9]*; do
+    p="${pid_dir##*/}"
+    val=$(awk '/VmSwap/{print $2}' "$pid_dir/status" 2>/dev/null)
+    if [[ -n "$val" && "$val" -gt 0 ]]; then
+      name=$(cat "$pid_dir/comm" 2>/dev/null || echo "?")
+      echo "$val $name"
+    fi
+  done | awk '{swap[$2]+=$1; cnt[$2]++} END {for(n in swap) print swap[n], cnt[n], n}' | sort -rn | head -8 | awk '{
+    kb=$1; count=$2; name=$3
+    mb = kb / 1024
+    if (mb >= 1024) {
+      printf "  │       ├─ %5.1fG  %s  ×%d\n", mb/1024, name, count
+    } else {
+      printf "  │       ├─ %5.0fM  %s  ×%d\n", mb, name, count
+    }
+  }'
+  echo "  │"
+  echo "  │    🐛 top 10 processes (RAM):"
+  echo "$PS_BY_MEM" | awk 'NR>1 && NR<=11 {printf "%s %s %s\n", $2, $3, $4}' | while read pid cpu mem; do
     print_proc_details "$pid" "${cpu%.*}" "${mem%.*}" "  │    "
   done
   echo "  │    └─ 🪄 kill -9 $MEM_PIDS"
