@@ -1,0 +1,58 @@
+{
+  "args": {
+    "rules": ".agent/repo=ehmpathy/role=mechanic/briefs/practices/code.prod/pitofsuccess.errors/rule.*.md",
+    "diffs": "since-main",
+    "pathsWith": "src/**/*.ts",
+    "join": "intersect"
+  },
+  "resolution": {
+    "ruleFiles": [
+      ".agent/repo=ehmpathy/role=mechanic/briefs/practices/code.prod/pitofsuccess.errors/rule.forbid.failhide.md.pt1.md",
+      ".agent/repo=ehmpathy/role=mechanic/briefs/practices/code.prod/pitofsuccess.errors/rule.forbid.failhide.md.pt2.md",
+      ".agent/repo=ehmpathy/role=mechanic/briefs/practices/code.prod/pitofsuccess.errors/rule.prefer.helpful-error-wrap.md",
+      ".agent/repo=ehmpathy/role=mechanic/briefs/practices/code.prod/pitofsuccess.errors/rule.require.exit-code-semantics.md",
+      ".agent/repo=ehmpathy/role=mechanic/briefs/practices/code.prod/pitofsuccess.errors/rule.require.failfast.[demo].shell.md",
+      ".agent/repo=ehmpathy/role=mechanic/briefs/practices/code.prod/pitofsuccess.errors/rule.require.failfast.[seed].md",
+      ".agent/repo=ehmpathy/role=mechanic/briefs/practices/code.prod/pitofsuccess.errors/rule.require.failfast.md",
+      ".agent/repo=ehmpathy/role=mechanic/briefs/practices/code.prod/pitofsuccess.errors/rule.require.failloud.md"
+    ],
+    "targetFilesFromDiffs": [
+      ".agent/repo=.this/role=any/skills/use.apikeys.sh",
+      ".behavior/v2026_04_22.backup-git/.bind/vlad.backup-git.flag",
+      ".behavior/v2026_04_22.backup-git/.ref.[feedback].v1.[given].by_human.md",
+      ".behavior/v2026_04_22.backup-git/.route/.bind.vlad.backup-git.flag",
+      ".behavior/v2026_04_22.backup-git/.route/.bouncer.cache.json",
+      ".behavior/v2026_04_22.backup-git/.route/.drive.blockers.latest.json",
+      ".behavior/v2026_04_22.backup-git/.route/.gitignore",
+      ".behavior/v2026_04_22.backup-git/.route/passage.jsonl",
+      ".behavior/v2026_04_22.backup-git/0.wish.md",
+      ".behavior/v2026_04_22.backup-git/1.vision.guard",
+      ".behavior/v2026_04_22.backup-git/1.vision.md",
+      ".behavior/v2026_04_22.backup-git/1.vision.stone",
+      ".behavior/v2026_04_22.backup-git/2.1.criteria.blackbox.md",
+      ".behavior/v2026_04_22.backup-git/2.1.criteria.blackbox.stone",
+      ".behavior/v2026_04_22.backup-git/2.2.criteria.blackbox.matrix.md",
+      ".behavior/v2026_04_22.backup-git/2.2.criteria.blackbox.matrix.stone",
+      ".behavior/v2026_04_22.backup-git/5.1.execution.phase0_to_phaseN.v1.guard",
+      ".behavior/v2026_04_22.backup-git/5.1.execution.phase0_to_phaseN.v1.i1.md",
+      ".behavior/v2026_04_22.backup-git/5.1.execution.phase0_to_phaseN.v1.stone",
+      ".behavior/v2026_04_22.backup-git/5.2.evaluation.v1.guard",
+      ".behavior/v2026_04_22.backup-git/5.2.evaluation.v1.stone",
+      ".behavior/v2026_04_22.backup-git/5.3.verification.v1.guard",
+      ".behavior/v2026_04_22.backup-git/5.3.verification.v1.stone",
+      ".behavior/v2026_04_22.backup-git/5.5.playtest.v1.guard",
+      ".behavior/v2026_04_22.backup-git/5.5.playtest.v1.stone",
+      ".behavior/v2026_04_22.backup-git/review/self/.gitignore",
+      ".claude/settings.json",
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "src/bash_aliases.sh",
+      "src/install_env.pt2.shell.git.aliases.sh"
+    ],
+    "targetFilesFromPaths": [],
+    "joinMode": "intersect",
+    "targetFilesJoined": [],
+    "targetFiles": []
+  }
+}

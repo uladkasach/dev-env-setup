@@ -30,19 +30,19 @@
           },
           {
             "type": "command",
-            "command": "./node_modules/.bin/rhachet roles boot --role driver",
-            "timeout": 30,
-            "author": "repo=bhrain/role=driver"
-          },
-          {
-            "type": "command",
-            "command": "./node_modules/.bin/rhx route.drive --when hook.onBoot",
+            "command": "./node_modules/.bin/rhx route.drive --mode hook",
             "timeout": 5,
             "author": "repo=bhrain/role=driver"
           },
           {
             "type": "command",
-            "command": "./node_modules/.bin/rhachet roles boot --role reviewer",
+            "command": "./node_modules/.bin/npx rhachet roles boot --role driver",
+            "timeout": 30,
+            "author": "repo=bhrain/role=driver"
+          },
+          {
+            "type": "command",
+            "command": "./node_modules/.bin/npx rhachet roles boot --role reviewer",
             "timeout": 30,
             "author": "repo=bhrain/role=reviewer"
           },
@@ -176,7 +176,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./node_modules/.bin/rhx route.drive --when hook.onStop",
+            "command": "./node_modules/.bin/rhx route.drive --mode hook",
             "timeout": 5,
             "author": "repo=bhrain/role=driver"
           }

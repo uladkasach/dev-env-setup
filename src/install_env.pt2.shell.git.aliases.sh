@@ -13,4 +13,5 @@ configure_git_aliases() {
   git config --global alias.tree '!bash -c "source ~/.bash_aliases && git_alias_tree \"\$@\"" --'
   git config --global alias.grab '!bash -c "source ~/.bash_aliases && git_alias_grab \"\$@\"" --'
   git config --global alias.graft '!bash -c "source ~/.bash_aliases && git_alias_graft \"\$@\"" --'
+  git config --global alias.backup '!bash -c "source ~/.bash_aliases && git_alias_backup \"\$@\"" --'
 }
