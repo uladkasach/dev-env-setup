@@ -21,8 +21,9 @@ alias jal='LOCALLY=true ja'
 # quick terraform alias
 alias tf='terraform'
 
-# claude code default model
+# claude code config (expected: v2.1.87, beyond which hooks are truncated)
 export ANTHROPIC_MODEL='claude-opus-4-5-20251101'
+export CLAUDE_CODE_SKIP_UPDATE_CHECK=1
 
 # aws profiles via keyrack
 # usage: use.ahbode.prep [--owner <owner>]
@@ -1516,24 +1517,25 @@ _git_tree_status() {
     return 0
   fi
 
-  local repo_filter=""
+  # declare all loop variables at function scope to avoid zsh local output quirks
+  local repo_filter="" found_any=false repos=() entries=() sorted=()
+  local rname timestamp dir entry idx total is_last repo_name worktrees_dir
+
   if [[ "$1" == "--repo" && -n "$2" ]]; then
     repo_filter="$2"
   fi
 
   if [[ -n "$repo_filter" ]]; then
     # scan all ~/git/*/_worktrees/ directories
-    local found_any=false
 
     for worktrees_dir in ~/git/*/_worktrees; do
       [[ -d "$worktrees_dir" ]] || continue
 
       # collect unique repo names in this worktrees dir
-      local repos=()
+      repos=()
       for dir in "$worktrees_dir"/*; do
         [[ -d "$dir" ]] || continue
         [[ "$(basename "$dir")" == "_patches" ]] && continue
-        local rname
         rname=$(basename "$dir" | cut -d. -f1)
         # filter by repo name unless @all
         if [[ "$repo_filter" != "@all" && "$rname" != "$repo_filter" ]]; then
@@ -1545,10 +1547,9 @@ _git_tree_status() {
       done
 
       for repo_name in "${repos[@]}"; do
-        local entries=()
+        entries=()
         for dir in "$worktrees_dir"/"$repo_name".*; do
           [[ -d "$dir" ]] || continue
-          local timestamp
           timestamp=$(git -C "$dir" log -1 --format="%ct" 2>/dev/null || echo "0")
           entries+=("$timestamp:$dir")
         done
@@ -1564,11 +1565,12 @@ _git_tree_status() {
         echo "🏔️  $repo_name"
         echo "   │"
 
-        local idx=0 total=${#sorted[@]}
+        idx=0
+        total=${#sorted[@]}
         for entry in "${sorted[@]}"; do
           ((idx++))
-          local dir="${entry#*:}"
-          local is_last="false"
+          dir="${entry#*:}"
+          is_last="false"
           [[ $idx -eq $total ]] && is_last="true"
           _git_tree_status_one "$dir" "$repo_name" "$is_last"
           [[ "$is_last" == "false" ]] && echo "   │"
@@ -1590,8 +1592,7 @@ _git_tree_status() {
     return 0
   fi
 
-  # current repo only
-  local worktrees_dir repo_name
+  # current repo only (variables already declared at function scope)
   worktrees_dir="$(_git_tree_worktrees_dir)"
   repo_name="$(_git_tree_repo_name)"
 
@@ -1603,10 +1604,9 @@ _git_tree_status() {
     return 0
   fi
 
-  local entries=()
+  entries=()
   for dir in "$worktrees_dir"/"$repo_name".*; do
     [[ -d "$dir" ]] || continue
-    local timestamp
     timestamp=$(git -C "$dir" log -1 --format="%ct" 2>/dev/null || echo "0")
     entries+=("$timestamp:$dir")
   done
@@ -1626,11 +1626,12 @@ _git_tree_status() {
   echo "🏔️  $repo_name"
   echo "   │"
 
-  local idx=0 total=${#sorted[@]}
+  idx=0
+  total=${#sorted[@]}
   for entry in "${sorted[@]}"; do
     ((idx++))
-    local dir="${entry#*:}"
-    local is_last="false"
+    dir="${entry#*:}"
+    is_last="false"
     [[ $idx -eq $total ]] && is_last="true"
     _git_tree_status_one "$dir" "$repo_name" "$is_last"
     [[ "$is_last" == "false" ]] && echo "   │"
@@ -2336,4 +2337,241 @@ usql() {
   else
     command usql "$@"
   fi
+}
+
+######################
+## git backup (invoked by git alias.backup)
+##
+## what: backup all git repos and claude sessions to s3
+##
+## why: one command to backup all uncommitted work before risky situations
+##      includes worktrees, staged/unstaged changes, and claude sessions
+##
+## how:
+##   git backup --repo all --into s3://bucket/machine=name
+##
+## output structure:
+##   s3://bucket/machine=name/effectiveAt=$timestamp/~/git.tar.gz
+##   s3://bucket/machine=name/effectiveAt=$timestamp/~/.claude.tar.gz
+##
+## exclusions: node_modules/ and .cache/ dirs excluded from git.tar.gz
+######################
+
+# .what: main dispatcher for git backup
+git_alias_backup() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "git backup - backup all git repos and claude sessions to s3"
+    echo ""
+    echo "usage: git backup --repo all --into <s3://bucket/machine=name>"
+    echo ""
+    echo "options:"
+    echo "  --repo all     backup all repos in ~/git/ (required)"
+    echo "  --into <uri>   s3 destination prefix (required)"
+    echo ""
+    echo "output structure:"
+    echo "  <uri>/effectiveAt=<timestamp>/~/git.tar.gz"
+    echo "  <uri>/effectiveAt=<timestamp>/~/.claude.tar.gz"
+    echo ""
+    echo "exclusions:"
+    echo "  node_modules/ and .cache/ dirs excluded from git.tar.gz"
+    return 0
+  fi
+
+  # check for pv (progress bar tool)
+  if ! command -v pv &>/dev/null; then
+    echo "⛈️  pv not found (needed for progress bars)"
+    echo "   └─ install: sudo apt install pv"
+    return 1
+  fi
+
+  local repo_target="" s3_prefix=""
+
+  # parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --repo)
+        repo_target="$2"
+        shift 2
+        ;;
+      --into)
+        s3_prefix="$2"
+        shift 2
+        ;;
+      *)
+        echo "error: unknown option '$1'"
+        echo "usage: git backup --repo all --into <s3://bucket/machine=name>"
+        return 1
+        ;;
+    esac
+  done
+
+  # validate --repo
+  if [[ -z "$repo_target" ]]; then
+    echo "error: --repo is required"
+    echo "usage: git backup --repo all --into <s3://bucket/machine=name>"
+    return 1
+  fi
+
+  if [[ "$repo_target" != "all" ]]; then
+    echo "error: --repo must be 'all'"
+    echo "usage: git backup --repo all --into <s3://bucket/machine=name>"
+    return 1
+  fi
+
+  # validate --into
+  if [[ -z "$s3_prefix" ]]; then
+    echo "error: --into is required"
+    echo "usage: git backup --repo all --into <s3://bucket/machine=name>"
+    return 1
+  fi
+
+  if [[ ! "$s3_prefix" =~ ^s3:// ]]; then
+    echo "error: --into must start with s3://"
+    echo "usage: git backup --repo all --into <s3://bucket/machine=name>"
+    return 1
+  fi
+
+  # validate ~/git/ exists
+  if [[ ! -d ~/git ]]; then
+    echo ""
+    echo "⛈️  no git dir found"
+    echo "   └─ ~/git/ does not exist"
+    echo ""
+    return 1
+  fi
+
+  # show tree status first
+  _git_tree_status --repo @all
+
+  # prepare timestamp and paths
+  local timestamp s3_dest tmp_dir total_bytes tar_size gz_size
+  local tar_stderr tar_stderr_file tar_exit changed_files git_size
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  s3_dest="${s3_prefix}/effectiveAt=${timestamp}/~"
+  tmp_dir=$(mktemp -d)
+
+  # === ~/git archive ===
+  # get total size in bytes for pv progress bar
+  total_bytes=$(du -sb ~/git --exclude='node_modules' --exclude='.cache' 2>/dev/null | cut -f1 || echo "0")
+  tar_stderr_file=$(mktemp)
+
+  # step 1: archive
+  echo "📦 ~/git"
+  tar -cf - \
+    --exclude='node_modules' \
+    --exclude='.cache' \
+    -C ~ git 2>"$tar_stderr_file" | \
+    pv -s "$total_bytes" -N $'   ├─ archive' > "$tmp_dir/git.tar"
+  tar_exit=${PIPESTATUS[0]}
+  tar_stderr=$(cat "$tar_stderr_file")
+  rm -f "$tar_stderr_file"
+
+  if [[ $tar_exit -gt 1 ]]; then
+    echo "⛈️  failed to archive ~/git"
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+
+  # patch if files changed mid-read
+  if [[ $tar_exit -eq 1 && -n "$tar_stderr" ]]; then
+    changed_files=()
+    while IFS= read -r line; do
+      if [[ "$line" =~ ^tar:\ (.+):\ file\ changed ]]; then
+        changed_files+=("${BASH_REMATCH[1]}")
+      fi
+    done <<< "$tar_stderr"
+
+    if [[ ${#changed_files[@]} -gt 0 ]]; then
+      echo "   ├─ patch ${#changed_files[@]} changed files..."
+      tar -rf "$tmp_dir/git.tar" \
+        --exclude='node_modules' \
+        --exclude='.cache' \
+        -C ~ "${changed_files[@]}" 2>/dev/null
+    fi
+  fi
+
+  # step 2: compress
+  tar_size=$(stat -c%s "$tmp_dir/git.tar")
+  pv -s "$tar_size" -N $'   └─ compress' < "$tmp_dir/git.tar" | gzip > "$tmp_dir/git.tar.gz"
+  rm "$tmp_dir/git.tar"
+  git_size=$(du -h "$tmp_dir/git.tar.gz" | cut -f1)
+
+  # === ~/.claude archive ===
+  local claude_size="" has_claude=false
+  if [[ -d ~/.claude ]]; then
+    total_bytes=$(du -sb ~/.claude 2>/dev/null | cut -f1 || echo "0")
+    tar_stderr_file=$(mktemp)
+
+    # step 1: archive
+    echo "📦 ~/.claude"
+    tar -cf - -C ~ .claude 2>"$tar_stderr_file" | \
+      pv -s "$total_bytes" -N $'   ├─ archive' > "$tmp_dir/.claude.tar"
+    tar_exit=${PIPESTATUS[0]}
+    tar_stderr=$(cat "$tar_stderr_file")
+    rm -f "$tar_stderr_file"
+
+    if [[ $tar_exit -gt 1 ]]; then
+      echo "⛈️  failed to archive ~/.claude"
+      rm -rf "$tmp_dir"
+      return 1
+    fi
+
+    # patch if files changed mid-read
+    if [[ $tar_exit -eq 1 && -n "$tar_stderr" ]]; then
+      changed_files=()
+      while IFS= read -r line; do
+        if [[ "$line" =~ ^tar:\ (.+):\ file\ changed ]]; then
+          changed_files+=("${BASH_REMATCH[1]}")
+        fi
+      done <<< "$tar_stderr"
+
+      if [[ ${#changed_files[@]} -gt 0 ]]; then
+        echo "   ├─ patch ${#changed_files[@]} changed files..."
+        tar -rf "$tmp_dir/.claude.tar" -C ~ "${changed_files[@]}" 2>/dev/null
+      fi
+    fi
+
+    # step 2: compress
+    tar_size=$(stat -c%s "$tmp_dir/.claude.tar")
+    pv -s "$tar_size" -N $'   └─ compress' < "$tmp_dir/.claude.tar" | gzip > "$tmp_dir/.claude.tar.gz"
+    rm "$tmp_dir/.claude.tar"
+    claude_size=$(du -h "$tmp_dir/.claude.tar.gz" | cut -f1)
+    has_claude=true
+  else
+    echo "⚠️  ~/.claude/ not found, skipped"
+  fi
+
+  # === upload to s3 ===
+  echo "☁️  upload"
+  gz_size=$(stat -c%s "$tmp_dir/git.tar.gz")
+  local git_tree_conn=$'└─'
+  [[ "$has_claude" == "true" ]] && git_tree_conn=$'├─'
+  if ! pv -s "$gz_size" -N "   $git_tree_conn git.tar.gz" < "$tmp_dir/git.tar.gz" | aws s3 cp - "$s3_dest/git.tar.gz"; then
+    echo "⛈️  failed to upload git.tar.gz"
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+
+  if [[ "$has_claude" == "true" ]]; then
+    gz_size=$(stat -c%s "$tmp_dir/.claude.tar.gz")
+    if ! pv -s "$gz_size" -N $'   └─ .claude.tar.gz' < "$tmp_dir/.claude.tar.gz" | aws s3 cp - "$s3_dest/.claude.tar.gz"; then
+      echo "⛈️  failed to upload .claude.tar.gz"
+      rm -rf "$tmp_dir"
+      return 1
+    fi
+  fi
+
+  # cleanup
+  rm -rf "$tmp_dir"
+
+  # show confirmation
+  echo ""
+  echo "🍯 got em"
+  if [[ "$has_claude" == "true" ]]; then
+    echo "   ├─ $s3_dest/git.tar.gz ($git_size)"
+    echo "   └─ $s3_dest/.claude.tar.gz ($claude_size)"
+  else
+    echo "   └─ $s3_dest/git.tar.gz ($git_size)"
+  fi
+  echo ""
 }
