@@ -266,11 +266,21 @@ JSON_MODE=0
 FULL_MODE=0
 KILL_MODE=""
 KILL_TYPE=""
+MIN_PROCS=3
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --json) JSON_MODE=1; shift ;;
     --full) FULL_MODE=1; shift ;;
+    --min)
+      if [[ -n "$2" && "$2" =~ ^[0-9]+$ ]]; then
+        MIN_PROCS="$2"
+        shift 2
+      else
+        echo "Usage: --min requires a number" >&2
+        exit 1
+      fi
+      ;;
     --kill)
       if [[ -n "$2" && "$2" != --* ]]; then
         KILL_MODE="$2"
@@ -281,16 +291,18 @@ while [[ $# -gt 0 ]]; do
           shift
         fi
       else
-        echo "Usage: machine_resource_procs_find_runaway [--full | --json | --kill cpu | --kill mem | --kill <prefix> [cpu|mem]]" >&2
+        echo "Usage: machine_resource_procs_find_runaway [--full | --json | --min N | --kill cpu | --kill mem | --kill <prefix> [cpu|mem]]" >&2
         exit 1
       fi
       ;;
     *)
-      echo "Usage: machine_resource_procs_find_runaway [--full | --json | --kill cpu | --kill mem | --kill <prefix> [cpu|mem]]" >&2
+      echo "Usage: machine_resource_procs_find_runaway [--full | --json | --min N | --kill cpu | --kill mem | --kill <prefix> [cpu|mem]]" >&2
       exit 1
       ;;
   esac
 done
+
+MAX_ROW=$((MIN_PROCS + 1))
 
 LOAD=$(awk '{print $1}' /proc/loadavg)
 CORES=$(nproc)
@@ -333,7 +345,8 @@ PS_BY_MEM=$(ps aux --sort=-%mem)
 format_top_procs() {
   local ps_output="$1"
   local mode="$2"
-  echo "$ps_output" | awk -v mode="$mode" 'NR>1 && NR<=4 {
+  local max_row="$3"
+  echo "$ps_output" | awk -v mode="$mode" -v max="$max_row" 'NR>1 && NR<=max {
     pid=$2; cpu=$3; mem=$4
     cmd_file="/proc/"pid"/comm"
     if ((getline cmd < cmd_file) > 0) { close(cmd_file) } else { cmd=$11 }
@@ -350,9 +363,9 @@ extract_pids() {
   echo "$1" | awk -v limit="$limit" 'NR>1 && NR<=limit {print $2}' | tr '\n' ' '
 }
 
-TOP_CPU=$(format_top_procs "$PS_BY_CPU" "cpu")
-TOP_MEM=$(format_top_procs "$PS_BY_MEM" "mem")
-CPU_PIDS=$(extract_pids "$PS_BY_CPU" 4)
+TOP_CPU=$(format_top_procs "$PS_BY_CPU" "cpu" "$MAX_ROW")
+TOP_MEM=$(format_top_procs "$PS_BY_MEM" "mem" "$MAX_ROW")
+CPU_PIDS=$(extract_pids "$PS_BY_CPU" "$MAX_ROW")
 MEM_PIDS=$(extract_pids "$PS_BY_MEM" 11)  # top 10 for memory
 
 if [[ $JSON_MODE -eq 1 ]]; then
@@ -369,15 +382,9 @@ if [[ $JSON_MODE -eq 1 ]]; then
   exit 0
 fi
 
-if [[ $LOAD_HIGH -eq 0 && $MEM_LOW -eq 0 && $FULL_MODE -eq 0 ]]; then
-  echo "🐈 lets prowl..."
-  echo "└─🌕 runaway"
-  echo "  └─✨ system smooth (load=$LOAD, mem=${MEM_AVAIL_PCT}%)"
-  exit 0
-fi
-
 echo "🐈 lets prowl..."
 echo "└─🌕 runaway"
+
 print_proc_details() {
   local pid="$1"
   local cpu="$2"
@@ -386,18 +393,45 @@ print_proc_details() {
   local comm=$(cat /proc/$pid/comm 2>/dev/null || echo "?")
   local cwd=$(readlink /proc/$pid/cwd 2>/dev/null | sed "s|^$HOME|~|" || echo "?")
   local cmdline=$(tr '\0' ' ' < /proc/$pid/cmdline 2>/dev/null | cut -c1-60 || echo "?")
-  echo "${prefix}├─ 🐛 $comm (${cpu}% CPU, ${mem}% MEM, PID $pid)"
+
+  # calculate elapsed time from process start
+  local clk_tck=$(getconf CLK_TCK)
+  local uptime_sec=$(awk '{print int($1)}' /proc/uptime)
+  local starttime=$(awk '{print $22}' /proc/$pid/stat 2>/dev/null || echo "0")
+  local start_sec=$((starttime / clk_tck))
+  local elapsed_sec=$((uptime_sec - start_sec))
+  local elapsed_min=$((elapsed_sec / 60))
+  local elapsed_hr=$((elapsed_min / 60))
+  local elapsed_str
+  if [[ $elapsed_hr -gt 0 ]]; then
+    elapsed_str="${elapsed_hr}h$((elapsed_min % 60))m"
+  elif [[ $elapsed_min -gt 0 ]]; then
+    elapsed_str="${elapsed_min}m"
+  else
+    elapsed_str="${elapsed_sec}s"
+  fi
+
+  # 🐛 if process is a hog (>50% CPU or >10% MEM), 🫧 otherwise
+  local emoji="🫧"
+  if [[ ${cpu%.*} -gt 50 ]] || [[ ${mem%.*} -gt 10 ]]; then
+    emoji="🐛"
+  fi
+
+  echo "${prefix}├─ $emoji $comm (${cpu}% CPU, ${mem}% MEM, ${elapsed_str}, PID $pid)"
   echo "${prefix}│     ├─ cwd: $cwd"
   echo "${prefix}│     └─ cmd: $cmdline"
 }
 
+# always show top CPU hogs so user can decide
 if [[ $LOAD_HIGH -eq 1 ]]; then
-  echo "  ├─🕯️ high load: $LOAD (threshold: $LOAD_THRESHOLD)"
-  echo "$PS_BY_CPU" | awk 'NR>1 && NR<=4 {printf "%s %s %s\n", $2, $3, $4}' | while read pid cpu mem; do
-    print_proc_details "$pid" "${cpu%.*}" "${mem%.*}" "  │    "
-  done
-  echo "  │    └─ 🪄 kill -9 $CPU_PIDS"
+  echo "  ├─🕯️ high load: $LOAD/$CORES (threshold: $LOAD_THRESHOLD)"
+else
+  echo "  ├─✨ load: $LOAD/$CORES"
 fi
+echo "$PS_BY_CPU" | awk -v max="$MAX_ROW" 'NR>1 && NR<=max {printf "%s %s %s\n", $2, $3, $4}' | while read pid cpu mem; do
+  print_proc_details "$pid" "${cpu%.*}" "${mem%.*}" "  │    "
+done
+echo "  │    └─ 🪄 kill -9 $CPU_PIDS"
 if [[ $MEM_LOW -eq 1 || $FULL_MODE -eq 1 ]]; then
   # get memory stats for display
   MEM_TOTAL_KB=$(awk '/MemTotal/{print $2}' /proc/meminfo)
@@ -838,4 +872,381 @@ OBSERVE_SCRIPT
 
   chmod +x "$bin_path"
   echo "• machine_resource_observe installed ($bin_path)"
+}
+
+install_tmpfiles_cleanup() {
+  #############################
+  ## tmpfiles cleanup timer
+  ##
+  ## what: prunes /tmp files older than 3 days
+  ##
+  ## why: systemd-tmpfiles-setup.service blocks boot for 4+ min on LUKS
+  ##      if /tmp has accumulated many files between monthly reboots.
+  ##      daily cleanup keeps /tmp small so boot is fast.
+  ##
+  ## ref: https://github.com/pop-os/pop/issues/1048
+  #############################
+  local service_path="/etc/systemd/system/tmp-cleanup.service"
+  local timer_path="/etc/systemd/system/tmp-cleanup.timer"
+
+  if [[ -f "$timer_path" ]]; then
+    echo "• tmp cleanup timer already installed; skipped"
+    return 0
+  fi
+
+  # create service
+  sudo tee "$service_path" > /dev/null << 'SERVICE'
+[Unit]
+Description=Cleanup /tmp files older than 3 days
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/find /tmp -mindepth 1 -mtime +3 -delete
+SERVICE
+
+  # create timer (daily at 3am, Persistent=true catches missed runs on next boot)
+  sudo tee "$timer_path" > /dev/null << 'TIMER'
+[Unit]
+Description=Daily cleanup of /tmp
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+TIMER
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now tmp-cleanup.timer
+
+  echo "• tmp cleanup timer installed (daily at 3am, deletes files >3 days old)"
+}
+
+install_machine_usage_snapshot() {
+  local bin_path="$HOME/.local/bin/machine_usage_snapshot"
+  mkdir -p "$(dirname "$bin_path")"
+
+  cat > "$bin_path" << 'SNAPSHOT_SCRIPT'
+#!/usr/bin/env bash
+######################################################################
+# machine_usage_snapshot — capture comprehensive system state for lag diagnosis
+#
+# usage:
+#   machine_usage_snapshot              # snapshot to ~/.cache/machine.usage.snapshots/
+#   machine_usage_snapshot --stdout     # print to stdout instead of file
+#   machine_usage_snapshot --dir /path  # custom output directory
+#
+# captures:
+#   - timestamp, hostname, kernel
+#   - load average (1, 5, 15 min) vs cores
+#   - cpu usage breakdown (user, system, iowait, idle)
+#   - memory stats (total, avail, used, cached, buffers, swap)
+#   - top 15 cpu processes with full details
+#   - top 15 mem processes with full details
+#   - d-state processes (blocked on I/O)
+#   - zombie processes
+#   - disk I/O stats
+#   - file descriptor usage
+#   - network connection counts
+#   - recent kernel messages (dmesg)
+#   - temperatures (if sensors available)
+######################################################################
+
+set -euo pipefail
+
+SNAPSHOT_DIR="$HOME/.cache/machine.usage.snapshots"
+STDOUT_MODE=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --stdout)
+      STDOUT_MODE=1
+      shift
+      ;;
+    --dir)
+      SNAPSHOT_DIR="$2"
+      shift 2
+      ;;
+    *)
+      echo "Usage: machine_usage_snapshot [--stdout] [--dir /path]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# timestamp for filename and content
+TS=$(date '+%Y-%m-%d_%H-%M-%S')
+TS_HUMAN=$(date '+%Y-%m-%d %H:%M:%S %Z')
+
+# output destination
+if [[ $STDOUT_MODE -eq 1 ]]; then
+  exec 3>&1
+else
+  mkdir -p "$SNAPSHOT_DIR"
+  OUTFILE="$SNAPSHOT_DIR/snapshot.$TS.txt"
+  exec 3>"$OUTFILE"
+fi
+
+emit() {
+  echo "$@" >&3
+}
+
+emit "╔══════════════════════════════════════════════════════════════════╗"
+emit "║  MACHINE USAGE SNAPSHOT                                          ║"
+emit "║  $TS_HUMAN"
+emit "╚══════════════════════════════════════════════════════════════════╝"
+emit ""
+
+# --- system info ---
+emit "┌─ SYSTEM ────────────────────────────────────────────────────────┐"
+emit "│ hostname: $(hostname)"
+emit "│ kernel:   $(uname -r)"
+emit "│ uptime:   $(uptime -p)"
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- load average ---
+CORES=$(nproc)
+read -r LOAD1 LOAD5 LOAD15 _ < /proc/loadavg
+emit "┌─ LOAD AVERAGE ──────────────────────────────────────────────────┐"
+emit "│ cores: $CORES"
+emit "│ load:  $LOAD1 (1m)  $LOAD5 (5m)  $LOAD15 (15m)"
+emit "│ ratio: $(echo "scale=2; $LOAD1 / $CORES" | bc) (1m)  $(echo "scale=2; $LOAD5 / $CORES" | bc) (5m)  $(echo "scale=2; $LOAD15 / $CORES" | bc) (15m)"
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- cpu breakdown ---
+emit "┌─ CPU BREAKDOWN ─────────────────────────────────────────────────┐"
+if command -v mpstat &>/dev/null; then
+  MPSTAT_OUT=$(mpstat 1 1 2>/dev/null | tail -1 | awk '{printf "│ user: %s%%  system: %s%%  iowait: %s%%  idle: %s%%\n", $3, $5, $6, $12}' || true)
+  if [[ -n "$MPSTAT_OUT" ]]; then
+    emit "$MPSTAT_OUT"
+  else
+    emit "│ (mpstat output unavailable)"
+  fi
+else
+  # fallback: parse /proc/stat
+  read -r _ user nice system idle iowait _ < /proc/stat
+  total=$((user + nice + system + idle + iowait))
+  emit "│ user: $((user * 100 / total))%  system: $((system * 100 / total))%  iowait: $((iowait * 100 / total))%  idle: $((idle * 100 / total))%"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- memory ---
+MEM_TOTAL_KB=$(awk '/MemTotal/{print $2}' /proc/meminfo)
+MEM_AVAIL_KB=$(awk '/MemAvailable/{print $2}' /proc/meminfo)
+MEM_FREE_KB=$(awk '/MemFree/{print $2}' /proc/meminfo)
+MEM_CACHED_KB=$(awk '/^Cached/{print $2}' /proc/meminfo)
+MEM_BUFFERS_KB=$(awk '/Buffers/{print $2}' /proc/meminfo)
+MEM_USED_KB=$((MEM_TOTAL_KB - MEM_AVAIL_KB))
+MEM_TOTAL_GB=$(echo "scale=1; $MEM_TOTAL_KB / 1048576" | bc)
+MEM_AVAIL_GB=$(echo "scale=1; $MEM_AVAIL_KB / 1048576" | bc)
+MEM_USED_GB=$(echo "scale=1; $MEM_USED_KB / 1048576" | bc)
+MEM_CACHED_GB=$(echo "scale=1; $MEM_CACHED_KB / 1048576" | bc)
+MEM_AVAIL_PCT=$((MEM_AVAIL_KB * 100 / MEM_TOTAL_KB))
+
+# swap
+SWAP_TOTAL_KB=$(awk '/SwapTotal/{print $2}' /proc/meminfo)
+SWAP_FREE_KB=$(awk '/SwapFree/{print $2}' /proc/meminfo)
+SWAP_USED_KB=$((SWAP_TOTAL_KB - SWAP_FREE_KB))
+if [[ $SWAP_TOTAL_KB -gt 0 ]]; then
+  SWAP_TOTAL_GB=$(echo "scale=1; $SWAP_TOTAL_KB / 1048576" | bc)
+  SWAP_USED_GB=$(echo "scale=1; $SWAP_USED_KB / 1048576" | bc)
+  SWAP_USED_PCT=$((SWAP_USED_KB * 100 / SWAP_TOTAL_KB))
+else
+  SWAP_TOTAL_GB="0"
+  SWAP_USED_GB="0"
+  SWAP_USED_PCT=0
+fi
+
+emit "┌─ MEMORY ─────────────────────────────────────────────────────────┐"
+emit "│ total:     ${MEM_TOTAL_GB}G"
+emit "│ used:      ${MEM_USED_GB}G ($((100 - MEM_AVAIL_PCT))%)"
+emit "│ available: ${MEM_AVAIL_GB}G (${MEM_AVAIL_PCT}%)"
+emit "│ cached:    ${MEM_CACHED_GB}G"
+emit "│ swap:      ${SWAP_USED_GB}G / ${SWAP_TOTAL_GB}G (${SWAP_USED_PCT}%)"
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- top cpu processes ---
+emit "┌─ TOP 15 CPU PROCESSES ───────────────────────────────────────────┐"
+ps aux --sort=-%cpu | head -16 | tail -15 | while read -r user pid cpu mem vsz rss tty stat start time cmd; do
+  comm=$(cat /proc/$pid/comm 2>/dev/null || echo "?")
+  cwd=$(readlink /proc/$pid/cwd 2>/dev/null | sed "s|^$HOME|~|" || echo "?")
+  # elapsed time
+  clk_tck=$(getconf CLK_TCK)
+  uptime_sec=$(awk '{print int($1)}' /proc/uptime)
+  starttime=$(awk '{print $22}' /proc/$pid/stat 2>/dev/null || echo "0")
+  start_sec=$((starttime / clk_tck))
+  elapsed_sec=$((uptime_sec - start_sec))
+  elapsed_min=$((elapsed_sec / 60))
+  elapsed_hr=$((elapsed_min / 60))
+  if [[ $elapsed_hr -gt 0 ]]; then
+    elapsed="${elapsed_hr}h$((elapsed_min % 60))m"
+  elif [[ $elapsed_min -gt 0 ]]; then
+    elapsed="${elapsed_min}m"
+  else
+    elapsed="${elapsed_sec}s"
+  fi
+  emit "│ $comm"
+  emit "│   pid=$pid  cpu=${cpu}%  mem=${mem}%  elapsed=$elapsed"
+  emit "│   cwd=$cwd"
+  emit "│   cmd=${cmd:0:70}"
+  emit "│"
+done
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- top mem processes ---
+emit "┌─ TOP 15 MEM PROCESSES ───────────────────────────────────────────┐"
+ps aux --sort=-%mem | head -16 | tail -15 | while read -r user pid cpu mem vsz rss tty stat start time cmd; do
+  comm=$(cat /proc/$pid/comm 2>/dev/null || echo "?")
+  rss_mb=$((rss / 1024))
+  emit "│ $comm"
+  emit "│   pid=$pid  mem=${mem}% (${rss_mb}MB)  cpu=${cpu}%"
+  emit "│   cmd=${cmd:0:70}"
+  emit "│"
+done
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- d-state processes (blocked on I/O) ---
+emit "┌─ D-STATE PROCESSES (blocked on I/O) ─────────────────────────────┐"
+DSTATE=$(ps aux | awk '$8 ~ /D/ {print $2, $11}' | head -10)
+if [[ -n "$DSTATE" ]]; then
+  echo "$DSTATE" | while read -r pid cmd; do
+    emit "│ pid=$pid  cmd=$cmd"
+  done
+else
+  emit "│ (none)"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- zombie processes ---
+emit "┌─ ZOMBIE PROCESSES ───────────────────────────────────────────────┐"
+ZOMBIES=$(ps aux | awk '$8 == "Z" {print $2, $11}' | head -10)
+if [[ -n "$ZOMBIES" ]]; then
+  echo "$ZOMBIES" | while read -r pid cmd; do
+    emit "│ pid=$pid  cmd=$cmd"
+  done
+else
+  emit "│ (none)"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- disk I/O ---
+emit "┌─ DISK I/O ───────────────────────────────────────────────────────┐"
+if command -v iostat &>/dev/null; then
+  IOSTAT_OUT=$(iostat -dx 1 1 2>/dev/null | tail -n +4 | head -10 || true)
+  if [[ -n "$IOSTAT_OUT" ]]; then
+    echo "$IOSTAT_OUT" | while read -r line; do
+      emit "│ $line"
+    done
+  else
+    emit "│ (no iostat output)"
+  fi
+else
+  emit "│ (iostat not available; install sysstat)"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- file descriptors ---
+emit "┌─ FILE DESCRIPTORS ───────────────────────────────────────────────┐"
+FD_USED=$(cat /proc/sys/fs/file-nr | awk '{print $1}')
+FD_MAX=$(cat /proc/sys/fs/file-nr | awk '{print $3}')
+emit "│ used: $FD_USED / $FD_MAX"
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- network connections ---
+emit "┌─ NETWORK CONNECTIONS ────────────────────────────────────────────┐"
+if command -v ss &>/dev/null; then
+  ESTABLISHED=$(ss -t state established | wc -l)
+  TIME_WAIT=$(ss -t state time-wait | wc -l)
+  LISTEN_COUNT=$(ss -tln | wc -l)
+  emit "│ established: $ESTABLISHED  time-wait: $TIME_WAIT  listen: $LISTEN_COUNT"
+else
+  emit "│ (ss not available)"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- recent kernel messages ---
+emit "┌─ RECENT KERNEL MESSAGES (last 20) ───────────────────────────────┐"
+DMESG_OUT=$(dmesg --time-format iso 2>/dev/null | tail -20 || true)
+if [[ -n "$DMESG_OUT" ]]; then
+  echo "$DMESG_OUT" | while read -r line; do
+    emit "│ ${line:0:70}"
+  done
+else
+  emit "│ (dmesg not accessible - may require sudo)"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- temperatures ---
+emit "┌─ TEMPERATURES ───────────────────────────────────────────────────┐"
+if command -v sensors &>/dev/null; then
+  sensors 2>/dev/null | grep -E '(Core|temp|Tctl|Tdie)' | head -10 | while read -r line; do
+    emit "│ $line"
+  done
+else
+  # fallback: check thermal zones
+  for tz in /sys/class/thermal/thermal_zone*/temp; do
+    if [[ -f "$tz" ]]; then
+      name=$(basename "$(dirname "$tz")")
+      temp=$(cat "$tz" 2>/dev/null || echo "0")
+      temp_c=$((temp / 1000))
+      emit "│ $name: ${temp_c}°C"
+    fi
+  done
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- process counts ---
+emit "┌─ PROCESS COUNTS ─────────────────────────────────────────────────┐"
+TOTAL_PROCS=$(ps aux | wc -l)
+ACTIVE=$(ps aux | awk '$8 ~ /R/ {count++} END {print count+0}')
+IDLE=$(ps aux | awk '$8 ~ /S/ {count++} END {print count+0}')
+emit "│ total: $TOTAL_PROCS  active: $ACTIVE  idle: $IDLE"
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- top open files by process ---
+emit "┌─ TOP 10 PROCESSES BY OPEN FILES ─────────────────────────────────┐"
+# collect open file counts safely
+OPEN_FILES_DATA=$(
+  for pid in $(ps -eo pid --no-headers 2>/dev/null | head -100); do
+    if [[ -d /proc/$pid/fd ]]; then
+      count=$(ls -1 /proc/$pid/fd 2>/dev/null | wc -l || echo "0")
+      comm=$(cat /proc/$pid/comm 2>/dev/null || echo "?")
+      echo "$count $pid $comm"
+    fi
+  done 2>/dev/null | sort -rn | head -10 || true
+)
+if [[ -n "$OPEN_FILES_DATA" ]]; then
+  echo "$OPEN_FILES_DATA" | while read -r count pid comm; do
+    emit "│ $comm (pid=$pid): $count open files"
+  done
+else
+  emit "│ (no data)"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+emit "═══════════════════════════════════════════════════════════════════"
+
+if [[ $STDOUT_MODE -eq 0 ]]; then
+  echo "📸 snapshot saved: $OUTFILE"
+fi
+SNAPSHOT_SCRIPT
+
+  chmod +x "$bin_path"
+  echo "• machine_usage_snapshot installed ($bin_path)"
 }

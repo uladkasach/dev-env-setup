@@ -117,6 +117,7 @@ alias machine.usage.diagnose.spinner='machine_resource_procs_find_spinner'  # su
 alias machine.usage.diagnose.runaway='machine_resource_procs_find_runaway --full'  # high CPU/memory right now
 alias machine.usage.diagnose.orphan='machine_resource_procs_find_orphan'    # cwd deleted (stale worktrees)
 alias machine.usage.observe='machine_resource_observe'                       # system snapshot
+alias machine.usage.snapshot='machine_usage_snapshot'                        # comprehensive lag diagnosis snapshot
 
 # note: 'terminal' command installed via install_env.sh (supports 'terminal /path/to/dir')
 
