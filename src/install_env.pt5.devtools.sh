@@ -28,9 +28,24 @@ install_rust() {
 install_robot_brains() {
   #########################
   ## claude-code + rhachet
+  ## ref: https://github.com/anthropics/claude-code
   #########################
   pnpm install -g @anthropic-ai/claude-code
   pnpm install -g rhachet
+
+  # disable background auto-updater (manual `claude update` still works)
+  # ref: https://code.claude.com/docs/en/setup
+  local settings_file="$HOME/.claude/settings.json"
+  mkdir -p "$HOME/.claude"
+  if [[ -f "$settings_file" ]]; then
+    # merge DISABLE_AUTOUPDATER into extant settings
+    jq '. * {"env": {"DISABLE_AUTOUPDATER": "1"}}' "$settings_file" > /tmp/claude-settings.json \
+      && mv /tmp/claude-settings.json "$settings_file"
+  else
+    # create new settings file
+    echo '{"env": {"DISABLE_AUTOUPDATER": "1"}}' > "$settings_file"
+  fi
+  echo "• claude-code auto-updater disabled (manual updates still work)"
 }
 
 install_ripgrep() {
