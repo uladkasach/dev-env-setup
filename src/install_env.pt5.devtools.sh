@@ -27,11 +27,13 @@ install_rust() {
 
 install_robot_brains() {
   #########################
-  ## claude-code + rhachet
+  ## claude-code + rhachet + codex
   ## ref: https://github.com/anthropics/claude-code
+  ## ref: https://github.com/openai/codex
   #########################
   pnpm install -g @anthropic-ai/claude-code
   pnpm install -g rhachet
+  pnpm install -g @openai/codex
 
   # disable background auto-updater (manual `claude update` still works)
   # ref: https://code.claude.com/docs/en/setup
