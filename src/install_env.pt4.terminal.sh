@@ -90,3 +90,30 @@ configure_neovim() {
   cp "$HOME/git/more/dev-env-setup/src/init.lua" ~/.config/nvim/init.lua
   echo "• neovim config applied"
 }
+
+install_pqiv() {
+  # lightweight image viewer for vim-style navigation
+  sudo apt install pqiv -y
+}
+
+configure_pqiv() {
+  # vim keybindings for pqiv
+  # ref: https://github.com/phillipberndt/pqiv
+  mkdir -p ~/.config
+  cat > ~/.config/pqivrc << 'EOF'
+[options]
+zoom-level=1.0
+disable-scaling=1
+
+[keybindings]
+h { shift_x(50) }
+j { shift_y(-50) }
+k { shift_y(50) }
+l { shift_x(-50) }
+gg { set_shift_align_corner(N) }
+G { set_shift_align_corner(S) }
+<Control>j { set_scale_level_relative(0.9) }
+<Control>k { set_scale_level_relative(1.1) }
+EOF
+  echo "• pqiv config applied (~/.config/pqivrc)"
+}

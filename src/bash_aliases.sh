@@ -21,6 +21,15 @@ alias jal='LOCALLY=true ja'
 # quick terraform alias
 alias tf='terraform'
 
+# vim-style image viewer
+function nimg {
+  if ! command -v pqiv &> /dev/null; then
+    echo "error: pqiv not installed. run: source src/install_env.pt4.terminal.sh && install_pqiv && configure_pqiv"
+    return 1
+  fi
+  pqiv "$@"
+}
+
 # claude code config (expected: v2.1.87, beyond which hooks are truncated)
 export ANTHROPIC_MODEL='claude-opus-4-5-20251101'
 export CLAUDE_CODE_SKIP_UPDATE_CHECK=1
