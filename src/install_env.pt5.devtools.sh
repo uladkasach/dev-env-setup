@@ -275,7 +275,7 @@ install_yubikey_agent() {
 }
 
 clone_org_repos() {
-  for organization in {ehmpathy,ahbode}; do
+  for organization in {ehmpathy,ahbode,whodisio}; do
     gh repo list $organization --limit 1000 | while read -r repo _; do
       gh repo clone "$repo" "$HOME/git/$repo"
     done
