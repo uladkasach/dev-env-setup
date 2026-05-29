@@ -105,6 +105,7 @@ alias op.signin='eval $(op signin)'
 export BROWSER="$HOME/.local/bin/browser"
 alias machine.logout='loginctl terminate-user "$USER"'
 alias machine.reboot='systemctl reboot'
+alias use.screencast='flatpak run org.gnome.NetworkDisplays'
 
 # diagnose problem processes (installed via install_env.sh)
 
