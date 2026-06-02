@@ -2451,6 +2451,15 @@ git_alias_backup() {
     return 1
   fi
 
+  # validate aws credentials upfront (fail fast, not after 30min of archive work)
+  if ! aws sts get-caller-identity &>/dev/null; then
+    echo ""
+    echo "⛈️  aws credentials expired or not configured"
+    echo "   └─ run: use.ahbode.prep"
+    echo ""
+    return 1
+  fi
+
   # show tree status first
   _git_tree_status --repo @all
 
