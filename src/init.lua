@@ -394,11 +394,50 @@ require('lazy').setup({
       })
 
       -- register custom handler for diff panes (vim diff + codediff extmarks)
+      -- fix: O(1) cache lookup, debounced updates, lifecycle-bounded state
       vim.defer_fn(function()
         local ok, handlers = pcall(require, 'neominimap.map.handlers')
         if not ok then return end
 
         local ns = vim.api.nvim_create_namespace('neominimap_vdiff')
+
+        -- state: bounded by buffer lifecycle
+        local cache = {}    -- bufnr -> { tick, annotations }
+        local queued = {}   -- bufnr -> timer_id
+        local focused = true
+
+        -- skip work when unfocused
+        vim.api.nvim_create_autocmd('FocusLost', {
+          callback = function() focused = false end,
+        })
+        vim.api.nvim_create_autocmd('FocusGained', {
+          callback = function() focused = true end,
+        })
+
+        -- cleanup on buffer delete
+        vim.api.nvim_create_autocmd({'BufDelete', 'BufWipeout'}, {
+          callback = function(args)
+            cache[args.buf] = nil
+            if queued[args.buf] then
+              vim.fn.timer_stop(queued[args.buf])
+              queued[args.buf] = nil
+            end
+          end,
+        })
+
+        -- find codediff namespace once
+        local codediff_ns = nil
+        local function get_codediff_ns()
+          if codediff_ns then return codediff_ns end
+          for name, id in pairs(vim.api.nvim_get_namespaces()) do
+            if name:match('codediff') then
+              codediff_ns = id
+              return id
+            end
+          end
+          return nil
+        end
+
         handlers.register({
           name = 'vdiff',
           mode = 'line',
@@ -406,29 +445,54 @@ require('lazy').setup({
           init = function() end,
           autocmds = {
             {
-              event = { 'BufEnter', 'DiffUpdated', 'TextChanged' },
+              event = { 'BufEnter', 'DiffUpdated' },
               opts = {
                 callback = function(apply, args)
                   apply(args.buf)
                 end,
               },
             },
+            {
+              event = { 'TextChanged' },
+              opts = {
+                callback = function(apply, args)
+                  local buf = args.buf
+                  -- cancel prior timer
+                  if queued[buf] then
+                    vim.fn.timer_stop(queued[buf])
+                  end
+                  -- schedule new (200ms debounce)
+                  queued[buf] = vim.fn.timer_start(200, function()
+                    queued[buf] = nil
+                    if vim.api.nvim_buf_is_valid(buf) then
+                      apply(buf)
+                    end
+                  end)
+                end,
+              },
+            },
           },
           get_annotations = function(bufnr)
-            local annotations = {}
-            if not vim.api.nvim_buf_is_valid(bufnr) then return annotations end
+            if not focused then return {} end
+            if not vim.api.nvim_buf_is_valid(bufnr) then return {} end
 
-            -- check if this is a codediff buffer
+            -- fast path: not a diff buffer
             local bufname = vim.api.nvim_buf_get_name(bufnr)
             local is_codediff = bufname:match('codediff:')
-
-            -- for native vim diff, check window diff mode
             local win = vim.fn.bufwinid(bufnr)
             local is_vimdiff = win ~= -1 and vim.wo[win].diff
 
-            if not is_codediff and not is_vimdiff then return annotations end
+            if not is_codediff and not is_vimdiff then return {} end
 
-            local line_count = vim.api.nvim_buf_line_count(bufnr)
+            -- check cache
+            local tick = vim.api.nvim_buf_get_changedtick(bufnr)
+            local cached = cache[bufnr]
+            if cached and cached.tick == tick then
+              return cached.annotations
+            end
+
+            -- build annotations
+            local annotations = {}
             local id_map = { DiffAdd = 1, DiffChange = 2, DiffDelete = 3, DiffText = 2 }
             local hl_map = {
               DiffAdd = 'NeominimapDiffAddLine',
@@ -437,49 +501,59 @@ require('lazy').setup({
               DiffText = 'NeominimapDiffChangeLine',
             }
 
-            for lnum = 1, line_count do
-              local found_hl = nil
-
-              -- try native diff_hlID first
-              local hl_id = vim.fn.diff_hlID(lnum, 1)
-              if hl_id > 0 then
-                found_hl = vim.fn.synIDattr(hl_id, 'name')
-              end
-
-              -- if not found and codediff buffer, check extmarks
-              if not found_hl and is_codediff then
-                local lnum0 = lnum - 1
-                for _, ns_id in pairs(vim.api.nvim_get_namespaces()) do
-                  local marks = vim.api.nvim_buf_get_extmarks(bufnr, ns_id, { lnum0, 0 }, { lnum0, -1 }, { details = true })
-                  for _, mark in ipairs(marks) do
-                    local details = mark[4]
-                    if details and details.hl_group then
-                      local hl = details.hl_group
-                      -- codediff uses CodeDiffLineInsert/CodeDiffLineDelete
-                      if hl == 'CodeDiffLineInsert' or hl == 'DiffAdd' or hl:match('Insert') or hl:match('Add') then
-                        found_hl = 'DiffAdd'
-                      elseif hl == 'CodeDiffLineDelete' or hl == 'DiffDelete' or hl:match('Delete') then
-                        found_hl = 'DiffDelete'
-                      elseif hl:match('Change') or hl:match('Modify') then
-                        found_hl = 'DiffChange'
-                      end
-                      if found_hl then break end
-                    end
+            if is_vimdiff then
+              -- vimdiff: use diff_hlID
+              local line_count = vim.api.nvim_buf_line_count(bufnr)
+              for lnum = 1, line_count do
+                local hl_id = vim.fn.diff_hlID(lnum, 1)
+                if hl_id > 0 then
+                  local found_hl = vim.fn.synIDattr(hl_id, 'name')
+                  if hl_map[found_hl] then
+                    table.insert(annotations, {
+                      lnum = lnum,
+                      end_lnum = lnum,
+                      id = id_map[found_hl],
+                      priority = 50,
+                      highlight = hl_map[found_hl],
+                    })
                   end
-                  if found_hl then break end
                 end
               end
-
-              if found_hl and hl_map[found_hl] then
-                table.insert(annotations, {
-                  lnum = lnum,
-                  end_lnum = lnum,
-                  id = id_map[found_hl],
-                  priority = 50,
-                  highlight = hl_map[found_hl],
-                })
+            elseif is_codediff then
+              -- codediff: single extmarks call for entire buffer
+              local cd_ns = get_codediff_ns()
+              if cd_ns then
+                local marks = vim.api.nvim_buf_get_extmarks(bufnr, cd_ns, 0, -1, { details = true })
+                for _, mark in ipairs(marks) do
+                  local lnum = mark[2] + 1
+                  local details = mark[4]
+                  if details and details.hl_group then
+                    local hl = details.hl_group
+                    local found_hl = nil
+                    if hl:match('Insert') or hl:match('Add') then
+                      found_hl = 'DiffAdd'
+                    elseif hl:match('Delete') then
+                      found_hl = 'DiffDelete'
+                    elseif hl:match('Change') then
+                      found_hl = 'DiffChange'
+                    end
+                    if found_hl and hl_map[found_hl] then
+                      table.insert(annotations, {
+                        lnum = lnum,
+                        end_lnum = lnum,
+                        id = id_map[found_hl],
+                        priority = 50,
+                        highlight = hl_map[found_hl],
+                      })
+                    end
+                  end
+                end
               end
             end
+
+            -- cache result (bounded by BufDelete autocmd)
+            cache[bufnr] = { tick = tick, annotations = annotations }
+
             return annotations
           end,
         })
