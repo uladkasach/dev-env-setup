@@ -15,6 +15,15 @@ if not vim.loop.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
+-- global focus state (shared by treesitter, vdiff handler, etc.)
+local nvim_focused = true
+vim.api.nvim_create_autocmd('FocusLost', {
+  callback = function() nvim_focused = false end,
+})
+vim.api.nvim_create_autocmd('FocusGained', {
+  callback = function() nvim_focused = true end,
+})
+
 -- cache git root per buffer (avoids subprocess on every statusline render)
 local git_root_cache = {}
 local function get_git_root(bufnr)
@@ -274,9 +283,12 @@ require('lazy').setup({
       -- register language aliases for markdown code block injection
       vim.treesitter.language.register('typescript', 'ts')
       vim.treesitter.language.register('bash', 'sh')
-      -- enable treesitter highlight on all filetypes
+      -- enable treesitter highlight on all filetypes (skip special buffers)
       vim.api.nvim_create_autocmd('FileType', {
         callback = function()
+          if not nvim_focused then return end
+          if vim.bo.buftype ~= '' then return end  -- skip virtual buffers
+          if vim.bo.filetype == 'neominimap' then return end
           pcall(vim.treesitter.start)
         end,
       })
@@ -404,15 +416,6 @@ require('lazy').setup({
         -- state: bounded by buffer lifecycle
         local cache = {}    -- bufnr -> { tick, annotations }
         local queued = {}   -- bufnr -> timer_id
-        local focused = true
-
-        -- skip work when unfocused
-        vim.api.nvim_create_autocmd('FocusLost', {
-          callback = function() focused = false end,
-        })
-        vim.api.nvim_create_autocmd('FocusGained', {
-          callback = function() focused = true end,
-        })
 
         -- cleanup on buffer delete
         vim.api.nvim_create_autocmd({'BufDelete', 'BufWipeout'}, {
@@ -473,7 +476,7 @@ require('lazy').setup({
             },
           },
           get_annotations = function(bufnr)
-            if not focused then return {} end
+            if not nvim_focused then return {} end
             if not vim.api.nvim_buf_is_valid(bufnr) then return {} end
 
             -- fast path: not a diff buffer
