@@ -1,3 +1,6 @@
+# ductwork — headless terminal streams
+source ~/.bash_aliases.ductwork.sh
+
 # prefer nvim over vim/vi
 alias vim='nvim'
 alias vi='nvim'
@@ -277,14 +280,16 @@ alias restart.bluetooth='bluetoothctl power on && systemctl restart bluetooth'
 alias restart.wifi='systemctl restart NetworkManager.service'
 
 # make it easy to update shell configs
-alias sync.devenv.bashaliases='cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases && source ~/.bash_aliases'
+alias sync.devenv.bashaliases='cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases && cp ~/git/more/dev-env-setup/src/ductwork.sh ~/.bash_aliases.ductwork.sh && source ~/.bash_aliases'
 alias sync.devenv.zshrc='cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc && source ~/.zshrc'
 alias sync.devenv.starship='mkdir -p ~/.config && cp ~/git/more/dev-env-setup/src/starship.toml ~/.config/starship.toml && echo "• starship config synced"'
 alias sync.devenv.gitaliases='source ~/git/more/dev-env-setup/src/install_env.pt2.shell.git.aliases.sh && configure_git_aliases'
 alias sync.devenv.nvim='mkdir -p ~/.config/nvim && cp ~/git/more/dev-env-setup/src/init.lua ~/.config/nvim/init.lua && echo "• neovim config synced"'
 alias sync.devenv.ptyxis='source ~/git/more/dev-env-setup/src/install_env.pt4.terminal.ptyxis.sh && configure_ptyxis'
+alias sync.devenv.kitty='source ~/git/more/dev-env-setup/src/install_env.pt4.terminal.kitty.sh && configure_kitty && configure_kitty_theme'
+alias sync.devenv.tmux='mkdir -p ~/.config/tmux && cp ~/git/more/dev-env-setup/src/tmux.conf ~/.config/tmux/tmux.conf && echo "• tmux config synced"'
 alias sync.devenv.cosmic='source ~/git/more/dev-env-setup/src/install_env.pt3.cosmic.sh && configure_cosmic_theme'
-alias sync.devenv='sync.devenv.bashaliases && sync.devenv.starship && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.cosmic'
+alias sync.devenv='sync.devenv.bashaliases && sync.devenv.starship && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.kitty && sync.devenv.tmux && sync.devenv.cosmic'
 
 # make it easy to pull down the devenv repo
 alias devenv.sync.repo='cd ~/git/more/dev-env-setup && git checkout main && git pull origin HEAD'

@@ -50,15 +50,22 @@ install_zsh() {
   sudo apt install zsh
 
   cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases
+  cp ~/git/more/dev-env-setup/src/ductwork.sh ~/.bash_aliases.ductwork.sh
   cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc
   chsh -s "$(which zsh)"
 }
 
 install_cli_deps() {
   sudo apt install -y xclip # required for pbpaste, pbcopy
-  sudo apt install -y jq # required for manipulating json in terminal
+  sudo apt install -y jq # required for json in terminal
   sudo apt install -y tree # required for tree view of directories
   sudo apt install -y fzf # fuzzy finder for history, files, etc
+  sudo apt install -y tmux # required for ductwork (headless terminal streams)
+}
+
+configure_tmux() {
+  mkdir -p ~/.config/tmux
+  cp ~/git/more/dev-env-setup/src/tmux.conf ~/.config/tmux/tmux.conf
 }
 
 install_starship() {
