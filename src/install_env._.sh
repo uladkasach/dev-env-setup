@@ -51,6 +51,7 @@ install_starship
 source "$THIS_DIR/install_env.pt2.shell.git.aliases.sh"
 configure_git_aliases
 install_cli_deps
+configure_tmux
 
 # pt3: cosmic desktop
 source "$THIS_DIR/install_env.pt3.cosmic.sh"
@@ -62,10 +63,15 @@ configure_cosmic_desktop
 # pt4: terminal & editor
 source "$THIS_DIR/install_env.pt4.terminal.sh"
 source "$THIS_DIR/install_env.pt4.terminal.ptyxis.sh"
+source "$THIS_DIR/install_env.pt4.terminal.kitty.sh"
 source "$THIS_DIR/install_env.pt5.devtools.sh"  # sourced early for install_rust
 install_fonts
 install_ptyxis
 configure_ptyxis
+install_kitty
+configure_kitty
+configure_kitty_theme
+configure_kitty_icon
 install_terminal_command
 install_vim
 install_rust  # must run before install_neovim (cargo needed for tree-sitter-cli)
