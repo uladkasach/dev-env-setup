@@ -49,9 +49,10 @@ clone_this_repo() {
 install_zsh() {
   sudo apt install zsh
 
-  cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases
-  cp ~/git/more/dev-env-setup/src/ductwork.sh ~/.bash_aliases.ductwork.sh
-  cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc
+  local src_dir="${DEV_ENV_SETUP_DIR:-~/git/more/dev-env-setup}/src"
+  cp "$src_dir/bash_aliases.sh" ~/.bash_aliases
+  cp "$src_dir/ductwork.sh" ~/.bash_aliases.ductwork.sh
+  cp "$src_dir/zshrc.sh" ~/.zshrc
   chsh -s "$(which zsh)"
 }
 
@@ -64,8 +65,23 @@ install_cli_deps() {
 }
 
 configure_tmux() {
-  mkdir -p ~/.config/tmux
-  cp ~/git/more/dev-env-setup/src/tmux.conf ~/.config/tmux/tmux.conf
+  local src_dir="${DEV_ENV_SETUP_DIR:-~/git/more/dev-env-setup}/src"
+
+  cp "$src_dir/tmux.conf" ~/.tmux.conf
+  echo "• tmux.conf installed"
+
+  # install tpm (tmux plugin manager) if not present
+  if [[ ! -d ~/.tmux/plugins/tpm ]]; then
+    git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+    echo "• tpm installed"
+  fi
+
+  # install plugins via tpm (headless)
+  # run install inside tmux so tpm can read its own config
+  tmux new-session -d -s _tpm_init
+  tmux run-shell -t _tpm_init ~/.tmux/plugins/tpm/bin/install_plugins
+  tmux kill-session -t _tpm_init 2>/dev/null || true
+  echo "• tmux plugins installed"
 }
 
 install_starship() {
@@ -87,8 +103,9 @@ install_starship() {
   chmod +x ~/.local/bin/starship
   rm -rf "$tmp_dir"
 
+  local src_dir="${DEV_ENV_SETUP_DIR:-~/git/more/dev-env-setup}/src"
   mkdir -p ~/.config
-  cp ~/git/more/dev-env-setup/src/starship.toml ~/.config/starship.toml
+  cp "$src_dir/starship.toml" ~/.config/starship.toml
 
   echo "• starship v${version} installed to ~/.local/bin/starship"
   starship --version
