@@ -52,6 +52,7 @@ install_zsh() {
   local src_dir="${DEV_ENV_SETUP_DIR:-~/git/more/dev-env-setup}/src"
   cp "$src_dir/bash_aliases.sh" ~/.bash_aliases
   cp "$src_dir/ductwork.sh" ~/.bash_aliases.ductwork.sh
+  cp "$src_dir/termwork.sh" ~/.bash_aliases.termwork.sh
   cp "$src_dir/zshrc.sh" ~/.zshrc
   chsh -s "$(which zsh)"
 }
