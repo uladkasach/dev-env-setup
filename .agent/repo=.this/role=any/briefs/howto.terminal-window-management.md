@@ -2,20 +2,21 @@
 
 ## .what
 
-open visible terminal windows for humans via kitty IPC. composable with ductwork for persistent sessions.
+open visible terminal windows for humans via kitty IPC. composable with ductwork for persistent sessions — local or cloud.
 
 ## .why
 
 - agents need to open terminals for human review
 - separate window management (kitty) from session management (tmux)
 - one terminal per duct session keeps model simple
+- cloud ducts enable persistent sessions on remote machines
 
 ## .namespaces
 
 | namespace | concern | backend |
 |-----------|---------|---------|
-| `duct.*` | session management | tmux |
-| `term.*` | window management | kitty |
+| `duct.*` | session management | tmux (local or cloud) |
+| `term.*` | window management | kitty (always local) |
 
 ## .usage
 
@@ -27,13 +28,27 @@ term.open --via kitty --cwd /path         # open in directory
 term.open --via kitty --shell /bin/zsh    # specify shell
 ```
 
-### with duct session
+### with local duct session
 
 ```bash
-# open terminal attached to duct
+# open terminal attached to local duct
 term.open --via kitty --on dev
 
 # if terminal already exists for that duct, focuses it instead
+```
+
+### with cloud duct session
+
+```bash
+# first, create headless session on cloud machine
+duct.open --on vlad@cloud:agent-1
+
+# open local kitty window attached to remote duct
+term.open --via kitty --on vlad@cloud:agent-1
+
+# kitty runs locally, ssh tunnels to remote tmux
+# ctrl+x d detaches, remote session continues
+# reattach anytime with same command
 ```
 
 ### window management
@@ -56,6 +71,8 @@ term.list --via kitty                     # list open terminals
 
 ## .composition with ductwork
 
+### local
+
 ```bash
 # create duct session
 duct.open --on build
@@ -71,6 +88,27 @@ duct.send --on build --what "npm run dev"
 term.open --via kitty --on build
 ```
 
+### cloud (agent trees)
+
+```bash
+# spawn multiple agents on cloud machine
+for i in 1 2 3; do
+  duct.open --on vlad@cloud:agent-$i
+  duct.send --on vlad@cloud:agent-$i --what "claude --task '$TASK_$i'"
+done
+
+# open local windows to watch any/all
+term.open --via kitty --on vlad@cloud:agent-1
+term.open --via kitty --on vlad@cloud:agent-2
+
+# read output (no window needed)
+duct.read --on vlad@cloud:agent-3
+
+# hibernate cloud machine... sessions persist via tmux-continuum
+# resume later, reattach to any session
+term.open --via kitty --on vlad@cloud:agent-1
+```
+
 ## .registry
 
 terminal metadata stored in `~/.termwork/{pid}.json`:
@@ -78,12 +116,16 @@ terminal metadata stored in `~/.termwork/{pid}.json`:
 ```json
 {
   "pid": 12345,
-  "socket": "unix:@kitty-12345",
+  "socket": "unix:/tmp/kitty-12345",
   "cwd": "/home/vlad/git/project",
-  "duct": "dev",
+  "duct": "agent-1",
+  "host": "vlad@cloud",
   "startedAt": 1718100000000
 }
 ```
+
+- `host` is empty string for local ducts
+- `host` is `user@hostname` for cloud ducts
 
 ## .install
 

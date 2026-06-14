@@ -2,11 +2,11 @@
   "organization": "uladkasach",
   "packageManager": "pnpm@10.24.0",
   "devDependencies": {
-    "rhachet": "^1.41.16",
+    "rhachet": "^1.41.17",
     "rhachet-brains-anthropic": "^0.4.1",
     "rhachet-brains-xai": "^0.3.3",
-    "rhachet-roles-bhrain": "^0.28.0",
-    "rhachet-roles-bhuild": "^0.21.13",
+    "rhachet-roles-bhrain": "^0.29.0",
+    "rhachet-roles-bhuild": "^0.21.15",
     "rhachet-roles-ehmpathy": "^1.35.12"
   },
   "scripts": {

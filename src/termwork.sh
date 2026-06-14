@@ -6,19 +6,29 @@
 # usage:
 #   term.open --via kitty                     # open kitty with shell
 #   term.open --via kitty --cwd /path         # open in directory
-#   term.open --via kitty --on work           # attach to duct session
+#   term.open --via kitty --on work           # attach to local duct
+#   term.open --via kitty --on user@host:work # attach to remote duct (cloud)
 #   term.open --via kitty --pid 12345         # focus terminal
 #   term.stop --via kitty --on work           # stop terminal by duct name
+#   term.stop --via kitty --on user@host:work # stop terminal by remote duct
 #   term.stop --via kitty --pid 12345         # stop terminal by pid
 #   term.read --via kitty --on work           # read terminal by duct name
+#   term.read --via kitty --on user@host:work # read terminal by remote duct
 #   term.read --via kitty --pid 12345         # read terminal by pid
-#   term.send --via kitty --on work --what "cmd"   # send by duct name
-#   term.send --via kitty --pid 12345 --what "cmd" # send by pid
+#   term.send --via kitty --on work --what "cmd"           # send by duct name
+#   term.send --via kitty --on user@host:work --what "cmd" # send to remote duct
+#   term.send --via kitty --pid 12345 --what "cmd"         # send by pid
 #   term.list --via kitty                     # list open terminals
 #
+# remote ducts:
+#   - use ductwork to create remote session: duct.open --on user@host:work
+#   - use termwork to attach local window:   term.open --via kitty --on user@host:work
+#   - kitty runs locally, ssh tunnels to remote tmux session
+#   - ctrl+x d detaches locally, remote session continues
+#
 # namespaces:
-#   duct.* = session management (tmux)
-#   term.* = window management (kitty)
+#   duct.* = session management (tmux, local or cloud)
+#   term.* = window management (kitty, always local)
 #
 # requires: kitty (sudo apt install kitty)
 ######################################################################
@@ -29,11 +39,30 @@ _term_ensure_dir() {
   mkdir -p "$TERMWORK_DIR"
 }
 
+# parse duct slug into host and session
+# e.g., "user@host:work" -> TERM_HOST="user@host", TERM_SESSION="work"
+# e.g., "work" -> TERM_HOST="", TERM_SESSION="work"
+_term_parse_duct_slug() {
+  local slug="$1"
+  if [[ "$slug" == *:* ]]; then
+    TERM_HOST="${slug%:*}"
+    TERM_SESSION="${slug#*:}"
+  else
+    TERM_HOST=""
+    TERM_SESSION="$slug"
+  fi
+}
+
+_term_is_remote() {
+  [[ -n "$TERM_HOST" ]]
+}
+
 _term_register() {
   local pid="$1"
   local socket="$2"
   local cwd="$3"
   local duct="$4"
+  local host="$5"
   _term_ensure_dir
   cat > "$TERMWORK_DIR/$pid.json" <<EOF
 {
@@ -41,6 +70,7 @@ _term_register() {
   "socket": "$socket",
   "cwd": "$cwd",
   "duct": "$duct",
+  "host": "$host",
   "startedAt": $(date +%s)000
 }
 EOF
@@ -52,13 +82,20 @@ _term_unregister() {
 }
 
 _term_find_by_duct() {
-  local duct="$1"
+  local slug="$1"
   _term_ensure_dir
-  local f d pid
+
+  # parse the slug to match against stored duct+host
+  _term_parse_duct_slug "$slug"
+  local want_host="$TERM_HOST"
+  local want_session="$TERM_SESSION"
+
+  local f d h pid
   while IFS= read -r -d '' f; do
     [[ -f "$f" ]] || continue
     d=$(jq -r '.duct // ""' "$f" 2>/dev/null)
-    if [[ "$d" == "$duct" ]]; then
+    h=$(jq -r '.host // ""' "$f" 2>/dev/null)
+    if [[ "$d" == "$want_session" && "$h" == "$want_host" ]]; then
       pid=$(jq -r '.pid' "$f" 2>/dev/null)
       # check if process still alive
       if kill -0 "$pid" 2>/dev/null; then
@@ -139,16 +176,35 @@ term.open() {
     fi
   fi
 
+  # parse duct slug for remote support
+  local duct_host=""
+  local duct_session=""
+  if [[ -n "$duct" ]]; then
+    _term_parse_duct_slug "$duct"
+    duct_host="$TERM_HOST"
+    duct_session="$TERM_SESSION"
+  fi
+
   # spawn kitty with remote control
   # use {kitty_pid} placeholder - kitty expands this to its actual PID
   if [[ -n "$duct" ]]; then
-    # attach to tmux session via interactive login shell (sources .zshrc, has PATH)
-    kitty \
-      -o "allow_remote_control=yes" \
-      -o "listen_on=unix:/tmp/kitty-{kitty_pid}" \
-      --detach \
-      --directory "$cwd" \
-      -e "$shell" -l -i -c "tmux attach-session -t '$duct'"
+    if [[ -n "$duct_host" ]]; then
+      # remote duct: ssh to host and attach to tmux session
+      kitty \
+        -o "allow_remote_control=yes" \
+        -o "listen_on=unix:/tmp/kitty-{kitty_pid}" \
+        --detach \
+        --directory "$cwd" \
+        -e ssh -t "$duct_host" "tmux attach-session -t '$duct_session'"
+    else
+      # local duct: attach to tmux session via interactive login shell
+      kitty \
+        -o "allow_remote_control=yes" \
+        -o "listen_on=unix:/tmp/kitty-{kitty_pid}" \
+        --detach \
+        --directory "$cwd" \
+        -e "$shell" -l -i -c "tmux attach-session -t '$duct_session'"
+    fi
   else
     kitty \
       -o "allow_remote_control=yes" \
@@ -169,10 +225,14 @@ term.open() {
 
   # register terminal with file socket path
   local socket="unix:/tmp/kitty-$pid"
-  _term_register "$pid" "$socket" "$cwd" "$duct"
+  _term_register "$pid" "$socket" "$cwd" "$duct_session" "$duct_host"
 
   if [[ -n "$duct" ]]; then
-    echo "🖥️  term://$duct opened (pid $pid)"
+    if [[ -n "$duct_host" ]]; then
+      echo "🖥️  term://$duct opened (pid $pid, cloud)"
+    else
+      echo "🖥️  term://$duct opened (pid $pid, local)"
+    fi
   else
     echo "🖥️  term://shell opened (pid $pid)"
   fi
@@ -361,7 +421,7 @@ term.list() {
   _term_ensure_dir
 
   local found=0
-  local f pid cwd duct started socket ts
+  local f pid cwd duct host started socket ts slug
 
   while IFS= read -r -d '' f; do
     [[ -f "$f" ]] || continue
@@ -369,6 +429,7 @@ term.list() {
     pid=$(jq -r '.pid' "$f" 2>/dev/null)
     cwd=$(jq -r '.cwd' "$f" 2>/dev/null)
     duct=$(jq -r '.duct // ""' "$f" 2>/dev/null)
+    host=$(jq -r '.host // ""' "$f" 2>/dev/null)
     started=$(jq -r '.startedAt' "$f" 2>/dev/null)
     socket=$(jq -r '.socket' "$f" 2>/dev/null)
 
@@ -381,16 +442,28 @@ term.list() {
     found=1
     ts=$(date -d "@$((started / 1000))" "+%Y-%m-%d %H:%M" 2>/dev/null || echo "$started")
 
+    # reconstruct full slug for display
+    if [[ -n "$host" ]]; then
+      slug="$host:$duct"
+    else
+      slug="$duct"
+    fi
+
     echo ""
     if [[ -n "$duct" ]]; then
-      echo "🖥️  term://$duct"
+      echo "🖥️  term://$slug"
     else
       echo "🖥️  term://shell"
     fi
     echo "   ├─ pid: $pid"
     echo "   ├─ cwd: $cwd"
     if [[ -n "$duct" ]]; then
-      echo "   ├─ duct: $duct"
+      echo "   ├─ duct: $slug"
+      if [[ -n "$host" ]]; then
+        echo "   ├─ host: $host (cloud)"
+      else
+        echo "   ├─ host: localhost (local)"
+      fi
     fi
     echo "   └─ opened: $ts"
   done < <(find "$TERMWORK_DIR" -maxdepth 1 -name '*.json' -print0 2>/dev/null)
