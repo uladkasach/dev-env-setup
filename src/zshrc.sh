@@ -90,6 +90,8 @@ fi
 
 # aliases
 source ~/.bash_aliases
+[[ -f ~/.bash_aliases.ductwork.sh ]] && source ~/.bash_aliases.ductwork.sh
+[[ -f ~/.bash_aliases.termwork.sh ]] && source ~/.bash_aliases.termwork.sh
 
 # make bash subshells (e.g., scripts, git aliases, makefiles) also load aliases
 # zsh sources ~/.bash_aliases above, but bash subshells spawned from zsh won't
