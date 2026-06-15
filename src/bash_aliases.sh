@@ -952,23 +952,25 @@ git_alias_tree() {
 # .what: list worktrees for current repo, or open a specific one
 _git_tree_get() {
   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    echo "git tree get - list worktrees for current repo"
+    echo "git tree get - list worktrees for current repo or all repos"
     echo ""
-    echo "usage: git tree get [branch] [--open <opener>]"
+    echo "usage: git tree get [branch] [--repo <name|@all>] [--open <opener>]"
     echo ""
     echo "options:"
     echo "  <branch>            show specific worktree (optional)"
+    echo "  --repo <name|@all>  filter by repo name or show all repos"
     echo "  --open <opener>     open worktree with specified opener"
     echo "                      e.g., --open terminal, --open codium"
     echo ""
     echo "examples:"
-    echo "  git tree get                        # list all worktrees"
+    echo "  git tree get                        # list all worktrees for current repo"
+    echo "  git tree get --repo @all            # list all worktrees across all repos"
     echo "  git tree get feat/foo               # show specific worktree"
     echo "  git tree get feat/foo --open codium # open in codium"
     return 0
   fi
 
-  local branch="" opener=""
+  local branch="" opener="" repo_filter=""
 
   # parse args
   local prev=""
@@ -978,8 +980,14 @@ _git_tree_get() {
       prev=""
       continue
     fi
+    if [[ "$prev" == "--repo" ]]; then
+      repo_filter="$arg"
+      prev=""
+      continue
+    fi
     case "$arg" in
       --open) prev="--open" ;;
+      --repo) prev="--repo" ;;
       -*) ;;
       *) [[ -z "$branch" ]] && branch="$arg" ;;
     esac
@@ -1007,18 +1015,25 @@ _git_tree_get() {
       return 1
     fi
 
-    local commit_info
+    local commit_info created_epoch mtime_epoch created_fmt mtime_fmt relative
     commit_info=$(git -C "$worktree_path" log -1 --format="%h %s" 2>/dev/null || echo "(unknown)")
+    created_epoch=$(stat -c %W "$worktree_path" 2>/dev/null || echo "0")
+    mtime_epoch=$(stat -c %Y "$worktree_path" 2>/dev/null || echo "0")
+    [[ "$created_epoch" == "0" ]] && created_epoch="$mtime_epoch"
+    created_fmt=$(_git_tree_format_date "$created_epoch")
+    mtime_fmt=$(_git_tree_format_date "$mtime_epoch")
+    relative=$(_git_tree_relative_time "$mtime_epoch")
 
     echo ""
     echo "🌲 $repo_name.$sanitized"
     echo "   ├─ branch: $branch"
-    echo "   ├─ path: $worktree_path"
+    echo -e "   ├─ \033[2mat $worktree_path\033[0m"
+    echo -e "   ├─ \033[2mon $created_fmt → $mtime_fmt, $relative\033[0m"
     if [[ -n "$opener" ]]; then
-      echo "   ├─ head: $commit_info"
+      echo "   ├─ $commit_info"
       echo -e "   └─ \033[2mopen in $opener...\033[0m"
     else
-      echo "   └─ head: $commit_info"
+      echo "   └─ $commit_info"
     fi
     echo ""
 
@@ -1029,47 +1044,157 @@ _git_tree_get() {
     return 0
   fi
 
-  # no branch specified: list all worktrees
+  # handle --repo flag for multi-repo mode
+  if [[ -n "$repo_filter" ]]; then
+    local found_any=false repos=() rname
+    local worktrees_base="${worktrees_dir%/*}"
+
+    for worktrees_dir in "$worktrees_base"/*/_worktrees; do
+      [[ -d "$worktrees_dir" ]] || continue
+      for dir in "$worktrees_dir"/*; do
+        [[ -d "$dir" ]] || continue
+        [[ "$(basename "$dir")" == "_patches" ]] && continue
+        rname=$(basename "$dir" | cut -d. -f1)
+        if [[ "$repo_filter" != "@all" && "$rname" != "$repo_filter" ]]; then
+          continue
+        fi
+        if [[ ! " ${repos[*]} " =~ " ${rname} " ]]; then
+          repos+=("$rname")
+        fi
+      done
+
+      for repo_name in "${repos[@]}"; do
+        local entries=()
+        for dir in "$worktrees_dir"/"$repo_name".*; do
+          [[ -d "$dir" ]] || continue
+          local timestamp
+          timestamp=$(stat -c %Y "$dir" 2>/dev/null || echo "0")
+          entries+=("$timestamp:$dir")
+        done
+
+        [[ ${#entries[@]} -eq 0 ]] && continue
+
+        found_any=true
+
+        # sort by timestamp (most recent first)
+        local sorted
+        IFS=$'\n' sorted=($(printf '%s\n' "${entries[@]}" | sort -t: -k1 -rn)); unset IFS
+
+        echo ""
+        echo "🏔️  $repo_name"
+        echo "   │"
+
+        local idx=0 total=${#sorted[@]}
+        for entry in "${sorted[@]}"; do
+          ((idx++))
+          local timestamp dir name branch_name commit_info
+          local created_epoch mtime_epoch created_fmt mtime_fmt relative
+          timestamp="${entry%%:*}"
+          dir="${entry#*:}"
+          name="$(basename "$dir")"
+          branch_name="${name#$repo_name.}"
+          commit_info=$(git -C "$dir" log -1 --format="%h %s" 2>/dev/null || echo "(unknown)")
+          created_epoch=$(stat -c %W "$dir" 2>/dev/null || echo "0")
+          mtime_epoch="$timestamp"
+          [[ "$created_epoch" == "0" ]] && created_epoch="$mtime_epoch"
+          created_fmt=$(_git_tree_format_date "$created_epoch")
+          mtime_fmt=$(_git_tree_format_date "$mtime_epoch")
+          relative=$(_git_tree_relative_time "$mtime_epoch")
+
+          if [[ $idx -eq $total ]]; then
+            echo "   └─ 🌲 $branch_name"
+            echo -e "       ├─ \033[2mat $dir\033[0m"
+            echo -e "       ├─ \033[2mon $created_fmt → $mtime_fmt, $relative\033[0m"
+            echo "       └─ $commit_info"
+          else
+            echo "   ├─ 🌲 $branch_name"
+            echo -e "   │     ├─ \033[2mat $dir\033[0m"
+            echo -e "   │     ├─ \033[2mon $created_fmt → $mtime_fmt, $relative\033[0m"
+            echo "   │     └─ $commit_info"
+            echo "   │"
+          fi
+        done
+      done
+      repos=()
+    done
+
+    if [[ "$found_any" == "false" ]]; then
+      echo ""
+      if [[ "$repo_filter" == "@all" ]]; then
+        echo "🏔️  (no worktrees on machine)"
+      else
+        echo "🏔️  $repo_filter"
+        echo "   └─ (no worktrees)"
+      fi
+    fi
+
+    echo ""
+    return 0
+  fi
+
+  # no branch specified, no --repo: list all worktrees for current repo
   if [[ ! -d "$worktrees_dir" ]]; then
     echo ""
-    echo "🌲 $repo_name"
+    echo "🏔️  $repo_name"
     echo "   └─ (no worktrees)"
     echo ""
     return 0
   fi
 
-  local found=0 count=0
-  local branches=()
+  local entries=()
   for dir in "$worktrees_dir"/"$repo_name".*; do
     [[ -d "$dir" ]] || continue
-    branches+=("$dir")
-    ((count++))
+    local timestamp
+    timestamp=$(stat -c %Y "$dir" 2>/dev/null || echo "0")
+    entries+=("$timestamp:$dir")
   done
+
+  if [[ ${#entries[@]} -eq 0 ]]; then
+    echo ""
+    echo "🏔️  $repo_name"
+    echo "   └─ (no worktrees)"
+    echo ""
+    return 0
+  fi
+
+  # sort by timestamp (most recent first)
+  local sorted
+  IFS=$'\n' sorted=($(printf '%s\n' "${entries[@]}" | sort -t: -k1 -rn)); unset IFS
 
   echo ""
   echo "🏔️  $repo_name"
+  echo "   │"
 
-  if [[ $count -eq 0 ]]; then
-    echo "   └─ (no worktrees)"
-  else
-    local i=0
-    for dir in "${branches[@]}"; do
-      ((i++))
-      local name branch_name commit_info
-      name="$(basename "$dir")"
-      branch_name="${name#$repo_name.}"
-      commit_info=$(git -C "$dir" log -1 --format="%h %s" 2>/dev/null || echo "(unknown)")
-      if [[ $i -eq $count ]]; then
-        echo "   └─ 🌲 $branch_name"
-        echo "       ├─ path: $dir"
-        echo "       └─ head: $commit_info"
-      else
-        echo "   ├─ 🌲 $branch_name"
-        echo "   │  ├─ path: $dir"
-        echo "   │  └─ head: $commit_info"
-      fi
-    done
-  fi
+  local idx=0 total=${#sorted[@]}
+  for entry in "${sorted[@]}"; do
+    ((idx++))
+    local timestamp dir name branch_name commit_info
+    local created_epoch mtime_epoch created_fmt mtime_fmt relative
+    timestamp="${entry%%:*}"
+    dir="${entry#*:}"
+    name="$(basename "$dir")"
+    branch_name="${name#$repo_name.}"
+    commit_info=$(git -C "$dir" log -1 --format="%h %s" 2>/dev/null || echo "(unknown)")
+    created_epoch=$(stat -c %W "$dir" 2>/dev/null || echo "0")
+    mtime_epoch="$timestamp"
+    [[ "$created_epoch" == "0" ]] && created_epoch="$mtime_epoch"
+    created_fmt=$(_git_tree_format_date "$created_epoch")
+    mtime_fmt=$(_git_tree_format_date "$mtime_epoch")
+    relative=$(_git_tree_relative_time "$mtime_epoch")
+
+    if [[ $idx -eq $total ]]; then
+      echo "   └─ 🌲 $branch_name"
+      echo -e "       ├─ \033[2mat $dir\033[0m"
+      echo -e "       ├─ \033[2mon $created_fmt → $mtime_fmt, $relative\033[0m"
+      echo "       └─ $commit_info"
+    else
+      echo "   ├─ 🌲 $branch_name"
+      echo -e "   │     ├─ \033[2mat $dir\033[0m"
+      echo -e "   │     ├─ \033[2mon $created_fmt → $mtime_fmt, $relative\033[0m"
+      echo "   │     └─ $commit_info"
+      echo "   │"
+    fi
+  done
   echo ""
 }
 
@@ -1434,12 +1559,43 @@ _git_tree_del() {
   echo ""
 }
 
+# .what: convert epoch to relative time string (e.g., "3h ago", "2d ago")
+# args: epoch_seconds
+_git_tree_relative_time() {
+  local epoch="$1"
+  local now diff
+  now=$(date +%s)
+  diff=$((now - epoch))
+
+  if [[ $diff -lt 3600 ]]; then
+    echo "$((diff / 60))m ago"
+  elif [[ $diff -lt 86400 ]]; then
+    echo "$((diff / 3600))h ago"
+  elif [[ $diff -lt 604800 ]]; then
+    echo "$((diff / 86400))d ago"
+  elif [[ $diff -lt 2592000 ]]; then
+    echo "$((diff / 604800))w ago"
+  elif [[ $diff -lt 31536000 ]]; then
+    echo "$((diff / 2592000)) mo ago"
+  else
+    echo "1y+ ago"
+  fi
+}
+
+# .what: convert epoch to date string (e.g., "May 26")
+# args: epoch_seconds
+_git_tree_format_date() {
+  local epoch="$1"
+  date -d "@$epoch" "+%b %-d" 2>/dev/null || echo "unknown"
+}
+
 # .what: print status for a single worktree directory
-# args: dir, repo_name, is_last (true/false)
+# args: dir, repo_name, is_last (true/false), timestamp (optional)
 _git_tree_status_one() {
   local dir="$1"
   local repo_name="$2"
   local is_last="$3"
+  local mtime="$4"
   local name branch_name display_branch
   name=$(basename "$dir")
   branch_name=$(echo "$name" | sed "s/^${repo_name}\\.//")
@@ -1453,8 +1609,19 @@ _git_tree_status_one() {
     child_prefix="   "
   fi
 
+  # get worktree timestamps
+  local created_epoch mtime_epoch created_fmt mtime_fmt relative
+  created_epoch=$(stat -c %W "$dir" 2>/dev/null || echo "0")
+  mtime_epoch="${mtime:-$(stat -c %Y "$dir" 2>/dev/null || echo "0")}"
+  # fallback: if birth time is 0, use mtime
+  [[ "$created_epoch" == "0" ]] && created_epoch="$mtime_epoch"
+  created_fmt=$(_git_tree_format_date "$created_epoch")
+  mtime_fmt=$(_git_tree_format_date "$mtime_epoch")
+  relative=$(_git_tree_relative_time "$mtime_epoch")
+
   echo "   $tree_conn 🌲 $display_branch"
   echo -e "   $child_prefix  ├─ \033[2mat $dir\033[0m"
+  echo -e "   $child_prefix  ├─ \033[2mon $created_fmt → $mtime_fmt, $relative\033[0m"
 
   # check local state (env -i to fully isolate from current repo's git env)
   local has_staged has_unstaged has_untracked
@@ -1566,7 +1733,7 @@ _git_tree_status() {
         entries=()
         for dir in "$worktrees_dir"/"$repo_name".*; do
           [[ -d "$dir" ]] || continue
-          timestamp=$(git -C "$dir" log -1 --format="%ct" 2>/dev/null || echo "0")
+          timestamp=$(stat -c %Y "$dir" 2>/dev/null || echo "0")
           entries+=("$timestamp:$dir")
         done
 
@@ -1574,8 +1741,8 @@ _git_tree_status() {
 
         found_any=true
 
-        # sort by timestamp (oldest first)
-        IFS=$'\n' sorted=($(printf '%s\n' "${entries[@]}" | sort -t: -k1 -n)); unset IFS
+        # sort by timestamp (most recent first)
+        IFS=$'\n' sorted=($(printf '%s\n' "${entries[@]}" | sort -t: -k1 -rn)); unset IFS
 
         echo ""
         echo "🏔️  $repo_name"
@@ -1585,10 +1752,11 @@ _git_tree_status() {
         total=${#sorted[@]}
         for entry in "${sorted[@]}"; do
           ((idx++))
+          timestamp="${entry%%:*}"
           dir="${entry#*:}"
           is_last="false"
           [[ $idx -eq $total ]] && is_last="true"
-          _git_tree_status_one "$dir" "$repo_name" "$is_last"
+          _git_tree_status_one "$dir" "$repo_name" "$is_last" "$timestamp"
           [[ "$is_last" == "false" ]] && echo "   │"
         done
       done
@@ -1623,7 +1791,7 @@ _git_tree_status() {
   entries=()
   for dir in "$worktrees_dir"/"$repo_name".*; do
     [[ -d "$dir" ]] || continue
-    timestamp=$(git -C "$dir" log -1 --format="%ct" 2>/dev/null || echo "0")
+    timestamp=$(stat -c %Y "$dir" 2>/dev/null || echo "0")
     entries+=("$timestamp:$dir")
   done
 
@@ -1635,8 +1803,8 @@ _git_tree_status() {
     return 0
   fi
 
-  # sort by timestamp (oldest first)
-  IFS=$'\n' sorted=($(printf '%s\n' "${entries[@]}" | sort -t: -k1 -n)); unset IFS
+  # sort by timestamp (most recent first)
+  IFS=$'\n' sorted=($(printf '%s\n' "${entries[@]}" | sort -t: -k1 -rn)); unset IFS
 
   echo ""
   echo "🏔️  $repo_name"
@@ -1646,10 +1814,11 @@ _git_tree_status() {
   total=${#sorted[@]}
   for entry in "${sorted[@]}"; do
     ((idx++))
+    timestamp="${entry%%:*}"
     dir="${entry#*:}"
     is_last="false"
     [[ $idx -eq $total ]] && is_last="true"
-    _git_tree_status_one "$dir" "$repo_name" "$is_last"
+    _git_tree_status_one "$dir" "$repo_name" "$is_last" "$timestamp"
     [[ "$is_last" == "false" ]] && echo "   │"
   done
 
