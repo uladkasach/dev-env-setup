@@ -1,6 +1,9 @@
 # ductwork — headless terminal streams
 source ~/.bash_aliases.ductwork.sh
 
+# termwork — terminal window management
+source ~/.bash_aliases.termwork.sh
+
 # prefer nvim over vim/vi
 alias vim='nvim'
 alias vi='nvim'
@@ -280,7 +283,7 @@ alias restart.bluetooth='bluetoothctl power on && systemctl restart bluetooth'
 alias restart.wifi='systemctl restart NetworkManager.service'
 
 # make it easy to update shell configs
-alias sync.devenv.bashaliases='cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases && cp ~/git/more/dev-env-setup/src/ductwork.sh ~/.bash_aliases.ductwork.sh && source ~/.bash_aliases'
+alias sync.devenv.bashaliases='cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases && cp ~/git/more/dev-env-setup/src/ductwork.sh ~/.bash_aliases.ductwork.sh && cp ~/git/more/dev-env-setup/src/termwork.sh ~/.bash_aliases.termwork.sh && source ~/.bash_aliases'
 alias sync.devenv.zshrc='cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc && source ~/.zshrc'
 alias sync.devenv.starship='mkdir -p ~/.config && cp ~/git/more/dev-env-setup/src/starship.toml ~/.config/starship.toml && echo "• starship config synced"'
 alias sync.devenv.gitaliases='source ~/git/more/dev-env-setup/src/install_env.pt2.shell.git.aliases.sh && configure_git_aliases'

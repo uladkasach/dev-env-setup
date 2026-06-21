@@ -33,16 +33,15 @@
 # requires: kitty (sudo apt install kitty)
 ######################################################################
 
-TERMWORK_DIR="$HOME/.termwork"
-
-_term_ensure_dir() {
+__term_ensure_dir() {
+  TERMWORK_DIR="${TERMWORK_DIR:-$HOME/.termwork}"
   mkdir -p "$TERMWORK_DIR"
 }
 
 # parse duct slug into host and session
 # e.g., "user@host:work" -> TERM_HOST="user@host", TERM_SESSION="work"
 # e.g., "work" -> TERM_HOST="", TERM_SESSION="work"
-_term_parse_duct_slug() {
+__term_parse_duct_slug() {
   local slug="$1"
   if [[ "$slug" == *:* ]]; then
     TERM_HOST="${slug%:*}"
@@ -53,17 +52,17 @@ _term_parse_duct_slug() {
   fi
 }
 
-_term_is_remote() {
+__term_is_remote() {
   [[ -n "$TERM_HOST" ]]
 }
 
-_term_register() {
+__term_register() {
   local pid="$1"
   local socket="$2"
   local cwd="$3"
   local duct="$4"
   local host="$5"
-  _term_ensure_dir
+  __term_ensure_dir
   cat > "$TERMWORK_DIR/$pid.json" <<EOF
 {
   "pid": $pid,
@@ -76,17 +75,18 @@ _term_register() {
 EOF
 }
 
-_term_unregister() {
+__term_unregister() {
+  __term_ensure_dir
   local pid="$1"
   rm -f "$TERMWORK_DIR/$pid.json"
 }
 
-_term_find_by_duct() {
+__term_find_by_duct() {
   local slug="$1"
-  _term_ensure_dir
+  __term_ensure_dir
 
   # parse the slug to match against stored duct+host
-  _term_parse_duct_slug "$slug"
+  __term_parse_duct_slug "$slug"
   local want_host="$TERM_HOST"
   local want_session="$TERM_SESSION"
 
@@ -107,10 +107,13 @@ _term_find_by_duct() {
       fi
     fi
   done < <(find "$TERMWORK_DIR" -maxdepth 1 -name '*.json' -print0 2>/dev/null)
-  return 1
+  # return 0 even when not found — empty output is valid, not an error
+  # (return 1 breaks scripts with set -euo pipefail)
+  return 0
 }
 
-_term_get_socket() {
+__term_get_socket() {
+  __term_ensure_dir
   local pid="$1"
   local f="$TERMWORK_DIR/$pid.json"
   if [[ -f "$f" ]]; then
@@ -149,7 +152,7 @@ term.open() {
   # if --pid given, focus that terminal
   if [[ -n "$pid" ]]; then
     local socket
-    socket=$(_term_get_socket "$pid")
+    socket=$(__term_get_socket "$pid")
     if [[ -z "$socket" ]]; then
       echo "✋ term.open: terminal $pid not found" >&2
       return 2
@@ -168,7 +171,7 @@ term.open() {
   # if duct specified, check for extant terminal
   if [[ -n "$duct" ]]; then
     local extant_pid
-    extant_pid=$(_term_find_by_duct "$duct")
+    extant_pid=$(__term_find_by_duct "$duct")
     if [[ -n "$extant_pid" ]]; then
       echo "🖥️  term://$duct found (pid $extant_pid)"
       term.open --via kitty --pid "$extant_pid"
@@ -180,7 +183,7 @@ term.open() {
   local duct_host=""
   local duct_session=""
   if [[ -n "$duct" ]]; then
-    _term_parse_duct_slug "$duct"
+    __term_parse_duct_slug "$duct"
     duct_host="$TERM_HOST"
     duct_session="$TERM_SESSION"
   fi
@@ -225,7 +228,7 @@ term.open() {
 
   # register terminal with file socket path
   local socket="unix:/tmp/kitty-$pid"
-  _term_register "$pid" "$socket" "$cwd" "$duct_session" "$duct_host"
+  __term_register "$pid" "$socket" "$cwd" "$duct_session" "$duct_host"
 
   if [[ -n "$duct" ]]; then
     if [[ -n "$duct_host" ]]; then
@@ -264,7 +267,7 @@ term.stop() {
 
   # lookup pid from duct name
   if [[ -n "$duct" && -z "$pid" ]]; then
-    pid=$(_term_find_by_duct "$duct")
+    pid=$(__term_find_by_duct "$duct")
     if [[ -z "$pid" ]]; then
       echo "✋ term.stop: no terminal for duct '$duct'" >&2
       return 2
@@ -277,7 +280,7 @@ term.stop() {
   fi
 
   local socket
-  socket=$(_term_get_socket "$pid")
+  socket=$(__term_get_socket "$pid")
   if [[ -z "$socket" ]]; then
     echo "✋ term.stop: terminal $pid not found" >&2
     return 2
@@ -285,12 +288,12 @@ term.stop() {
 
   if ! kitten @ --to "$socket" close-window 2>/dev/null; then
     # process might already be dead
-    _term_unregister "$pid"
+    __term_unregister "$pid"
     echo "🖥️  term $pid already stopped"
     return 0
   fi
 
-  _term_unregister "$pid"
+  __term_unregister "$pid"
   echo "🖥️  term $pid stopped"
 }
 
@@ -320,7 +323,7 @@ term.read() {
 
   # lookup pid from duct name
   if [[ -n "$duct" && -z "$pid" ]]; then
-    pid=$(_term_find_by_duct "$duct")
+    pid=$(__term_find_by_duct "$duct")
     if [[ -z "$pid" ]]; then
       echo "✋ term.read: no terminal for duct '$duct'" >&2
       return 2
@@ -333,7 +336,7 @@ term.read() {
   fi
 
   local socket
-  socket=$(_term_get_socket "$pid")
+  socket=$(__term_get_socket "$pid")
   if [[ -z "$socket" ]]; then
     echo "✋ term.read: terminal $pid not found" >&2
     return 2
@@ -370,7 +373,7 @@ term.send() {
 
   # lookup pid from duct name
   if [[ -n "$duct" && -z "$pid" ]]; then
-    pid=$(_term_find_by_duct "$duct")
+    pid=$(__term_find_by_duct "$duct")
     if [[ -z "$pid" ]]; then
       echo "✋ term.send: no terminal for duct '$duct'" >&2
       return 2
@@ -388,7 +391,7 @@ term.send() {
   fi
 
   local socket
-  socket=$(_term_get_socket "$pid")
+  socket=$(__term_get_socket "$pid")
   if [[ -z "$socket" ]]; then
     echo "✋ term.send: terminal $pid not found" >&2
     return 2
@@ -418,7 +421,7 @@ term.list() {
     return 2
   fi
 
-  _term_ensure_dir
+  __term_ensure_dir
 
   local found=0
   local f pid cwd duct host started socket ts slug

@@ -14,16 +14,79 @@
 #   duct.read --on user@host:work
 #   duct.stop --on work                      # kill session
 #   duct.stop --on user@host:work
-#   duct.list                                # local sessions
-#   duct.list --on user@host                 # remote sessions
+#   duct.list                                # list all ducts (from cache)
+#   duct.list --on user@host                 # list ducts on specific host
+#   duct.list --refresh                      # refresh cache from all hosts
+#   duct.host.add user@host                  # register a host
+#   duct.host.del user@host                  # unregister a host
+#   duct.host.list                           # list hosts
 #
 # requires: tmux (sudo apt install tmux)
 ######################################################################
 
+######################################################################
+# registry: ~/.ductwork/hosts/{host}.json and ~/.ductwork/ducts/{session}.json
+######################################################################
+
+__duct_ensure_dirs() {
+  DUCTWORK_DIR="${DUCTWORK_DIR:-$HOME/.ductwork}"
+  mkdir -p "$DUCTWORK_DIR/hosts"
+  mkdir -p "$DUCTWORK_DIR/ducts"
+}
+
+__duct_register_host() {
+  local host="$1"
+  __duct_ensure_dirs
+  local file="$DUCTWORK_DIR/hosts/$host.json"
+  local now
+  now=$(date +%s)
+  cat > "$file" <<EOF
+{
+  "lastSeen": ${now}000
+}
+EOF
+}
+
+__duct_unregister_host() {
+  local host="$1"
+  __duct_ensure_dirs
+  rm -f "$DUCTWORK_DIR/hosts/$host.json"
+}
+
+__duct_register_duct() {
+  local session="$1"
+  local host="$2"
+  __duct_ensure_dirs
+  local file="$DUCTWORK_DIR/ducts/$session.json"
+  local now
+  now=$(date +%s)
+  cat > "$file" <<EOF
+{
+  "host": "$host",
+  "createdAt": ${now}000
+}
+EOF
+}
+
+__duct_unregister_duct() {
+  local session="$1"
+  __duct_ensure_dirs
+  rm -f "$DUCTWORK_DIR/ducts/$session.json"
+}
+
+__duct_get_duct_host() {
+  local session="$1"
+  __duct_ensure_dirs
+  local file="$DUCTWORK_DIR/ducts/$session.json"
+  if [[ -f "$file" ]]; then
+    jq -r '.host // ""' "$file" 2>/dev/null
+  fi
+}
+
 # parse slug into host and session
 # e.g., "user@host:work" -> host="user@host", session="work"
 # e.g., "work" -> host="", session="work"
-_duct_parse_slug() {
+__duct_parse_slug() {
   local slug="$1"
   if [[ "$slug" == *:* ]]; then
     DUCT_HOST="${slug%:*}"
@@ -34,7 +97,7 @@ _duct_parse_slug() {
   fi
 }
 
-_duct_is_remote() {
+__duct_is_remote() {
   [[ -n "$DUCT_HOST" ]]
 }
 
@@ -53,9 +116,9 @@ duct.open() {
     return 2
   fi
 
-  _duct_parse_slug "$slug"
+  __duct_parse_slug "$slug"
 
-  if _duct_is_remote; then
+  if __duct_is_remote; then
     # remote: ssh to create/attach
     if ! ssh "$DUCT_HOST" "tmux has-session -t '$DUCT_SESSION' 2>/dev/null"; then
       if ! ssh "$DUCT_HOST" "tmux new-session -d -s '$DUCT_SESSION'"; then
@@ -66,6 +129,10 @@ duct.open() {
     else
       echo "🔧 duct://$slug found (cloud)"
     fi
+
+    # register host + duct
+    __duct_register_host "$DUCT_HOST"
+    __duct_register_duct "$DUCT_SESSION" "$DUCT_HOST"
 
     if [[ "$mode" == "headfull" ]]; then
       echo "🔧 duct://$slug attach (ctrl+x d to detach)"
@@ -82,6 +149,9 @@ duct.open() {
     else
       echo "🔧 duct://$slug found (local)"
     fi
+
+    # register duct (localhost)
+    __duct_register_duct "$DUCT_SESSION" "localhost"
 
     if [[ "$mode" == "headfull" ]]; then
       echo "🔧 duct://$slug attach (ctrl+x d to detach)"
@@ -109,9 +179,9 @@ duct.send() {
     return 2
   fi
 
-  _duct_parse_slug "$slug"
+  __duct_parse_slug "$slug"
 
-  if _duct_is_remote; then
+  if __duct_is_remote; then
     if ! ssh "$DUCT_HOST" "tmux has-session -t '$DUCT_SESSION' 2>/dev/null"; then
       echo "✋ duct.send: session '$slug' not found" >&2
       return 2
@@ -148,9 +218,9 @@ duct.read() {
     return 2
   fi
 
-  _duct_parse_slug "$slug"
+  __duct_parse_slug "$slug"
 
-  if _duct_is_remote; then
+  if __duct_is_remote; then
     if ! ssh "$DUCT_HOST" "tmux has-session -t '$DUCT_SESSION' 2>/dev/null"; then
       echo "✋ duct.read: session '$slug' not found" >&2
       return 2
@@ -167,48 +237,120 @@ duct.read() {
   fi
 }
 
+__duct_list_host_sessions() {
+  local host="$1"
+  if [[ "$host" == "localhost" ]]; then
+    tmux list-sessions -F "#{session_name}" 2>/dev/null
+  else
+    ssh "$host" "tmux list-sessions -F '#{session_name}'" 2>/dev/null
+  fi
+}
+
+__duct_refresh_host() {
+  local host="$1"
+  __duct_ensure_dirs
+
+  # update host lastSeen
+  if [[ "$host" != "localhost" ]]; then
+    __duct_register_host "$host"
+  fi
+
+  # get live sessions
+  local sessions
+  sessions=$(__duct_list_host_sessions "$host")
+
+  # register each session
+  local session
+  while IFS= read -r session; do
+    [[ -z "$session" ]] && continue
+    __duct_register_duct "$session" "$host"
+  done <<< "$sessions"
+
+  # remove stale ducts for this host
+  local f duct_session duct_host
+  for f in "$DUCTWORK_DIR"/ducts/*.json; do
+    [[ -f "$f" ]] || continue
+    duct_host=$(jq -r '.host // ""' "$f" 2>/dev/null)
+    [[ "$duct_host" != "$host" ]] && continue
+    duct_session=$(basename "$f" .json)
+    if ! echo "$sessions" | grep -qx "$duct_session"; then
+      rm -f "$f"
+    fi
+  done
+}
+
 duct.list() {
   local host=""
+  local refresh=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --on) host="$2"; shift 2 ;;
+      --refresh) refresh="1"; shift ;;
       *) echo "✋ duct.list: unknown arg '$1'" >&2; return 2 ;;
     esac
   done
 
-  local sessions
-  local location
+  __duct_ensure_dirs
 
+  # if --on specified, just query that host
   if [[ -n "$host" ]]; then
-    location="cloud"
-    sessions=$(ssh "$host" "tmux list-sessions -F '#{session_name}|#{session_created}'" 2>/dev/null)
-  else
-    location="local"
-    sessions=$(tmux list-sessions -F "#{session_name}|#{session_created}" 2>/dev/null)
-  fi
-
-  if [[ -z "$sessions" ]]; then
-    echo "🔧 ($location: none)"
+    if [[ -n "$refresh" ]]; then
+      __duct_refresh_host "$host"
+    fi
+    local sessions
+    sessions=$(__duct_list_host_sessions "$host")
+    if [[ -z "$sessions" ]]; then
+      echo "📡 $host"
+      echo "   └─ (none)"
+      return
+    fi
+    echo "📡 $host"
+    echo "$sessions" | while IFS= read -r name; do
+      echo "   ├─ $name"
+    done
     return
   fi
 
-  local ts
-  echo "$sessions" | while IFS='|' read -r name created; do
-    if [[ -n "$host" ]]; then
-      ts=$(ssh "$host" "date -d '@$created' '+%Y-%m-%d %H:%M'" 2>/dev/null || echo "$created")
+  # refresh all hosts if requested
+  if [[ -n "$refresh" ]]; then
+    # refresh localhost
+    __duct_refresh_host "localhost"
+    # refresh remote hosts
+    local f h
+    for f in "$DUCTWORK_DIR"/hosts/*.json; do
+      [[ -f "$f" ]] || continue
+      h=$(basename "$f" .json)
+      __duct_refresh_host "$h"
+    done
+  fi
+
+  # group ducts by host from cache
+  local -A host_ducts
+  local f duct_host duct_session
+  for f in "$DUCTWORK_DIR"/ducts/*.json; do
+    [[ -f "$f" ]] || continue
+    duct_host=$(jq -r '.host // "localhost"' "$f" 2>/dev/null)
+    duct_session=$(basename "$f" .json)
+    if [[ -n "${host_ducts[$duct_host]}" ]]; then
+      host_ducts[$duct_host]="${host_ducts[$duct_host]}|$duct_session"
     else
-      ts=$(date -d "@$created" "+%Y-%m-%d %H:%M" 2>/dev/null || echo "$created")
+      host_ducts[$duct_host]="$duct_session"
     fi
-    echo ""
-    echo "🔧 $name"
-    if [[ -n "$host" ]]; then
-      echo "   ├─ uri: duct://$host:$name"
-      echo "   ├─ host: $host (cloud)"
-    else
-      echo "   ├─ uri: duct://$name"
-      echo "   ├─ host: localhost (local)"
-    fi
-    echo "   └─ opened: $ts"
+  done
+
+  if [[ ${#host_ducts[@]} -eq 0 ]]; then
+    echo "📡 (none)"
+    return
+  fi
+
+  # print grouped by host
+  local h sessions_str
+  for h in "${!host_ducts[@]}"; do
+    echo "📡 $h"
+    sessions_str="${host_ducts[$h]}"
+    echo "$sessions_str" | tr '|' '\n' | while IFS= read -r name; do
+      echo "   ├─ $name"
+    done
   done
 }
 
@@ -225,9 +367,9 @@ duct.stop() {
     return 2
   fi
 
-  _duct_parse_slug "$slug"
+  __duct_parse_slug "$slug"
 
-  if _duct_is_remote; then
+  if __duct_is_remote; then
     if ! ssh "$DUCT_HOST" "tmux has-session -t '$DUCT_SESSION' 2>/dev/null"; then
       echo "✋ duct.stop: session '$slug' not found" >&2
       return 2
@@ -246,5 +388,67 @@ duct.stop() {
       return 1
     fi
   fi
+
+  # unregister duct
+  __duct_unregister_duct "$DUCT_SESSION"
+
   echo "🔧 duct://$slug stopped"
+}
+
+duct.host.add() {
+  local host="$1"
+  if [[ -z "$host" ]]; then
+    echo "✋ duct.host.add: host required" >&2
+    return 2
+  fi
+  __duct_register_host "$host"
+  echo "📡 host $host added"
+}
+
+duct.host.del() {
+  local host="$1"
+  if [[ -z "$host" ]]; then
+    echo "✋ duct.host.del: host required" >&2
+    return 2
+  fi
+  __duct_ensure_dirs
+
+  # remove host
+  __duct_unregister_host "$host"
+
+  # remove ducts for this host
+  local f duct_host
+  for f in "$DUCTWORK_DIR"/ducts/*.json; do
+    [[ -f "$f" ]] || continue
+    duct_host=$(jq -r '.host // ""' "$f" 2>/dev/null)
+    if [[ "$duct_host" == "$host" ]]; then
+      rm -f "$f"
+    fi
+  done
+
+  echo "📡 host $host removed"
+}
+
+duct.host.list() {
+  __duct_ensure_dirs
+
+  local found=0
+  local f h lastSeen ts
+
+  # always show localhost
+  echo "📡 localhost (local)"
+  found=1
+
+  for f in "$DUCTWORK_DIR"/hosts/*.json; do
+    [[ -f "$f" ]] || continue
+    h=$(basename "$f" .json)
+    lastSeen=$(jq -r '.lastSeen // 0' "$f" 2>/dev/null)
+    ts=$(date -d "@$((lastSeen / 1000))" "+%Y-%m-%d %H:%M" 2>/dev/null || echo "unknown")
+    echo "📡 $h (last seen: $ts)"
+    found=1
+  done
+
+  if [[ $found -eq 0 ]]; then
+    echo "📡 (no hosts)"
+  fi
 }
