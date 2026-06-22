@@ -2,6 +2,7 @@
 ######################################################################
 # pt3: cosmic desktop
 # cosmic-term, cosmic theme, cosmic desktop (keybinds, panels, dock)
+# cos-cli (wayland window/workspace management)
 ######################################################################
 
 upgrade_cosmic_term() {
@@ -117,4 +118,61 @@ Some(([
 ]))
 WINGS
   echo "• top panel: status area left, controls right"
+}
+
+install_cos_cli() {
+  # .what = install cos-cli for cosmic window/workspace management
+  # .why  = enables terminal.snapshot/restore to place windows on workspaces
+  # ref: https://github.com/estin/cos-cli
+  if command -v cos-cli &>/dev/null; then
+    echo "• cos-cli already installed; skipped"
+    return 0
+  fi
+  cargo install --git https://github.com/estin/cos-cli
+  echo "• cos-cli installed"
+}
+
+install_terminal_session_timer() {
+  # .what = install systemd user timer for auto-snapshot every 5 min
+  # .why  = ensures terminal layout is captured before crash/restart
+  local src_dir="$HOME/git/more/dev-env-setup/src"
+  local user_units="$HOME/.config/systemd/user"
+  mkdir -p "$user_units"
+
+  cp "$src_dir/terminal-session-snapshot.service" "$user_units/"
+  cp "$src_dir/terminal-session-snapshot.timer" "$user_units/"
+
+  systemctl --user daemon-reload
+  systemctl --user enable --now terminal-session-snapshot.timer
+
+  echo "• terminal session auto-snapshot enabled (every 5 min)"
+  echo "  check status: systemctl --user status terminal-session-snapshot.timer"
+}
+
+configure_terminal_session_logout_hook() {
+  # .what = snapshot terminal session before logout/shutdown
+  # .why  = capture final state before controlled exit
+  local hook_dir="$HOME/.config/systemd/user"
+  mkdir -p "$hook_dir"
+
+  # create service that runs on session stop
+  cat > "$hook_dir/terminal-session-snapshot-on-exit.service" << 'EOF'
+[Unit]
+Description=Snapshot terminal session before logout
+DefaultDependencies=no
+Before=shutdown.target reboot.target halt.target
+
+[Service]
+Type=oneshot
+Environment=DISPLAY=:0
+ExecStart=/bin/bash -c 'source ~/.bash_aliases && _terminal_session_snapshot'
+
+[Install]
+WantedBy=shutdown.target reboot.target halt.target
+EOF
+
+  systemctl --user daemon-reload
+  systemctl --user enable terminal-session-snapshot-on-exit.service
+
+  echo "• terminal session logout hook enabled"
 }

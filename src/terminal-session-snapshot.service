@@ -1,0 +1,8 @@
+[Unit]
+Description=Snapshot terminal session (ptyxis windows across cosmic workspaces)
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+Environment=DISPLAY=:0
+ExecStart=/bin/bash -c 'source ~/.bash_aliases && _terminal_session_snapshot'

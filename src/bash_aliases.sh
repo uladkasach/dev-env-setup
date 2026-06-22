@@ -121,6 +121,224 @@ alias machine.usage.snapshot='machine_usage_snapshot'                        # c
 
 # note: 'terminal' command installed via install_env.sh (supports 'terminal /path/to/dir')
 
+# terminal session management
+# .what = snapshot and restore terminal windows across cosmic workspaces
+# .why  = recover exact terminal layout after restart/crash
+_terminal_session_snapshot() {
+  local config_dir="$HOME/.config/terminal-sessions"
+  local snapshot_file="$config_dir/default.json"
+  mkdir -p "$config_dir"
+
+  # check cos-cli available
+  if ! command -v cos-cli &>/dev/null; then
+    echo "error: cos-cli not installed. run: source ~/git/more/dev-env-setup/src/install_env.pt3.cosmic.sh && install_cos_cli" >&2
+    return 1
+  fi
+
+  # get all windows from cosmic
+  local cos_info
+  cos_info=$(cos-cli info --json 2>/dev/null)
+  if [[ -z "$cos_info" ]]; then
+    echo "error: cos-cli info failed (is cosmic compositor active?)" >&2
+    return 1
+  fi
+
+  # collect cwds from all shell processes with git repos
+  # simpler than a ptyxis process tree trace (flatpak sandbox complicates that)
+  local cwds_json="[]"
+  local all_cwds=()
+
+  # find all interactive shell processes (bash, zsh, fish)
+  while IFS= read -r shell_pid; do
+    if [[ -d "/proc/$shell_pid" ]]; then
+      local cwd
+      cwd=$(readlink -f "/proc/$shell_pid/cwd" 2>/dev/null || true)
+      # only include if it's a valid directory that's a git repo
+      if [[ -n "$cwd" && -d "$cwd" ]]; then
+        # check if inside a git repo (has .git ancestor)
+        if git -C "$cwd" rev-parse --git-dir &>/dev/null; then
+          all_cwds+=("$cwd")
+        fi
+      fi
+    fi
+  done < <(pgrep -x "bash|zsh|fish" 2>/dev/null || true)
+
+  # dedupe and convert to json array
+  if [[ ${#all_cwds[@]} -gt 0 ]]; then
+    cwds_json=$(printf '%s\n' "${all_cwds[@]}" | sort -u | jq -R -s 'split("\n") | map(select(length > 0))')
+  fi
+
+  # filter to ptyxis windows and build snapshot
+  # cos-cli info structure: .apps[] has app_id, title, workspaces[].workspace
+  # match each window to a cwd based on repo name in title
+  local snapshot
+  snapshot=$(echo "$cos_info" | jq -c --argjson cwds "$cwds_json" '
+    # helper: extract repo.worktree from title like "repo.worktree:branch"
+    def extract_repo: split(":")[0] | split(" ")[0] | gsub("[^a-zA-Z0-9._-]"; "");
+
+    # helper: find matching cwd for a repo name
+    def find_cwd(repo):
+      ($cwds | map(select(. | test("/" + repo + "$"))) | first) // null;
+
+    {
+      version: 1,
+      timestamp: (now | todate),
+      windows: [
+        .apps[]
+        | select(.app_id == "app.devsuite.Ptyxis")
+        | . as $app
+        | ($app.title | extract_repo) as $repo
+        | {
+            title: $app.title,
+            workspace: ($app.workspaces[0].workspace // "1"),
+            cwd: (if $repo != "" then find_cwd($repo) else null end)
+          }
+      ]
+    }
+  ')
+
+  # validate snapshot has windows
+  local window_count
+  window_count=$(echo "$snapshot" | jq '.windows | length')
+  if [[ "$window_count" -eq 0 ]]; then
+    echo "no ptyxis windows found to snapshot"
+    return 0
+  fi
+
+  # write snapshot
+  echo "$snapshot" > "$snapshot_file"
+  local workspace_count
+  workspace_count=$(echo "$snapshot" | jq '[.windows[].workspace] | unique | length')
+  echo "snapshot saved: $window_count windows across $workspace_count workspaces"
+  echo "  → $snapshot_file"
+}
+
+_terminal_session_restore() {
+  local config_dir="$HOME/.config/terminal-sessions"
+  local snapshot_file="$config_dir/default.json"
+  local mode="plan"
+  local filter_ws=""
+
+  # parse args
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --apply) mode="apply"; shift ;;
+      --workspace) filter_ws="$2"; shift 2 ;;
+      *) echo "error: unknown option: $1" >&2; return 1 ;;
+    esac
+  done
+
+  # check snapshot exists
+  if [[ ! -f "$snapshot_file" ]]; then
+    echo "error: no snapshot found at $snapshot_file" >&2
+    echo "run: terminal.snapshot" >&2
+    return 1
+  fi
+
+  # check cos-cli available
+  if ! command -v cos-cli &>/dev/null; then
+    echo "error: cos-cli not installed. run: source ~/git/more/dev-env-setup/src/install_env.pt3.cosmic.sh && install_cos_cli" >&2
+    return 1
+  fi
+
+  # read snapshot
+  local snapshot
+  snapshot=$(cat "$snapshot_file")
+  local timestamp
+  timestamp=$(echo "$snapshot" | jq -r '.timestamp')
+
+  if [[ -n "$filter_ws" ]]; then
+    echo "restore workspace $filter_ws from $timestamp"
+  else
+    echo "restore terminal session from $timestamp"
+  fi
+
+  # process windows, skip those without cwd
+  local restored_count=0
+  local skipped_count=0
+  local skipped_titles=()
+  local current_ws=""
+
+  while IFS= read -r window_json; do
+    local title workspace cwd
+    title=$(echo "$window_json" | jq -r '.title')
+    workspace=$(echo "$window_json" | jq -r '.workspace')
+    cwd=$(echo "$window_json" | jq -r '.cwd // empty')
+
+    # filter by workspace if specified
+    if [[ -n "$filter_ws" && "$workspace" != "$filter_ws" ]]; then
+      continue
+    fi
+
+    # skip windows without cwd
+    if [[ -z "$cwd" || ! -d "$cwd" ]]; then
+      ((skipped_count++))
+      # truncate title for display
+      local short_title="${title:0:50}"
+      [[ ${#title} -gt 50 ]] && short_title="${short_title}..."
+      skipped_titles+=("$short_title")
+      continue
+    fi
+
+    # print workspace header when it changes
+    if [[ "$workspace" != "$current_ws" ]]; then
+      current_ws="$workspace"
+      echo "  workspace $workspace:"
+    fi
+
+    if [[ "$mode" == "plan" ]]; then
+      echo "    - $cwd"
+    else
+      echo "    + $cwd"
+      # get current max window index before spawn
+      local max_idx_before
+      max_idx_before=$(cos-cli info --json | jq '[.apps[].index] | max // -1')
+
+      # spawn new window
+      flatpak run app.devsuite.Ptyxis --new-window --working-directory "$cwd" &
+
+      # wait for new window to appear and get its index
+      local new_idx=""
+      local attempts=0
+      while [[ -z "$new_idx" && $attempts -lt 30 ]]; do
+        sleep 0.1
+        new_idx=$(cos-cli info --json | jq --argjson prev "$max_idx_before" '[.apps[] | select(.app_id == "app.devsuite.Ptyxis" and .index > $prev)] | .[0].index // empty')
+        ((attempts++))
+      done
+
+      # move by specific index (not app-id which moves ALL)
+      if [[ -n "$new_idx" ]]; then
+        local target_ws=$((workspace - 1))
+        cos-cli move --index "$new_idx" --workspace "$target_ws" 2>/dev/null || true
+      fi
+    fi
+    ((restored_count++))
+  done < <(echo "$snapshot" | jq -c '.windows[] | select(.title != "")' | sort -t'"' -k4,4n)
+
+  # summary
+  echo ""
+  local ws_flag=""
+  [[ -n "$filter_ws" ]] && ws_flag=" --workspace $filter_ws"
+  if [[ "$mode" == "plan" ]]; then
+    echo "plan: $restored_count windows would be restored"
+    [[ $restored_count -gt 0 ]] && echo "run: terminal.restore${ws_flag} --apply"
+  else
+    echo "done: $restored_count windows restored"
+  fi
+
+  # warn about skipped windows
+  if [[ $skipped_count -gt 0 ]]; then
+    echo ""
+    echo "warning: $skipped_count windows skipped (no cwd):"
+    for t in "${skipped_titles[@]}"; do
+      echo "  ⚠ $t"
+    done
+  fi
+}
+
+alias terminal.snapshot='_terminal_session_snapshot'
+alias terminal.restore='_terminal_session_restore'
+
 # make it easier to open the file manager
 alias files='nautilus & disown'
 
