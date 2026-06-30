@@ -1,0 +1,47 @@
+always:
+  briefs:
+    # essential — persistent rules + repo context, always in context
+    say:
+      - briefs/repo.overview.md
+      - briefs/rule.require.install-via-procedures.md
+      - briefs/rule.require.repo-as-source-of-truth.md
+      - briefs/rule.require.root-install-invocation.md
+      - briefs/rule.require.solve-at-cause.md
+
+    # reference — fetch on demand
+    ref:
+      # nvim config + specs
+      - briefs/nvim.md
+      - briefs/nvim.minimap.spec.md
+      - briefs/nvim.gitsigns-minimap.spec.md
+      - briefs/nvim.highlights.gitsigns.md
+      - briefs/nvim.highlights.neominimap.md
+      - briefs/nvim.neominimap.custom-handler.md
+      - briefs/nvim.treesitter.markdown-injection.spec.md
+      - briefs/nvim.treesitter.parser-error.md
+      - briefs/nvim/criteria/codediff.explorer.collapse.md
+      - briefs/nvim/criteria/codediff.explorer.width.md
+      - briefs/nvim/criteria/codediff.keymaps.md
+      - briefs/nvim/criteria/diff.boundary.nav.md
+      - briefs/diff-boundary-nav.md
+      # system specs + power
+      - briefs/system.power.spec.md
+      - briefs/system.power.howto.md
+      - briefs/system.runaway_monitor.spec.md
+      # diagnostic + setup howtos
+      - briefs/howto.diagnose-nvim-hang.md
+      - briefs/howto.diagnose-wayland-client-death.md
+      - briefs/howto.fix-apple-magic-device-bluetooth.md
+      - briefs/howto.headless-terminal-streams.md
+      - briefs/howto.terminal-window-management.md
+      - briefs/howto.termwork-roundtrip.md
+      - briefs/howto.setup-from-worktree.md
+      - briefs/gotcha.shell-snapshotter-underscore-prefix.md
+      # theme + persona
+      - briefs/theme.desert.md
+      - briefs/im_a.ghlitch_blackcat.md
+  skills:
+    say:
+      - skills/machine.diagnose.lag.sh
+      - skills/nvim.diagnose.runaway.sh
+      - skills/use.apikeys.sh

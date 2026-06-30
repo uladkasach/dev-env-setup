@@ -1,8 +1,8 @@
 # ductwork — headless terminal streams
-source ~/.bash_aliases.ductwork.sh
+[[ -f ~/.bash_aliases.ductwork.sh ]] && source ~/.bash_aliases.ductwork.sh
 
 # termwork — terminal window management
-source ~/.bash_aliases.termwork.sh
+[[ -f ~/.bash_aliases.termwork.sh ]] && source ~/.bash_aliases.termwork.sh
 
 # prefer nvim over vim/vi
 alias vim='nvim'
@@ -37,7 +37,7 @@ function nimg {
 }
 
 # claude code config (expected: v2.1.87, beyond which hooks are truncated)
-export ANTHROPIC_MODEL='claude-opus-4-5-20251101'
+export ANTHROPIC_MODEL='claude-opus-4-8[1m]'
 export CLAUDE_CODE_SKIP_UPDATE_CHECK=1
 
 # aws profiles via keyrack

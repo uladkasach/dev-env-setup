@@ -89,9 +89,8 @@ if [[ -t 1 ]]; then
 fi
 
 # aliases
+# note: ~/.bash_aliases sources ductwork + termwork itself, so zsh gets them via this
 source ~/.bash_aliases
-[[ -f ~/.bash_aliases.ductwork.sh ]] && source ~/.bash_aliases.ductwork.sh
-[[ -f ~/.bash_aliases.termwork.sh ]] && source ~/.bash_aliases.termwork.sh
 
 # make bash subshells (e.g., scripts, git aliases, makefiles) also load aliases
 # zsh sources ~/.bash_aliases above, but bash subshells spawned from zsh won't
@@ -157,3 +156,9 @@ esac
 # starship prompt (only for interactive TTY sessions)
 # skipped for: Claude Code, scripts, pipes — they don't need a prompt
 [[ -t 1 ]] && eval "$(starship init zsh)"
+
+# claude code: lower auto-compact threshold from default ~83% to 50%
+# keeps the conversation context smaller so large payloads don't accumulate,
+# which reduces per-minute input-token (ITPM) spikes that trip "rate limit reached"
+# note: must be exported in shell — a value in settings.json env block is ignored
+export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50

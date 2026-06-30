@@ -49,7 +49,7 @@ clone_this_repo() {
 install_zsh() {
   sudo apt install zsh
 
-  local src_dir="${DEV_ENV_SETUP_DIR:-~/git/more/dev-env-setup}/src"
+  local src_dir="${DEV_ENV_SETUP_DIR:-$HOME/git/more/dev-env-setup}/src"
   cp "$src_dir/bash_aliases.sh" ~/.bash_aliases
   cp "$src_dir/ductwork.sh" ~/.bash_aliases.ductwork.sh
   cp "$src_dir/termwork.sh" ~/.bash_aliases.termwork.sh
@@ -66,7 +66,7 @@ install_cli_deps() {
 }
 
 configure_tmux() {
-  local src_dir="${DEV_ENV_SETUP_DIR:-~/git/more/dev-env-setup}/src"
+  local src_dir="${DEV_ENV_SETUP_DIR:-$HOME/git/more/dev-env-setup}/src"
 
   cp "$src_dir/tmux.conf" ~/.tmux.conf
   echo "• tmux.conf installed"
@@ -104,7 +104,7 @@ install_starship() {
   chmod +x ~/.local/bin/starship
   rm -rf "$tmp_dir"
 
-  local src_dir="${DEV_ENV_SETUP_DIR:-~/git/more/dev-env-setup}/src"
+  local src_dir="${DEV_ENV_SETUP_DIR:-$HOME/git/more/dev-env-setup}/src"
   mkdir -p ~/.config
   cp "$src_dir/starship.toml" ~/.config/starship.toml
 
