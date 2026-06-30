@@ -9,7 +9,7 @@ THIS_DIR="$HOME/git/more/dev-env-setup/src"
 
 # temp aliases for bootstrap (lifted to bash_aliases later)
 browser() { setsid flatpak run org.mozilla.firefox "$@" >/dev/null 2>&1 & }  # until install_browser_command runs
-alias terminal='ptyxis 2>/dev/null || cosmic-term'
+alias terminal='kitty 2>/dev/null || cosmic-term'
 alias machine.logout='loginctl terminate-user "$USER"'
 alias machine.reboot='systemctl reboot'
 
@@ -72,6 +72,7 @@ install_kitty
 configure_kitty
 configure_kitty_theme
 configure_kitty_icon
+configure_kitty_default
 install_terminal_command
 install_vim
 install_rust  # must run before install_neovim (cargo needed for tree-sitter-cli)

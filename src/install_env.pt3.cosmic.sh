@@ -65,13 +65,13 @@ SHORTCUTS
   local system_actions="/usr/share/cosmic/com.system76.CosmicSettings.Shortcuts/v1/system_actions"
   local user_actions="$shortcuts_dir/system_actions"
   if [[ -f "$system_actions" ]]; then
-    sed -e 's|Terminal: "cosmic-term"|Terminal: "flatpak run app.devsuite.Ptyxis --new-window -d ~"|' \
+    sed -e 's|Terminal: "cosmic-term"|Terminal: "kitty --directory ~"|' \
         -e 's|PowerOff: "cosmic-osd shutdown"|PowerOff: "true"|' \
         -e 's|Suspend: "systemctl suspend"|Suspend: "true"|' \
         -e 's|LogOut: "cosmic-osd log-out"|LogOut: "true"|' \
         -e 's|LockScreen: "loginctl lock-session"|LockScreen: "true"|' \
         "$system_actions" > "$user_actions"
-    echo "• default terminal: ptyxis"
+    echo "• default terminal: kitty"
     echo "• power/lock/logout keybinds disabled (use terminal commands)"
   fi
 
