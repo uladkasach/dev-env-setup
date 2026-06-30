@@ -156,3 +156,9 @@ esac
 # starship prompt (only for interactive TTY sessions)
 # skipped for: Claude Code, scripts, pipes — they don't need a prompt
 [[ -t 1 ]] && eval "$(starship init zsh)"
+
+# claude code: lower auto-compact threshold from default ~83% to 50%
+# keeps the conversation context smaller so large payloads don't accumulate,
+# which reduces per-minute input-token (ITPM) spikes that trip "rate limit reached"
+# note: must be exported in shell — a value in settings.json env block is ignored
+export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50
