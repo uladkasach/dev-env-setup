@@ -35,14 +35,6 @@ install_ptyxis() {
   ## ref: https://documentation.ubuntu.com/desktop/en/latest/how-to/change-the-default-terminal/
   ##########################
 
-  # skip if ptyxis is already the default terminal (e.g., ubuntu 25.10+, gnome 47+)
-  local current_terminal
-  current_terminal=$(readlink -f /usr/bin/x-terminal-emulator 2>/dev/null || echo "")
-  if [[ "$current_terminal" == *ptyxis* ]]; then
-    echo "• ptyxis already default terminal; skipped"
-    return 0
-  fi
-
   # install via flatpak if not already installed
   if ! flatpak list | grep -q app.devsuite.Ptyxis; then
     flatpak install -y flathub app.devsuite.Ptyxis
@@ -55,9 +47,22 @@ flatpak run app.devsuite.Ptyxis --new-window
 EOF
   sudo chmod +x /usr/bin/ptyxis.wrapper
 
-  # register and set as default terminal (ctrl+alt+t)
+  # register as a selectable alternative (kitty is the default — see configure_kitty_default)
   sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/ptyxis.wrapper 50
-  sudo update-alternatives --set x-terminal-emulator /usr/bin/ptyxis.wrapper
+}
+
+configure_kitty_default() {
+  # set kitty as the system default terminal (ctrl+alt+t / x-terminal-emulator)
+  # kitty is apt-installed at /usr/bin/kitty (see install_kitty)
+  if ! command -v kitty &>/dev/null; then
+    echo "• kitty not installed; run install_kitty first; skipped"
+    return 0
+  fi
+
+  # register at higher priority than ptyxis (50) and force-select kitty
+  sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/kitty 60
+  sudo update-alternatives --set x-terminal-emulator /usr/bin/kitty
+  echo "• default terminal: kitty (x-terminal-emulator)"
 }
 
 # note: configure_ptyxis is defined in install_env.pt4.terminal.ptyxis.sh, sourced by dispatcher
@@ -70,7 +75,7 @@ install_terminal_command() {
 #!/usr/bin/env bash
 dir="${1:-.}"
 dir="$(realpath "$dir")"
-setsid -f flatpak run app.devsuite.Ptyxis --new-window --working-directory "$dir"
+setsid -f kitty --directory "$dir"
 EOF
   sudo chmod +x /usr/bin/terminal
 }
