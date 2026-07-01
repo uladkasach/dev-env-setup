@@ -1273,6 +1273,27 @@ require('lazy').setup({
       vim.keymap.set('n', '-', '<CMD>Oil<CR>', { desc = 'Open parent directory' })
     end,
   },
+  {
+    '3rd/image.nvim',
+    -- render images inline via kitty graphics protocol
+    -- requires: kitty terminal + imagemagick cli (see install_env.pt4.terminal.sh)
+    build = false,  -- magick_cli processor needs no build step
+    config = function()
+      require('image').setup({
+        backend = 'kitty',
+        processor = 'magick_cli',  -- imagemagick cli, avoids luarocks/magick rock
+        integrations = {
+          -- render images embedded in markdown documents
+          markdown = {
+            enabled = true,
+            only_render_image_at_cursor = false,
+          },
+        },
+        -- open image files directly as rendered images
+        hijack_file_patterns = { '*.png', '*.jpg', '*.jpeg', '*.gif', '*.webp', '*.avif' },
+      })
+    end,
+  },
 })
 
 -- disable tabline

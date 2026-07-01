@@ -88,6 +88,8 @@ install_neovim() {
   sudo add-apt-repository ppa:neovim-ppa/unstable -y && sudo apt update && sudo apt install neovim -y
   # tree-sitter-cli required for nvim-treesitter parser compilation
   cargo install tree-sitter-cli
+  # imagemagick required by image.nvim magick_cli processor to render pngs inline (via kitty graphics)
+  sudo apt install imagemagick -y
 }
 
 configure_neovim() {
