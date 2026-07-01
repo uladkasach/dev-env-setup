@@ -86,7 +86,8 @@ map ctrl+shift+k scroll_page_up
 map ctrl+shift+j scroll_page_down
 
 # window management
-map ctrl+backslash new_os_window
+# --cwd=current inherits the pwd of the active window (via shell integration)
+map ctrl+backslash launch --type=os-window --cwd=current
 
 # font size
 map ctrl+equal change_font_size all +1.0
