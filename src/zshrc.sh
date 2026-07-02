@@ -43,20 +43,24 @@ if [[ -t 1 ]]; then
   chpwd_functions+=(_osc7_cwd)
   _osc7_cwd  # run once on shell start
 
-  # set terminal tab title to repo:branch (or directory name if not in repo)
+  # set terminal title to "repo:branch/subpath" within a repo, else the pwd
+  # subpath is the dir relative to repo root (e.g. repo:branch/src); omitted at root
   # uses OSC 2 escape sequence for window/tab title
   _set_terminal_title() {
     local title
     if git rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
       local repo=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)")
       local branch=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null)
-      title="${repo}:${branch}"
+      local subpath="$(git rev-parse --show-prefix 2>/dev/null)"  # e.g. "src/foo/" ("" at root)
+      subpath="${subpath%/}"                                      # drop the "/" suffix
+      title="${repo}:${branch}${subpath:+/$subpath}"             # append /subpath only if set
     else
-      title="${PWD##*/}"  # just the current directory name
+      title="${PWD/#$HOME/~}"  # home-abbreviated pwd
     fi
     printf '\e]2;%s\a' "$title"
   }
   chpwd_functions+=(_set_terminal_title)
+  precmd_functions+=(_set_terminal_title)  # re-assert on every prompt (restores title after apps like nvim exit)
   _set_terminal_title  # run once on shell start
 
   # completions: rebuild only if completion files changed

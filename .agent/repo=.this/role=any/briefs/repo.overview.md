@@ -11,7 +11,7 @@ personal development environment configuration repo — shell configs, aliases, 
 | file | purpose |
 |------|---------|
 | `bash_aliases.sh` | shell aliases + functions (copied to `~/.bash_aliases`) |
-| `zshrc.sh` | zsh config with oh-my-zsh + spaceship theme (copied to `~/.zshrc`) |
+| `zshrc.sh` | zsh config with starship prompt + fzf (copied to `~/.zshrc`) |
 | `install_env.sh` | full environment setup procedure (keyd, ptyxis, codium, docker, etc) |
 | `backup_env.sh` | backup current env to 1password |
 
