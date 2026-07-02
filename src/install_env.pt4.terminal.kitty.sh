@@ -66,6 +66,12 @@ cursor_blink_interval 0
 # scrollback
 scrollback_lines 10000
 
+# title ownership: let the shell own the OS window title
+# kitty's shell integration sets its own title, which fights our zsh
+# _set_terminal_title (OSC 2, re-asserted on every precmd). no-title disables
+# kitty's version so the shell is authoritative — pwd/repo:branch stays in the title.
+shell_integration no-title
+
 # keybinds (ptyxis parity — preserve muscle memory)
 # clear defaults for cleaner config
 clear_all_shortcuts yes
@@ -80,6 +86,12 @@ map ctrl+shift+h previous_tab
 map ctrl+shift+l next_tab
 map ctrl+shift+w close_tab
 map ctrl+o select_tab
+
+# tab title: mirror the shell-set OSC title (repo:branch/subpath from
+# _set_terminal_title in zshrc). {title} is that string, since shell_integration
+# no-title hands title ownership to the shell. keeps tab bar == titlebar.
+# note: tab bar is hidden with a single tab (kitty default), shown at 2+ tabs
+tab_title_template "{title}"
 
 # scroll
 map ctrl+shift+k scroll_page_up
