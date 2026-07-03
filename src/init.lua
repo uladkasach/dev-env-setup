@@ -1282,6 +1282,11 @@ require('lazy').setup({
       require('image').setup({
         backend = 'kitty',
         processor = 'magick_cli',  -- imagemagick cli, avoids luarocks/magick rock
+        -- fill terminal width by default
+        -- width cap at 100% makes width the constraint that binds; raise height cap
+        -- (default 50%) so tall images are not clamped before they reach full width
+        max_width_window_percentage = 100,
+        max_height_window_percentage = 100,
         integrations = {
           -- render images embedded in markdown documents
           markdown = {
