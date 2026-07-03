@@ -84,6 +84,9 @@ clear_all_shortcuts yes
 # clipboard
 map ctrl+shift+c copy_to_clipboard
 map ctrl+shift+v paste_from_clipboard
+# ctrl+c copies when a terminal selection exists, else passes through as a
+# normal interrupt — so nvim's <C-c> visual copy and shell SIGINT still work
+map ctrl+c copy_or_interrupt
 
 # tabs
 map ctrl+t new_tab
