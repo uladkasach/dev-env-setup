@@ -65,7 +65,7 @@ SHORTCUTS
   local system_actions="/usr/share/cosmic/com.system76.CosmicSettings.Shortcuts/v1/system_actions"
   local user_actions="$shortcuts_dir/system_actions"
   if [[ -f "$system_actions" ]]; then
-    sed -e 's|Terminal: "cosmic-term"|Terminal: "kitty --directory ~"|' \
+    sed -e 's|Terminal: "cosmic-term"|Terminal: "sh -c '"'"'exec kitty --directory ~ 2>/dev/null'"'"'"|' \
         -e 's|PowerOff: "cosmic-osd shutdown"|PowerOff: "true"|' \
         -e 's|Suspend: "systemctl suspend"|Suspend: "true"|' \
         -e 's|LogOut: "cosmic-osd log-out"|LogOut: "true"|' \

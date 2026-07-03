@@ -66,6 +66,11 @@ cursor_blink_interval 0
 # scrollback
 scrollback_lines 10000
 
+# touchpad scroll speed: kitty maps hi-res touchpad deltas 1:1 by default
+# (touch_scroll_multiplier 1.0), which feels sluggish next to gnome apps that
+# accelerate. bump so the laptop touchpad scrolls at a comfortable pace.
+touch_scroll_multiplier 3.0
+
 # title ownership: let the shell own the OS window title
 # kitty's shell integration sets its own title, which fights our zsh
 # _set_terminal_title (OSC 2, re-asserted on every precmd). no-title disables
@@ -79,6 +84,9 @@ clear_all_shortcuts yes
 # clipboard
 map ctrl+shift+c copy_to_clipboard
 map ctrl+shift+v paste_from_clipboard
+# ctrl+c copies when a terminal selection exists, else passes through as a
+# normal interrupt — so nvim's <C-c> visual copy and shell SIGINT still work
+map ctrl+c copy_or_interrupt
 
 # tabs
 map ctrl+t new_tab
@@ -195,7 +203,11 @@ Name=Kitty
 GenericName=Terminal emulator
 Comment=Fast, feature-rich, GPU based terminal
 TryExec=kitty
-Exec=kitty
+# redirect stderr to /dev/null: kitty logs [PARSE ERROR] warnings (e.g. xterm
+# modifyOtherKeys) to its process stderr, shared across all os-windows in the
+# instance — incl. ctrl+\ spinoffs. muted here to stop the leak into any
+# terminal that launched the root kitty.
+Exec=sh -c 'exec kitty 2>/dev/null'
 Icon=$icon_dir/kitty-custom.png
 Categories=System;TerminalEmulator;
 EOF
