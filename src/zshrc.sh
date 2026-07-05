@@ -51,6 +51,8 @@ if [[ -t 1 ]]; then
     if git rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
       local repo=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)")
       local branch=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null)
+      local branchsuffix=".${branch//\//.}"                      # worktree dir convention: repo.branch-with-slashes-as-dots
+      repo="${repo%$branchsuffix}"                               # drop redundant branch suffix (e.g. dev-env-setup.vlad.fix-kitty-titles -> dev-env-setup)
       local subpath="$(git rev-parse --show-prefix 2>/dev/null)"  # e.g. "src/foo/" ("" at root)
       subpath="${subpath%/}"                                      # drop the "/" suffix
       title="${repo}:${branch}${subpath:+/$subpath}"             # append /subpath only if set
