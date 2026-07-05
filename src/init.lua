@@ -4,6 +4,12 @@ vim.treesitter.start = function(bufnr, lang)
   pcall(orig_ts_start, bufnr, lang)
 end
 
+-- force truecolor so gui hex themes (e.g. lualine) render everywhere.
+-- .why = auto-detection is at the mercy of the terminal/terminfo handshake,
+--        which the kitty 0.32 -> 0.47.4 tarball swap broke -> statusline
+--        collapsed to a flat fallback. pin it so it never depends on autodetect.
+vim.o.termguicolors = true
+
 -- bootstrap lazy.nvim plugin manager
 local lazypath = vim.fn.stdpath('data') .. '/lazy/lazy.nvim'
 if not vim.loop.fs_stat(lazypath) then
