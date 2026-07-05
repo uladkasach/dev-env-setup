@@ -95,6 +95,11 @@ install_kitty() {
 
   echo "• kitty v${version} installed to /opt/kitty.app (kitty -> /usr/local/bin/kitty)"
   kitty --version
+
+  # libnotify-bin provides notify-send, used by the ctrl+c copy toast
+  # (copy_or_interrupt_notify.py). without it the kitten fails with
+  # "no such file or directory: notify-send" on the copy branch.
+  sudo apt install -y libnotify-bin
 }
 
 configure_kitty() {
@@ -157,8 +162,10 @@ clear_all_shortcuts yes
 map ctrl+shift+c copy_to_clipboard
 map ctrl+shift+v paste_from_clipboard
 # ctrl+c copies when a terminal selection exists, else passes through as a
-# normal interrupt — so nvim's <C-c> visual copy and shell SIGINT still work
-map ctrl+c copy_or_interrupt
+# normal interrupt — so nvim's <C-c> visual copy and shell SIGINT still work.
+# custom kitten (vs builtin copy_or_interrupt) so we can toast on the copy
+# branch only — a builtin `combine` would fire the notify on interrupt too.
+map ctrl+c kitten copy_or_interrupt_notify.py
 # ctrl+v pastes (desktop-parity). unlike ctrl+c this is unconditional, so kitty
 # grabs ctrl+v globally — the only default it shadows is shell quoted-insert
 # (rare). nvim's own <C-v> paste maps stay as fallback for non-kitty terminals.
@@ -197,6 +204,40 @@ map ctrl+j send_key shift+enter
 
 # misc
 map ctrl+shift+f5 load_config_file
+EOF
+
+  # custom kitten that backs the `map ctrl+c` line above.
+  # replicates copy_or_interrupt (copy on selection, else SIGINT) but toasts
+  # via notify-send on the copy branch only — so a halt of claude/nvim/shell
+  # with an empty selection stays silent and just sends ^C.
+  # api refs: Window.text_for_selection(), kitty.clipboard.set_clipboard_string,
+  #           Window.write_to_child(b'\x03')
+  cat > ~/.config/kitty/copy_or_interrupt_notify.py << 'EOF'
+from kitty.boss import Boss
+from kitty.clipboard import set_clipboard_string
+from kittens.tui.handler import result_handler
+
+
+@result_handler(no_ui=True)
+def handle_result(args, answer, target_window_id, boss: Boss) -> None:
+    window = boss.window_id_map.get(target_window_id)
+    if window is None:
+        return
+    selection = window.text_for_selection()
+    if selection:
+        # copy branch: mirror the clipboard + surface a desktop toast
+        set_clipboard_string(selection)
+        import subprocess
+        subprocess.Popen(
+            ['notify-send', '-t', '1200', '-a', 'kitty', 'copied to clipboard']
+        )
+    else:
+        # no selection: pass through as a normal interrupt (^C -> SIGINT)
+        window.write_to_child(b'\x03')
+
+
+def main(args):
+    pass
 EOF
 
   echo "• kitty config applied (~/.config/kitty/kitty.conf)"
