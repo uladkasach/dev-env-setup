@@ -85,11 +85,59 @@ install_vim() {
 }
 
 install_neovim() {
-  sudo add-apt-repository ppa:neovim-ppa/unstable -y && sudo apt update && sudo apt install neovim -y
+  #########################
+  ## neovim: from the official stable release tarball (version-pinned)
+  ## ref: https://github.com/neovim/neovim/releases
+  ##
+  ## why tarball, not ppa:
+  ##  - neovim-ppa/unstable ships dev snapshots (e.g. v0.12.0-dev) whose input
+  ##    regressions double-emitted <CR>/<BS> inside nvim under kitty
+  ##  - neovim-ppa/stable publishes NO neovim binary for noble (deps only)
+  ##  - the official tarball is self-contained and pinnable
+  ##
+  ## integrity: neovim publishes NO gpg signature for release assets, so a
+  ## pinned sha256 is the only tamper check available. the hash below came from
+  ## github's api asset digest for v0.12.3 (server-computed). to bump: update
+  ## version + sha256 together, from `gh api .../releases/tags/vX | .assets[].digest`.
+  #########################
+  local version="0.12.3"
+  local archive="nvim-linux-x86_64.tar.gz"
+  local url="https://github.com/neovim/neovim/releases/download/v${version}/${archive}"
+  local sha256="c441b547142860bf01bcce39e36cbed185c41112813e15443b16e5237750724d"
+  local tmp_dir="/tmp/nvim-install"
+
+  # drop any ppa-managed neovim so /usr/bin/nvim can't shadow the tarball
+  sudo add-apt-repository --remove ppa:neovim-ppa/unstable -y || true
+  sudo add-apt-repository --remove ppa:neovim-ppa/stable -y || true
+  sudo apt remove neovim neovim-runtime -y || true
+
+  # fetch stable tarball
+  rm -rf "$tmp_dir" && mkdir -p "$tmp_dir"
+  curl -fsSL "$url" -o "$tmp_dir/$archive"
+
+  # fail fast unless the download matches the pinned sha256
+  if ! echo "${sha256}  $tmp_dir/$archive" | sha256sum -c - >/dev/null 2>&1; then
+    echo "⛈️  neovim install aborted: sha256 mismatch (expected $sha256)"
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+  echo "✨ neovim tarball sha256 verified ($sha256)"
+
+  # extract to /opt (extracts to /opt/nvim-linux-x86_64)
+  sudo rm -rf /opt/nvim-linux-x86_64
+  sudo tar -xzf "$tmp_dir/$archive" -C /opt
+  rm -rf "$tmp_dir"
+
+  # expose on PATH via /usr/local/bin (precedes /usr/bin)
+  sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+
   # tree-sitter-cli required for nvim-treesitter parser compilation
   cargo install tree-sitter-cli
   # imagemagick required by image.nvim magick_cli processor to render pngs inline (via kitty graphics)
   sudo apt install imagemagick -y
+
+  echo "• neovim v${version} installed to /opt/nvim-linux-x86_64 (nvim -> /usr/local/bin/nvim)"
+  nvim --version | head -1
 }
 
 configure_neovim() {
