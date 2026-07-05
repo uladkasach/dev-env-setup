@@ -190,6 +190,11 @@ map ctrl+equal change_font_size all +1.0
 map ctrl+minus change_font_size all -1.0
 map ctrl+0 change_font_size all 0
 
+# key remaps
+# ctrl+j sends shift+enter — lets apps that treat shift+enter specially
+# (e.g. newline vs submit) be driven from the home-row ctrl+j
+map ctrl+j send_key shift+enter
+
 # misc
 map ctrl+shift+f5 load_config_file
 EOF
