@@ -19,13 +19,82 @@
 ######################################################################
 
 install_kitty() {
-  # install kitty via apt (flatpak sandbox blocks remote control sockets)
-  if command -v kitty &>/dev/null; then
-    echo "• kitty already installed; skipped"
-    return 0
+  #########################
+  ## kitty: from the official binary tarball (version-pinned)
+  ## ref: https://github.com/kovidgoyal/kitty/releases
+  ##
+  ## why tarball, not apt:
+  ##  - ubuntu noble ships kitty ~0.32, which predates the fix for issue #7136
+  ##    (kitty sent spurious key-release events for Enter/Tab/Backspace under the
+  ##    keyboard protocol; nvim counted each release as a second press → doubles)
+  ##  - the fix landed in kitty ~0.35; the official tarball tracks latest (0.47+)
+  ##  - not flatpak, so remote-control sockets (kitten @) still work
+  #########################
+  local version="0.47.4"
+  local archive="kitty-${version}-x86_64.txz"
+  local base="https://github.com/kovidgoyal/kitty/releases/download/v${version}"
+  local url="${base}/${archive}"
+  local sig_url="${base}/${archive}.sig"
+  local tmp_dir="/tmp/kitty-install"
+
+  # kitty signs every release artifact with kovid goyal's gpg key.
+  # pin the fingerprint so a swapped key cannot slip a forged tarball past us.
+  # ref: https://github.com/kovidgoyal/kitty/discussions/5942
+  local key_url="https://github.com/kovidgoyal.gpg"
+  local key_fpr="3CE1780F78DD88DF45194FD706BC317B515ACE7C"
+
+  # also pin the sha256 (belt-and-suspenders atop gpg). the hash came from
+  # github's api asset digest for v0.47.4. to bump: update version + sha256
+  # together, from `gh api .../releases/tags/vX | .assets[].digest`.
+  local sha256="bc230142b2bd27f2a4bf1b1b67575f3d397a4ea2cc83f4ac2b912c306a939693"
+
+  # drop any apt-managed kitty so /usr/bin/kitty can't shadow the tarball
+  sudo apt remove kitty kitty-terminfo -y || true
+
+  # fetch tarball + detached signature
+  rm -rf "$tmp_dir" && mkdir -p "$tmp_dir"
+  curl -fsSL "$url" -o "$tmp_dir/$archive"
+  curl -fsSL "$sig_url" -o "$tmp_dir/${archive}.sig"
+
+  # fail fast unless the download matches the pinned sha256
+  if ! echo "${sha256}  $tmp_dir/$archive" | sha256sum -c - >/dev/null 2>&1; then
+    echo "⛈️  kitty install aborted: sha256 mismatch (expected $sha256)"
+    rm -rf "$tmp_dir"
+    return 1
   fi
-  sudo apt install kitty -y
-  echo "• kitty installed via apt"
+
+  # verify the signature in an isolated gpg home (leaves the user gpg store untouched)
+  local gnupg_dir="$tmp_dir/gnupg"
+  mkdir -p "$gnupg_dir" && chmod 700 "$gnupg_dir"
+  curl -fsSL "$key_url" -o "$tmp_dir/kovid.gpg"
+  gpg --homedir "$gnupg_dir" --import "$tmp_dir/kovid.gpg"
+
+  # fail fast unless the imported key matches the pinned fingerprint
+  if ! gpg --homedir "$gnupg_dir" --list-keys --with-colons "$key_fpr" >/dev/null 2>&1; then
+    echo "⛈️  kitty install aborted: release key fingerprint mismatch (expected $key_fpr)"
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+
+  # fail fast unless the tarball signature is valid for that key
+  if ! gpg --homedir "$gnupg_dir" --verify "$tmp_dir/${archive}.sig" "$tmp_dir/$archive" 2>&1 | grep -q "Good signature"; then
+    echo "⛈️  kitty install aborted: tarball signature verification failed"
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+  echo "✨ kitty tarball signature verified (kovid goyal, $key_fpr)"
+
+  # extract to /opt/kitty.app (self-contained: bin/, lib/, share/)
+  sudo rm -rf /opt/kitty.app && sudo mkdir -p /opt/kitty.app
+  sudo tar -xJf "$tmp_dir/$archive" -C /opt/kitty.app
+  rm -rf "$tmp_dir"
+
+  # expose on PATH via /usr/local/bin (precedes /usr/bin)
+  sudo ln -sf /opt/kitty.app/bin/kitty /usr/local/bin/kitty
+  sudo ln -sf /opt/kitty.app/bin/kitten /usr/local/bin/kitten
+
+  echo "• kitty v${version} installed to /opt/kitty.app (kitty -> /usr/local/bin/kitty)"
+  kitty --version
 }
 
 configure_kitty() {
