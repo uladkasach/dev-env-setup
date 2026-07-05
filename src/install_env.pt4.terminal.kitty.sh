@@ -126,7 +126,10 @@ initial_window_width  140c
 initial_window_height 74c
 window_padding_width 4
 hide_window_decorations no
-confirm_os_window_close 0
+# confirm before a window with an active foreground program (nvim, claude, etc)
+# is closed. -1 = confirm only when a non-shell program is active; a bare shell
+# closes with no prompt. 0 = never confirm; positive N = confirm past N windows.
+confirm_os_window_close -1
 
 # cursor
 cursor_shape block
@@ -156,6 +159,10 @@ map ctrl+shift+v paste_from_clipboard
 # ctrl+c copies when a terminal selection exists, else passes through as a
 # normal interrupt — so nvim's <C-c> visual copy and shell SIGINT still work
 map ctrl+c copy_or_interrupt
+# ctrl+v pastes (desktop-parity). unlike ctrl+c this is unconditional, so kitty
+# grabs ctrl+v globally — the only default it shadows is shell quoted-insert
+# (rare). nvim's own <C-v> paste maps stay as fallback for non-kitty terminals.
+map ctrl+v paste_from_clipboard
 
 # tabs
 map ctrl+t new_tab
