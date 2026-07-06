@@ -48,8 +48,10 @@ install_kitty() {
   # together, from `gh api .../releases/tags/vX | .assets[].digest`.
   local sha256="bc230142b2bd27f2a4bf1b1b67575f3d397a4ea2cc83f4ac2b912c306a939693"
 
-  # drop any apt-managed kitty so /usr/bin/kitty can't shadow the tarball
-  sudo apt remove kitty kitty-terminfo -y || true
+  # drop the apt-managed kitty binary so /usr/bin/kitty can't shadow the tarball.
+  # keep kitty-terminfo: it ships only the xterm-kitty terminfo entry (no binary),
+  # which tmux/ssh need — it is (re)installed at the end of this function.
+  sudo apt remove kitty -y || true
 
   # fetch tarball + detached signature
   rm -rf "$tmp_dir" && mkdir -p "$tmp_dir"
@@ -95,6 +97,14 @@ install_kitty() {
 
   echo "• kitty v${version} installed to /opt/kitty.app (kitty -> /usr/local/bin/kitty)"
   kitty --version
+
+  # install the xterm-kitty terminfo entry via apt.
+  # kitty sets TERM=xterm-kitty; tmux/ssh launched outside the kitty window need
+  # this entry in the ncurses search path or they abort with "unsuitable
+  # terminal: xterm-kitty". the terminfo pkg only ships the terminfo entry (not
+  # the binary), so apt's version is fine even though we install kitty via tarball.
+  sudo apt install kitty-terminfo -y
+  echo "• kitty-terminfo installed (xterm-kitty entry for tmux/ssh)"
 
   # libnotify-bin provides notify-send, used by the ctrl+c copy toast
   # (copy_or_interrupt_notify.py). without it the kitten fails with
@@ -175,14 +185,39 @@ map ctrl+v paste_from_clipboard
 map ctrl+t new_tab
 map ctrl+shift+h previous_tab
 map ctrl+shift+l next_tab
+map ctrl+tab next_tab
+map ctrl+shift+tab previous_tab
 map ctrl+shift+w close_tab
 map ctrl+o select_tab
+
+# jump straight to tab N by ordinal position (ctrl+1 = first tab, etc).
+# goto_tab is 1-indexed and positional, so it tracks the tab bar order, not the
+# termwork --tab slug. ctrl+0 jumps to the last tab regardless of count.
+map ctrl+1 goto_tab 1
+map ctrl+2 goto_tab 2
+map ctrl+3 goto_tab 3
+map ctrl+4 goto_tab 4
+map ctrl+5 goto_tab 5
+map ctrl+6 goto_tab 6
+map ctrl+7 goto_tab 7
+map ctrl+8 goto_tab 8
+map ctrl+9 goto_tab 9
+map ctrl+0 goto_tab -1
 
 # tab title: mirror the shell-set OSC title (repo:branch/subpath from
 # _set_terminal_title in zshrc). {title} is that string, since shell_integration
 # no-title hands title ownership to the shell. keeps tab bar == titlebar.
+# {title:^14} center-pads each title to a 14-wide field so every tab is equal
+# width (the `separator` style below sizes tabs to content, which would otherwise
+# collapse each tab to its title length). titles longer than 14 grow as needed.
 # note: tab bar is hidden with a single tab (kitty default), shown at 2+ tabs
-tab_title_template "{title}"
+tab_title_template "{title:^14}"
+
+# tab bar style: flat, no divider. `separator` drops the default `fade` gradient
+# edges; an empty tab_separator removes the character between tabs entirely, so
+# the only cue for the active tab is its inverted color (set in desert.conf).
+tab_bar_style separator
+tab_separator ""
 
 # scroll
 map ctrl+shift+k scroll_page_up
@@ -193,9 +228,11 @@ map ctrl+shift+j scroll_page_down
 map ctrl+backslash launch --type=os-window --cwd=current
 
 # font size
+# ctrl+0 is reassigned to goto_tab (last tab) above, so the size reset moves to
+# ctrl+shift+0 to avoid the clash.
 map ctrl+equal change_font_size all +1.0
 map ctrl+minus change_font_size all -1.0
-map ctrl+0 change_font_size all 0
+map ctrl+shift+0 change_font_size all 0
 
 # key remaps
 # ctrl+j sends shift+enter — lets apps that treat shift+enter specially
@@ -288,10 +325,17 @@ color7  #f5deb3
 color15 #ffffff
 
 # tab bar
-active_tab_foreground   #ffffff
-active_tab_background   #555555
+# active tab = desert-toned invert: dark text on the wheat accent (#f5deb3, the
+# same light tone inactive tabs use for their text). inactive tabs blend flat into
+# the bar (bg == terminal background), so the only cue for the current tab is the
+# inversion — no divider, no box. active_tab_font_style plain drops kitty's default
+# bold-italic on the active tab.
+active_tab_foreground   #333333
+active_tab_background   #f5deb3
+active_tab_font_style   normal
 inactive_tab_foreground #f5deb3
 inactive_tab_background #333333
+inactive_tab_font_style normal
 EOF
 
   echo "• kitty desert theme applied (~/.config/kitty/themes/desert.conf)"
