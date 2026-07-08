@@ -1213,7 +1213,7 @@ _git_tree_set() {
     echo "  --from this         create branch from current HEAD"
     echo "  --open <opener>     open worktree with specified opener"
     echo "                      e.g., --open terminal, --open codium"
-    echo "  --init              run pnpm install in background"
+    echo "  --init              run pnpm install + rhx upgrade in background"
     echo ""
     echo "behavior:"
     echo "  - if worktree exists: keeps it (idempotent)"
@@ -1328,7 +1328,7 @@ _git_tree_set() {
   [[ "$init_flag" == "true" ]] && lines+=("will init in background...")
   [[ -n "$opener" ]] && lines+=("will open in $opener...")
   [[ -z "$opener" ]] && lines+=("tip: use --open <opener> to open (e.g., --open terminal, --open codium)")
-  [[ "$init_flag" != "true" && -f "$worktree_path/package.json" ]] && lines+=("tip: use --init to run pnpm install in background")
+  [[ "$init_flag" != "true" && -f "$worktree_path/package.json" ]] && lines+=("tip: use --init to run pnpm install + rhx upgrade in background")
 
   if [[ ${#lines[@]} -eq 0 ]]; then
     echo "   └─ head: $commit_info"
@@ -1344,11 +1344,12 @@ _git_tree_set() {
   fi
   echo ""
 
-  # kick off pnpm install in background if requested and package.json exists
+  # kick off pnpm install + rhx upgrade in background if requested and package.json exists
   if [[ "$init_flag" == "true" && -f "$worktree_path/package.json" ]]; then
     (
       cd "$worktree_path" && \
       pnpm install --silent 2>/dev/null && \
+      rhx upgrade 2>/dev/null && \
       echo "🐢 init complete for $repo_name.$sanitized"
     ) &
     disown
