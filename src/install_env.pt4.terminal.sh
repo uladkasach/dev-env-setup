@@ -53,16 +53,18 @@ EOF
 
 configure_kitty_default() {
   # set kitty as the system default terminal (ctrl+alt+t / x-terminal-emulator)
-  # kitty is apt-installed at /usr/bin/kitty (see install_kitty)
-  if ! command -v kitty &>/dev/null; then
+  # install_kitty symlinks the tarball binary to /usr/local/bin/kitty, so look up
+  # the real path rather than assume /usr/bin/kitty (which does not exist).
+  local kitty_bin
+  kitty_bin="$(command -v kitty)" || {
     echo "• kitty not installed; run install_kitty first; skipped"
     return 0
-  fi
+  }
 
   # register at higher priority than ptyxis (50) and force-select kitty
-  sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator /usr/bin/kitty 60
-  sudo update-alternatives --set x-terminal-emulator /usr/bin/kitty
-  echo "• default terminal: kitty (x-terminal-emulator)"
+  sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator "$kitty_bin" 60
+  sudo update-alternatives --set x-terminal-emulator "$kitty_bin"
+  echo "• default terminal: kitty (x-terminal-emulator, $kitty_bin)"
 }
 
 # note: configure_ptyxis is defined in install_env.pt4.terminal.ptyxis.sh, sourced by dispatcher
