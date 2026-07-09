@@ -107,7 +107,7 @@ install_kitty() {
   echo "• kitty-terminfo installed (xterm-kitty entry for tmux/ssh)"
 
   # libnotify-bin provides notify-send, used by the ctrl+c copy toast
-  # (copy_or_interrupt_notify.py). without it the kitten fails with
+  # (copy_notify.py). without it the kitten fails with
   # "no such file or directory: notify-send" on the copy branch.
   sudo apt install -y libnotify-bin
 }
@@ -171,15 +171,18 @@ clear_all_shortcuts yes
 # clipboard
 map ctrl+shift+c copy_to_clipboard
 map ctrl+shift+v paste_from_clipboard
-# ctrl+c copies when a terminal selection exists, else passes through as a
-# normal interrupt — so nvim's <C-c> visual copy and shell SIGINT still work.
-# custom kitten (vs builtin copy_or_interrupt) so we can toast on the copy
-# branch only — a builtin `combine` would fire the notify on interrupt too.
-map ctrl+c kitten copy_or_interrupt_notify.py
+# ctrl+c always copies (strict desktop parity) — copies the selection when one
+# exists, else no-op. interrupt lives entirely on ctrl+x, so ctrl+c never sends
+# ^C. custom kitten (vs builtin copy_to_clipboard) so we can toast on copy.
+map ctrl+c kitten copy_notify.py
 # ctrl+v pastes (desktop-parity). unlike ctrl+c this is unconditional, so kitty
 # grabs ctrl+v globally — the only default it shadows is shell quoted-insert
 # (rare). nvim's own <C-v> paste maps stay as fallback for non-kitty terminals.
 map ctrl+v paste_from_clipboard
+# ctrl+x sends ^C (SIGINT) — the sole interrupt / "cancel and clear prompt" key.
+# ctrl+c is copy-only (desktop parity), so interrupt lives here unambiguously.
+# also the ^C escape inside TUI apps (nvim, REPLs) now that ctrl+c never passes.
+map ctrl+x send_text all \x03
 
 # tabs
 map ctrl+t new_tab
@@ -244,12 +247,12 @@ map ctrl+shift+f5 load_config_file
 EOF
 
   # custom kitten that backs the `map ctrl+c` line above.
-  # replicates copy_or_interrupt (copy on selection, else SIGINT) but toasts
-  # via notify-send on the copy branch only — so a halt of claude/nvim/shell
-  # with an empty selection stays silent and just sends ^C.
-  # api refs: Window.text_for_selection(), kitty.clipboard.set_clipboard_string,
-  #           Window.write_to_child(b'\x03')
-  cat > ~/.config/kitty/copy_or_interrupt_notify.py << 'EOF'
+  # copy-only (strict desktop parity): copies the selection and toasts via
+  # notify-send. with no selection it is a no-op — ctrl+c never sends ^C, so
+  # interrupt is unambiguously ctrl+x. builtin copy_to_clipboard would skip the
+  # toast, so we keep a kitten for the desktop-toast feedback.
+  # api refs: Window.text_for_selection(), kitty.clipboard.set_clipboard_string
+  cat > ~/.config/kitty/copy_notify.py << 'EOF'
 from kitty.boss import Boss
 from kitty.clipboard import set_clipboard_string
 from kittens.tui.handler import result_handler
@@ -261,16 +264,15 @@ def handle_result(args, answer, target_window_id, boss: Boss) -> None:
     if window is None:
         return
     selection = window.text_for_selection()
-    if selection:
-        # copy branch: mirror the clipboard + surface a desktop toast
-        set_clipboard_string(selection)
-        import subprocess
-        subprocess.Popen(
-            ['notify-send', '-t', '1200', '-a', 'kitty', 'copied to clipboard']
-        )
-    else:
-        # no selection: pass through as a normal interrupt (^C -> SIGINT)
-        window.write_to_child(b'\x03')
+    if not selection:
+        # no selection: no-op (interrupt lives on ctrl+x, not ctrl+c)
+        return
+    # copy branch: mirror the clipboard + surface a desktop toast
+    set_clipboard_string(selection)
+    import subprocess
+    subprocess.Popen(
+        ['notify-send', '-t', '1200', '-a', 'kitty', 'copied to clipboard']
+    )
 
 
 def main(args):
@@ -342,8 +344,12 @@ EOF
 }
 
 configure_kitty_icon() {
-  # install custom kitty icon
-  # creates a custom icon and updates the .desktop file
+  # install custom kitty icon across all three surfaces that render it:
+  #   1. dock/launcher/taskbar — the .desktop Icon= (+ Wayland app_id binding)
+  #   2. window titlebar        — kitty's own ~/.config/kitty/kitty.app.png
+  #      (kitty applies this at startup on X11 + wayland; compositor-permitting)
+  #      ref: https://sw.kovidgoyal.net/kitty/faq/
+  # these are independent — one alone leaves the other on the default icon.
   local icon_dir="$HOME/.local/share/icons/hicolor/256x256/apps"
   local desktop_file="$HOME/.local/share/applications/kitty.desktop"
   local custom_icon="$HOME/git/more/dev-env-setup/assets/kitty-icon.png"
@@ -355,9 +361,19 @@ configure_kitty_icon() {
     return 0
   fi
 
-  # install icon
+  # install into the hicolor theme under BOTH names:
+  #  - kitty.png: the theme name wayland compositors (cosmic) look up from the
+  #    window app_id (kitty reports app_id=kitty). without this, the app_id
+  #    lookup misses and the dock falls back to the stock icon.
+  #  - kitty-custom.png: the absolute path the .desktop Icon= points at.
   mkdir -p "$icon_dir"
+  cp "$custom_icon" "$icon_dir/kitty.png"
   cp "$custom_icon" "$icon_dir/kitty-custom.png"
+
+  # install kitty's native window-titlebar icon. kitty reads this file from its
+  # config dir at startup and sets the per-window icon itself.
+  mkdir -p "$HOME/.config/kitty"
+  cp "$custom_icon" "$HOME/.config/kitty/kitty.app.png"
 
   # create/update desktop file with custom icon
   mkdir -p "$(dirname "$desktop_file")"
@@ -375,11 +391,14 @@ TryExec=kitty
 # terminal that launched the root kitty.
 Exec=sh -c 'exec kitty 2>/dev/null'
 Icon=$icon_dir/kitty-custom.png
+# bind the running window to this entry so the dock honors Icon=. on wayland the
+# window is matched by app_id (kitty=kitty); StartupWMClass declares that match.
+StartupWMClass=kitty
 Categories=System;TerminalEmulator;
 EOF
 
   # update icon cache
   gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor 2>/dev/null || true
 
-  echo "• kitty custom icon installed"
+  echo "• kitty custom icon installed (dock + titlebar; logout to flush cache)"
 }
