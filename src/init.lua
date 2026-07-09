@@ -1430,8 +1430,12 @@ hi('NeominimapDiffDeleteLine', { bg = '#7a5a5a' })  -- bright pastel red
 
 
 
--- ctrl+c = copy (visual mode)
+-- ctrl+c / ctrl+shift+c = copy (visual mode)
+-- kitty grabs ctrl+c and forwards ctrl+shift+c (CSI 99;6u) downstream, so
+-- <C-S-c> is the path that fires under kitty; <C-c> stays as the fallback for
+-- non-kitty terminals that pass ctrl+c straight through.
 vim.keymap.set('v', '<C-c>', '"+y')
+vim.keymap.set('v', '<C-S-c>', '"+y')
 
 -- ctrl+v = paste (insert + normal mode)
 vim.keymap.set('i', '<C-v>', '<C-r>+')
