@@ -171,9 +171,12 @@ clear_all_shortcuts yes
 # clipboard
 map ctrl+shift+c copy_to_clipboard
 map ctrl+shift+v paste_from_clipboard
-# ctrl+c always copies (strict desktop parity) — copies the selection when one
-# exists, else no-op. interrupt lives entirely on ctrl+x, so ctrl+c never sends
-# ^C. custom kitten (vs builtin copy_to_clipboard) so we can toast on copy.
+# ctrl+c: copy kitty's own selection (with toast) AND forward an unambiguous
+# ctrl+shift+c downstream, so apps that own their own selection (nvim visual
+# mode) can yank. the forward is the keyboard-protocol key CSI 99 ; 6 u, never
+# the ^C byte — so ctrl+c still never interrupts the shell. the sole interrupt
+# key stays ctrl+x. custom kitten (vs builtin copy_to_clipboard) both toasts on
+# copy and gates the downstream forward on the app's kbd-protocol state.
 map ctrl+c kitten copy_notify.py
 # ctrl+v pastes (desktop-parity). unlike ctrl+c this is unconditional, so kitty
 # grabs ctrl+v globally — the only default it shadows is shell quoted-insert
@@ -246,12 +249,22 @@ map ctrl+j send_key shift+enter
 map ctrl+shift+f5 load_config_file
 EOF
 
-  # custom kitten that backs the `map ctrl+c` line above.
-  # copy-only (strict desktop parity): copies the selection and toasts via
-  # notify-send. with no selection it is a no-op — ctrl+c never sends ^C, so
-  # interrupt is unambiguously ctrl+x. builtin copy_to_clipboard would skip the
-  # toast, so we keep a kitten for the desktop-toast feedback.
-  # api refs: Window.text_for_selection(), kitty.clipboard.set_clipboard_string
+  # custom kitten that backs the `map ctrl+c` line above. two independent jobs:
+  #
+  # 1. copy branch — when kitty owns a mouse selection, mirror it to the
+  #    clipboard and surface a desktop toast via notify-send.
+  #
+  # 2. forward branch — send an unambiguous ctrl+shift+c downstream so apps that
+  #    own their own selection (nvim visual mode) can yank. encoded as the kitty
+  #    keyboard-protocol key CSI 99 ; 6 u (\x1b[99;6u), never the ^C byte, so the
+  #    shell can never SIGINT off ctrl+c. only forwarded when the focused app has
+  #    the keyboard protocol on (nvim does; a bare shell prompt does not), so the
+  #    shell prompt stays clean of stray escapes.
+  #
+  # interrupt stays entirely on ctrl+x. builtin copy_to_clipboard would skip both
+  # the toast and the gated forward, so a kitten earns its keep here.
+  # api refs: Window.text_for_selection(), kitty.clipboard.set_clipboard_string,
+  #           Screen.current_key_encoding_flags(), Window.write_to_child()
   cat > ~/.config/kitty/copy_notify.py << 'EOF'
 from kitty.boss import Boss
 from kitty.clipboard import set_clipboard_string
@@ -263,16 +276,21 @@ def handle_result(args, answer, target_window_id, boss: Boss) -> None:
     window = boss.window_id_map.get(target_window_id)
     if window is None:
         return
+
+    # copy branch: mirror kitty's own selection to the clipboard + toast
     selection = window.text_for_selection()
-    if not selection:
-        # no selection: no-op (interrupt lives on ctrl+x, not ctrl+c)
-        return
-    # copy branch: mirror the clipboard + surface a desktop toast
-    set_clipboard_string(selection)
-    import subprocess
-    subprocess.Popen(
-        ['notify-send', '-t', '1200', '-a', 'kitty', 'copied to clipboard']
-    )
+    if selection:
+        set_clipboard_string(selection)
+        import subprocess
+        subprocess.Popen(
+            ['notify-send', '-t', '1200', '-a', 'kitty', 'copied to clipboard']
+        )
+
+    # forward branch: hand an unambiguous ctrl+shift+c to the focused app so it
+    # can yank its own selection. gated on the kbd protocol so the shell (which
+    # does not enable it) never receives the escape — no stray input, no SIGINT.
+    if window.screen.current_key_encoding_flags():
+        window.write_to_child(b'\x1b[99;6u')
 
 
 def main(args):
