@@ -120,6 +120,218 @@ local function get_codediff_explorer_file()
   return nil
 end
 
+-- image extensions that image.nvim renders via kitty graphics.
+-- single source of truth: the codediff image-diff detect AND the image.nvim
+-- hijack_file_patterns (see plugin config below) both derive from this.
+-- headless-tested via .behavior/.../verify.image-diff.lua (mirror pattern —
+-- that file re-declares this list + is_image_diff_path; update BOTH on change).
+local IMAGE_DIFF_EXTS = {
+  png = true, jpg = true, jpeg = true, gif = true, webp = true, avif = true,
+}
+
+-- glob form of IMAGE_DIFF_EXTS for image.nvim's hijack_file_patterns
+local IMAGE_DIFF_GLOBS = {}
+for ext in pairs(IMAGE_DIFF_EXTS) do
+  IMAGE_DIFF_GLOBS[#IMAGE_DIFF_GLOBS + 1] = '*.' .. ext
+end
+table.sort(IMAGE_DIFF_GLOBS)
+
+-- true if the path ends in a renderable image extension
+local function is_image_diff_path(path)
+  if not path then return false end
+  local ext = path:match('%.([%w]+)$')
+  if not ext then return false end
+  return IMAGE_DIFF_EXTS[ext:lower()] == true
+end
+
+-- fill one pane: render an image, or show a text label on a blank pane
+local function set_image_diff_pane(win, present, image_mod, img_path, label, winbar)
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_win_set_buf(win, buf)
+  vim.bo[buf].bufhidden = 'wipe'
+  vim.wo[win].winbar = winbar
+  vim.wo[win].number = false
+  vim.wo[win].relativenumber = false
+  vim.wo[win].signcolumn = 'no'
+  if present then
+    -- render the image into this specific window + buffer
+    image_mod.hijack_buffer(img_path, win, buf)
+  else
+    -- absent side: a text label on a blank pane
+    vim.bo[buf].modifiable = true
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, { '', '  ' .. label, '' })
+    vim.bo[buf].modifiable = false
+  end
+  return buf
+end
+
+-- open a side-by-side image diff: old (git base) vs new (worktree), rendered
+-- INTO codediff's own diff windows so the explorer tree stays on the left —
+-- exactly where a text diff shows. opts = { git_root, path, old_path, status,
+-- base_revision }
+local function open_codediff_image_diff(opts)
+  local image_ok, image_mod = pcall(require, 'image')
+  if not image_ok then
+    vim.notify('image.nvim absent — cannot diff image', vim.log.levels.WARN)
+    return
+  end
+
+  local git_root = opts.git_root
+  local path = opts.path
+  -- loud, not silent: a nil git_root/path would otherwise fail with no feedback
+  if not git_root or not path then
+    vim.notify('codediff-image-diff: no git_root/path for node — cannot diff image', vim.log.levels.WARN)
+    return
+  end
+  local old_path = opts.old_path or path
+  local base = opts.base_revision or 'HEAD'
+  local status = opts.status or ''
+  local ext = path:match('%.([%w]+)$') or 'png'
+
+  -- which sides exist, from git status (A/?? = no old; D = no new)
+  local has_old = not (status == 'A' or status == '??')
+  local has_new = not (status == 'D')
+
+  -- extract the old blob to a temp file, byte-safe (no text decode)
+  local old_tmp = nil
+  if has_old then
+    local spec = base .. ':' .. old_path
+    local res = vim.system({ 'git', '-C', git_root, 'show', spec }, { text = false }):wait()
+    if res.code == 0 and res.stdout and #res.stdout > 0 then
+      old_tmp = vim.fn.tempname() .. '.' .. ext
+      local fh = io.open(old_tmp, 'wb')
+      if fh then
+        fh:write(res.stdout)
+        fh:close()
+      else
+        old_tmp = nil
+        has_old = false
+      end
+    else
+      -- base blob absent (e.g. a rename edge) — treat as no old
+      has_old = false
+    end
+  end
+
+  -- absolute path of the on-disk new file
+  local abs_new = git_root .. '/' .. path
+
+  -- keep the codediff explorer tree visible: render into codediff's OWN diff
+  -- windows (old = original_win, new = modified_win) in the current tab, exactly
+  -- where a text diff shows. this preserves the staged/unstaged treestruct on
+  -- the left instead of a dedicated tab that hides it.
+  local tabpage = vim.api.nvim_get_current_tabpage()
+
+  -- find the explorer window, so close can return focus to the tree
+  local explorer_win = nil
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+    local b = vim.api.nvim_win_get_buf(win)
+    if vim.bo[b].filetype == 'codediff-explorer' then
+      explorer_win = win
+      break
+    end
+  end
+
+  -- reuse codediff's diff windows: original=old (base), modified=new (worktree)
+  local old_win, new_win = nil, nil
+  local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
+  if lc_ok then
+    local orig_win, mod_win = lifecycle.get_windows(tabpage)
+    if orig_win and vim.api.nvim_win_is_valid(orig_win)
+      and mod_win and vim.api.nvim_win_is_valid(mod_win) then
+      old_win, new_win = orig_win, mod_win
+    end
+  end
+
+  -- fallbacks: split beside the explorer, or (no explorer) a dedicated tab
+  local used_dedicated_tab = false
+  if not old_win or not new_win then
+    if explorer_win and vim.api.nvim_win_is_valid(explorer_win) then
+      vim.api.nvim_set_current_win(explorer_win)
+      vim.cmd('rightbelow vsplit')
+      old_win = vim.api.nvim_get_current_win()
+      vim.cmd('rightbelow vsplit')
+      new_win = vim.api.nvim_get_current_win()
+    else
+      used_dedicated_tab = true
+      vim.cmd('tabnew')
+      new_win = vim.api.nvim_get_current_win()
+      vim.cmd('aboveleft vsplit')
+      old_win = vim.api.nvim_get_current_win()
+    end
+  end
+
+  -- close handler: a dedicated tab closes; the in-explorer layout returns focus
+  -- to the tree (the panes are reused by the next selection). temp removal is
+  -- owned by the BufWipeout autocmd below, so every close path cleans up.
+  local function close_image_diff()
+    if used_dedicated_tab then
+      vim.cmd('tabclose')
+    elseif explorer_win and vim.api.nvim_win_is_valid(explorer_win) then
+      vim.api.nvim_set_current_win(explorer_win)
+    end
+  end
+
+  -- clear any stale image placement on the reused windows first. codediff's
+  -- diff windows persist across selections, so a prior render (e.g. unstaged →
+  -- then staged for the same file) would ghost/flicker under the new one. kitty
+  -- graphics are placement-based, not buffer-bound, so an explicit clear is the
+  -- root-cause fix, not a buffer swap.
+  for _, w in ipairs({ old_win, new_win }) do
+    if w and vim.api.nvim_win_is_valid(w) then
+      for _, img in ipairs(image_mod.get_images({ window = w })) do
+        pcall(function() img:clear(true) end)
+      end
+    end
+  end
+
+  local old_buf = set_image_diff_pane(
+    old_win, has_old, image_mod, old_tmp,
+    'no before version (added)', 'before (' .. base .. ')'
+  )
+  local new_buf = set_image_diff_pane(
+    new_win, has_new, image_mod, abs_new,
+    'no after version (deleted)', 'after (tree)'
+  )
+
+  -- delete the temp blob on any close path, not just q
+  if old_tmp then
+    vim.api.nvim_create_autocmd('BufWipeout', {
+      buffer = old_buf,
+      once = true,
+      callback = function() pcall(os.remove, old_tmp) end,
+    })
+  end
+
+  -- q leaves the image view: back to the tree (in-explorer) or shut the tab
+  for _, b in ipairs({ old_buf, new_buf }) do
+    vim.keymap.set('n', 'q', close_image_diff,
+      { buffer = b, nowait = true, silent = true, desc = 'leave image diff' })
+  end
+
+  -- keep focus on the tree (like a text diff does), so the human can browse to
+  -- the next file without a hop back. fall back to the new pane only when there
+  -- is no explorer (dedicated-tab case).
+  if explorer_win and vim.api.nvim_win_is_valid(explorer_win) then
+    vim.api.nvim_set_current_win(explorer_win)
+  elseif vim.api.nvim_win_is_valid(new_win) then
+    vim.api.nvim_set_current_win(new_win)
+  end
+end
+
+-- open the image diff for an explorer file node — single source of the
+-- node.data → opts shape, shared by the <CR> and <2-LeftMouse> handlers so a
+-- field change (e.g. a new_path field for renames) is a one-place edit
+local function open_image_diff_for_node(node, explorer)
+  open_codediff_image_diff({
+    git_root = explorer.git_root or node.data.git_root,
+    path = node.data.path,
+    old_path = node.data.old_path,
+    status = node.data.status,
+    base_revision = explorer.base_revision,
+  })
+end
+
 -- check if line has diff highlight (works for both vimdiff and codediff)
 local function line_has_diff_hl(lnum)
   -- first try native diff_hlID (for vimdiff)
@@ -962,8 +1174,13 @@ require('lazy').setup({
         end
       end, 50)
 
-      -- patch codediff explorer keymaps to use our collapse state
-      vim.defer_fn(function()
+      -- patch codediff explorer keymaps SYNCHRONOUSLY, before the first
+      -- :CodeDiff builds the explorer. a deferred patch (vim.defer_fn) races the
+      -- first explorer render and misses it — the image node then falls through
+      -- to codediff's text diff, where binary bytes render as garbage and the
+      -- virtual codediff:// png buffer errors. run inline via an iife so the
+      -- `return` early-exits still work.
+      ;(function()
         local ok, keymaps_mod = pcall(require, 'codediff.ui.explorer.keymaps')
         if not ok then return end
 
@@ -971,6 +1188,26 @@ require('lazy').setup({
         keymaps_mod.setup = function(explorer)
           -- call original to set up all keymaps
           original_setup(explorer)
+
+          -- divert image selections at the SINGLE funnel: every entry point
+          -- (<CR>, double-click, ]f/[f file-nav, auto-open, reselect) routes
+          -- through explorer.on_file_select. wrap it so an image node never
+          -- reaches codediff's text/diff path. the keymaps below also divert
+          -- directly; this wrapper covers the file-nav + programmatic entries.
+          local original_on_file_select = explorer.on_file_select
+          explorer.on_file_select = function(file_data, opts)
+            if file_data and is_image_diff_path(file_data.path) then
+              open_codediff_image_diff({
+                git_root = explorer.git_root or file_data.git_root,
+                path = file_data.path,
+                old_path = file_data.old_path,
+                status = file_data.status,
+                base_revision = explorer.base_revision,
+              })
+              return
+            end
+            return original_on_file_select(file_data, opts)
+          end
 
           -- override the Enter keymap to sync collapse across groups for same path
           local tree = explorer.tree
@@ -1014,14 +1251,34 @@ require('lazy').setup({
               end
               tree:render()
             else
-              -- file node — default select
-              if explorer.on_file_select then
+              -- file node
+              if is_image_diff_path(node.data.path) then
+                -- image node — divert to our side-by-side image diff, so the
+                -- binary never reaches codediff's text/diff path (which errors)
+                open_image_diff_for_node(node, explorer)
+              elseif explorer.on_file_select then
+                -- non-image file — codediff default
                 explorer.on_file_select(node.data)
               end
             end
           end, { buffer = split.bufnr, noremap = true, silent = true, nowait = true, desc = 'Toggle/select' })
+
+          -- double-click mirrors <CR> for file nodes: codediff binds
+          -- <2-LeftMouse> straight to on_file_select, which would feed an image
+          -- into the text/diff path and error. divert image nodes here too.
+          vim.keymap.set('n', '<2-LeftMouse>', function()
+            local node = tree:get_node()
+            if not node or not node.data then return end
+            local node_type = node.data.type
+            if node_type == 'group' or node_type == 'directory' then return end
+            if is_image_diff_path(node.data.path) then
+              open_image_diff_for_node(node, explorer)
+            elseif explorer.on_file_select then
+              explorer.on_file_select(node.data)
+            end
+          end, { buffer = split.bufnr, noremap = true, silent = true, nowait = true, desc = 'Select file' })
         end
-      end, 50)
+      end)()
 
 
       -- codediff buffer keymaps
@@ -1301,7 +1558,9 @@ require('lazy').setup({
           },
         },
         -- open image files directly as rendered images
-        hijack_file_patterns = { '*.png', '*.jpg', '*.jpeg', '*.gif', '*.webp', '*.avif' },
+        -- derived from IMAGE_DIFF_EXTS (top of file) — one source of truth,
+        -- shared with the codediff image-diff detect
+        hijack_file_patterns = IMAGE_DIFF_GLOBS,
       })
     end,
   },
