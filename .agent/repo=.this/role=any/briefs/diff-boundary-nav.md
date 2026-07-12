@@ -55,3 +55,15 @@ two chunk detection methods:
 | normal buffer | ctrl+d k | prev boundary (gitsigns) |
 | codediff buffer | ctrl+d j | next boundary (diff hl) |
 | codediff buffer | ctrl+d k | prev boundary (diff hl) |
+
+## .gotcha: ctrl-held ctrl+j → shift+enter
+
+kitty remaps `ctrl+j` to `shift+enter` (`map ctrl+j send_key shift+enter` in
+install_env.pt4). so when ctrl stays down the whole time for `ctrl+d ctrl+j`,
+nvim never receives `<C-j>` (= `<NL>`, byte 0x0a) — it arrives as `<S-CR>`.
+
+fix: each boundary_down bind also covers `<C-d><S-CR>`, so ctrl-held next-diff
+works. `ctrl+k` is untouched by kitty, so prev needs no equivalent.
+
+- `<C-j>` keytrans → `<NL>` (why the plain bind cannot catch the kitty case)
+- `<S-CR>` is a distinct keycode in nvim 0.10+ with the kitty keyboard protocol

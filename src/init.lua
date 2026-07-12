@@ -463,6 +463,11 @@ require('lazy').setup({
       vim.keymap.set('n', '<C-d>k', boundary_up, { desc = 'Prev diff boundary' })
       vim.keymap.set('n', '<C-d><C-j>', boundary_down, { desc = 'Next diff boundary' })
       vim.keymap.set('n', '<C-d><C-k>', boundary_up, { desc = 'Prev diff boundary' })
+      -- kitty remaps ctrl+j -> shift+enter (see install_env.pt4 `map ctrl+j
+      -- send_key shift+enter`), so ctrl-held <C-d><C-j> never delivers <C-j> to
+      -- nvim — it arrives as <S-CR>. map that too so "ctrl held down" next-diff
+      -- works. ctrl+k is untouched by kitty, so prev needs no equivalent.
+      vim.keymap.set('n', '<C-d><S-CR>', boundary_down, { desc = 'Next diff boundary' })
       -- ctrl+d s = stage, u = unstage, x = discard
       local function stage_buffer()
         gs.stage_buffer()
@@ -1317,6 +1322,10 @@ require('lazy').setup({
           vim.keymap.set('n', '<C-d>k', boundary_up, { buffer = true, desc = 'Prev diff boundary' })
           vim.keymap.set('n', '<C-d><C-j>', boundary_down, { buffer = true, desc = 'Next diff boundary' })
           vim.keymap.set('n', '<C-d><C-k>', boundary_up, { buffer = true, desc = 'Prev diff boundary' })
+          -- kitty remaps ctrl+j -> shift+enter, so ctrl-held <C-d><C-j> reaches
+          -- nvim as <S-CR>; map it so next-diff works with ctrl held (see the
+          -- gitsigns block above for the full rationale). ctrl+k is untouched.
+          vim.keymap.set('n', '<C-d><S-CR>', boundary_down, { buffer = true, desc = 'Next diff boundary' })
           -- 'o' to open file in new tab
           vim.keymap.set('n', 'o', function()
             local bufname = vim.api.nvim_buf_get_name(0)
@@ -1696,6 +1705,18 @@ hi('NeominimapDiffDeleteLine', { bg = '#7a5a5a' })  -- bright pastel red
 vim.keymap.set('v', '<C-c>', '"+y')
 vim.keymap.set('v', '<C-S-c>', '"+y')
 
+-- show a copied status on clipboard yanks (mirrors the +stage 🤙 status), so
+-- every copy path (<C-c>, <C-S-c>, "+y) confirms the copy in one place. gated on
+-- the + register so an ordinary yy into the unnamed register stays quiet.
+vim.api.nvim_create_autocmd('TextYankPost', {
+  callback = function()
+    local ev = vim.v.event
+    if ev.operator == 'y' and ev.regname == '+' then
+      print('+copied 🤙')
+    end
+  end,
+})
+
 -- ctrl+v = paste (insert + normal mode)
 vim.keymap.set('i', '<C-v>', '<C-r>+')
 vim.keymap.set('n', '<C-v>', '"+p')
@@ -1726,9 +1747,15 @@ vim.keymap.set('i', '<C-z>', '<Esc>ui', { noremap = true })
 vim.keymap.set('n', '<C-S-z>', '<C-r>', { noremap = true })
 vim.keymap.set('i', '<C-S-z>', '<Esc><C-r>i', { noremap = true })
 
--- ctrl+r = copy relative path of current file to clipboard (relative to cwd)
-vim.keymap.set('n', '<C-r>', function()
+-- ctrl+r = copy relative path of current file to clipboard (relative to cwd).
+-- also bind the ctrl+alt+r and ctrl+super+r variants: with the kitty keyboard
+-- protocol on, those held-modifier combos reach nvim as distinct keycodes
+-- (<C-A-r> / <C-D-r>), so point all three at the same copy so muscle memory works.
+local function copy_relpath()
   local path = vim.fn.expand('%:.')
   vim.fn.setreg('+', path)
   print('copied: ' .. path)
-end, { noremap = true, silent = false })
+end
+vim.keymap.set('n', '<C-r>', copy_relpath, { noremap = true, silent = false })
+vim.keymap.set('n', '<C-A-r>', copy_relpath, { noremap = true, silent = false })
+vim.keymap.set('n', '<C-D-r>', copy_relpath, { noremap = true, silent = false })
