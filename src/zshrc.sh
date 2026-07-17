@@ -47,10 +47,10 @@ if [[ -t 1 ]]; then
   # subpath is the dir relative to repo root (e.g. repo:branch/src); omitted at root
   # uses OSC 2 escape sequence for window/tab title
   _set_terminal_title() {
-    local title
+    local title repo="" branch=""
     if git rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
-      local repo=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)")
-      local branch=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null)
+      repo=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)")
+      branch=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null)
       local branchsuffix=".${branch//\//.}"                      # worktree dir convention: repo.branch-with-slashes-as-dots
       repo="${repo%$branchsuffix}"                               # drop redundant branch suffix (e.g. dev-env-setup.vlad.fix-kitty-titles -> dev-env-setup)
       local subpath="$(git rev-parse --show-prefix 2>/dev/null)"  # e.g. "src/foo/" ("" at root)
@@ -60,6 +60,16 @@ if [[ -t 1 ]]; then
       title="${PWD/#$HOME/~}"  # home-abbreviated pwd
     fi
     printf '\e]2;%s\a' "$title"
+
+    # inside tmux, push repo + branch as pane options so the tmux status line can
+    # read them directly (see status-left/right in tmux.conf) — no string parse,
+    # no git subprocess on a status refresh. outside a repo these are empty, so the
+    # status line clears rather than show a stale repo/branch. branch here is clean
+    # (no subpath), so the status-right shows only the branch.
+    if [[ -n "$TMUX" ]]; then
+      tmux set -p @repo "$repo" 2>/dev/null
+      tmux set -p @branch "$branch" 2>/dev/null
+    fi
   }
   chpwd_functions+=(_set_terminal_title)
   precmd_functions+=(_set_terminal_title)  # re-assert on every prompt (restores title after apps like nvim exit)

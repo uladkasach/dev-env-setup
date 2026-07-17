@@ -216,8 +216,11 @@ map ctrl+0 goto_tab -1
 # {title:^14} center-pads each title to a 14-wide field so every tab is equal
 # width (the `separator` style below sizes tabs to content, which would otherwise
 # collapse each tab to its title length). titles longer than 14 grow as needed.
+# the literal space each side guarantees ≥1 space around the title at ANY length
+# (center-pad only fills titles shorter than 14; longer ones would touch the edge)
+# and — since tab_separator is empty — yields a clear gap between adjacent tabs.
 # note: tab bar is hidden with a single tab (kitty default), shown at 2+ tabs
-tab_title_template "{title:^14}"
+tab_title_template " {title:^14} "
 
 # tab bar style: flat, no divider. `separator` drops the default `fade` gradient
 # edges; an empty tab_separator removes the character between tabs entirely, so
