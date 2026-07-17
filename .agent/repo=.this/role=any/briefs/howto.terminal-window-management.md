@@ -69,6 +69,43 @@ term.send --via kitty --pid 12345 --what "cmd"  # send command
 term.list --via kitty                     # list open terminals
 ```
 
+### roles (one terminal, many role tabs)
+
+one kitty window can host several ducts as tabs — one per role. a role's duct is
+found at `<terminal>/<role>`.
+
+```bash
+# ductwork creates the role sessions first
+duct.open --on worktree/mechanic
+duct.open --on worktree/foreman
+
+# first --for opens the terminal, its base tab is the mechanic role
+term.open --via kitty --on worktree --for mechanic
+
+# a later --for adds a tab for the foreman role
+term.open --via kitty --on worktree --for foreman
+
+# address a role's tab for read/send/stop
+term.read --via kitty --on worktree --for foreman
+term.send --via kitty --on worktree --for foreman --what "cmd"
+term.stop --via kitty --on worktree --for foreman   # close just that tab
+term.stop --via kitty --on worktree                 # close the whole terminal
+```
+
+- `--for <role>` = `--tab <role> --duct <terminal>/<role>` — the tab bar shows the
+  clean role, while the tab attaches the (possibly longer, globally-unique) session
+- terminal identity stays `<terminal>` (`--on`), so `--on` finds it for every role
+- `--for` is local-only in v1
+
+low-level tab primitives (what `--for` is built on):
+
+```bash
+term.open --via kitty --on dev --tab aux            # add tab 'aux' (session 'aux')
+term.open --via kitty --on dev --tab aux --duct srv # tab 'aux', session 'srv'
+term.read --via kitty --on dev --tab aux            # read tab 'aux'
+term.stop --via kitty --on dev --tab aux            # close only tab 'aux'
+```
+
 ## .composition with ductwork
 
 ### local
@@ -118,14 +155,20 @@ terminal metadata stored in `~/.termwork/{pid}.json`:
   "pid": 12345,
   "socket": "unix:/tmp/kitty-12345",
   "cwd": "/home/vlad/git/project",
-  "duct": "agent-1",
-  "host": "vlad@cloud",
+  "duct": "worktree",
+  "host": "",
+  "tabs": [
+    { "slug": "mechanic", "kittyId": 1 },
+    { "slug": "foreman", "kittyId": 2 }
+  ],
   "startedAt": 1718100000000
 }
 ```
 
 - `host` is empty string for local ducts
 - `host` is `user@hostname` for cloud ducts
+- `duct` is the terminal identity (the `--on` value), not the attached session
+- `tabs[].slug` is the tab title + addressable id; the base tab is `tabs[0]`
 
 ## .install
 

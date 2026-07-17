@@ -20,16 +20,33 @@
 #   term.send --via kitty --pid 12345 --what "cmd"         # send by pid
 #   term.list --via kitty                     # list open terminals
 #
-# tabs (within a terminal's slug namespace):
-#   term.open --via kitty --on dev --tab aux            # add tab 'aux' to terminal 'dev'
+# roles (the ergonomic interface — one duct per role at <terminal>/<role>):
+#   term.open --via kitty --on worktree --for mechanic  # open worktree, base tab 'mechanic' (worktree/mechanic)
+#   term.open --via kitty --on worktree --for foreman   # add tab 'foreman' (worktree/foreman)
+#   term.read --via kitty --on worktree --for foreman   # read the foreman tab
+#   term.send --via kitty --on worktree --for foreman --what cmd
+#   term.stop --via kitty --on worktree --for foreman   # close only the foreman tab
+#   term.stop --via kitty --on worktree                 # close worktree + all its role tabs
+#
+#   - --for <role> = --tab <role> --duct <terminal>/<role> (clean title, role-scoped duct)
+#   - the FIRST --for on a fresh terminal is its base tab; a later --for adds a tab
+#   - the terminal identity stays <terminal> (--on), so --on finds it for every role
+#   - --for is local-only in v1
+#
+# tabs (the low-level primitives that --for is built on):
+#   term.open --via kitty --on dev --tab aux            # add tab 'aux' (attaches session 'aux')
+#   term.open --via kitty --on dev --tab aux --duct srv # add tab 'aux' that attaches session 'srv'
 #   term.read --via kitty --on dev --tab aux            # read tab 'aux'
 #   term.send --via kitty --on dev --tab aux --what cmd # send to tab 'aux'
 #   term.stop --via kitty --on dev --tab aux            # close only tab 'aux'
 #   term.stop --via kitty --on dev                      # close terminal + all its tabs
 #
 #   - a tab slug is unique within its terminal; address is (--on <terminal>, --tab <slug>)
-#   - --tab <slug> titles the kitty tab <slug> and attaches to tmux session <slug>
-#   - absent --tab = today's behavior (the terminal itself); prior callers unchanged
+#   - --tab <slug> = the tab's title AND addressable id; commands key off this id
+#   - the FIRST --tab for a not-yet-open terminal labels its base tab
+#   - a later --tab adds a tab; --duct <session> overrides the session it attaches
+#     (defaults to <slug>), so the clean label never leaks the real session name
+#   - absent --tab/--for = base tab named 'main' (or TERMWORK_BASE_TAB); prior callers unchanged
 #   - --pid addresses a terminal, never a tab
 #
 # remote ducts:
@@ -57,19 +74,31 @@ __term_usage() {
   case "$verb" in
     term.open)
       cat <<'EOF'
-term.open — open or focus a kitty terminal, or add a tab
+term.open — open or focus a kitty terminal, or add a role tab
 
   --via kitty            (required) terminal backend
   --on <terminal>        attach to a duct/terminal by slug (local or user@host:sess)
+  --for <role>            role tab at <terminal>/<role> (= --tab <role> --duct <terminal>/<role>)
   --cwd <path>           open in a directory
   --pid <pid>            focus an extant terminal by pid
-  --tab <slug>           add (or focus) a tab within the --on terminal
+  --tab <slug>           label the base tab (first open) or add/focus a tab
+  --duct <session>       tmux session an added --tab attaches (default: the --tab slug)
   --shell <path>         shell to launch (default: $SHELL)
   --help, -h             show this help
 
-  absent --tab = the terminal's base tab (named 'main' by default; override with
-  the TERMWORK_BASE_TAB env var). the base tab's label is independent of the
-  window title (which the shell keeps as repo:branch). --tab requires --on.
+  --for <role> is the ergonomic interface: a role's duct lives at <terminal>/<role>.
+  the FIRST --for on a fresh terminal is its base tab; a later --for adds a tab. the
+  terminal identity stays <terminal> (--on), so --on finds it for every role. --for
+  is local-only and must not be combined with --tab/--duct.
+
+  low-level: --tab <slug> is the tab's title AND addressable id; --duct <session>
+  overrides the session it attaches (default: the slug), so the clean label never
+  leaks the session name. the FIRST --tab on a not-yet-open terminal becomes its base
+  tab (which attaches its --duct, default the slug); a later --tab adds a tab.
+
+  absent --tab/--for = the terminal's base tab (named 'main' by default; override
+  with the TERMWORK_BASE_TAB env var). the base tab's label is independent of the
+  window title (which the shell keeps as repo:branch). --tab/--for require --on.
 EOF
       ;;
     term.stop)
@@ -79,10 +108,11 @@ term.stop — close a terminal (and all its tabs), or one tab
   --via kitty            (required) terminal backend
   --on <terminal>        the terminal by slug
   --pid <pid>            the terminal by pid
+  --for <role>           close only the role's tab (= --tab <role>)
   --tab <slug>           close only that tab (last tab → terminal closes)
   --help, -h             show this help
 
-  no --tab = close the terminal + all its tabs. --tab requires --on.
+  no --tab/--for = close the terminal + all its tabs. --tab/--for require --on.
 EOF
       ;;
     term.read)
@@ -92,10 +122,11 @@ term.read — print a terminal's (or tab's) text to stdout
   --via kitty            (required) terminal backend
   --on <terminal>        the terminal by slug
   --pid <pid>            the terminal by pid
+  --for <role>           read only the role's tab (= --tab <role>)
   --tab <slug>           read only that tab
   --help, -h             show this help
 
-  --tab requires --on.
+  --tab/--for require --on.
 EOF
       ;;
     term.send)
@@ -106,10 +137,11 @@ term.send — send text (+Enter) to a terminal or tab
   --on <terminal>        the terminal by slug
   --pid <pid>            the terminal by pid
   --what <text>          (required) the text to send
+  --for <role>           send only to the role's tab (= --tab <role>)
   --tab <slug>           send only to that tab
   --help, -h             show this help
 
-  --tab requires --on.
+  --tab/--for require --on.
 EOF
       ;;
     term.list)
@@ -452,7 +484,11 @@ __term_probe_tab() {
   kitten @ --to "$socket" ls --match "$match" >/dev/null 2>&1
 }
 
-# .what = launch a new tab titled by slug, print the new kitty window id
+# .what = launch a new tab titled by $title, attached to tmux session $session,
+#         and print the new kitty window id
+# .why  = title and session are decoupled: the tab bar shows a clean human label
+#         ($title) while the tab attaches a possibly-uglier globally-unique session
+#         ($session). callers that pass one slug for both get today's behavior.
 __term_launch_tab() {
   local socket="$1"
   local title="$2"
@@ -554,6 +590,9 @@ term.open() {
   local duct=""
   local pid=""
   local tab=""
+  local tab_duct=""
+  local role=""
+  local base_label=""
   local shell="${SHELL:-/bin/bash}"
 
   while [[ $# -gt 0 ]]; do
@@ -563,6 +602,8 @@ term.open() {
       --on) duct="$2"; shift 2 ;;
       --pid) pid="$2"; shift 2 ;;
       --tab) tab="$2"; shift 2 ;;
+      --duct) tab_duct="$2"; shift 2 ;;
+      --for) role="$2"; shift 2 ;;
       --shell) shell="$2"; shift 2 ;;
       --help|-h) __term_usage term.open; return 0 ;;
       *) echo "✋ term.open: unknown arg '$1'" >&2; return 2 ;;
@@ -579,13 +620,42 @@ term.open() {
     return 2
   fi
 
+  # --for <role> is role-scoped sugar: it expands to --tab <role> --duct <slug>/<role>,
+  # so a role's duct is found at <terminal>/<role>. a fresh terminal's first --for
+  # becomes its base tab (which attaches slug/role); a later --for adds a tab. the tab
+  # bar shows the clean <role>, never the longer slug/role session name.
+  if [[ -n "$role" ]]; then
+    if [[ -z "$duct" ]]; then
+      echo "✋ term.open: --for requires --on <terminal>" >&2
+      return 2
+    fi
+    if [[ -n "$tab" || -n "$tab_duct" ]]; then
+      echo "✋ term.open: --for is shorthand for --tab/--duct; do not combine them" >&2
+      return 2
+    fi
+    # role ducts live at slug/role — a local convention; remote role terminals are
+    # not supported in v1 (tabs are local-only), so fail clear on a remote slug
+    if [[ "$duct" == *:* ]]; then
+      echo "✋ term.open: --for role terminals are local-only in v1 (no remote '$duct')" >&2
+      return 2
+    fi
+    tab="$role"
+    tab_duct="$duct/$role"
+  fi
+
   # --tab addresses a tab within a terminal's namespace; --pid names a terminal
   if [[ -n "$tab" && -n "$pid" ]]; then
     echo "✋ term.open: --pid addresses a terminal; use --on <terminal> --tab <slug> for a tab" >&2
     return 2
   fi
 
-  # --tab <slug>: add (or focus) a tab within the --on terminal
+  # --duct sets the session an added --tab attaches; it is meaningless without --tab
+  if [[ -n "$tab_duct" && -z "$tab" ]]; then
+    echo "✋ term.open: --duct sets the session for --tab; it requires --tab <slug>" >&2
+    return 2
+  fi
+
+  # --tab <slug>: label the base tab (first open) or add/focus a tab in --on terminal
   if [[ -n "$tab" ]]; then
     if [[ -z "$duct" ]]; then
       echo "✋ term.open: --tab requires --on <terminal>" >&2
@@ -597,15 +667,20 @@ term.open() {
     # the lock below, so a concurrent stop between here and the lock is caught.
     local host_pid
     host_pid=$(__term_find_by_duct "$duct")
+
+    # terminal not open yet → this first --tab/--for becomes its base tab. carry the
+    # label in base_label and fall through to the base-open flow below, where the base
+    # attaches the tab's duct (tab_duct, default: the slug).
     if [[ -z "$host_pid" ]]; then
-      echo "✋ term.open: no terminal '$duct' (open it first)" >&2
-      return 2
+      base_label="$tab"
     fi
 
-    # serialize check→launch→register under the per-terminal lock (keyed by pid,
-    # shared with every other op on this terminal). the brace group holds fd 9
-    # for its duration; return tears it down (unlocks). single-digit fd keeps the
-    # redirect parseable when this file is sourced into zsh as well as bash.
+    # terminal already open → add (or focus) a tab under the per-terminal lock.
+    # serialize check→launch→register under the lock (keyed by pid, shared with
+    # every other op on this terminal). the brace group holds fd 9 for its
+    # duration; return tears it down (unlocks). single-digit fd keeps the redirect
+    # parseable when this file is sourced into zsh as well as bash.
+    if [[ -n "$host_pid" ]]; then
     local lockpath
     lockpath=$(__term_lock_path "$host_pid")
     {
@@ -666,10 +741,21 @@ term.open() {
         fi
       fi
 
-      # launch the tab, titled by its slug, attached to the tmux session of that slug;
-      # capture the new kitty window id printed on stdout as the robust handle
+      # the tab attaches the tmux session named by --duct (default: the slug — so
+      # title==session stays today's behavior). the title stays the clean slug even
+      # when the session is a longer unique name.
+      local tab_session="${tab_duct:-$tab}"
+
+      # guard: a tab attaches a local tmux session; if it is absent the shell exits
+      # and the tab dies instantly. fail clear before we spawn (matches base-open).
+      if ! __term_has_tmux_session "$tab_session"; then
+        echo "✋ term.open: no tmux session '$tab_session' — create it first (tmux new-session -d -s '$tab_session')" >&2
+        return 2
+      fi
+
+      # launch the tab; capture the new kitty window id printed on stdout (robust handle)
       local tab_id
-      if ! tab_id=$(__term_launch_tab "$host_socket" "$tab" "$cwd" "$shell" "$tab"); then
+      if ! tab_id=$(__term_launch_tab "$host_socket" "$tab" "$cwd" "$shell" "$tab_session"); then
         echo "💥 term.open: failed to open tab '$tab' in terminal '$duct'" >&2
         return 1
       fi
@@ -685,6 +771,7 @@ term.open() {
       echo "🖥️  term://$duct tab '$tab' opened (in pid $host_pid)"
       return 0
     } 9>"$lockpath"
+    fi
   fi
 
   # if --pid given, focus that terminal
@@ -728,12 +815,26 @@ term.open() {
     duct_session="$TERM_SESSION"
   fi
 
+  # the base tab's attached session: a --tab/--for on this first open (base_label
+  # set) attaches the tab's own duct (e.g. slug/role for --for), while the terminal's
+  # identity stays duct_session (the --on value) — so a later --on <slug> still finds
+  # it. absent base_label, the base attaches the terminal's own duct (today).
+  local base_attach="$duct_session"
+  if [[ -n "$base_label" ]]; then
+    # a fresh --tab/--for base is local-only (its duct is a local session)
+    if [[ -n "$duct_host" ]]; then
+      echo "✋ term.open: --tab/--for on a fresh terminal is local-only in v1 (no remote '$duct')" >&2
+      return 2
+    fi
+    base_attach="${tab_duct:-$tab}"
+  fi
+
   # guard: a local duct attaches to a tmux session; if that session is absent the
   # attach fails, the shell exits, and the kitty dies within ~0.3s (leaving no
   # window and a confusing dead-socket error). fail clear before we spawn.
   if [[ -n "$duct" && -z "$duct_host" ]]; then
-    if ! __term_has_tmux_session "$duct_session"; then
-      echo "✋ term.open: no tmux session '$duct_session' — create it first (tmux new-session -d -s '$duct_session')" >&2
+    if ! __term_has_tmux_session "$base_attach"; then
+      echo "✋ term.open: no tmux session '$base_attach' — create it first (tmux new-session -d -s '$base_attach')" >&2
       return 2
     fi
   fi
@@ -756,7 +857,7 @@ term.open() {
         -o "listen_on=unix:/tmp/kitty-{kitty_pid}" \
         --detach \
         --directory "$cwd" \
-        -e "$shell" -l -i -c "tmux attach-session -t '$duct_session'"
+        -e "$shell" -l -i -c "tmux attach-session -t '$base_attach'"
     fi
   else
     kitty \
@@ -792,8 +893,9 @@ term.open() {
   # label ("main" by default) instead of the shell's repo:branch window title —
   # the two are separate: the window title (OSC-2, titlebar) stays repo:branch,
   # this only names the tab. register it so it shows in term.list and is
-  # addressable as --tab main. override the label via TERMWORK_BASE_TAB.
-  local base_tab="${TERMWORK_BASE_TAB:-main}"
+  # addressable as --tab <label>. precedence: an explicit --tab on this first open
+  # (base_label) wins, else TERMWORK_BASE_TAB, else 'main'.
+  local base_tab="${base_label:-${TERMWORK_BASE_TAB:-main}}"
   __term_set_tab_title "$socket" "$base_tab"
   local base_id
   base_id=$(__term_get_base_window_id "$socket")
@@ -816,6 +918,7 @@ term.stop() {
   local pid=""
   local duct=""
   local tab=""
+  local role=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -823,6 +926,7 @@ term.stop() {
       --pid) pid="$2"; shift 2 ;;
       --on) duct="$2"; shift 2 ;;
       --tab) tab="$2"; shift 2 ;;
+      --for) role="$2"; shift 2 ;;
       --help|-h) __term_usage term.stop; return 0 ;;
       *) echo "✋ term.stop: unknown arg '$1'" >&2; return 2 ;;
     esac
@@ -836,6 +940,19 @@ term.stop() {
   if [[ "$via" != "kitty" ]]; then
     echo "✋ term.stop: unknown terminal '$via'" >&2
     return 2
+  fi
+
+  # --for <role> addresses the role's tab (titled <role>); shorthand for --tab <role>
+  if [[ -n "$role" ]]; then
+    if [[ -z "$duct" ]]; then
+      echo "✋ term.stop: --for requires --on <terminal>" >&2
+      return 2
+    fi
+    if [[ -n "$tab" ]]; then
+      echo "✋ term.stop: --for is shorthand for --tab; do not combine them" >&2
+      return 2
+    fi
+    tab="$role"
   fi
 
   # --tab addresses a tab within a terminal; --pid names a terminal
@@ -993,6 +1110,7 @@ term.read() {
   local pid=""
   local duct=""
   local tab=""
+  local role=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -1000,6 +1118,7 @@ term.read() {
       --pid) pid="$2"; shift 2 ;;
       --on) duct="$2"; shift 2 ;;
       --tab) tab="$2"; shift 2 ;;
+      --for) role="$2"; shift 2 ;;
       --help|-h) __term_usage term.read; return 0 ;;
       *) echo "✋ term.read: unknown arg '$1'" >&2; return 2 ;;
     esac
@@ -1013,6 +1132,19 @@ term.read() {
   if [[ "$via" != "kitty" ]]; then
     echo "✋ term.read: unknown terminal '$via'" >&2
     return 2
+  fi
+
+  # --for <role> addresses the role's tab (titled <role>); shorthand for --tab <role>
+  if [[ -n "$role" ]]; then
+    if [[ -z "$duct" ]]; then
+      echo "✋ term.read: --for requires --on <terminal>" >&2
+      return 2
+    fi
+    if [[ -n "$tab" ]]; then
+      echo "✋ term.read: --for is shorthand for --tab; do not combine them" >&2
+      return 2
+    fi
+    tab="$role"
   fi
 
   # --tab addresses a tab within a terminal; --pid names a terminal
@@ -1089,6 +1221,7 @@ term.send() {
   local duct=""
   local what=""
   local tab=""
+  local role=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -1097,6 +1230,7 @@ term.send() {
       --on) duct="$2"; shift 2 ;;
       --what) what="$2"; shift 2 ;;
       --tab) tab="$2"; shift 2 ;;
+      --for) role="$2"; shift 2 ;;
       --help|-h) __term_usage term.send; return 0 ;;
       *) echo "✋ term.send: unknown arg '$1'" >&2; return 2 ;;
     esac
@@ -1110,6 +1244,19 @@ term.send() {
   if [[ "$via" != "kitty" ]]; then
     echo "✋ term.send: unknown terminal '$via'" >&2
     return 2
+  fi
+
+  # --for <role> addresses the role's tab (titled <role>); shorthand for --tab <role>
+  if [[ -n "$role" ]]; then
+    if [[ -z "$duct" ]]; then
+      echo "✋ term.send: --for requires --on <terminal>" >&2
+      return 2
+    fi
+    if [[ -n "$tab" ]]; then
+      echo "✋ term.send: --for is shorthand for --tab; do not combine them" >&2
+      return 2
+    fi
+    tab="$role"
   fi
 
   # --tab addresses a tab within a terminal; --pid names a terminal
