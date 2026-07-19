@@ -27,7 +27,6 @@ personal development environment configuration repo — shell configs, aliases, 
 
 - **keyd**: capslock = ctrl (held) / escape (tapped); ralt/rctrl = vim arrows
 - **ptyxis**: gpu-accelerated terminal with vim-style tab nav (ctrl+h/l)
-- **gitui**: terminal git tui with desert theme + hjkl navigation
 - **codium**: vscodium with microsoft extensions + sync-settings
 - **fnm**: fast node manager with pnpm + corepack
 

@@ -50,21 +50,6 @@ warm earth tones on a dark neutral background. high contrast where it matters (f
 - location: `~/.var/app/app.devsuite.Ptyxis/config/glib-2.0/settings/keyfile`
 - note: ptyxis ships with Gogh's Desert palette built in, so we just reference it by name
 
-### gitui
-
-- applied via: `configure_gitui_theme()` in `src/install_env.sh`
-- method: writes a `theme.ron` file that maps Desert hex values to gitui's theme slots
-- location: `~/.config/gitui/theme.ron`
-- color map:
-  - selection bg → `#555555` (bright black)
-  - command fg → `#F5DEB3` (white/wheat)
-  - diff add → `#98FB98` (green)
-  - diff delete → `#FF2B2B` (red)
-  - diff modified → `#F0E68C` (yellow)
-  - commit hash → `#CD853F` (blue/peru)
-  - commit author → `#87CEFF` (bright blue)
-  - branch → `#FFA0A0` (cyan/pink)
-
 ### neovim
 
 - applied via: `src/init.lua` (synced by `sync.devenv.nvim`)

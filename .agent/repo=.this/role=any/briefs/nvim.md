@@ -127,4 +127,4 @@ powered by mini.map. disabled for neo-tree, oil, help, and gitdiff.pane.tree.
 
 ## theme
 
-desert palette from [gogh](https://github.com/Gogh-Co/Gogh/blob/master/themes/Desert.yml) — warm earth tones on dark background. matches ptyxis terminal and gitui configs.
+desert palette from [gogh](https://github.com/Gogh-Co/Gogh/blob/master/themes/Desert.yml) — warm earth tones on dark background. matches ptyxis terminal config.

@@ -24,9 +24,12 @@ bindkey '^[[1;5C' forward-word                    # Ctrl+Right
 bindkey '^[[1;5D' backward-word                   # Ctrl+Left
 bindkey '^H' kill-whole-line                      # Ctrl+Backspace
 
-# edit command line in $EDITOR (ctrl+x ctrl+e)
+# edit command line in $EDITOR (nvim). ctrl+e is the primary bind; ctrl+x ctrl+e
+# stays as the zsh-default fallback. note: ctrl+e was end-of-line in emacs mode —
+# that jump is now edit-command-line; use ctrl+a then the arrow, or just edit.
 autoload -Uz edit-command-line
 zle -N edit-command-line
+bindkey '^E' edit-command-line
 bindkey '^X^E' edit-command-line
 
 # interactive session setup
