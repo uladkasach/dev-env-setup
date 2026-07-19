@@ -18,7 +18,7 @@ applies to all system and tool configurations:
 - terminal configs (ptyxis, keybindings)
 - git configs and aliases
 - shell configs (zsh, bash_aliases)
-- tool configs (gitui, keyd, codium)
+- tool configs (keyd, codium)
 - system settings (swappiness, inotify limits)
 
 ## .how
@@ -32,18 +32,18 @@ applies to all system and tool configurations:
 ### 👍 good — config via repo
 
 ```sh
-# edit install_env.sh to update gitui theme
-vim src/install_env.sh  # modify configure_gitui_theme()
+# edit install_env.sh to update ptyxis theme
+vim src/install_env.sh  # modify configure_ptyxis()
 
 # re-run the function to apply
-source src/install_env.sh && configure_gitui_theme
+source src/install_env.sh && configure_ptyxis
 ```
 
 ### 👎 bad — direct config edit
 
 ```sh
 # direct edit loses reproducibility
-vim ~/.config/gitui/theme.ron
+vim ~/.var/app/app.devsuite.Ptyxis/config/glib-2.0/settings/keyfile
 ```
 
 ## .sync commands
