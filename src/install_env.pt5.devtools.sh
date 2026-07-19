@@ -35,19 +35,34 @@ install_robot_brains() {
   pnpm install -g rhachet
   pnpm install -g @openai/codex
 
-  # disable background auto-updater (manual `claude update` still works)
-  # ref: https://code.claude.com/docs/en/setup
+  configure_robot_brains
+}
+
+configure_robot_brains() {
+  #########################
+  ## claude-code cli config
+  ## ref: https://code.claude.com/docs/en/setup
+  #########################
+
+  # patch:
+  # - DISABLE_UPDATES: block all self-update paths (we manage claude via pnpm),
+  #   which silences the "auto-update failed" startup nag
+  # - disableClaudeAiConnectors: stop claude.ai connector auto-fetch, which
+  #   silences the "N claude.ai connector needs auth · /mcp" nag (v2.1.182+ only)
+  # note: the "switched to native installer" nag is NOT gated by settings.json —
+  #   it needs DISABLE_INSTALLATION_CHECKS exported in the shell (see src/zshrc.sh)
+  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1"}, "disableClaudeAiConnectors": true}'
   local settings_file="$HOME/.claude/settings.json"
   mkdir -p "$HOME/.claude"
   if [[ -f "$settings_file" ]]; then
-    # merge DISABLE_AUTOUPDATER into extant settings
-    jq '. * {"env": {"DISABLE_AUTOUPDATER": "1"}}' "$settings_file" > /tmp/claude-settings.json \
+    # deep-merge patch into extant settings
+    jq --argjson patch "$patch" '. * $patch' "$settings_file" > /tmp/claude-settings.json \
       && mv /tmp/claude-settings.json "$settings_file"
   else
     # create new settings file
-    echo '{"env": {"DISABLE_AUTOUPDATER": "1"}}' > "$settings_file"
+    echo "$patch" > "$settings_file"
   fi
-  echo "• claude-code auto-updater disabled (manual updates still work)"
+  echo "• claude-code updates + claude.ai connectors disabled"
 }
 
 install_ripgrep() {

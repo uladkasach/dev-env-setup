@@ -168,3 +168,15 @@ esac
 # which reduces per-minute input-token (ITPM) spikes that trip "rate limit reached"
 # note: must be exported in shell — a value in settings.json env block is ignored
 export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50
+
+# claude code: block all self-update paths (we manage claude via pnpm global)
+# silences the "auto-update failed" nag
+# note: must be exported in shell — the settings.json env block is read too late
+export DISABLE_AUTOUPDATER=1
+export DISABLE_UPDATES=1
+
+# claude code: suppress the "switched from npm to native installer" migration nag
+# undocumented flag found in the minified source (gates the installer check):
+#   if (K.current || v9() || w1(process.env.DISABLE_INSTALLATION_CHECKS)) return;
+# ref: https://github.com/anthropics/claude-code/issues/23683
+export DISABLE_INSTALLATION_CHECKS=1
