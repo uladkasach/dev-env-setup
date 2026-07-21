@@ -58,6 +58,9 @@ __duct_register_duct() {
   local host="$2"
   __duct_ensure_dirs
   local file="$DUCTWORK_DIR/ducts/$session.json"
+  # session may contain a slash (e.g. treename/role) -> nested path;
+  # create the parent dir so the registry write does not fail
+  mkdir -p "$(dirname "$file")"
   local now
   now=$(date +%s)
   cat > "$file" <<EOF
@@ -71,7 +74,10 @@ EOF
 __duct_unregister_duct() {
   local session="$1"
   __duct_ensure_dirs
-  rm -f "$DUCTWORK_DIR/ducts/$session.json"
+  local file="$DUCTWORK_DIR/ducts/$session.json"
+  rm -f "$file"
+  # session may be nested (treename/role) -> remove the now-empty parent dir
+  rmdir --ignore-fail-on-non-empty "$(dirname "$file")" 2>/dev/null || true
 }
 
 __duct_get_duct_host() {
@@ -267,16 +273,21 @@ __duct_refresh_host() {
   done <<< "$sessions"
 
   # remove stale ducts for this host
+  # recurse: ducts may be nested (ducts/tree/role.json) when session holds a
+  # slash; derive session as the path relative to ducts/ so the tree prefix is
+  # kept and the grep comparison against live sessions matches
   local f duct_session duct_host
-  for f in "$DUCTWORK_DIR"/ducts/*.json; do
+  while IFS= read -r f; do
     [[ -f "$f" ]] || continue
     duct_host=$(jq -r '.host // ""' "$f" 2>/dev/null)
     [[ "$duct_host" != "$host" ]] && continue
-    duct_session=$(basename "$f" .json)
-    if ! echo "$sessions" | grep -qx "$duct_session"; then
+    duct_session="${f#"$DUCTWORK_DIR"/ducts/}"
+    duct_session="${duct_session%.json}"
+    if ! echo "$sessions" | grep -qxF "$duct_session"; then
       rm -f "$f"
+      rmdir --ignore-fail-on-non-empty "$(dirname "$f")" 2>/dev/null || true
     fi
-  done
+  done < <(find "$DUCTWORK_DIR/ducts" -type f -name '*.json' 2>/dev/null)
 }
 
 duct.list() {
@@ -327,18 +338,22 @@ duct.list() {
   # group ducts by host from cache
   local -A host_ducts
   local f duct_host duct_session
-  for f in "$DUCTWORK_DIR"/ducts/*.json; do
+  # recurse: ducts may be nested (ducts/tree/role.json) when session holds a slash;
+  # derive session as the path relative to ducts/ so the tree prefix is kept
+  while IFS= read -r f; do
     [[ -f "$f" ]] || continue
     duct_host=$(jq -r '.host // "localhost"' "$f" 2>/dev/null)
-    duct_session=$(basename "$f" .json)
-    if [[ -n "${host_ducts[$duct_host]}" ]]; then
+    duct_session="${f#"$DUCTWORK_DIR"/ducts/}"
+    duct_session="${duct_session%.json}"
+    if [[ -n "${host_ducts[$duct_host]:-}" ]]; then
       host_ducts[$duct_host]="${host_ducts[$duct_host]}|$duct_session"
     else
       host_ducts[$duct_host]="$duct_session"
     fi
-  done
+  done < <(find "$DUCTWORK_DIR/ducts" -type f -name '*.json' 2>/dev/null)
 
-  if [[ ${#host_ducts[@]} -eq 0 ]]; then
+  # empty assoc array is safe to probe via values expansion with :- default
+  if [[ -z "${host_ducts[*]:-}" ]]; then
     echo "📡 (none)"
     return
   fi
@@ -417,14 +432,16 @@ duct.host.del() {
   __duct_unregister_host "$host"
 
   # remove ducts for this host
+  # recurse so nested ducts (ducts/tree/role.json) are found too
   local f duct_host
-  for f in "$DUCTWORK_DIR"/ducts/*.json; do
+  while IFS= read -r f; do
     [[ -f "$f" ]] || continue
     duct_host=$(jq -r '.host // ""' "$f" 2>/dev/null)
     if [[ "$duct_host" == "$host" ]]; then
       rm -f "$f"
+      rmdir --ignore-fail-on-non-empty "$(dirname "$f")" 2>/dev/null || true
     fi
-  done
+  done < <(find "$DUCTWORK_DIR/ducts" -type f -name '*.json' 2>/dev/null)
 
   echo "📡 host $host removed"
 }

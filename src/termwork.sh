@@ -753,6 +753,15 @@ term.open() {
         return 2
       fi
 
+      # wait for the listen socket to answer before we drive it — when a terminal
+      # was opened moments ago its kitty socket may not yet be ready, so a tab
+      # launch that fires too soon leaks a raw "connect: no such file" error and
+      # fails. mirror base-open: await the socket, fail loud if it never answers.
+      if ! __term_await_socket "$host_socket"; then
+        echo "💥 term.open: terminal '$duct' socket never answered for tab '$tab'" >&2
+        return 1
+      fi
+
       # launch the tab; capture the new kitty window id printed on stdout (robust handle)
       local tab_id
       if ! tab_id=$(__term_launch_tab "$host_socket" "$tab" "$cwd" "$shell" "$tab_session"); then
