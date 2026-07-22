@@ -236,6 +236,15 @@ map ctrl+shift+j scroll_page_down
 # --cwd=current inherits the pwd of the active window (via shell integration)
 map ctrl+backslash launch --type=os-window --cwd=current
 
+# force-reboot the active window's process (ctrl+shift+r) — kitty-side parity
+# with tmux's duct reboot (respawn-pane -k). SIGKILLs whatever runs in the
+# active window (e.g. a wedged nvim that will not :q) and respawns a fresh shell
+# at the same cwd, in the same tab. kitty grabs the key before the child sees
+# it, so it fires even when the child is fully hung.
+# note: tmux-backed tabs never reach here — tmux's own no-prefix C-S-r
+# (respawn-pane) intercepts first; this bind covers bare-shell kitty windows.
+map ctrl+shift+r kitten reboot_window.py
+
 # font size
 # ctrl+0 is reassigned to goto_tab (last tab) above, so the size reset moves to
 # ctrl+shift+0 to avoid the clash.
@@ -294,6 +303,62 @@ def handle_result(args, answer, target_window_id, boss: Boss) -> None:
     # does not enable it) never receives the escape — no stray input, no SIGINT.
     if window.screen.current_key_encoding_flags():
         window.write_to_child(b'\x1b[99;6u')
+
+
+def main(args):
+    pass
+EOF
+
+  # custom kitten that backs the `map ctrl+shift+r` line above. kitty has no
+  # native "respawn the process in this window" action (a window is bound to its
+  # child for life), so this kitten reproduces tmux's `respawn-pane -k -c` from
+  # the outside:
+  #
+  # 1. capture the active window's cwd BEFORE we tear it down.
+  # 2. launch a fresh shell in the same tab at that cwd. done first so the tab
+  #    never drops to zero windows (which would close the tab itself).
+  # 3. SIGKILL the old window's whole process group — hard-kills a wedged nvim
+  #    (or anything) that ignores gentler signals. kitty grabbed the key before
+  #    the child saw it, so this fires even on a fully hung child.
+  # 4. close the corpse window; child death would auto-close it anyway, this
+  #    just makes it immediate.
+  #
+  # each window's child runs in its own process group (kitty setsid's it), so
+  # killpg only nukes this window's tree — never kitty or its siblings.
+  # api refs: Boss.window_id_map, Boss.launch, Boss.close_window,
+  #           Window.cwd_of_child, Window.child.pid
+  cat > ~/.config/kitty/reboot_window.py << 'EOF'
+import os
+import signal
+
+from kitty.boss import Boss
+from kittens.tui.handler import result_handler
+
+
+@result_handler(no_ui=True)
+def handle_result(args, answer, target_window_id, boss: Boss) -> None:
+    window = boss.window_id_map.get(target_window_id)
+    if window is None:
+        return
+
+    # capture cwd before the window dies; fall back to home if unknown
+    cwd = window.cwd_of_child or os.path.expanduser('~')
+
+    # respawn a fresh shell in the same tab at the same cwd FIRST, so the tab
+    # never drops to zero windows (which would close the tab itself)
+    boss.launch('--type=window', f'--cwd={cwd}')
+
+    # SIGKILL the old window's whole process group — works even on a fully hung
+    # nvim, since kitty grabbed the key before the child ever saw it
+    pid = window.child.pid
+    if pid is not None:
+        try:
+            os.killpg(os.getpgid(pid), signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+    # close the corpse; child death auto-closes it anyway, this is immediate
+    boss.close_window(window)
 
 
 def main(args):

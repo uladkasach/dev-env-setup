@@ -30,6 +30,111 @@ vim.api.nvim_create_autocmd('FocusGained', {
   callback = function() nvim_focused = true end,
 })
 
+-- ─────────────────────────────────────────────────────────────────
+-- self-watchdog: cap runaway memory of THIS nvim core
+-- .what = a low-freq timer that reads our own RSS, writes a trend log,
+--         and trips a breaker (disable the heavy handlers + notify)
+--         before the systemd MemoryHigh scope throttles us.
+-- .why  = neovim 0.11+ runs the editor core as its own process. a
+--         runaway plugin (treesitter / neominimap-vdiff / image) can
+--         leak it to multi-GB and thrash swap until the box freezes.
+--         self-heal, not auto-kill: we quiet the leak, keep the buffers.
+-- .log  = stdpath('state')/selfwatch.log — grep it to see WHICH
+--         subsystem grows (rss vs buffer-count vs treesitter-count).
+-- ─────────────────────────────────────────────────────────────────
+do
+  local log_path = vim.fn.stdpath('state') .. '/selfwatch.log'
+  local warn_rss_kb = 800 * 1024   -- 0.8 GB: start to log the trend
+  local soft_rss_kb = 1200 * 1024  -- 1.2 GB: trip the breaker (below MemoryHigh=1.5G)
+  local tripped = false
+  local cpu_last = nil
+
+  -- read our own resident memory (kB) from /proc/self/status
+  local function get_self_rss_kb()
+    local f = io.open('/proc/self/status', 'r')
+    if not f then return nil end
+    for line in f:lines() do
+      local kb = line:match('^VmRSS:%s+(%d+) kB')
+      if kb then f:close() return tonumber(kb) end
+    end
+    f:close()
+    return nil
+  end
+
+  -- read our own cumulative cpu ticks (utime+stime) from /proc/self/stat
+  local function get_self_cpu_ticks()
+    local f = io.open('/proc/self/stat', 'r')
+    if not f then return nil end
+    local data = f:read('*a')
+    f:close()
+    -- fields after the ")" that closes (comm), which may hold spaces
+    local after = data and data:match('%)%s+(.*)$')
+    if not after then return nil end
+    local fields = {}
+    for tok in after:gmatch('%S+') do fields[#fields + 1] = tok end
+    -- post-")" indices: utime = 12, stime = 13
+    return (tonumber(fields[12]) or 0) + (tonumber(fields[13]) or 0)
+  end
+
+  -- count buffers with an active treesitter highlighter
+  local function count_ts_bufs()
+    local n = 0
+    local ok, active = pcall(function() return vim.treesitter.highlighter.active end)
+    if ok and active then
+      for _ in pairs(active) do n = n + 1 end
+    end
+    return n
+  end
+
+  local function append_log(line)
+    local f = io.open(log_path, 'a')
+    if not f then return end
+    f:write(line .. '\n')
+    f:close()
+  end
+
+  -- disable the heaviest handlers to halt growth, then reclaim
+  local function trip_breaker(rss_mb)
+    tripped = true
+    _G.nvim_selfwatch_tripped = true
+    pcall(vim.cmd, 'Neominimap off')
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      pcall(vim.treesitter.stop, buf)
+    end
+    collectgarbage('collect')
+    pcall(vim.fn.jobstart, {
+      'notify-send', '-u', 'critical', '-a', 'nvim',
+      'nvim self-watchdog tripped',
+      ('rss %dMB — disabled minimap + treesitter to stop a leak. see %s')
+        :format(rss_mb, log_path),
+    })
+    append_log(('%s TRIP rss_mb=%d pid=%d — disabled minimap+treesitter')
+      :format(os.date('%Y-%m-%dT%H:%M:%S'), rss_mb, vim.fn.getpid()))
+  end
+
+  local timer = vim.uv.new_timer()
+  timer:start(30000, 30000, vim.schedule_wrap(function()
+    local rss = get_self_rss_kb()
+    if not rss then return end
+    local cpu = get_self_cpu_ticks()
+    local cpu_delta = (cpu and cpu_last) and (cpu - cpu_last) or 0
+    cpu_last = cpu
+
+    -- log a compact trend line once we cross the warn line (low volume)
+    if rss >= warn_rss_kb then
+      append_log(('%s rss_mb=%d cpu_ticks=%d bufs=%d ts=%d tripped=%s cwd=%s')
+        :format(os.date('%Y-%m-%dT%H:%M:%S'), math.floor(rss / 1024), cpu_delta,
+          #vim.api.nvim_list_bufs(), count_ts_bufs(), tostring(tripped),
+          vim.fn.getcwd()))
+    end
+
+    -- trip the breaker once, when we cross the soft limit
+    if not tripped and rss >= soft_rss_kb then
+      trip_breaker(math.floor(rss / 1024))
+    end
+  end))
+end
+
 -- cache git root per buffer (avoids subprocess on every statusline render)
 local git_root_cache = {}
 local function get_git_root(bufnr)
