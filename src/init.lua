@@ -1713,6 +1713,14 @@ vim.api.nvim_create_autocmd('TextYankPost', {
     local ev = vim.v.event
     if ev.operator == 'y' and ev.regname == '+' then
       print('+copied 🤙')
+      -- desktop toast. through tmux the copy happens in nvim, not kitty, so
+      -- kitty's copy_notify.py toast never fires (it only toasts when kitty
+      -- owns the selection). dispatch it here so a clipboard yank confirms with
+      -- the same toast on every path. gated on the binary so a host that lacks
+      -- notify-send stays quiet instead of an E903 error.
+      if vim.fn.executable('notify-send') == 1 then
+        vim.fn.jobstart({ 'notify-send', '-t', '1200', '-a', 'kitty', 'copied to clipboard' })
+      end
     end
   end,
 })
