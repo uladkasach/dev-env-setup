@@ -1733,6 +1733,15 @@ vim.keymap.set('n', '<C-v>', '"+p')
 vim.keymap.set('n', '<C-s>', ':w<CR>')
 vim.keymap.set('i', '<C-s>', '<Esc>:w<CR>')
 
+-- ctrl+q = force quit ALL windows, no save prompt (:qa!). the escape hatch for
+-- when :q wedges on a modified buffer or a stubborn split. bound in normal,
+-- insert, and visual so it fires from any mode without a hop to normal first.
+-- note: this only helps while nvim still reads input; a fully hung nvim needs a
+-- kill from outside the process (see the tmux force-reboot keymap).
+vim.keymap.set('n', '<C-q>', '<Cmd>qa!<CR>', { noremap = true })
+vim.keymap.set('i', '<C-q>', '<Cmd>qa!<CR>', { noremap = true })
+vim.keymap.set('v', '<C-q>', '<Cmd>qa!<CR>', { noremap = true })
+
 -- ctrl+e = smart file tree toggle
 -- if neo-tree not open: open and focus it
 -- if neo-tree open but not focused: focus it
