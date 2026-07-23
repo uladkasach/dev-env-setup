@@ -350,6 +350,29 @@ tsx() { npx tsx "$@"; }
 npm_real() { command npm "$@"; }
 npx_real() { command npx "$@"; }
 
+# cap nvim memory so no single editor core can hog the machine.
+# .why = neovim 0.11+ runs the editor core as its own `nvim --embed`
+#        process. a runaway plugin (treesitter/minimap/diff) can leak
+#        it to multi-GB and thrash swap until the whole machine freezes.
+#        a systemd user scope makes the kernel throttle it at MemoryHigh
+#        and refuse to grow past MemoryMax, so it cannot hog the box.
+#        the in-nvim self-watchdog (init.lua) trips first, below these
+#        limits, to self-heal without a kill — this scope is the backstop.
+nvim() {
+  # find the real nvim binary, bypass this function (works in bash + zsh)
+  local bin
+  bin=$( unset -f nvim 2>/dev/null; command -v nvim )
+  # cap only in a real user session with systemd; else run bare
+  if [[ -n "$bin" ]] && command -v systemd-run >/dev/null 2>&1 && [[ -n "$XDG_RUNTIME_DIR" ]]; then
+    systemd-run --user --scope --quiet --collect \
+      -p MemoryHigh=1500M \
+      -p MemoryMax=2G \
+      "$bin" "$@"
+  else
+    command nvim "$@"
+  fi
+}
+
 
 ######################
 ## support github app tokens auth
