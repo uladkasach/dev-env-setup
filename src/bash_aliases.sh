@@ -58,6 +58,7 @@ _use_aws_profile() {
 function use.ahbode.test { _use_aws_profile test "$@"; }
 function use.ahbode.prep { _use_aws_profile prep "$@"; }
 function use.ahbode.prod { _use_aws_profile prod "$@"; }
+function use.ahbode.camp { _use_aws_profile camp "$@"; }
 function use.ahbode.root { _use_aws_profile sudo "$@"; }
 function use.ahction.prod { _use_aws_profile prod "$@"; }
 function use.whodis.prod { _use_aws_profile prod "$@"; }
