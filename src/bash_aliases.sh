@@ -290,10 +290,11 @@ alias sync.devenv.gitaliases='source ~/git/more/dev-env-setup/src/install_env.pt
 alias sync.devenv.nvim='mkdir -p ~/.config/nvim && cp ~/git/more/dev-env-setup/src/init.lua ~/.config/nvim/init.lua && echo "• neovim config synced"'
 alias sync.devenv.ptyxis='source ~/git/more/dev-env-setup/src/install_env.pt4.terminal.ptyxis.sh && configure_ptyxis'
 alias sync.devenv.kitty='source ~/git/more/dev-env-setup/src/install_env.pt4.terminal.kitty.sh && configure_kitty && configure_kitty_theme'
+alias sync.devenv.terminal='source ~/git/more/dev-env-setup/src/install_env.pt4.terminal.sh && install_terminal_command && echo "• terminal command synced"'
 alias sync.devenv.tmux='cp ~/git/more/dev-env-setup/src/tmux.conf ~/.tmux.conf && echo "• tmux config synced" && { tmux source-file ~/.tmux.conf 2>/dev/null && echo "• sourced into live server (detach+reattach to renegotiate terminal-features)" || echo "• no live tmux server to source into"; }'
 alias sync.devenv.cosmic='source ~/git/more/dev-env-setup/src/install_env.pt3.cosmic.sh && configure_cosmic_theme'
 alias sync.devenv.brains='source ~/git/more/dev-env-setup/src/install_env.pt5.devtools.sh && configure_robot_brains'
-alias sync.devenv='sync.devenv.bashaliases && sync.devenv.starship && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.kitty && sync.devenv.tmux && sync.devenv.cosmic && sync.devenv.brains'
+alias sync.devenv='sync.devenv.bashaliases && sync.devenv.starship && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.kitty && sync.devenv.terminal && sync.devenv.tmux && sync.devenv.cosmic && sync.devenv.brains'
 
 # make it easy to pull down the devenv repo
 alias devenv.sync.repo='cd ~/git/more/dev-env-setup && git checkout main && git pull origin HEAD'
