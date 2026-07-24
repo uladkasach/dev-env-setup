@@ -187,6 +187,23 @@ map ctrl+v paste_from_clipboard
 # also the ^C escape inside TUI apps (nvim, REPLs) now that ctrl+c never passes.
 map ctrl+x send_text all \x03
 
+# mouse: keep native selection even while an app has grabbed the mouse.
+# tmux runs with `mouse on` (so the wheel scrolls its 50k scrollback), which puts
+# kitty in the "grabbed" state — where kitty's default hands left-drag to the app
+# and reserves Shift for its own selection. these overrides make kitty claim
+# left-drag for its OWN selection under grabbed too, so a highlight sticks with no
+# modifier and the ctrl+c kitten (copy_notify.py) has a selection to mirror. the
+# wheel is left unmapped, so kitty still forwards it to whichever app holds the
+# grab (tmux -> scrollback, nvim -> its own scroll). net: kitty owns selection,
+# the app owns the wheel. mouse_selection tracks the drag from press to release
+# on its own.
+# note: "grabbed" is app-agnostic, so this also gives kitty-native selection
+# inside nvim (in place of nvim visual-drag); nvim still yanks via the ctrl+c
+# forward (CSI 99;6u). ungrabbed selection keeps kitty's stock defaults.
+mouse_map left press grabbed mouse_selection normal
+mouse_map left doublepress grabbed mouse_selection word
+mouse_map left triplepress grabbed mouse_selection line
+
 # tabs
 map ctrl+t new_tab
 map ctrl+shift+h previous_tab
@@ -241,8 +258,12 @@ map ctrl+backslash launch --type=os-window --cwd=current
 # active window (e.g. a wedged nvim that will not :q) and respawns a fresh shell
 # at the same cwd, in the same tab. kitty grabs the key before the child sees
 # it, so it fires even when the child is fully hung.
-# note: tmux-backed tabs never reach here — tmux's own no-prefix C-S-r
-# (respawn-pane) intercepts first; this bind covers bare-shell kitty windows.
+# hard rule: reboot at the LEAF holder. kitty's map fires before the key reaches
+# its child, so a tmux-backed tab would (wrongly) reboot the kitty window — which
+# is the tmux CLIENT — and detach the duct. so the kitten first checks for tmux:
+# if found, it re-emits ctrl+shift+r downward (extended key CSI 114;6u) and lets
+# tmux's own `-n C-S-r respawn-pane` reboot the pane. only a bare-shell window
+# (no tmux) reboots kitty-side.
 map ctrl+shift+r kitten reboot_window.py
 
 # font size
@@ -326,7 +347,9 @@ EOF
   # each window's child runs in its own process group (kitty setsid's it), so
   # killpg only nukes this window's tree — never kitty or its siblings.
   # api refs: Boss.window_id_map, Boss.launch, Boss.close_window,
-  #           Window.cwd_of_child, Window.child.pid
+  #           Window.cwd_of_child, Window.child.pid, Window.write_to_child
+  #           (tmux detection walks /proc directly — Window.child.foreground_processes
+  #            returns empty when tmux holds the pty, so it cannot be used here)
   cat > ~/.config/kitty/reboot_window.py << 'EOF'
 import os
 import signal
@@ -335,10 +358,81 @@ from kitty.boss import Boss
 from kittens.tui.handler import result_handler
 
 
+def _read_ppid(pid: int) -> int:
+    # parse ppid (field 4) from /proc/<pid>/stat. the comm field (2) sits in
+    # parens and may hold spaces or ')' — so split AFTER the last ')' to stay safe.
+    try:
+        with open('/proc/%d/stat' % pid) as fh:
+            data = fh.read()
+        rest = data[data.rindex(')') + 1:].split()
+        return int(rest[1])
+    except Exception:
+        return -1
+
+
+def _proc_is_tmux(pid: int) -> bool:
+    # match on comm (covers 'tmux: client', whose comm kitty/setproctitle mangles)
+    # and on cmdline[0] basename (a clean 'tmux'), so either representation hits.
+    try:
+        with open('/proc/%d/comm' % pid) as fh:
+            if fh.read().strip().startswith('tmux'):
+                return True
+    except Exception:
+        pass
+    try:
+        with open('/proc/%d/cmdline' % pid, 'rb') as fh:
+            argv0 = fh.read().split(b'\x00', 1)[0].decode('utf-8', 'replace')
+        return os.path.basename(argv0) == 'tmux'
+    except Exception:
+        return False
+
+
+def _window_holds_tmux(window) -> bool:
+    # hard rule: reboot at the leaf holder. detect whether a tmux client runs in
+    # this window's process tree. kitty's own foreground_processes comes back EMPTY
+    # when tmux holds the pty (tmux takes the controlling pty for its client), so we
+    # cannot trust that api here. instead walk /proc down from kitty's child pid
+    # (the login zsh) and look for tmux anywhere in the subtree — the duct's attach
+    # helper runs `tmux attach` as a descendant of that shell, not as its foreground
+    # process. a local duct shows a 'tmux' descendant; a bare shell has none (so it
+    # reboots kitty-side). a remote duct attaches over ssh, so tmux lives on the far
+    # host and is (correctly) invisible here — those reboot kitty-side too, which is
+    # the right leaf on this machine.
+    root = window.child.pid
+    if root is None:
+        return False
+
+    # build a ppid -> [pid] map once, then BFS the subtree under root
+    kids = {}
+    for name in os.listdir('/proc'):
+        if not name.isdigit():
+            continue
+        pid = int(name)
+        kids.setdefault(_read_ppid(pid), []).append(pid)
+
+    stack = list(kids.get(root, []))
+    while stack:
+        pid = stack.pop()
+        if _proc_is_tmux(pid):
+            return True
+        stack.extend(kids.get(pid, []))
+    return False
+
+
 @result_handler(no_ui=True)
 def handle_result(args, answer, target_window_id, boss: Boss) -> None:
     window = boss.window_id_map.get(target_window_id)
     if window is None:
+        return
+
+    # hard rule: reboot at the leaf holder. when tmux is attached in this window,
+    # its pane is the leaf — so re-emit ctrl+shift+r as the extended key CSI 114;6u
+    # (114 = 'r', 6 = ctrl+shift; the path copy_notify uses for CSI 99;6u) and let
+    # tmux's own `-n C-S-r respawn-pane` reboot the pane. kitty's map swallowed the
+    # key, so we must re-send it. a reboot here would instead kill the tmux client
+    # and detach the duct.
+    if _window_holds_tmux(window):
+        window.write_to_child(b'\x1b[114;6u')
         return
 
     # capture cwd before the window dies; fall back to home if unknown
