@@ -390,25 +390,38 @@ print_proc_details() {
   local cpu="$2"
   local mem="$3"
   local prefix="$4"
+
+  # dead-on-read: the process exited between the ps snapshot and this re-read.
+  # its /proc is already gone, so its ps %CPU is stale and its start time is
+  # unreadable. report it as exited rather than fake an age from system uptime.
+  if [[ ! -r /proc/$pid/stat ]]; then
+    echo "${prefix}├─ 💨 [exited] (was ${cpu}% CPU, ${mem}% MEM, PID $pid — gone before re-read)"
+    return
+  fi
+
   local comm=$(cat /proc/$pid/comm 2>/dev/null || echo "?")
   local cwd=$(readlink /proc/$pid/cwd 2>/dev/null | sed "s|^$HOME|~|" || echo "?")
   local cmdline=$(tr '\0' ' ' < /proc/$pid/cmdline 2>/dev/null | cut -c1-60 || echo "?")
 
-  # calculate elapsed time from process start
+  # calculate elapsed time from process start.
+  # only trust a real start time; if it is absent the process raced out from
+  # under us, so show "?" rather than infer uptime as the age.
   local clk_tck=$(getconf CLK_TCK)
   local uptime_sec=$(awk '{print int($1)}' /proc/uptime)
-  local starttime=$(awk '{print $22}' /proc/$pid/stat 2>/dev/null || echo "0")
-  local start_sec=$((starttime / clk_tck))
-  local elapsed_sec=$((uptime_sec - start_sec))
-  local elapsed_min=$((elapsed_sec / 60))
-  local elapsed_hr=$((elapsed_min / 60))
-  local elapsed_str
-  if [[ $elapsed_hr -gt 0 ]]; then
-    elapsed_str="${elapsed_hr}h$((elapsed_min % 60))m"
-  elif [[ $elapsed_min -gt 0 ]]; then
-    elapsed_str="${elapsed_min}m"
-  else
-    elapsed_str="${elapsed_sec}s"
+  local starttime=$(awk '{print $22}' /proc/$pid/stat 2>/dev/null)
+  local elapsed_str="?"
+  if [[ -n "$starttime" && "$starttime" -gt 0 ]]; then
+    local start_sec=$((starttime / clk_tck))
+    local elapsed_sec=$((uptime_sec - start_sec))
+    local elapsed_min=$((elapsed_sec / 60))
+    local elapsed_hr=$((elapsed_min / 60))
+    if [[ $elapsed_hr -gt 0 ]]; then
+      elapsed_str="${elapsed_hr}h$((elapsed_min % 60))m"
+    elif [[ $elapsed_min -gt 0 ]]; then
+      elapsed_str="${elapsed_min}m"
+    else
+      elapsed_str="${elapsed_sec}s"
+    fi
   fi
 
   # 🐛 if process is a hog (>50% CPU or >10% MEM), 🫧 otherwise
@@ -1073,22 +1086,33 @@ emit ""
 # --- top cpu processes ---
 emit "┌─ TOP 15 CPU PROCESSES ───────────────────────────────────────────┐"
 ps aux --sort=-%cpu | head -16 | tail -15 | while read -r user pid cpu mem vsz rss tty stat start time cmd; do
+  # dead-on-read: process exited between the ps snapshot and this re-read.
+  # report it as exited rather than fake an age from system uptime.
+  if [[ ! -r /proc/$pid/stat ]]; then
+    emit "│ [exited]"
+    emit "│   pid=$pid  cpu=${cpu}%  mem=${mem}%  (gone before re-read)"
+    emit "│"
+    continue
+  fi
   comm=$(cat /proc/$pid/comm 2>/dev/null || echo "?")
   cwd=$(readlink /proc/$pid/cwd 2>/dev/null | sed "s|^$HOME|~|" || echo "?")
-  # elapsed time
+  # elapsed time — only trust a real start time; else show "?"
   clk_tck=$(getconf CLK_TCK)
   uptime_sec=$(awk '{print int($1)}' /proc/uptime)
-  starttime=$(awk '{print $22}' /proc/$pid/stat 2>/dev/null || echo "0")
-  start_sec=$((starttime / clk_tck))
-  elapsed_sec=$((uptime_sec - start_sec))
-  elapsed_min=$((elapsed_sec / 60))
-  elapsed_hr=$((elapsed_min / 60))
-  if [[ $elapsed_hr -gt 0 ]]; then
-    elapsed="${elapsed_hr}h$((elapsed_min % 60))m"
-  elif [[ $elapsed_min -gt 0 ]]; then
-    elapsed="${elapsed_min}m"
-  else
-    elapsed="${elapsed_sec}s"
+  starttime=$(awk '{print $22}' /proc/$pid/stat 2>/dev/null)
+  elapsed="?"
+  if [[ -n "$starttime" && "$starttime" -gt 0 ]]; then
+    start_sec=$((starttime / clk_tck))
+    elapsed_sec=$((uptime_sec - start_sec))
+    elapsed_min=$((elapsed_sec / 60))
+    elapsed_hr=$((elapsed_min / 60))
+    if [[ $elapsed_hr -gt 0 ]]; then
+      elapsed="${elapsed_hr}h$((elapsed_min % 60))m"
+    elif [[ $elapsed_min -gt 0 ]]; then
+      elapsed="${elapsed_min}m"
+    else
+      elapsed="${elapsed_sec}s"
+    fi
   fi
   emit "│ $comm"
   emit "│   pid=$pid  cpu=${cpu}%  mem=${mem}%  elapsed=$elapsed"
