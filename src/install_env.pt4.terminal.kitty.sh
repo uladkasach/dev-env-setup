@@ -169,7 +169,11 @@ shell_integration no-title
 clear_all_shortcuts yes
 
 # clipboard
-map ctrl+shift+c copy_to_clipboard
+# ctrl+shift+c runs the same kitten as ctrl+c, so both keys copy + toast + gate
+# the downstream forward identically (desktop parity: both copy from anywhere,
+# incl. nvim visual mode through tmux). builtin copy_to_clipboard would skip the
+# toast and the forward, so the kitten backs both.
+map ctrl+shift+c kitten copy_notify.py
 map ctrl+shift+v paste_from_clipboard
 # ctrl+c: copy kitty's own selection (with toast) AND forward an unambiguous
 # ctrl+shift+c downstream, so apps that own their own selection (nvim visual
@@ -299,9 +303,46 @@ EOF
   # api refs: Window.text_for_selection(), kitty.clipboard.set_clipboard_string,
   #           Screen.current_key_encoding_flags(), Window.write_to_child()
   cat > ~/.config/kitty/copy_notify.py << 'EOF'
+import os
+
 from kitty.boss import Boss
 from kitty.clipboard import set_clipboard_string
 from kittens.tui.handler import result_handler
+
+
+def _holds_tmux(window) -> bool:
+    # detect whether a tmux client runs in this window's process tree. through
+    # tmux, kitty's child is tmux (not nvim), and tmux never enables the kitty
+    # keyboard protocol upward — so current_key_encoding_flags() reads 0 and the
+    # forward gate below would (wrongly) stay shut. walk /proc down from kitty's
+    # child pid (the login zsh) and look for tmux anywhere in the subtree, exactly
+    # as reboot_window.py does (foreground_processes is empty when tmux holds pty).
+    root = getattr(window.child, 'pid', None)
+    if not root:
+        return False
+    kids = {}
+    for name in os.listdir('/proc'):
+        if not name.isdigit():
+            continue
+        pid = int(name)
+        try:
+            with open('/proc/%d/stat' % pid) as fh:
+                data = fh.read()
+            ppid = int(data[data.rindex(')') + 1:].split()[1])
+        except Exception:
+            continue
+        kids.setdefault(ppid, []).append(pid)
+    stack = list(kids.get(root, []))
+    while stack:
+        pid = stack.pop()
+        try:
+            with open('/proc/%d/comm' % pid) as fh:
+                if fh.read().strip().startswith('tmux'):
+                    return True
+        except Exception:
+            pass
+        stack.extend(kids.get(pid, []))
+    return False
 
 
 @result_handler(no_ui=True)
@@ -320,9 +361,12 @@ def handle_result(args, answer, target_window_id, boss: Boss) -> None:
         )
 
     # forward branch: hand an unambiguous ctrl+shift+c to the focused app so it
-    # can yank its own selection. gated on the kbd protocol so the shell (which
-    # does not enable it) never receives the escape — no stray input, no SIGINT.
-    if window.screen.current_key_encoding_flags():
+    # can yank its own selection. forward when EITHER the direct child has the
+    # kitty kbd protocol on (bare nvim: flags != 0) OR tmux holds the pty (through
+    # tmux the child is tmux, which never surfaces nvim's protocol upward so flags
+    # is always 0 — detect tmux directly instead). a bare shell (no protocol, no
+    # tmux) still receives no escape, so the prompt stays clean.
+    if window.screen.current_key_encoding_flags() or _holds_tmux(window):
         window.write_to_child(b'\x1b[99;6u')
 
 
