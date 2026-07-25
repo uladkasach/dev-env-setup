@@ -37,7 +37,7 @@ function nimg {
 }
 
 # claude code config (expected: v2.1.87, beyond which hooks are truncated)
-export ANTHROPIC_MODEL='claude-opus-4-8[1m]'
+export ANTHROPIC_MODEL='claude-opus-5[1m]'
 export CLAUDE_CODE_SKIP_UPDATE_CHECK=1
 
 # aws profiles via keyrack
