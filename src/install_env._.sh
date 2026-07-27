@@ -29,6 +29,7 @@ install_firefox_color_extension
 install_vimium_extension
 configure_firefox_prefs
 configure_firefox_theme
+configure_firefox_ctrltab_keys
 
 # pt1c: system performance
 source "$THIS_DIR/install_env.pt1.system.performance.sh"

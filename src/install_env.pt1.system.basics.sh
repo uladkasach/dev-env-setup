@@ -22,6 +22,18 @@ install_vimium_extension() {
   browser https://addons.mozilla.org/en-US/firefox/addon/vimium-ff/
 }
 
+configure_firefox_ctrltab_keys() {
+  # rebind tab-switch keys from the linux default (alt+N) to ctrl+N,
+  # for parity with kitty (ctrl+1..8 = tab N, ctrl+9 = last tab).
+  #
+  # flatpak firefox seals /app read-only, so the autoconfig files are
+  # delivered via the sanctioned org.mozilla.firefox.systemconfig
+  # extension point (mounted at /app/etc/firefox inside the sandbox).
+  # see: .agent/repo=.this/role=any/briefs/howto.firefox-ctrl-tab-keys.md
+  "$HOME/git/more/dev-env-setup/.agent/repo=.this/role=any/skills/firefox.systemconfig.sh" install
+  echo "• firefox ctrl+N tab keys configured (fully quit firefox to apply)"
+}
+
 configure_firefox_theme() {
   # desert theme for firefox color extension
   # matches ptyxis/nvim desert palette
