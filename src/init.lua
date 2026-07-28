@@ -644,6 +644,21 @@ require('lazy').setup({
       }
     end,
     config = function()
+      -- defuse neominimap before nvim tears windows down on quit.
+      -- why: neominimap's WinClosed/BufWinEnter autocmds vim.schedule() a
+      --      refresh that calls nvim_win_set_buf on the minimap window. on
+      --      :q those callbacks run mid-teardown against a half-destroyed
+      --      window and throw, which floods the -- More -- pager. the queued
+      --      callbacks each throw again, so the pager never clears -> permahang.
+      -- fix: turn neominimap off first. the queued callbacks then re-check the
+      --      enabled flag and take the harmless "no minimap" branch instead of
+      --      the set_buf path. pcall + silent! so quit never blocks on this.
+      vim.api.nvim_create_autocmd({ 'QuitPre', 'VimLeavePre' }, {
+        callback = function()
+          pcall(vim.cmd, 'silent! Neominimap off')
+        end,
+      })
+
       -- helper to update minimap from "after" pane
       _G.update_minimap_from_after = function()
         local after_win = nil

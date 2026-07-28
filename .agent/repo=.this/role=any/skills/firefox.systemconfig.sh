@@ -137,17 +137,6 @@ try {
 }
 EOF
 
-  echo "   channel: $EXT_DIR"
-  echo "     ├─ defaults/pref/autoconfig.js"
-  echo "     └─ firefox.cfg (ctrl+N keyset rebind)"
-  echo ""
-  echo "✨ installed"
-  echo ""
-  echo "🌊 next steps (must test live — cannot verify headlessly):"
-  echo "   1. fully quit firefox (all windows)"
-  echo "   2. relaunch, open 2+ tabs"
-  echo "   3. press ctrl+2 → should jump to tab 2"
-  echo "   if it fails to switch: run 'firefox.systemconfig.sh status' and report"
   exit 0
 }
 

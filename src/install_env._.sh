@@ -39,6 +39,7 @@ install_machine_resource_procs_find_runaway
 install_machine_resource_procs_find_spinner
 install_machine_resource_procs_find_orphan
 install_runaway_monitor
+install_kitty_snap_hooks
 # install_earlyoom  # optional — auto-kills memory hogs before OOM freeze; see briefs/system.runaway-monitor.spec.md
 
 # pt2: shell & git
