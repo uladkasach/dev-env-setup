@@ -296,15 +296,26 @@ alias sync.devenv.tmux='cp ~/git/more/dev-env-setup/src/tmux.conf ~/.tmux.conf &
 alias sync.devenv.cosmic='source ~/git/more/dev-env-setup/src/install_env.pt3.cosmic.sh && configure_cosmic_theme'
 alias sync.devenv.firefox='source ~/git/more/dev-env-setup/src/install_env.pt1.system.basics.sh && configure_firefox_ctrltab_keys'
 alias sync.devenv.brains='source ~/git/more/dev-env-setup/src/install_env.pt5.devtools.sh && configure_robot_brains'
-alias sync.devenv='sync.devenv.bashaliases && sync.devenv.starship && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.kitty && sync.devenv.terminal && sync.devenv.tmux && sync.devenv.cosmic && sync.devenv.firefox && sync.devenv.brains'
+# cronhooks = timed hooks (systemd user timers). config syncs re-apply files, but
+# do NOT (re)establish the timers — this does. user-timers only (no sudo), so it
+# is safe to fold into sync.devenv without a password prompt.
+alias sync.devenv.cronhooks='source ~/git/more/dev-env-setup/src/install_env.pt1.system.performance.sh && install_runaway_monitor && install_kitty_snap_hooks'
+alias sync.devenv='sync.devenv.bashaliases && sync.devenv.starship && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.kitty && sync.devenv.terminal && sync.devenv.tmux && sync.devenv.cosmic && sync.devenv.firefox && sync.devenv.brains && sync.devenv.cronhooks'
 
 # make it easy to pull down the devenv repo
 alias devenv.sync.repo='cd ~/git/more/dev-env-setup && git checkout main && git pull origin HEAD'
 
+# snapshot every open kitty window (pwd, program, age, mem) + save to ~/.kitty/snaps for resume
+# reads only /proc (never kitty remote control, never env); see rule.require.security-paramount
+alias kitty.snap='~/git/more/dev-env-setup/.agent/repo=.this/role=any/skills/kitty.snapshot.terminals.sh --save'
+
 # make it easy to suspend and restart and shutdown
+# power.off / power.restart snap the kitty session first, so the window/pwd map
+# survives the reboot (see briefs/howto.restore-kitty-session.md); kitty.snap is
+# a no-op when kitty is absent, so this stays safe everywhere
 alias power.suspend='systemctl suspend' # todo, swap to `suspend-then-hibernate` when supported
-alias power.off='shutdown -h now '
-alias power.restart='reboot'
+alias power.off='kitty.snap; shutdown -h now'
+alias power.restart='kitty.snap; reboot'
 
 # make it easy to work with bluetooth devices
 alias bluetooth.devices='bluetoothctl devices';

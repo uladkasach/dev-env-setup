@@ -23,30 +23,46 @@ these are independent. mouse-drag can work while visual-mode copy is dead, and v
 
 the forward is `CSI 99;6u`, **never** the raw `^C` byte — so `ctrl+c` can never SIGINT the shell. interrupt lives on `ctrl+x` instead.
 
-## .the tmux gate gotcha (the core subtlety)
+## .the gate: allowlist forward to nvim only (the hard invariant)
 
-the kitten's forward branch is **gated**. the original gate was:
+**hard invariant: `ctrl+c` / `ctrl+shift+c` must NEVER interrupt any receiver,
+globally.** the forward is therefore sent to a strict **allowlist** of apps that
+treat `CSI 99;6u` as copy — currently `{'nvim'}`. every other app (claude-cli,
+shells, unknown TUIs) reads a ctrl+c-family key as interrupt, so it is never
+sent to them. the gate **fails closed**: an app the kitten cannot confirm as an
+allowed receiver gets no forward.
 
 ```python
-if window.screen.current_key_encoding_flags():
+FORWARD_ALLOWLIST = {'nvim'}
+...
+if _focused_app(window) in FORWARD_ALLOWLIST:
     window.write_to_child(b'\x1b[99;6u')
 ```
 
-`current_key_encoding_flags()` reads kitty's **direct child**.
+### how the kitten names the focused app
 
-- kitty → nvim: child is nvim, protocol on → flags != 0 → forward fires → yank works
-- kitty → tmux → nvim: child is **tmux**, and tmux never surfaces nvim's kitty-keyboard-protocol upward → flags is **always 0** → forward never fires → copy dead
+`_focused_app(window)` returns the command the human actually interacts with:
 
-verified live: `flags=3` bare nvim, `flags=0` through tmux. this is structural, not session state — a net-new tmux fails identically.
+- **through tmux** — the *active pane's* command. the kitten finds the tmux
+  client in the window's `/proc` subtree, reads its control pts
+  (`readlink /proc/<pid>/fd/0`, which equals tmux's `#{client_tty}`), then asks
+  tmux: `list-clients` → session for that tty, `list-panes` → the
+  `#{pane_current_command}` of the active pane. forwards only if that is `nvim`.
+- **no tmux** — `window.child.foreground_processes[0]` basename.
 
-### the fix
+### why the old gate was wrong (history)
 
-the kitten also detects tmux directly via a `/proc` subtree walk from `window.child.pid` (same technique `reboot_window.py` uses, because kitty's `foreground_processes` returns empty when tmux holds the pty). it forwards when **either** flags != 0 **or** tmux is the child:
+the original gate was `current_key_encoding_flags() or _holds_tmux(window)`:
 
-```python
-if window.screen.current_key_encoding_flags() or _holds_tmux(window):
-    window.write_to_child(b'\x1b[99;6u')
-```
+- `current_key_encoding_flags()` reads kitty's **direct child**. through tmux the
+  child is tmux, which never surfaces nvim's kitty-keyboard-protocol upward, so
+  flags is **always 0** (verified live: `flags=3` bare nvim, `flags=0` through
+  tmux). that killed copy through tmux, so `_holds_tmux` was added as an OR.
+- but `_holds_tmux` returns true if tmux is **anywhere** in the subtree — it did
+  not check *which pane* is active. so in a tmux window with claude-cli in the
+  active pane, `ctrl+c` forwarded `CSI 99;6u` to claude, which read it as
+  **interrupt**. that broke the invariant. the allowlist + active-pane detection
+  replaces it.
 
 ## .the tmux relay (necessary but not sufficient)
 
@@ -65,15 +81,34 @@ set -as terminal-features 'xterm-kitty:clipboard'
 
 ## .both keys are equal
 
-`ctrl+c` and `ctrl+shift+c` both map to `kitten copy_notify.py`, so they behave identically everywhere: copy kitty's selection + toast, plus forward to the child. the builtin `copy_to_clipboard` action would skip both the toast and the forward, so the kitten backs both keys.
+`ctrl+c` and `ctrl+shift+c` both map to `kitten copy_notify.py`, so they behave identically everywhere: copy kitty's selection + toast, plus the allowlist forward. the builtin `copy_to_clipboard` action would skip both the toast and the forward, so the kitten backs both keys.
+
+## .the invariant: never interrupt (why the allowlist, not a broad gate)
+
+`ctrl+c` / `ctrl+shift+c` are **copy-only, globally** — they must never reach any
+receiver as an interrupt. that is why the forward is an **allowlist** (only nvim),
+not a broad "forward whenever a protocol/tmux is present" gate.
+
+- **nvim** — has `<C-S-c> → "+y` → yanks. the one allowed receiver.
+- **claude-cli** — reads the forwarded key as interrupt/cancel. so it is on the
+  active pane, the kitten detects that and forwards **none** of it.
+- **a bare shell / unknown TUI** — no yank keymap; also excluded.
+
+the copy branch still always runs, so mouse-select + `ctrl+c` copies kitty's
+selection + toasts from *any* app (claude included) — it just never forwards the
+key onward. the shell's SIGINT lives on `ctrl+x` alone.
+
+to allow a new app to receive the copy-forward, add its `pane_current_command` /
+foreground comm to `FORWARD_ALLOWLIST` — and only if it truly yanks the key
+rather than interrupts.
 
 ## .diagnose live, do not assume
 
-when copy breaks, instrument the kitten — add a debug line that appends `current_key_encoding_flags()` and `bool(selection)` to a log file, press the key once on each path, then read the log. one press settles whether the gate is shut (flags=0) or the forward fires but dies downstream. (write the log under the repo `.temp/`, not `/tmp` — a hook blocks `/tmp` reads.)
-
-## .tradeoff
-
-the forward reaches a **bare shell inside tmux** too (it also gets `CSI 99;6u` on `ctrl+c`). harmless because interrupt lives on `ctrl+x`, but it is a deliberate deviation from "ctrl+c is copy-only, untouched escape at the prompt".
+when copy breaks, instrument the kitten — append `_focused_app(window)` and
+`bool(selection)` to a log file, press the key once on each path, then read the
+log. one press settles whether the focus was misread (so the allowlist shut the
+gate) or the forward fired but died downstream. (write the log under the repo
+`.temp/`, not `/tmp` — a hook blocks `/tmp` reads.)
 
 ## .see also
 

@@ -1274,3 +1274,113 @@ SNAPSHOT_SCRIPT
   chmod +x "$bin_path"
   echo "• machine_usage_snapshot installed ($bin_path)"
 }
+
+install_kitty_snap_hooks() {
+  #############################
+  # kitty session snapshot hooks
+  #
+  # why: capture the window/pwd map before the laptop dies, so a prior
+  #      session can be restored later. see the restore guide:
+  #      .agent/repo=.this/role=any/briefs/howto.restore-kitty-session.md
+  #
+  # triggers:
+  #   - low battery: a systemd user timer polls every 60s and snaps once
+  #     per discharge episode at or below 5%
+  #   - reboot/shutdown via cli: the power.off / power.restart aliases snap
+  #     first (wired in bash_aliases.sh)
+  #
+  # security: reads only /sys battery + /proc (via the snap skill); never
+  #           kitty remote control, never env. see:
+  #           .agent/repo=.this/role=any/briefs/rule.require.security-paramount.md
+  #############################
+
+  local bin_path="$HOME/.local/bin/kitty_snap_lowbatt"
+  local service_path="$HOME/.config/systemd/user/kitty_snap_lowbatt.service"
+  local timer_path="$HOME/.config/systemd/user/kitty_snap_lowbatt.timer"
+
+  mkdir -p "$HOME/.local/bin"
+  mkdir -p "$HOME/.config/systemd/user"
+
+  # low-battery guard: one-shot check, snap once per critical episode
+  cat > "$bin_path" << 'LOWBATT'
+#!/bin/bash
+#############################
+# kitty_snap_lowbatt (two-stage low-battery guard)
+# snaps the kitty session as the battery descends past 10% and again
+# past 5%, so the window/pwd map survives a power-off. each stage fires
+# once per discharge episode, only on the way down (not on the way up).
+#############################
+
+WARN=10  # first snap on descent past this
+CRIT=5   # second snap on descent past this
+BATT="/sys/class/power_supply/BAT0"
+SNAP_DIR="$HOME/.kitty/snaps"
+MARK_WARN="$SNAP_DIR/.lowbatt.warn.snapped"
+MARK_CRIT="$SNAP_DIR/.lowbatt.crit.snapped"
+SKILL="$HOME/git/more/dev-env-setup/.agent/repo=.this/role=any/skills/kitty.snapshot.terminals.sh"
+
+# no battery -> skip
+[[ -r "$BATT/capacity" && -r "$BATT/status" ]] || exit 0
+
+cap=$(cat "$BATT/capacity" 2>/dev/null)
+status=$(cat "$BATT/status" 2>/dev/null)
+[[ "$cap" =~ ^[0-9]+$ ]] || exit 0
+
+# reset both stages when on power (so snaps fire only on descent) or when
+# back above the warn band. note: "Discharging" is the literal BAT0/status value
+if [[ "$status" != "Discharging" || "$cap" -gt "$WARN" ]]; then
+  rm -f "$MARK_WARN" "$MARK_CRIT"
+  exit 0
+fi
+
+mkdir -p "$SNAP_DIR"
+
+# critical band: snap once past 5%
+if [[ "$cap" -le "$CRIT" ]]; then
+  [[ -f "$MARK_CRIT" ]] && exit 0
+  "$SKILL" --save >/dev/null 2>&1
+  touch "$MARK_CRIT"
+  logger -t kitty_snap_lowbatt "battery ${cap}% (<=${CRIT}%) — snapped kitty session"
+  exit 0
+fi
+
+# warn band: 5% < cap <= 10%, snap once
+[[ -f "$MARK_WARN" ]] && exit 0
+"$SKILL" --save >/dev/null 2>&1
+touch "$MARK_WARN"
+logger -t kitty_snap_lowbatt "battery ${cap}% (<=${WARN}%) — snapped kitty session"
+LOWBATT
+
+  chmod +x "$bin_path"
+
+  # systemd service
+  cat > "$service_path" << 'SERVICE'
+[Unit]
+Description=Snapshot kitty session when battery is low
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/kitty_snap_lowbatt
+StandardOutput=journal
+StandardError=journal
+SERVICE
+
+  # systemd timer (every 3 min, 2 min after boot)
+  cat > "$timer_path" << 'TIMER'
+[Unit]
+Description=Check battery for kitty session snapshot every 3 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=3min
+
+[Install]
+WantedBy=timers.target
+TIMER
+
+  systemctl --user daemon-reload
+  systemctl --user enable --now kitty_snap_lowbatt.timer
+
+  echo "• kitty_snap_lowbatt timer installed + enabled (snaps on descent past 10% and 5%)"
+  echo "• cli reboot/shutdown snap wired via power.off / power.restart (bash_aliases.sh)"
+}

@@ -175,12 +175,13 @@ clear_all_shortcuts yes
 # toast and the forward, so the kitten backs both.
 map ctrl+shift+c kitten copy_notify.py
 map ctrl+shift+v paste_from_clipboard
-# ctrl+c: copy kitty's own selection (with toast) AND forward an unambiguous
-# ctrl+shift+c downstream, so apps that own their own selection (nvim visual
-# mode) can yank. the forward is the keyboard-protocol key CSI 99 ; 6 u, never
-# the ^C byte — so ctrl+c still never interrupts the shell. the sole interrupt
-# key stays ctrl+x. custom kitten (vs builtin copy_to_clipboard) both toasts on
-# copy and gates the downstream forward on the app's kbd-protocol state.
+# ctrl+c: copy kitty's own selection (with toast) AND forward the keyboard-
+# protocol key CSI 99 ; 6 u to nvim ONLY, so nvim visual mode can yank. the
+# forward is never the ^C byte, and the kitten sends it to an allowlist (nvim)
+# only — so ctrl+c / ctrl+shift+c can NEVER interrupt any receiver (claude-cli,
+# shells, other TUIs get no key). hard invariant; see copy_notify.py. the sole
+# interrupt key stays ctrl+x. custom kitten (vs builtin copy_to_clipboard) both
+# toasts on copy and gates the forward on the focused app.
 map ctrl+c kitten copy_notify.py
 # ctrl+v pastes (desktop-parity). unlike ctrl+c this is unconditional, so kitty
 # grabs ctrl+v globally — the only default it shadows is shell quoted-insert
@@ -289,37 +290,49 @@ EOF
   # custom kitten that backs the `map ctrl+c` line above. two independent jobs:
   #
   # 1. copy branch — when kitty owns a mouse selection, mirror it to the
-  #    clipboard and surface a desktop toast via notify-send.
+  #    clipboard and surface a desktop toast via notify-send. always runs.
   #
-  # 2. forward branch — send an unambiguous ctrl+shift+c downstream so apps that
-  #    own their own selection (nvim visual mode) can yank. encoded as the kitty
-  #    keyboard-protocol key CSI 99 ; 6 u (\x1b[99;6u), never the ^C byte, so the
-  #    shell can never SIGINT off ctrl+c. only forwarded when the focused app has
-  #    the keyboard protocol on (nvim does; a bare shell prompt does not), so the
-  #    shell prompt stays clean of stray escapes.
+  # 2. forward branch — send an unambiguous ctrl+shift+c downstream so nvim
+  #    visual mode can yank. encoded as the kitty keyboard-protocol key
+  #    CSI 99 ; 6 u (\x1b[99;6u), never the ^C byte. HARD INVARIANT: this key
+  #    must never interrupt any receiver, so it is forwarded ONLY to an
+  #    allowlist of apps that treat it as copy (nvim). the kitten names the
+  #    focused app — the active tmux pane's command through tmux, else the
+  #    window's foreground process — and forwards only on a match. claude-cli,
+  #    shells, and unknown TUIs (which would read it as interrupt) get none.
+  #    fail closed: an unconfirmed focus forwards nothing.
   #
   # interrupt stays entirely on ctrl+x. builtin copy_to_clipboard would skip both
   # the toast and the gated forward, so a kitten earns its keep here.
   # api refs: Window.text_for_selection(), kitty.clipboard.set_clipboard_string,
-  #           Screen.current_key_encoding_flags(), Window.write_to_child()
+  #           Window.child.pid, Window.child.foreground_processes,
+  #           Window.write_to_child(); tmux active-pane via /proc + tmux list-*
   cat > ~/.config/kitty/copy_notify.py << 'EOF'
 import os
+import subprocess
 
 from kitty.boss import Boss
 from kitty.clipboard import set_clipboard_string
 from kittens.tui.handler import result_handler
 
+# HARD INVARIANT: ctrl+c / ctrl+shift+c must NEVER interrupt any receiver.
+# so the copy-key forward (CSI 99;6u) is sent to a strict allowlist of apps
+# that treat it as copy — nvim yanks it via <C-S-c> -> "+y. every other app
+# (claude-cli, shells, other TUIs) reads a ctrl+c-family key as interrupt, so
+# the key is never sent to them. detection fails closed: an app we cannot
+# confirm as an allowed receiver gets none of it.
+FORWARD_ALLOWLIST = {'nvim'}
 
-def _holds_tmux(window) -> bool:
-    # detect whether a tmux client runs in this window's process tree. through
-    # tmux, kitty's child is tmux (not nvim), and tmux never enables the kitty
-    # keyboard protocol upward — so current_key_encoding_flags() reads 0 and the
-    # forward gate below would (wrongly) stay shut. walk /proc down from kitty's
-    # child pid (the login zsh) and look for tmux anywhere in the subtree, exactly
-    # as reboot_window.py does (foreground_processes is empty when tmux holds pty).
-    root = getattr(window.child, 'pid', None)
-    if not root:
-        return False
+
+def _comm(pid: int) -> str:
+    try:
+        with open('/proc/%d/comm' % pid) as fh:
+            return fh.read().strip()
+    except Exception:
+        return ''
+
+
+def _child_map() -> dict:
     kids = {}
     for name in os.listdir('/proc'):
         if not name.isdigit():
@@ -332,17 +345,85 @@ def _holds_tmux(window) -> bool:
         except Exception:
             continue
         kids.setdefault(ppid, []).append(pid)
+    return kids
+
+
+def _subtree(root: int, kids: dict) -> list:
+    out = []
     stack = list(kids.get(root, []))
     while stack:
         pid = stack.pop()
-        try:
-            with open('/proc/%d/comm' % pid) as fh:
-                if fh.read().strip().startswith('tmux'):
-                    return True
-        except Exception:
-            pass
+        out.append(pid)
         stack.extend(kids.get(pid, []))
-    return False
+    return out
+
+
+def _tmux_client_tty(pids: list) -> str:
+    # a tmux client in the subtree owns the kitty pty as its stdin. readlink of
+    # fd/0 yields the /dev/pts/N that matches tmux's own #{client_tty}.
+    for pid in pids:
+        if _comm(pid).startswith('tmux'):
+            try:
+                return os.readlink('/proc/%d/fd/0' % pid)
+            except Exception:
+                pass
+    return ''
+
+
+def _tmux_active_command(client_tty: str) -> str:
+    # ask tmux for the command in the active pane of the session this client is
+    # attached to. fail closed (return '') on any error so the caller forwards none.
+    try:
+        clients = subprocess.check_output(
+            ['tmux', 'list-clients', '-F', '#{client_tty}\t#{session_name}'],
+            timeout=1,
+        ).decode()
+    except Exception:
+        return ''
+    session = ''
+    for line in clients.splitlines():
+        parts = line.split('\t')
+        if len(parts) == 2 and parts[0] == client_tty:
+            session = parts[1]
+            break
+    if not session:
+        return ''
+    try:
+        panes = subprocess.check_output(
+            ['tmux', 'list-panes', '-t', session, '-F',
+             '#{pane_active} #{pane_current_command}'],
+            timeout=1,
+        ).decode()
+    except Exception:
+        return ''
+    for line in panes.splitlines():
+        if line.startswith('1 '):
+            return line[2:].strip()
+    return ''
+
+
+def _focused_app(window) -> str:
+    # name the app the human actively interacts with in this window. through
+    # tmux -> the active pane's command; else the window's foreground process.
+    # returns '' when it cannot be sure, so the caller stays on the safe path.
+    root = getattr(window.child, 'pid', None)
+    if not root:
+        return ''
+    pids = [root] + _subtree(root, _child_map())
+    client_tty = _tmux_client_tty(pids)
+    if client_tty:
+        return _tmux_active_command(client_tty)
+    # no tmux: the window's own foreground process
+    try:
+        for proc in window.child.foreground_processes:
+            cmd = proc.get('cmdline') or []
+            if cmd:
+                base = os.path.basename(cmd[0])
+                if base:
+                    return base
+    except Exception:
+        pass
+    return _comm(pids[-1]) if pids else ''
 
 
 @result_handler(no_ui=True)
@@ -351,22 +432,20 @@ def handle_result(args, answer, target_window_id, boss: Boss) -> None:
     if window is None:
         return
 
-    # copy branch: mirror kitty's own selection to the clipboard + toast
+    # copy branch: mirror kitty's own selection to the clipboard + toast.
+    # this always runs, independent of the forward gate below.
     selection = window.text_for_selection()
     if selection:
         set_clipboard_string(selection)
-        import subprocess
         subprocess.Popen(
             ['notify-send', '-t', '1200', '-a', 'kitty', 'copied to clipboard']
         )
 
-    # forward branch: hand an unambiguous ctrl+shift+c to the focused app so it
-    # can yank its own selection. forward when EITHER the direct child has the
-    # kitty kbd protocol on (bare nvim: flags != 0) OR tmux holds the pty (through
-    # tmux the child is tmux, which never surfaces nvim's protocol upward so flags
-    # is always 0 — detect tmux directly instead). a bare shell (no protocol, no
-    # tmux) still receives no escape, so the prompt stays clean.
-    if window.screen.current_key_encoding_flags() or _holds_tmux(window):
+    # forward branch: send the copy key ONLY to an allowed receiver (nvim), so
+    # the key can never land on claude-cli / a shell / an unknown TUI as an
+    # interrupt. this upholds the hard invariant above. fail closed: unknown
+    # focus -> no forward.
+    if _focused_app(window) in FORWARD_ALLOWLIST:
         window.write_to_child(b'\x1b[99;6u')
 
 
