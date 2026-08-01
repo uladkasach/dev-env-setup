@@ -210,7 +210,10 @@ mouse_map left doublepress grabbed mouse_selection word
 mouse_map left triplepress grabbed mouse_selection line
 
 # tabs
-map ctrl+t new_tab
+# new_tab would start at kitty's own launch cwd (usually ~), which drops the pwd
+# of the tab you spawned from. launch --type=tab --cwd=current inherits the
+# active window's pwd instead — same mechanism as ctrl+backslash below.
+map ctrl+t launch --type=tab --cwd=current
 map ctrl+shift+h previous_tab
 map ctrl+shift+l next_tab
 map ctrl+tab next_tab
