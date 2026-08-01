@@ -387,6 +387,53 @@ nvim() {
   fi
 }
 
+# cap claude memory so the fleet of sessions cannot hog the machine.
+# .why = claude forks node subprocesses for tool calls (rhx, rhachet, jest).
+#        those can orphan — their parent exits, systemd adopts them — yet
+#        they stay in the session's cgroup. sessions left open for weeks
+#        accrue hundreds, and dozens of sessions collectively exhaust ram.
+# .how = every session joins a shared claude.slice. the aggregate cap lives
+#        on the slice, so the kernel reclaims from the COLDEST sessions
+#        first — idle week-old sessions get squeezed to swap while the
+#        active one stays resident. per-session MemoryMax is only a runaway
+#        backstop, deliberately far above normal peaks.
+# .note = cgroup membership survives reparent to systemd, so this covers
+#         orphaned node children too — that is why the scope, not the
+#         process, is the right boundary.
+# .size = measured peaks are 3.5-5.6G per session vs ~1G steady, because
+#         context compaction and parallel tool calls spike hard. MemoryMax
+#         must clear the peak or the cgroup oom killer reaps the session
+#         mid-turn. 8G leaves headroom above the worst observed peak.
+#         set the aggregate cap via: claude.memory.cap.set
+claude() {
+  # find the real claude binary, bypass this function (works in bash + zsh)
+  local bin
+  bin=$( unset -f claude 2>/dev/null; command -v claude )
+  # cap only in a real user session with systemd; else run bare
+  if [[ -n "$bin" ]] && command -v systemd-run >/dev/null 2>&1 && [[ -n "$XDG_RUNTIME_DIR" ]]; then
+    systemd-run --user --scope --quiet --collect \
+      --slice=claude.slice \
+      -p MemoryMax=8G \
+      "$bin" "$@"
+  else
+    command claude "$@"
+  fi
+}
+
+# set the aggregate memory cap across ALL claude sessions.
+# .why = per-session caps cannot stop N sessions from collectively eating
+#        the box. this caps the fleet, and the kernel picks the victims by
+#        coldness — which is what we want: idle sessions yield, active ones
+#        keep their pages.
+# .note = MemoryHigh throttles via reclaim; it never kills. safe to tighten
+#         live — running sessions get squeezed down to the new line.
+claude_memory_cap_set() {
+  local cap="${1:-12G}"
+  systemctl --user set-property claude.slice MemoryHigh="$cap"
+  echo "🐢 claude.slice MemoryHigh=$cap (aggregate across all sessions)"
+}
+alias claude.memory.cap.set='claude_memory_cap_set'
+
 
 ######################
 ## support github app tokens auth
