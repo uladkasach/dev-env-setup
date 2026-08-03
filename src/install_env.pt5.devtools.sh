@@ -49,9 +49,16 @@ configure_robot_brains() {
   #   which silences the "auto-update failed" startup nag
   # - disableClaudeAiConnectors: stop claude.ai connector auto-fetch, which
   #   silences the "N claude.ai connector needs auth · /mcp" nag (v2.1.182+ only)
+  # - CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: turn off prompt suggestions — the grey
+  #   ghost text claude proposes inside its own input box (tab accepts it).
+  #   the `/`-command menu and `@`-file completion are separate features and are
+  #   NOT affected. opt-out shipped in claude 2.0.71 (anthropics/claude-code#13878)
   # note: the "switched to native installer" nag is NOT gated by settings.json —
   #   it needs DISABLE_INSTALLATION_CHECKS exported in the shell (see src/zshrc.sh)
-  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1"}, "disableClaudeAiConnectors": true}'
+  # note: the env block suits the prompt-suggestion flag because claude reads it as
+  #   process.env.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION mid-session, well after
+  #   settings load — unlike the boot-time checks, which need a real shell export
+  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false"}, "disableClaudeAiConnectors": true}'
   local settings_file="$HOME/.claude/settings.json"
   mkdir -p "$HOME/.claude"
   if [[ -f "$settings_file" ]]; then
@@ -62,7 +69,7 @@ configure_robot_brains() {
     # create new settings file
     echo "$patch" > "$settings_file"
   fi
-  echo "• claude-code updates + claude.ai connectors disabled"
+  echo "• claude-code updates + claude.ai connectors + prompt suggestions disabled"
 }
 
 install_ripgrep() {
