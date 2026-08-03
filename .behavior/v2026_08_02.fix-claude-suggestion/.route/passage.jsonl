@@ -1,0 +1,8 @@
+{"stone":"1.vision","status":"arrived","reason":"entered guard reviews"}
+{"stone":"1.vision","status":"blocked","blocker":"review.self","reason":"review.self required: has-grounded-in-reality"}
+{"stone":"1.vision","status":"promised","reason":"promised review.self: has-grounded-in-reality"}
+{"stone":"1.vision","status":"promised","reason":"promised review.self: has-questioned-requirements"}
+{"stone":"1.vision","status":"promised","reason":"promised review.self: has-questioned-assumptions"}
+{"stone":"1.vision","status":"promised","reason":"promised review.self: has-questioned-questions"}
+{"stone":"1.vision","status":"arrived","reason":"entered guard reviews"}
+{"stone":"1.vision","status":"blocked","blocker":"approval","reason":"wait for human approval"}
