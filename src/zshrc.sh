@@ -105,6 +105,13 @@ if [[ -t 1 ]]; then
   bindkey '^[[B' history-beginning-search-forward   # Down (normal mode)
   bindkey '^[OA' history-beginning-search-backward  # Up (application mode)
   bindkey '^[OB' history-beginning-search-forward   # Down (application mode)
+
+  # emoji: ':turt<TAB>' -> 🐢, ':zap:' -> ⚡, ':zap<Enter>' -> emoji zap
+  # must load AFTER compinit (it wraps a completion widget) and AFTER fzf
+  # (so our TAB bind takes precedence) — same ordering discipline as above.
+  # zsh only: it uses zle/bindkey, which bash has none of, so it cannot
+  # live in ~/.bash_aliases (BASH_ENV makes bash source that file too).
+  [[ -f ~/.zshrc.emoji.sh ]] && source ~/.zshrc.emoji.sh
 fi
 
 # aliases

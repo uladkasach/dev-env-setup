@@ -296,11 +296,15 @@ alias sync.devenv.tmux='cp ~/git/more/dev-env-setup/src/tmux.conf ~/.tmux.conf &
 alias sync.devenv.cosmic='source ~/git/more/dev-env-setup/src/install_env.pt3.cosmic.sh && configure_cosmic_theme'
 alias sync.devenv.firefox='source ~/git/more/dev-env-setup/src/install_env.pt1.system.basics.sh && configure_firefox_ctrltab_keys'
 alias sync.devenv.brains='source ~/git/more/dev-env-setup/src/install_env.pt5.devtools.sh && configure_robot_brains'
+# emoji = the zsh widget + its index. the widget copy is cheap so it syncs every
+# time; the index is a ~1MB network fetch, so it builds only when absent. rebuild
+# on demand with `rhx emoji.index.set` — unicode ships new emoji yearly.
+alias sync.devenv.emoji='cp ~/git/more/dev-env-setup/src/emoji.zsh ~/.zshrc.emoji.sh && echo "• emoji widget synced" && { [ -s ~/.local/share/emoji/emoji.tsv ] && echo "• emoji index found" || bash ~/git/more/dev-env-setup/src/emoji.index.build.sh; }'
 # cronhooks = timed hooks (systemd user timers). config syncs re-apply files, but
 # do NOT (re)establish the timers — this does. user-timers only (no sudo), so it
 # is safe to fold into sync.devenv without a password prompt.
 alias sync.devenv.cronhooks='source ~/git/more/dev-env-setup/src/install_env.pt1.system.performance.sh && install_runaway_monitor && install_kitty_snap_hooks'
-alias sync.devenv='sync.devenv.bashaliases && sync.devenv.starship && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.kitty && sync.devenv.terminal && sync.devenv.tmux && sync.devenv.cosmic && sync.devenv.firefox && sync.devenv.brains && sync.devenv.cronhooks'
+alias sync.devenv='sync.devenv.bashaliases && sync.devenv.starship && sync.devenv.zshrc && sync.devenv.gitaliases && sync.devenv.nvim && sync.devenv.ptyxis && sync.devenv.kitty && sync.devenv.terminal && sync.devenv.tmux && sync.devenv.cosmic && sync.devenv.firefox && sync.devenv.brains && sync.devenv.emoji && sync.devenv.cronhooks'
 
 # make it easy to pull down the devenv repo
 alias devenv.sync.repo='cd ~/git/more/dev-env-setup && git checkout main && git pull origin HEAD'
