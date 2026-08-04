@@ -53,6 +53,7 @@ install_starship
 source "$THIS_DIR/install_env.pt2.shell.git.aliases.sh"
 configure_git_aliases
 install_cli_deps
+install_emoji  # after install_cli_deps, which brings fzf + jq
 configure_tmux
 
 # pt3: cosmic desktop

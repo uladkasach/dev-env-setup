@@ -85,6 +85,50 @@ configure_tmux() {
   echo "• tmux plugins installed"
 }
 
+install_emoji() {
+  #########################
+  ## emoji: inline emoji autocomplete in zsh
+  ## ':turt<TAB>' -> 🐢   ':zap:' -> ⚡   ':zap<Enter>' -> emoji zap
+  ##
+  ## two artifacts:
+  ##   ~/.zshrc.emoji.sh  the zle widget + `emoji` command (sourced by zshrc)
+  ##   ~/.local/share/emoji/emoji.tsv  the index (built from CLDR + unicode)
+  ##
+  ## .note = zsh only. it uses zle/bindkey, so it must NOT go in
+  ##         ~/.bash_aliases — BASH_ENV makes bash source that file, and
+  ##         bash has no zle. zshrc.sh sources it after compinit + fzf.
+  #########################
+  local src_dir="${DEV_ENV_SETUP_DIR:-$HOME/git/more/dev-env-setup}/src"
+
+  # fzf powers the picker on ambiguous matches; jq builds the index.
+  # both come from install_cli_deps, which runs immediately before this
+  # in install_env._.sh — so assert rather than re-apt. a second
+  # `apt install` here would duplicate that fn and, worse, prompt for a
+  # sudo password mid-install for packages already present.
+  local absent=()
+  command -v fzf >/dev/null || absent+=(fzf)
+  command -v jq  >/dev/null || absent+=(jq)
+  if (( ${#absent[@]} )); then
+    echo "✋ emoji needs: ${absent[*]}" >&2
+    echo "   run install_cli_deps first (install_env._.sh orders it before this)" >&2
+    return 2
+  fi
+
+  cp "$src_dir/emoji.zsh" ~/.zshrc.emoji.sh
+  echo "• emoji widget installed"
+
+  # build the index. this is the same file `rhx emoji.index.set` runs,
+  # so the human and the agent can never drift apart.
+  bash "$src_dir/emoji.index.build.sh"
+
+  # prove it works before we claim it does. the suite rebinds no keys —
+  # it stubs zle and drives the widgets headlessly, so it is safe here.
+  zsh "$src_dir/emoji.test.zsh" || {
+    echo "✋ emoji widget failed its own tests — install is not sound" >&2
+    return 1
+  }
+}
+
 install_starship() {
   #########################
   ## starship: cross-shell prompt in rust
