@@ -53,12 +53,14 @@ configure_robot_brains() {
   #   ghost text claude proposes inside its own input box (tab accepts it).
   #   the `/`-command menu and `@`-file completion are separate features and are
   #   NOT affected. opt-out shipped in claude 2.0.71 (anthropics/claude-code#13878)
+  # - permissions.defaultMode=acceptEdits: sessions start in accept-edits mode so
+  #   file edits apply without a prompt (shift+tab still cycles modes live)
   # note: the "switched to native installer" nag is NOT gated by settings.json —
   #   it needs DISABLE_INSTALLATION_CHECKS exported in the shell (see src/zshrc.sh)
   # note: the env block suits the prompt-suggestion flag because claude reads it as
   #   process.env.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION mid-session, well after
   #   settings load — unlike the boot-time checks, which need a real shell export
-  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false"}, "disableClaudeAiConnectors": true}'
+  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false"}, "disableClaudeAiConnectors": true, "permissions": {"defaultMode": "acceptEdits"}}'
   local settings_file="$HOME/.claude/settings.json"
   mkdir -p "$HOME/.claude"
   if [[ -f "$settings_file" ]]; then
