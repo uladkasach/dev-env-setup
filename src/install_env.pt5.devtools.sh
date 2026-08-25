@@ -25,17 +25,58 @@ install_rust() {
   source "$HOME/.cargo/env"
 }
 
+# the claude-code version this env holds at.
+# .why = claude truncates hook output beyond v2.1.87, and our hooks (permission
+#   checks, role boot, route drive) depend on that output being whole. so we pin
+#   deliberately instead of tracking latest (rule.require.pinned-versions).
+# .note = raise this only after verifying hook output survives the new version
+CLAUDE_CODE_VERSION_PINNED='2.1.87'
+
 install_robot_brains() {
   #########################
   ## claude-code + rhachet + codex
   ## ref: https://github.com/anthropics/claude-code
   ## ref: https://github.com/openai/codex
   #########################
-  pnpm install -g @anthropic-ai/claude-code
   pnpm install -g rhachet
   pnpm install -g @openai/codex
 
+  # note: claude-code itself is installed by configure_robot_brains, so that the
+  # pin + shadow prune converge on every `sync.devenv.brains`, not just on install
   configure_robot_brains
+}
+
+prune_claude_code_shadows() {
+  #########################
+  ## remove npm-global claude-code installs that outrank the pinned pnpm copy
+  #########################
+
+  # .what = uninstall @anthropic-ai/claude-code from every fnm node version
+  # .why = `fnm env --use-on-cd` puts fnm's multishell bin ahead of PNPM_HOME on
+  #   every shell, and the PNPM_HOME prepend in zshrc is skipped when PNPM_HOME is
+  #   already anywhere in PATH. so a stray `npm install -g @anthropic-ai/claude-code`
+  #   (or claude's own native-installer migration) silently outranks the pinned
+  #   pnpm copy — and since no alias or pin binds claude, the swap goes unnoticed.
+  #   a prune at the source is the only guard PATH order cannot undo.
+  local pruned=0
+  local nodedir
+
+  for nodedir in "$HOME"/.local/share/fnm/node-versions/*/installation; do
+    [[ -d "$nodedir/lib/node_modules/@anthropic-ai/claude-code" ]] || continue
+
+    # invoke npm by absolute path, via its own node — the interactive `npm` shell
+    # function routes to pnpm when no package-lock.json is present, so a bare
+    # `npm uninstall -g` here would remove the pnpm copy we mean to keep
+    "$nodedir/bin/node" "$nodedir/bin/npm" uninstall -g @anthropic-ai/claude-code >/dev/null 2>&1 || {
+      echo "⛈️  failed to prune npm-global claude-code at $nodedir"
+      echo "   fix: '$nodedir/bin/node' '$nodedir/bin/npm' uninstall -g @anthropic-ai/claude-code"
+      return 1
+    }
+    echo "• pruned npm-global claude-code shadow at $(basename "$(dirname "$nodedir")")"
+    pruned=1
+  done
+
+  [[ "$pruned" -eq 1 ]] || echo "• no npm-global claude-code shadows found"
 }
 
 configure_robot_brains() {
@@ -43,6 +84,16 @@ configure_robot_brains() {
   ## claude-code cli config
   ## ref: https://code.claude.com/docs/en/setup
   #########################
+
+  # remove any npm-global copy that would outrank the pinned pnpm install
+  prune_claude_code_shadows || return 1
+
+  # converge the pnpm global install onto the pin (idempotent: a no-op when matched)
+  pnpm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION_PINNED" || {
+    echo "⛈️  failed to install claude-code@$CLAUDE_CODE_VERSION_PINNED"
+    echo "   fix: pnpm install -g @anthropic-ai/claude-code@$CLAUDE_CODE_VERSION_PINNED"
+    return 1
+  }
 
   # patch:
   # - DISABLE_UPDATES: block all self-update paths (we manage claude via pnpm),
@@ -72,6 +123,31 @@ configure_robot_brains() {
     echo "$patch" > "$settings_file"
   fi
   echo "• claude-code updates + claude.ai connectors + prompt suggestions disabled"
+
+  # drop the shell's cached command paths — we just removed a `claude` that may
+  # have been resolved and cached earlier in this same shell
+  if [[ -n "$ZSH_VERSION" ]]; then rehash; else hash -r 2>/dev/null || true; fi
+
+  # verify the claude that actually resolves is the pinned pnpm copy.
+  # .why = prune + install converge the filesystem, but PATH order decides which
+  #   binary wins. assert the outcome rather than assume it (rule.forbid.failhide)
+  local claude_path claude_version
+  claude_path="$(command -v claude)" || {
+    echo "⛈️  claude not found on PATH after install"
+    echo "   fix: confirm PNPM_HOME ($HOME/.local/share/pnpm) is on PATH, then re-run sync.devenv.brains"
+    return 1
+  }
+
+  claude_version="$("$claude_path" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+  if [[ "$claude_version" != "$CLAUDE_CODE_VERSION_PINNED" ]]; then
+    echo "⛈️  claude resolves to v${claude_version:-unknown}, expected the pinned v$CLAUDE_CODE_VERSION_PINNED"
+    echo "   at:  $claude_path"
+    echo "   why: another claude install outranks the pinned pnpm copy on PATH"
+    echo "   fix: which -a claude   # find the shadow, then remove it at its source"
+    return 1
+  fi
+
+  echo "• claude-code pinned at v$CLAUDE_CODE_VERSION_PINNED, resolves to $claude_path"
 }
 
 install_ripgrep() {

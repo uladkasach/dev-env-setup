@@ -36,7 +36,10 @@ function nimg {
   pqiv "$@"
 }
 
-# claude code config (expected: v2.1.87, beyond which hooks are truncated)
+# claude code config
+# the version pin (v2.1.87, beyond which hooks are truncated) is held and verified
+# by CLAUDE_CODE_VERSION_PINNED in src/install_env.pt5.devtools.sh — run
+# `sync.devenv.brains` to converge it. it is not enforced from here.
 export ANTHROPIC_MODEL='claude-opus-5[1m]'
 export CLAUDE_CODE_SKIP_UPDATE_CHECK=1
 
