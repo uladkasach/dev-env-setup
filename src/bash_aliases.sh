@@ -8,6 +8,16 @@
 alias vim='nvim'
 alias vi='nvim'
 
+# push kitty's xterm-kitty terminfo to a remote host (one-time per host),
+# so plain ssh/scp/rsync into it no longer fail with "unknown terminal type".
+# .why = remotes lack kitty's terminfo; ship the entry once, no ssh wrapper.
+# usage: ssh.terminfo.push user@host
+alias ssh.terminfo.push='_ssh_terminfo_push'
+_ssh_terminfo_push() {
+  [[ -z "$1" ]] && { echo "usage: ssh.terminfo.push user@host"; return 2; }
+  infocmp -x xterm-kitty | ssh "$1" 'tic -x -o ~/.terminfo /dev/stdin'
+}
+
 # open notes
 alias notes='nvim ~/git/notes/main.txt'
 
