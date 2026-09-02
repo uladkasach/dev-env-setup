@@ -627,6 +627,64 @@ _is 'usage.http-200-is-not-an-error' 'absent' \
 _is 'usage.http-200-carries-the-windows' '24 48' \
   "$(_usage_node_ok | jq -r '[.five_hour.utilization, .seven_day.utilization] | join(" ")')"
 
+# ---- the 200-shape gate: a PRESENT-but-unreadable number must refuse, never read as zero
+# ⚠️ this is the worst-direction failure this whole feature can have, so it earns its own block.
+#   the gate once tested only that the windows were OBJECTS, which passes a body whose
+#   `.utilization` is a string — and every step after that converts the string into a confident
+#   zero rather than refuse it: jq's `// 0` fires on null/false only (a non-empty string is
+#   truthy, so it flows through), then awk's `printf "%.0f"` coerces it to 0 silently. the human
+#   reads `session ░░░░░░░░░░ 0% used` on an account whose real number was never read, and acts
+#   on a full-budget all-clear. a refusal costs them a retry; this costs them the decision the
+#   tool exists to inform.
+_usage_node_body() {
+  ( eval "_brains_auth_usage_reply() { printf '%s\n200' '$1'; }"
+    _brains_auth_node_via_access 'ua' 'kai@x.com' 'tok' )
+}
+_shape_verdict() { _usage_node_body "$1" | jq -r '.error // "trusted"'; }
+# a string utilization is the shape that produced the defect — it must be refused
+_is 'shape.string-utilization-refuses' 'unexpected_shape' \
+  "$(_shape_verdict '{"five_hour":{"utilization":"n/a"},"seven_day":{"utilization":48}}')"
+# ⚠️ the two cases below split one claim in half on purpose, because a single case here would
+#   overclaim. the coercion does NOT happen in the node — a node built from a string body still
+#   carries the literal "n/a" — it happens two steps later in `_brains_auth_round`. so the first
+#   case pins the COERCION (proving the danger is real and downstream), and the second pins that
+#   the gate stops the body before it can ever reach it. a case named "never-reads-zero" that
+#   only looked at the node would go green for the wrong reason and read as proof it is not
+#   (`hazard.a-clamp-can-lie-the-same-way-code-can`).
+# first: awk really does turn a non-numeric string into a confident 0. this is the mechanism.
+_is 'shape.round-coerces-a-string-to-zero' '0' "$(_brains_auth_round 'n/a')"
+# second: so the gate must refuse the body BEFORE the render can hand that string to round.
+#   an error node has no `.five_hour` at all, which is what "refused" reads here.
+_is 'shape.string-never-reaches-the-round' 'refused' \
+  "$(case "$(_usage_node_body '{"five_hour":{"utilization":"n/a"},"seven_day":{"utilization":48}}' \
+              | jq -r 'if has("error") then "refused" else (.five_hour.utilization|tostring) end')" in
+       refused) echo 'refused' ;;
+       *)       echo "REACHED THE RENDER" ;;
+     esac)"
+# the second window is checked too — a gate that only guarded the first would pass this
+_is 'shape.string-in-second-window-refuses' 'unexpected_shape' \
+  "$(_shape_verdict '{"five_hour":{"utilization":24},"seven_day":{"utilization":"high"}}')"
+# an absent value must refuse rather than fall to `// 0` — `(null|type)` is "null", not "number"
+_is 'shape.absent-utilization-refuses' 'unexpected_shape' \
+  "$(_shape_verdict '{"five_hour":{},"seven_day":{"utilization":48}}')"
+# an explicit null likewise: this is the one case `// 0` WOULD have caught, and it must still
+# refuse rather than render a zero the endpoint never sent
+_is 'shape.null-utilization-refuses' 'unexpected_shape' \
+  "$(_shape_verdict '{"five_hour":{"utilization":null},"seven_day":{"utilization":48}}')"
+# the ABSENT-window half the gate already closed must stay closed — this is the regression the
+# narrowed test could plausibly break, since a window that is not an object has no `.utilization`
+_is 'shape.absent-window-still-refuses' 'unexpected_shape' \
+  "$(_shape_verdict '{"seven_day":{"utilization":48}}')"
+_is 'shape.non-object-window-still-refuses' 'unexpected_shape' \
+  "$(_shape_verdict '{"five_hour":"n/a","seven_day":{"utilization":48}}')"
+# and a genuinely healthy body must still pass — a gate that refuses every body is not a gate.
+# a float is deliberate: utilization is a percentage, and an int-only test would refuse a
+# healthy endpoint that reports 24.5
+_is 'shape.healthy-body-is-trusted' 'trusted' \
+  "$(_shape_verdict '{"five_hour":{"utilization":24.5},"seven_day":{"utilization":48}}')"
+_is 'shape.zero-is-a-real-number' 'trusted' \
+  "$(_shape_verdict '{"five_hour":{"utilization":0},"seven_day":{"utilization":0}}')"
+
 # ---- the shared pre-flight verdict on a stored token
 # ⚠️ `use` and `usage` run the SAME two checks in the SAME order and diverge only in how they
 #   present the answer. that was one fact told twice, and this file has already paid for the
@@ -650,9 +708,14 @@ _is 'tokenerr.keyrack-outranks-shape' 'keyrack_unreadable' \
 #   beside it as an extracted leaf — so a reader of the pair could not tell whether "inline"
 #   or "extracted" was the convention, and only one of the two was snappable without a driven
 #   sweep. both are leaves now, and both are snapped here.
+# ⚠️ this helper does the profile read the ORCHESTRATOR does, then hands the name to the
+#   render — because the render is a pure leaf and no longer opens the file itself. the two
+#   lines below are the caller's two lines, so this still covers profile-file → rendered text
+#   end to end; what it no longer does is let a render reach for a global.
 _render_no_subs_when() {
   printf '%s' "$1" > "$_BRAINS_AUTH_LIVE_PROFILE"
-  _brains_auth_render_no_subscriptions
+  _brains_auth_render_no_subscriptions \
+    "$(_brains_auth_creds_field "$_BRAINS_AUTH_LIVE_PROFILE" '.oauthAccount.emailAddress')"
 }
 _snap 'coldstart.no-subs.names-the-live-account' \
   "$(_render_no_subs_when '{"oauthAccount":{"emailAddress":"kai@ehmpathy.com"}}')"
@@ -665,6 +728,16 @@ _is 'coldstart.no-subs.torn-profile-omits-the-hint' 'omitted' \
        *"profile names"*) echo 'INVENTED a name' ;;
        *)                 echo 'omitted' ;;
      esac)"
+# ⚠️ the render must be a PURE function of its argument — it renders the name it is HANDED,
+#   and never the one the profile file happens to hold. this is the clamp on that: the file on
+#   disk says `moana@x.com`, the argument says `kai@x.com`, and the argument must win. the leaf
+#   used to open the file itself, and under that shape this case reads `moana@x.com` — a leaf
+#   that ignores its own input, which is the whole reason a pure-vs-i/o mixup is a defect and
+#   not a style note. it also proves the file read moved OUT rather than merely got shadowed.
+_is 'coldstart.no-subs.render-is-pure' 'kai@x.com' \
+  "$( printf '%s' '{"oauthAccount":{"emailAddress":"moana@x.com"}}' > "$_BRAINS_AUTH_LIVE_PROFILE"
+      _brains_auth_render_no_subscriptions 'kai@x.com' \
+        | sed -n 's/.*profile names \([^ ]*\) .*/\1/p' )"
 
 # ---------------------------------------------------------------- the profile sync
 # this function once swallowed every failure silently, which made the one state it exists to
@@ -2114,6 +2187,39 @@ _curl_rc_of() {
 _is 'callleaf.usage-passes-curl-rc'   '7' "$(_curl_rc_of usage_reply 7)"
 _is 'callleaf.refresh-passes-curl-rc' '7' "$(_curl_rc_of refresh_reply 7)"
 _is 'callleaf.usage-passes-curl-ok'   '0' "$(_curl_rc_of usage_reply 0)"
+# ⚠️ the case above was FLAKY before the usage leaf got its own subshell, and the flake WAS the
+#   defect. a stubbed curl that returns without a read of stdin makes `printf` take SIGPIPE
+#   (141); with `pipefail` on in the caller's shell, the pipeline reports 141 instead of curl's
+#   status — so a call that WORKED reads as `curl_failed` and the human is told the endpoint is
+#   unreachable. whether it fired came down to which side of the pipe won the race, so the case
+#   went red only sometimes, and only under a pipe.
+#   the SIGPIPE itself cannot be forced — whether it fires depends on the pipe buffer absorbing
+#   a ~60-byte write before the reader exits, and it usually does. so these clamp the CONTRACT
+#   the SIGPIPE happened to violate, which is deterministic: with pipefail ON in the caller, an
+#   upstream failure in the pipeline must NOT become the leaf's answer. curl's code must be.
+#   a failed `printf` stands in for the SIGPIPE — same position in the pipeline, same effect
+#   under pipefail, but it fires every time instead of by luck.
+_curl_rc_under_pipefail() {
+  ( set -o pipefail
+    eval "curl() { return $2; }"
+    printf() { return 3; }        # the upstream failure, forced
+    _brains_auth_$1 'ua/1' 'tok' >/dev/null 2>&1
+    echo $? )
+}
+_is 'callleaf.usage-ok-survives-caller-pipefail'   '0' "$(_curl_rc_under_pipefail usage_reply 0)"
+# ⚠️ the honest note on the case below: it does NOT bite on the defect, and is not claimed to.
+#   under pipefail bash reports the RIGHTMOST non-zero, so with curl at 7 the answer is 7 with
+#   or without the containment. it guards the FIX instead — `set +o pipefail` is exactly the
+#   kind of change that could mask a real curl failure, and this is what says it did not. a
+#   clamp that guards a repair is worth keeping; a clamp that pretends to guard the defect
+#   would not be (`hazard.a-clamp-can-lie-the-same-way-code-can`).
+_is 'callleaf.usage-rc-survives-caller-pipefail'   '7' "$(_curl_rc_under_pipefail usage_reply 7)"
+# ...and the containment must hold the other way too: the leaf sets an option, so it must not
+# leak that change back to the caller. `set +o pipefail` in a bare function body would.
+_is 'callleaf.usage-does-not-leak-pipefail' 'on' \
+  "$( set -o pipefail
+      _brains_auth_usage_reply 'ua/1' 'tok' >/dev/null 2>&1 || :
+      case "$(set -o | grep '^pipefail')" in *on) echo 'on' ;; *) echo 'LEAKED off' ;; esac )"
 
 # and the bearer must never reach curl's ARGV — `/proc/<pid>/cmdline` is world-readable, so a
 # token passed as an argument is visible in `ps` to any local user for the life of the call.
@@ -2241,6 +2347,31 @@ case "$(_boot_orphaned)" in
   *'no src/brains.auth.sh in any parent'*) _is 'boot.orphaned-fails-loud' 'named' 'named' ;;
   *)                                       _is 'boot.orphaned-fails-loud' 'named' 'silent or unnamed' ;;
 esac
+# ⚠️ a SOURCED file's top-level assignments land in the CALLER's namespace, where `local` is
+#   unavailable to contain them. this preamble's header promises it leaves EXACTLY two names
+#   behind, and that promise is only worth what a case can check — so this reads the caller's
+#   namespace after the source and asserts the transient walk variables are gone. the failure
+#   it clamps is quiet by nature: an incidental global cannot be seen in any output, and only
+#   shows up as a collision with some later definition in the same shell, far from here.
+_boot_leaks() {
+  ( source "$_BOOT" --skill brains.auth.test >/dev/null 2>&1
+    for _v in _BRAINS_AUTH_BOOTSTRAP_DIR _BRAINS_AUTH_WALK; do
+      [[ -n "${!_v+set}" ]] && printf '%s ' "$_v"
+    done )
+}
+_is 'boot.leaves-no-walk-globals' '' "$(_boot_leaks)"
+# ...and the two documented outputs must still be there — a cleanup that swept too wide would
+# pass the case above while it broke every proxy, so the positive half is asserted too.
+# ⚠️ a real extra arg is passed on purpose. with ONLY `--skill <v>`, the `ARGS` left behind is
+#   an empty array, and an emptiness test cannot tell that apart from an unset one — so the
+#   case would have read as a broken output on a preamble that works. the arg doubles as the
+#   proof that the `--skill` token is stripped and the rest forwarded verbatim.
+_boot_outputs() {
+  ( source "$_BOOT" --skill brains.auth.test --json >/dev/null 2>&1
+    [[ -n "${BRAINS_AUTH_SRC:-}" ]] && printf 'src '
+    printf '%s' "${ARGS[*]}" )
+}
+_is 'boot.keeps-its-two-outputs' 'src --json' "$(_boot_outputs)"
 
 # -------------------------------------------------- the error roster must not drift
 # ⚠️ `_ERRORS` (up at the hints snapshot) is hand-kept, so a code added to

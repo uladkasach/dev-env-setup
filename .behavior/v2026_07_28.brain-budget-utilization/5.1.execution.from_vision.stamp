@@ -2,95 +2,226 @@
 
 🗿 route.stone.set
    ├─ stone = 5.1.execution.from_vision
-   ├─ passage = blocked
-   ├─ reason = blockers exceed threshold (5 > 0)
+   ├─ passage = malfunction
+   ├─ reason = reviewer or judge malfunctioned
+   ├─ options
+   │  ├─ overrule the malfunction
+   │  │  └─ rhx route.stone.set --stone 5.1.execution.from_vision --as overruled
+   │  └─ or fix the reviewer, then retry
    └─ guard
       ├─ artifacts
       │   ├─ $route/5.1.execution.from_vision.yield.md
       │   └─ src/**/*
       ├─ reviews
-      │   ├─ r1: repo-rules (l1, 14/18)
-      │   │   ├─ rejected 139.4s
+      │   ├─ r1: repo-rules (l1, 15/18)
+      │   │   ├─ rejected 117.9s
       │   │   ├─ 1 blocker 🔴
+      │   │   ├─ 2 nitpicks 🟠
+      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r001._.given.by_peer.repo-rules.md
+      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r001._.taken.by_self.repo-rules.md
+      │   ├─ r2: mech-failhides (l1, 15/18)
+      │   │   ├─ rejected 98.0s
+      │   │   ├─ 2 blockers 🔴
       │   │   ├─ 1 nitpick 🟠
-      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r001._.given.by_peer.repo-rules.md
-      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r001._.taken.by_self.repo-rules.md
-      │   ├─ r2: mech-failhides (l1, 14/18)
-      │   │   ├─ approved 92.0s
-      │   │   ├─ 0 blockers ✓
-      │   │   ├─ 1 nitpick 🟠
-      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r002._.given.by_peer.mech-failhides.md
-      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r002._.taken.by_self.mech-failhides.md
-      │   ├─ r3: mech-decode-friction (l1, 14/18)
-      │   │   ├─ approved 62.9s
+      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r002._.given.by_peer.mech-failhides.md
+      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r002._.taken.by_self.mech-failhides.md
+      │   ├─ r3: mech-decode-friction (l1, 15/18)
+      │   │   ├─ approved 70.9s
       │   │   ├─ 0 blockers ✓
       │   │   ├─ 0 nitpicks ✓
-      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r003._.given.by_peer.mech-decode-friction.md
-      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r003._.taken.by_self.mech-decode-friction.md
-      │   ├─ r4: arch-opport-decomposition (l1, 14/18)
-      │   │   ├─ approved 86.9s
-      │   │   ├─ 0 blockers ✓
-      │   │   ├─ 1 nitpick 🟠
-      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r004._.given.by_peer.arch-opport-decomposition.md
-      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r004._.taken.by_self.arch-opport-decomposition.md
-      │   ├─ r5: arch-smell-scopeleaks (l1, 14/18)
-      │   │   ├─ approved 64.6s
+      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r003._.given.by_peer.mech-decode-friction.md
+      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r003._.taken.by_self.mech-decode-friction.md
+      │   ├─ r4: arch-opport-decomposition (l1, 15/18)
+      │   │   ├─ rejected 69.1s
+      │   │   ├─ 1 blocker 🔴
+      │   │   ├─ 2 nitpicks 🟠
+      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r004._.given.by_peer.arch-opport-decomposition.md
+      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r004._.taken.by_self.arch-opport-decomposition.md
+      │   ├─ r5: arch-smell-scopeleaks (l1, 15/18)
+      │   │   ├─ approved 893.7s
       │   │   ├─ 0 blockers ✓
       │   │   ├─ 0 nitpicks ✓
-      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r005._.given.by_peer.arch-smell-scopeleaks.md
-      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r005._.taken.by_self.arch-smell-scopeleaks.md
-      │   ├─ r6: arch-hazards-maintenance (l1, 14/18)
-      │   │   ├─ approved 131.4s
-      │   │   ├─ 0 blockers ✓
+      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r005._.given.by_peer.arch-smell-scopeleaks.md
+      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r005._.taken.by_self.arch-smell-scopeleaks.md
+      │   ├─ r6: arch-hazards-maintenance (l1, 15/18)
+      │   │   ├─ rejected 140.9s
+      │   │   ├─ 2 blockers 🔴
+      │   │   ├─ 4 nitpicks 🟠
+      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r006._.given.by_peer.arch-hazards-maintenance.md
+      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r006._.taken.by_self.arch-hazards-maintenance.md
+      │   ├─ r7: arch-hazards-behavior (l1, 15/18)
+      │   │   ├─ rejected 236.4s
+      │   │   ├─ 1 blocker 🔴
       │   │   ├─ 3 nitpicks 🟠
-      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r006._.given.by_peer.arch-hazards-maintenance.md
-      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r006._.taken.by_self.arch-hazards-maintenance.md
-      │   ├─ r7: arch-hazards-behavior (l1, 14/18)
-      │   │   ├─ approved 180.8s
-      │   │   ├─ 0 blockers ✓
-      │   │   ├─ 3 nitpicks 🟠
-      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r007._.given.by_peer.arch-hazards-behavior.md
-      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r007._.taken.by_self.arch-hazards-behavior.md
+      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r007._.given.by_peer.arch-hazards-behavior.md
+      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r007._.taken.by_self.arch-hazards-behavior.md
       │   ├─ r8: behavior-intent-coverage (l1, 14/18)
-      │   │   ├─ rejected 108.6s
-      │   │   ├─ 3 blockers 🔴
-      │   │   ├─ 1 nitpick 🟠
-      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r008._.given.by_peer.behavior-intent-coverage.md
-      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r008._.taken.by_self.behavior-intent-coverage.md
+      │   │   ├─ malfunction 💥
+      │   │   ├─ terminal — does not block higher levels
+      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r008._.given.by_peer.behavior-intent-coverage.md
+      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r008._.taken.by_self.behavior-intent-coverage.md
       │   ├─ r9: ergo-friction-hazards (l1, 14/18)
-      │   │   ├─ rejected 88.8s
-      │   │   ├─ 1 blocker 🔴
-      │   │   ├─ 1 nitpick 🟠
-      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r009._.given.by_peer.ergo-friction-hazards.md
-      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i029.2e645c3db4439151d9.r009._.taken.by_self.ergo-friction-hazards.md
+      │   │   ├─ malfunction 💥
+      │   │   ├─ terminal — does not block higher levels
+      │   │   ├─ given: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r009._.given.by_peer.ergo-friction-hazards.md
+      │   │   └─ taken: .behavior/v2026_07_28.brain-budget-utilization/.reviews/peer/5.1.execution.from_vision._.review.i030.1fed3beb105290e35b.r009._.taken.by_self.ergo-friction-hazards.md
       │   ├─ r10: enroll-impl-behavior-intent (l3, 12/18)
       │   │   └─ awaits l1 terminal
       │   └─ r11: enroll-impl-arch-defects (l3, 12/18)
       │       └─ awaits l1 terminal
       └─ judges
           └─ j1: $rhachet run --repo bhrain --skill route.stone.judge --mechanism reviewed? --stone $stone --route $route --allow-blockers 0 --allow-nitpicks 3
-              ├─ finished 6.1s ✗
-              └─ reason: blockers exceed threshold (5 > 0)
+              ├─ finished 2.9s ✗
+              └─ reason: no review files found for hash 07fa7d29
 
 ────────────────────────────────────────────────────────────────
 
-🪶 judge 1
+🔎 review 8
    ├─ stdout
    │  ├─
    │  │
-   │  │  🪨 run solid skill repo=bhrain/role=driver/skill=route.stone.judge
+   │  │  🪨 run solid skill repo=bhrain/role=reviewer/skill=review
    │  │  
-   │  │  passed: false
-   │  │  reason: blockers exceed threshold (5 > 0)
+   │  │  🦉 let's review
+   │  │     ├─ brain: fireworks/deepseek/v4-flash
+   │  │     ├─ focus: push
+   │  │     └─ scope
+   │  │        ├─ diffs: since-main
+   │  │        ├─ paths: **/*.{ts,sh}
+   │  │        └─ join: intersect
+   │  │  
+   │  │  🔭 metrics.expected
+   │  │     ├─ files
+   │  │     │  ├─ rules: 1
+   │  │     │  ├─ refs: 17
+   │  │     │  └─ targets: 7
+   │  │     ├─ tokens
+   │  │     │  ├─ estimate: 534,201
+   │  │     │  └─ context: 53.4%
+   │  │     └─ cost
+   │  │        └─ estimate: $0.089745740
+   │  │  
+   │  │  🪵 logs
+   │  │     ├─ scope: .log/bhrain/review/2026-09-02T07-01-37-148Z/input.scope.json
+   │  │     ├─ metrics: .log/bhrain/review/2026-09-02T07-01-37-148Z/metrics.expected.json
+   │  │     └─ tokens: .log/bhrain/review/2026-09-02T07-01-37-148Z/tokens.expected.md
+   │  │        ├─ rules: .agent (393, 100%)
+   │  │        └─ targets: src (114.7k, 59.13%), .agent (79.3k, 40.87%)
    │  │
    │  └─
    ├─ stderr
    │  ├─
    │  │
-   │  │  🪨 run solid skill repo=bhrain/role=driver/skill=route.stone.judge
-   │  │     └─ ✋ blocked by constraints
+   │  │  🪨 run solid skill repo=bhrain/role=reviewer/skill=review
+   │  │     └─ 💥 failed with an error
+   │  │  
+   │  │  /home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/openai@5.8.2_zod@4.3.4/node_modules/openai/core/error.js:68
+   │  │          return new APIError(status, error, message, headers);
+   │  │                 ^
+   │  │  
+   │  │  APIError: 412 Account vladatahbode is suspended, possibly due to reaching the monthly spending limit or failure to pay past invoices. Please go to https://fireworks.ai/account/billing for more information.
+   │  │      at APIError.generate (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/openai@5.8.2_zod@4.3.4/node_modules/openai/core/error.js:68:16)
+   │  │      at OpenAI.makeStatusError (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/openai@5.8.2_zod@4.3.4/node_modules/openai/client.js:158:32)
+   │  │      at OpenAI.makeRequest (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/openai@5.8.2_zod@4.3.4/node_modules/openai/client.js:301:30)
+   │  │      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+   │  │      at async BrainAtom.ask (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/rhachet-brains-fireworksai@0.1.6_rhachet@1.47.3_zod@4.3.4_/node_modules/rhachet-brains-fireworksai/dist/domain.operations/atom/genBrainAtom.js:124:30)
+   │  │      at async Object.ask (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/rhachet@1.47.3_zod@4.3.4/node_modules/rhachet/dist/domain.operations/brain/asBrainAtomWithContextBound.js:20:24)
+   │  │      at async Object.operation (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/rhachet-roles-bhrain@0.32.1_@types+node@25.3.0_rhachet-brains-fireworksai@0.1.6_rhachet_f66c9911f163e9e577c0f2b369cc9395/node_modules/rhachet-roles-bhrain/dist/domain.operations/review/stepReview.js:621:32)
+   │  │      at async withSpinner (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/rhachet-roles-bhrain@0.32.1_@types+node@25.3.0_rhachet-brains-fireworksai@0.1.6_rhachet_f66c9911f163e9e577c0f2b369cc9395/node_modules/rhachet-roles-bhrain/dist/domain.operations/review/stepReview.js:126:28)
+   │  │      at async stepReview (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/rhachet-roles-bhrain@0.32.1_@types+node@25.3.0_rhachet-brains-fireworksai@0.1.6_rhachet_f66c9911f163e9e577c0f2b369cc9395/node_modules/rhachet-roles-bhrain/dist/domain.operations/review/stepReview.js:619:26)
+   │  │      at async Module.review (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/rhachet-roles-bhrain@0.32.1_@types+node@25.3.0_rhachet-brains-fireworksai@0.1.6_rhachet_f66c9911f163e9e577c0f2b369cc9395/node_modules/rhachet-roles-bhrain/dist/contract/cli/review.js:242:9) {
+   │  │    status: 412,
+   │  │    headers: Headers {},
+   │  │    requestID: 'chatcmpl-dd055278192749b4aab42fe537523b91',
+   │  │    error: {
+   │  │      message: 'Account vladatahbode is suspended, possibly due to reaching the monthly spending limit or failure to pay past invoices. Please go to https://fireworks.ai/account/billing for more information.',
+   │  │      param: null,
+   │  │      code: 'PRECONDITION_FAILED',
+   │  │      type: 'error'
+   │  │    },
+   │  │    code: 'PRECONDITION_FAILED',
+   │  │    param: null,
+   │  │    type: 'error'
+   │  │  }
+   │  │  
+   │  │  Node.js v22.21.0
    │  │
    │  └─
    └─ passage blocked
-      ├─ blocked by constraints
-      └─ exit code: 2 ✋
+      ├─ blocked by malfunction
+      └─ exit code: 1 💥
+
+🔎 review 9
+   ├─ stdout
+   │  ├─
+   │  │
+   │  │  🪨 run solid skill repo=bhrain/role=reviewer/skill=review
+   │  │  
+   │  │  🦉 let's review
+   │  │     ├─ brain: fireworks/deepseek/v4-flash
+   │  │     ├─ focus: push
+   │  │     └─ scope
+   │  │        ├─ diffs: since-main
+   │  │        ├─ paths: **/*.{ts,sh}
+   │  │        └─ join: intersect
+   │  │  
+   │  │  🔭 metrics.expected
+   │  │     ├─ files
+   │  │     │  ├─ rules: 1
+   │  │     │  ├─ refs: 15
+   │  │     │  └─ targets: 7
+   │  │     ├─ tokens
+   │  │     │  ├─ estimate: 523,526
+   │  │     │  └─ context: 52.4%
+   │  │     └─ cost
+   │  │        └─ estimate: $0.087952480
+   │  │  
+   │  │  🪵 logs
+   │  │     ├─ scope: .log/bhrain/review/2026-09-02T07-01-46-177Z/input.scope.json
+   │  │     ├─ metrics: .log/bhrain/review/2026-09-02T07-01-46-177Z/metrics.expected.json
+   │  │     └─ tokens: .log/bhrain/review/2026-09-02T07-01-46-177Z/tokens.expected.md
+   │  │        ├─ rules: .agent (601, 100%)
+   │  │        └─ targets: src (114.7k, 59.13%), .agent (79.3k, 40.87%)
+   │  │
+   │  └─
+   ├─ stderr
+   │  ├─
+   │  │
+   │  │  🪨 run solid skill repo=bhrain/role=reviewer/skill=review
+   │  │     └─ 💥 failed with an error
+   │  │  
+   │  │  /home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/openai@5.8.2_zod@4.3.4/node_modules/openai/core/error.js:68
+   │  │          return new APIError(status, error, message, headers);
+   │  │                 ^
+   │  │  
+   │  │  APIError: 412 Account vladatahbode is suspended, possibly due to reaching the monthly spending limit or failure to pay past invoices. Please go to https://fireworks.ai/account/billing for more information.
+   │  │      at APIError.generate (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/openai@5.8.2_zod@4.3.4/node_modules/openai/core/error.js:68:16)
+   │  │      at OpenAI.makeStatusError (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/openai@5.8.2_zod@4.3.4/node_modules/openai/client.js:158:32)
+   │  │      at OpenAI.makeRequest (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/openai@5.8.2_zod@4.3.4/node_modules/openai/client.js:301:30)
+   │  │      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+   │  │      at async BrainAtom.ask (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/rhachet-brains-fireworksai@0.1.6_rhachet@1.47.3_zod@4.3.4_/node_modules/rhachet-brains-fireworksai/dist/domain.operations/atom/genBrainAtom.js:124:30)
+   │  │      at async Object.ask (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/rhachet@1.47.3_zod@4.3.4/node_modules/rhachet/dist/domain.operations/brain/asBrainAtomWithContextBound.js:20:24)
+   │  │      at async Object.operation (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/rhachet-roles-bhrain@0.32.1_@types+node@25.3.0_rhachet-brains-fireworksai@0.1.6_rhachet_f66c9911f163e9e577c0f2b369cc9395/node_modules/rhachet-roles-bhrain/dist/domain.operations/review/stepReview.js:621:32)
+   │  │      at async withSpinner (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/rhachet-roles-bhrain@0.32.1_@types+node@25.3.0_rhachet-brains-fireworksai@0.1.6_rhachet_f66c9911f163e9e577c0f2b369cc9395/node_modules/rhachet-roles-bhrain/dist/domain.operations/review/stepReview.js:126:28)
+   │  │      at async stepReview (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/rhachet-roles-bhrain@0.32.1_@types+node@25.3.0_rhachet-brains-fireworksai@0.1.6_rhachet_f66c9911f163e9e577c0f2b369cc9395/node_modules/rhachet-roles-bhrain/dist/domain.operations/review/stepReview.js:619:26)
+   │  │      at async Module.review (/home/vlad/git/more/_worktrees/dev-env-setup.vlad.brain-budget-utilization/node_modules/.pnpm/rhachet-roles-bhrain@0.32.1_@types+node@25.3.0_rhachet-brains-fireworksai@0.1.6_rhachet_f66c9911f163e9e577c0f2b369cc9395/node_modules/rhachet-roles-bhrain/dist/contract/cli/review.js:242:9) {
+   │  │    status: 412,
+   │  │    headers: Headers {},
+   │  │    requestID: 'chatcmpl-5e1b6176f177464fa4dc8f7768de1611',
+   │  │    error: {
+   │  │      message: 'Account vladatahbode is suspended, possibly due to reaching the monthly spending limit or failure to pay past invoices. Please go to https://fireworks.ai/account/billing for more information.',
+   │  │      param: null,
+   │  │      code: 'PRECONDITION_FAILED',
+   │  │      type: 'error'
+   │  │    },
+   │  │    code: 'PRECONDITION_FAILED',
+   │  │    param: null,
+   │  │    type: 'error'
+   │  │  }
+   │  │  
+   │  │  Node.js v22.21.0
+   │  │
+   │  └─
+   └─ passage blocked
+      ├─ blocked by malfunction
+      └─ exit code: 1 💥

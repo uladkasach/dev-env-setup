@@ -12,10 +12,12 @@
 #         infinite silent spin in exactly the command whose copy was touched.
 #         one definition cannot drift from itself.
 #
-# .note = this file is SOURCED, never executed. it leaves two things behind
-#         for the caller:
+# .note = this file is SOURCED, never executed. it leaves EXACTLY two names
+#         behind for the caller, and no others:
 #           $BRAINS_AUTH_SRC — the sourced src/brains.auth.sh path
 #           ${ARGS[@]}       — the caller's args, minus the --skill token
+#         the transient walk variables are unset before the source line, so a
+#         proxy or the harness inherits no incidental globals from here.
 #
 # usage:
 #   source "$(dirname "${BASH_SOURCE[0]}")/brains.auth.bootstrap.sh"
@@ -53,6 +55,17 @@ done
   echo "   this file must live inside a checkout that carries src/brains.auth.sh" >&2
   exit 1
 }
+
+# ⚠️ this file is SOURCED, so an unqualified assignment lands in the CALLER's namespace and
+#   stays there. the two walk variables above are transient path-resolution state, not output
+#   — `local` is unavailable at a file's top level, so the cleanup has to be explicit. left
+#   behind they are incidental globals a reader of a "source" preamble would not expect, free
+#   to collide with a later definition in the same shell. only the two documented outputs
+#   survive this line: $BRAINS_AUTH_SRC and ${ARGS[@]}.
+#   the unset comes AFTER the landmark check on purpose — that failure message names
+#   $_BRAINS_AUTH_BOOTSTRAP_DIR, so an earlier cleanup would print a blank path in the one
+#   case the path is the whole answer.
+unset _BRAINS_AUTH_BOOTSTRAP_DIR _BRAINS_AUTH_WALK
 
 # drop the --skill token the rhx wrapper prepends; forward the rest verbatim
 # ⚠️ the value guard carries real weight here; it is not defensive decoration. `shift 2`
