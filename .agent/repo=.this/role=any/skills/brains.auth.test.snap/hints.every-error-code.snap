@@ -1,0 +1,24 @@
+no_token -> ✋ no token (run: brains.auth.set)
+token_expired -> ✋ token expired (run: brains.auth.set)
+needs_reauth -> ✋ stored token is stale — re-auth (run: brains.auth.set)
+refresh_rejected -> ✋ refresh token dead (run: brains.auth.set)
+refresh_server_error -> 💥 anthropic returned a server error — your token is fine; retry shortly
+refresh_rate_limited -> 💥 rate-limited on token refresh — retry in a bit; if it never clears, the pinned user-agent (claude-code/2.0.1) may be stale — override with BRAINS_AUTH_UA
+no_access_token -> 💥 refresh gave no access token — the oauth flow may have changed
+refresh_curl_failed -> 💥 network error on token refresh — retry shortly
+api_key_not_oauth -> ✋ that is an api key, not a subscription oauth token
+keyrack_absent -> ✋ not stored yet (run: brains.auth.set)
+keyrack_unreadable -> 💥 could not read the keyrack (run: rhx keyrack unlock --owner ehmpath --env prep)
+active_token_expired -> ✋ live token expired — run any claude command to renew it
+active_creds_unreadable -> 💥 could not read the live claude credentials
+active_identity_unknown -> ✋ a login is present but unnamed — run any claude command, then retry
+active_identity_unverified -> ✋ a login is present but its name could not be verified — run any claude command to renew it, then retry
+curl_failed -> 💥 network error (see above) — retry shortly
+rate_limited -> 💥 rate-limited — retry shortly; if it never clears, the pinned user-agent (claude-code/2.0.1) may be stale — override with BRAINS_AUTH_UA
+unexpected_shape -> 💥 endpoint returned an unexpected shape — the api may have changed
+usage_server_error -> 💥 anthropic returned a server error — your token is fine; retry shortly
+usage_rejected -> ✋ the endpoint refused this token — it may lack the usage scope (re-run: brains.auth.set)
+parse_failure -> 💥 could not read the endpoint response
+some_code_we_never_declared -> 💥 some_code_we_never_declared
+no_subscriptions -> ✋ no subscriptions stored yet — add one: brains.auth.set
+keyrack_list_failed -> 💥 could not list the keyrack — unlock it: rhx keyrack unlock --owner ehmpath

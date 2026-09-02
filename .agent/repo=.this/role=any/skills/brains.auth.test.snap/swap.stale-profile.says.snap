@@ -1,0 +1,7 @@
+🐢 paddle out — swap to kai@x.com
+   ├─ stowed moana@x.com
+   └─ signed in as kai@x.com 🧠 — but claude's own profile view is STALE
+
+🐢 heads up — the swap landed; <tmp>/.claude.json still names the prior account
+   fix: re-run brains.auth.use --reach kai@x.com once the file is writable
+🐢 heads up — claude sessions already open still hold the old token; restart them

@@ -1,0 +1,9 @@
+reach=kai@x.com  active=kai@x.com    arc=0 -> noop
+reach=kai@x.com  active=moana@x.com  arc=0 -> proceed
+reach=kai@x.com  active=<none>       arc=0 -> proceed
+reach=kai@x.com  active=kai@x.com    arc=1 -> refuse_unknown
+reach=kai@x.com  active=moana@x.com  arc=1 -> refuse_unknown
+reach=kai@x.com  active=<none>       arc=1 -> refuse_unknown
+reach=kai@x.com  active=kai@x.com    arc=2 -> refuse_unverified
+reach=kai@x.com  active=moana@x.com  arc=2 -> refuse_unverified
+reach=kai@x.com  active=<none>       arc=2 -> refuse_unverified

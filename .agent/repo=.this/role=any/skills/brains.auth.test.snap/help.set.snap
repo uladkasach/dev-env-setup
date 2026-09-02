@@ -1,0 +1,19 @@
+🐢 brains.auth.set — store a claude subscription oauth token in the global keyrack
+
+  usage: brains.auth.set [--reach <email>]
+
+  opens an isolated browser sign-in (never your global claude), reads that
+  session's oauth refresh token, and stores it as
+  BRAINS_AUTH__OF__CLAUDE_CODE_OAUTH_TOKEN cut at that account's email, in the
+  global (--org @all) keyrack — so it is reachable from any repo.
+
+    --reach <email>  only if the account cannot be asked (rare) — the
+                     email is read from the token itself by default.
+                     alias: --sub (the old name, superseded)
+
+  exit codes, for a caller that reads only $?:
+    0  the account was stored
+    1  it broke on our side — retry may help (no private dir, keyrack write)
+    2  it needs you — a dead token, a bad flag, or a sign-in you did not finish
+
+  example: brains.auth.set

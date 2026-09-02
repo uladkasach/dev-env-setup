@@ -4,6 +4,5 @@ extends:
   - .agent/repo=bhuild/role=dispatcher/keyrack.yml
   - .agent/repo=ehmpathy/role=mechanic/keyrack.yml
 env.prod: null
-env.prep: null
 env.test: null
 env.all: null

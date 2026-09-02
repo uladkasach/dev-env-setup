@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+######################################################################
+# .what = the shared preamble every brains.auth skill proxy needs:
+#         locate this worktree's src/brains.auth.sh, source it, and strip
+#         the `--skill <value>` token the rhx wrapper injects.
+#
+# .why  = three proxies each carried a byte-identical copy of this block —
+#         the same value-guard, and the same six-line comment that explains
+#         it. that crosses the rule of three, and the duplicated part is not
+#         decoration: it is a HANG GUARD. a fourth proxy copied carelessly,
+#         or a "tidy-up" that trimmed the guard from one copy, restores an
+#         infinite silent spin in exactly the command whose copy was touched.
+#         one definition cannot drift from itself.
+#
+# .note = this file is SOURCED, never executed. it leaves two things behind
+#         for the caller:
+#           $BRAINS_AUTH_SRC — the sourced src/brains.auth.sh path
+#           ${ARGS[@]}       — the caller's args, minus the --skill token
+#
+# usage:
+#   source "$(dirname "${BASH_SOURCE[0]}")/brains.auth.bootstrap.sh"
+#   _brains_auth_usage "${ARGS[@]}"
+######################################################################
+
+# .note = ${BASH_SOURCE[0]} is THIS file, so the path holds no matter which
+#   proxy sourced it, and no matter the caller's cwd.
+#
+# ⚠️ the root is found by LANDMARK, never by a hop count. it used to be
+#   `$dir/../../../..` — four `..` steps chosen because this file sits at
+#   `.agent/repo=.this/role=any/skills/`, which is four levels down. that count
+#   was correct (`role=any` is ONE directory, not two — a reviewer read it as
+#   two and filed a blocker, which is the tell), but "correct" is the wrong
+#   property to lean on: it holds only for THIS layout, it re-derives from a
+#   directory convention nobody promised to keep, and a rename or one more
+#   level breaks every entry point at once with a message that names a path
+#   rather than a cause.
+#   so we walk up and stop at the directory that actually holds what we want.
+#   the search states the intent, cannot be off by one, and survives any
+#   reshuffle of the levels between here and the root.
+_BRAINS_AUTH_BOOTSTRAP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BRAINS_AUTH_SRC=''
+_BRAINS_AUTH_WALK="$_BRAINS_AUTH_BOOTSTRAP_DIR"
+while [[ "$_BRAINS_AUTH_WALK" != / ]]; do
+  if [[ -f "$_BRAINS_AUTH_WALK/src/brains.auth.sh" ]]; then
+    BRAINS_AUTH_SRC="$_BRAINS_AUTH_WALK/src/brains.auth.sh"
+    break
+  fi
+  _BRAINS_AUTH_WALK="$(dirname "$_BRAINS_AUTH_WALK")"
+done
+
+[[ -n "$BRAINS_AUTH_SRC" ]] || {
+  echo "💥 no src/brains.auth.sh in any parent of ${_BRAINS_AUTH_BOOTSTRAP_DIR}" >&2
+  echo "   this file must live inside a checkout that carries src/brains.auth.sh" >&2
+  exit 1
+}
+
+# drop the --skill token the rhx wrapper prepends; forward the rest verbatim
+# ⚠️ the value guard carries real weight here; it is not defensive decoration. `shift 2`
+#   with only ONE argument left is a NO-OP in bash — the positional params stay untouched
+#   and the non-zero return goes unread — so `$1` would still be `--skill` on the next pass
+#   and this loop would spin forever, silently, until someone hits ctrl+c. a lone `--skill`
+#   at the end of the args is the whole of what it takes. so we fail fast on it instead.
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skill)
+      [[ $# -ge 2 ]] || { echo "✋ --skill needs a value" >&2; exit 2; }
+      shift 2
+      ;;
+    *) ARGS+=("$1"); shift ;;
+  esac
+done
+
+# shellcheck disable=SC1090
+source "$BRAINS_AUTH_SRC"

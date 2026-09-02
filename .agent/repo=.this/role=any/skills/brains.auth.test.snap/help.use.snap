@@ -1,0 +1,30 @@
+🐢 brains.auth.use — point the global claude cli at a stored subscription
+
+  usage: brains.auth.use [--reach <email>]
+
+    --reach <email>  the account to sign in as
+                     alias: --sub (the old name, superseded)
+    (no args)        show which account is signed in now
+
+  example: brains.auth.use --reach casey@ahction.com
+
+  whichever account you are on now is detected and stowed automatically —
+  even one you signed into by hand — so you can swap back with no browser.
+  open claude sessions keep the OLD token in memory — restart them after.
+
+  exit codes with --reach (a SWAP), for a caller that reads only $?:
+    0  the swap landed, cleanly
+    1  it broke on our side — OR the swap landed but claude's own profile
+       view is stale (the tree says which; your credentials are intact)
+    2  it needs you — a dead token, a bad flag, or an identity we could not
+       verify (a swap is refused rather than risk the live account's token)
+
+  exit codes with no args (a READ) — these differ, and a non-zero here
+  means the ANSWER is doubtful, never that a credential moved:
+    0  the answer is trustworthy — a verified name, or a confirmed
+       absence of any login
+    1  a login is present but could not be named — a FAILED read, kept
+       apart from 'no login' on purpose
+    2  a name was found but not verified — do not act on it unchecked.
+       an idle terminal whose access token has expired reads this way,
+       so treat it as 'renew, then re-ask', not as an error

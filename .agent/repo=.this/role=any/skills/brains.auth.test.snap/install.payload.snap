@@ -1,0 +1,10 @@
+{
+  "accessToken": "sk-ant-oat01-access-token-fixture",
+  "expiresAt": "<exp>",
+  "refreshToken": "sk-ant-ort01-parked-token-fixture",
+  "scopes": [
+    "user:inference",
+    "user:profile"
+  ],
+  "subscriptionType": "max"
+}

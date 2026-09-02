@@ -1,0 +1,3 @@
+🐢 no claude subscriptions in the global keyrack yet
+   add one with:
+   └─ brains.auth.set

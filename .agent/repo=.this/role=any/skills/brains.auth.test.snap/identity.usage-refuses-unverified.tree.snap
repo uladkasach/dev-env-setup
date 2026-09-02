@@ -1,0 +1,9 @@
+🧠 claude budget
+   └─ ✋ a login is present but its name could not be verified — run any claude command to renew it, then retry
+
+   the login here looks like kai@ehmpathy.com — a guess, not a fact:
+   that name was read from <tmp>/.claude.json, which can lag the live token.
+
+   no account was read. a budget read REFRESHES each stored token, and a refresh
+   against whichever account is truly live would sign your open session out. with
+   the live one unproven, every account is a candidate, so none can be read.

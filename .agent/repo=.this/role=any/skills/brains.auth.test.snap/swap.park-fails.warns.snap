@@ -1,0 +1,12 @@
+🐢 paddle out — swap to kai@x.com
+🐢 heads up — swapped in kai@x.com, but could not stow moana@x.com into the keyrack
+   its ONLY token is now <tmp>/.credentials.json.bak. rescue it:
+     1. cp <tmp>/.credentials.json.bak <tmp>/.credentials.json
+     2. brains.auth.set          # files moana@x.com back into the keyrack
+     3. rm -f <tmp>/.credentials.json.bak
+     4. brains.auth.use --reach kai@x.com   # swap back to where you meant to be
+   ⚠️ that file holds a live token in the clear; it is kept ONLY because the keyrack
+      copy failed. until it is rescued, every swap REFUSES rather than overwrite it.
+   └─ signed in as kai@x.com 🧠
+
+🐢 heads up — claude sessions already open still hold the old token; restart them

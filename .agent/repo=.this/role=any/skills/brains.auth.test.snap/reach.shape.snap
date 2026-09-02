@@ -1,0 +1,8 @@
+ok   'kai@ehmpath.com'
+ok   'a.b+c@sub.domain.co'
+no   '@all'
+no   'kai'
+no   'kai@ehmpath'
+no   'kai @ehmpath.com'
+no   'kai@@ehmpath.com'
+no   ''
