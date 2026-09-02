@@ -1,0 +1,8 @@
+🐢 paddle out — swap to kai@x.com
+🐢 hold up — the signed-in account changed while this swap was mid-flight
+   ~/.claude no longer holds what it held when this started, so the install was
+   stopped: it would have overwritten another account's only live token.
+   likely another 'brains.auth.use', or a 'claude /login' in another terminal.
+   rerun when the other swap has settled.
+🐢 bummer dude — kai@x.com's token rotated but could NOT be filed back
+   its stored copy is dead, so re-auth it: brains.auth.set

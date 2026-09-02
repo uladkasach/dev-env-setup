@@ -1,0 +1,4 @@
+🐢 paddle out — swap to kai@x.com
+🐢 bummer dude — kai@x.com's token rotated but could NOT be filed back
+   its stored copy is dead, so re-auth it: brains.auth.set
+   your prior login is untouched — the swap stopped before it was replaced

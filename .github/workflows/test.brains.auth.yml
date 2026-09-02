@@ -1,0 +1,102 @@
+# .what = run the brains.auth snapshot suite on every push that touches it
+#
+# .why  = brains.auth.* is ~2,700 lines of credential bash under a few hundred clamps, and
+#   until this workflow the suite ran ONLY when a human remembered to type it. that is not a
+#   hypothetical gap: the defect where the suite wrote its fixtures through two path variables
+#   that default to the human's real ~/.claude.json — and so clobbered a 400 KB live config on
+#   every run — survived 14 review rounds precisely because the only person who ran the suite
+#   was the same person who wrote the gap. a gate no one has to remember is the fix.
+#
+# .note = the exact clamp count is NOT repeated here. `header.count-matches-the-suite` asserts
+#   it against `src/brains.auth.sh`'s own preamble, so that line is the single copy; a second
+#   hand-kept figure in this header would be one more number free to drift, which is the very
+#   defect that assertion was added to close.
+#
+# .note = this deliberately does NOT run `npm ci`. the suite is a standalone bash executable
+#   whose dependencies are bash, jq, and four coreutils/util-linux tools its clamps lean on
+#   (`timeout`, `setsid`, `cmp`, `stat` — all present on ubuntu-latest, and the suite's own
+#   preflight HALTS by name on an absent one). it is hermetic by construction (no network,
+#   no real dotfiles — it redirects both target paths into a temp dir and HALTS if either
+#   escapes). so the job needs no node, no private registry auth, and no secrets. that also
+#   means a fork PR runs it green without a token.
+#
+# ⚠️ NOT YET OBSERVED GREEN ON A RUNNER. the suite is green on the author's machine (all cases
+#   via `rhx brains.auth.test`), but this workflow's exact invocation — a bare `bash` — was
+#   never executed here, because the sandbox this was written in denies bare `bash`. the
+#   residual risk is small and named: the suite `source`s `src/brains.auth.sh` under `set -u`,
+#   so a top-level reference to a variable the runner does not set would abort the run. that
+#   risk used to be much larger, when the suite sourced the whole 4,300-line `bash_aliases.sh`
+#   monolith and inherited every unrelated alias's environment assumptions. the extraction to
+#   `src/brains.auth.sh` cut that surface to self-contained lines that reference only `$HOME`
+#   — which every runner sets.
+name: test.brains.auth
+
+on:
+  push:
+    paths:
+      - 'src/brains.auth.sh'
+      - 'src/bash_aliases.sh'
+      # ⚠️ `**`, not `*`. github path globs follow gitignore semantics, where a single `*`
+      #   never crosses a `/` — so `brains.auth.*` matched the harness and the proxies but NOT
+      #   `brains.auth.test.snap/*.snap`, one segment deeper. that left the gate blind to
+      #   exactly the edit it exists to catch: a baseline updated without a re-run of the
+      #   suite. the workflow would have sat green through the very regression class its own
+      #   header cites as the reason it was built.
+      - '.agent/repo=.this/role=any/skills/brains.auth.**'
+      - '.github/workflows/test.brains.auth.yml'
+  pull_request:
+    paths:
+      - 'src/brains.auth.sh'
+      - 'src/bash_aliases.sh'
+      # ⚠️ `**`, not `*`. github path globs follow gitignore semantics, where a single `*`
+      #   never crosses a `/` — so `brains.auth.*` matched the harness and the proxies but NOT
+      #   `brains.auth.test.snap/*.snap`, one segment deeper. that left the gate blind to
+      #   exactly the edit it exists to catch: a baseline updated without a re-run of the
+      #   suite. the workflow would have sat green through the very regression class its own
+      #   header cites as the reason it was built.
+      - '.agent/repo=.this/role=any/skills/brains.auth.**'
+      - '.github/workflows/test.brains.auth.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # jq is preinstalled on ubuntu-latest, but a runner-image change that dropped it would
+      # otherwise surface as a wall of confusing case failures rather than one clear line.
+      - name: assert jq
+        run: jq --version
+
+      # ⚠️ the suite reads `src/brains.auth.sh` and every `.snap` baseline from the checkout,
+      #   so this step fails loudly if either is absent from the index. that is the intent: a
+      #   suite that exists only in someone's worktree is not coverage, and this is what says so.
+      # ⚠️ the bootstrap is on this list because the HARNESS sources it — it is not merely a
+      #   proxy concern. absent from the index, the suite dies on a `source: no such file`
+      #   before its first case, which reads as a broken harness rather than an unstaged one.
+      # ⚠️ the list is EVERY file the sentence above names, and the three proxies besides. an
+      #   earlier version of this step named `src/brains.auth.sh` in its comment and checked
+      #   only three other paths — the comment claimed a guarantee the code did not provide.
+      #   the file under test is the single worst one to omit: absent, the bootstrap's own
+      #   landmark walk does eventually catch it, but from a later step and with a message
+      #   about a checkout layout rather than the one-line `rhx git.stage.add` fix the others
+      #   get. a comment that overclaims its own check is the shape
+      #   hazard.a-clamp-can-lie-the-same-way-code-can.md warns about, in the guard itself.
+      - name: assert the suite and its baselines are tracked
+        run: |
+          for f in \
+            'src/brains.auth.sh' \
+            '.agent/repo=.this/role=any/skills/brains.auth.test.sh' \
+            '.agent/repo=.this/role=any/skills/brains.auth.bootstrap.sh' \
+            '.agent/repo=.this/role=any/skills/brains.auth.usage.sh' \
+            '.agent/repo=.this/role=any/skills/brains.auth.set.sh' \
+            '.agent/repo=.this/role=any/skills/brains.auth.use.sh'
+          do
+            test -f "$f" || { echo "✋ ${f} is not tracked — run: rhx git.stage.add '${f}'" >&2; exit 2; }
+          done
+          test -d '.agent/repo=.this/role=any/skills/brains.auth.test.snap' \
+            || { echo '✋ the snapshot baselines are not tracked — run: rhx git.stage.add' >&2; exit 2; }
+
+      - name: brains.auth suite
+        run: bash '.agent/repo=.this/role=any/skills/brains.auth.test.sh'

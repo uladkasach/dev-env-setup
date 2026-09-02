@@ -4,6 +4,9 @@
 # termwork — terminal window management
 [[ -f ~/.bash_aliases.termwork.sh ]] && source ~/.bash_aliases.termwork.sh
 
+# brains.auth — see + store claude subscription budget usage by token
+[[ -f ~/.bash_aliases.brains.auth.sh ]] && source ~/.bash_aliases.brains.auth.sh
+
 # prefer nvim over vim/vi
 alias vim='nvim'
 alias vi='nvim'
@@ -239,7 +242,6 @@ _report_usage_ram_real() {
   echo ""
 }
 alias report.usage.ram.real='_report_usage_ram_real'
-
 # make it easy to speed test internet connection (25MB download via Cloudflare)
 _speedtest_internet() {
   setopt local_options no_notify no_monitor
@@ -287,7 +289,10 @@ alias restart.bluetooth='bluetoothctl power on && systemctl restart bluetooth'
 alias restart.wifi='systemctl restart NetworkManager.service'
 
 # make it easy to update shell configs
-alias sync.devenv.bashaliases='cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases && cp ~/git/more/dev-env-setup/src/ductwork.sh ~/.bash_aliases.ductwork.sh && cp ~/git/more/dev-env-setup/src/termwork.sh ~/.bash_aliases.termwork.sh && source ~/.bash_aliases'
+# ⚠️ every `src/X.sh` sourced from the head of this file needs a cp HERE too. a source line
+#   whose cp is absent stays silent: the `[[ -f ]]` guard makes an absent file a no-op, so the
+#   whole namespace simply fails to exist on the host, with no error to read.
+alias sync.devenv.bashaliases='cp ~/git/more/dev-env-setup/src/bash_aliases.sh ~/.bash_aliases && cp ~/git/more/dev-env-setup/src/ductwork.sh ~/.bash_aliases.ductwork.sh && cp ~/git/more/dev-env-setup/src/termwork.sh ~/.bash_aliases.termwork.sh && cp ~/git/more/dev-env-setup/src/brains.auth.sh ~/.bash_aliases.brains.auth.sh && source ~/.bash_aliases'
 alias sync.devenv.zshrc='cp ~/git/more/dev-env-setup/src/zshrc.sh ~/.zshrc && source ~/.zshrc'
 alias sync.devenv.starship='mkdir -p ~/.config && cp ~/git/more/dev-env-setup/src/starship.toml ~/.config/starship.toml && echo "• starship config synced"'
 alias sync.devenv.gitaliases='source ~/git/more/dev-env-setup/src/install_env.pt2.shell.git.aliases.sh && configure_git_aliases'
@@ -2865,3 +2870,7 @@ git_alias_backup() {
   fi
   echo ""
 }
+
+# ⚠️ this file MUST end with a newline. an absent one glues the last line to whatever follows,
+#   and a prior incident killed the parse of ALL 4000+ lines that way — every alias in the file,
+#   silently, from one edit at the tail (hazard.bash-aliases-parse-silently.md).

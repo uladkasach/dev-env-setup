@@ -1,0 +1,31 @@
+🐢 brains.auth.usage — see your claude subscription budget (% used per window)
+
+  usage: brains.auth.usage [--reach <email>|@all] [--json]
+
+  reads each account's oauth token from the global keyrack and queries
+  the usage endpoint, then renders one block per account.
+
+  --reach <email>  one account only (default: @all)
+                   alias: --sub (the old name, superseded)
+  --json           raw endpoint json per account (for automation)
+
+  each percent is budget USED, so a full bar means the window is spent.
+
+  ⚠️ this read WRITES. anthropic rotates a refresh token every time it is spent,
+     so each account read mints once and stores the rotated token back into the
+     keyrack — one keyrack write per account, per call. that is what keeps the
+     next read working; it is not incidental.
+
+     so poll no faster than once every 5 minutes. a tighter loop churns the
+     credential store for numbers that only move on the hour, and a write-back
+     that fails mid-churn leaves that account needing brains.auth.set.
+
+     each account also costs one 'keyrack unlock' subprocess per call — one,
+     not one per retry — so an @all sweep scales with your account count.
+
+  exit codes, for a cron or statusline that reads only $?:
+    0  at least one account was read
+    1  every account failed, and at least one failure is ours to fix
+    2  every account failed, and every failure is yours to fix
+
+  example: brains.auth.usage --reach casey@ahction.com
