@@ -109,3 +109,5 @@
 {"stone":"5.1.execution.from_vision","status":"contemplated","reason":"contemplated review.peer: repo-rules"}
 {"stone":"5.1.execution.from_vision","status":"arrived","reason":"entered guard reviews"}
 {"stone":"5.1.execution.from_vision","status":"blocked","blocker":"review.peer","reason":"blockers exceed threshold (5 > 0)"}
+{"stone":"5.1.execution.from_vision","status":"arrived","reason":"entered guard reviews"}
+{"stone":"5.1.execution.from_vision","status":"malfunction"}
