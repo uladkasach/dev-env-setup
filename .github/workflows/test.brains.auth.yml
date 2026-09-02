@@ -20,19 +20,15 @@
 #   escapes). so the job needs no node, no private registry auth, and no secrets. that also
 #   means a fork PR runs it green without a token.
 #
-# ✓ OBSERVED GREEN ON A RUNNER — 2026-09-02, ubuntu-latest, 13s. runs 33597657678,
-#   33598831411, 33598835831, on `push` and `pull_request` alike. this header carried the
-#   OPPOSITE claim until then: the sandbox it was authored in denies a bare `bash`, so the
-#   workflow's exact invocation had never once been executed. the caveat is retired by
-#   evidence, not by assumption — which is the only way a ⚠️ in a guard should ever come down
-#   (`hazard.a-clamp-can-lie-the-same-way-code-can.md`).
-#
-#   the risk it named is retired with it: the suite `source`s `src/brains.auth.sh` under
-#   `set -u`, so a top-level reference to a variable the runner does not set would have aborted
-#   the run. it does not. that surface was once far larger — the suite used to source the whole
-#   4,300-line `bash_aliases.sh` monolith and inherit every unrelated alias's environment
-#   assumptions — and the extraction to `src/brains.auth.sh` cut it to self-contained lines that
-#   reference only `$HOME`, which every runner sets.
+# ⚠️ NOT YET OBSERVED GREEN ON A RUNNER. the suite is green on the author's machine (all cases
+#   via `rhx brains.auth.test`), but this workflow's exact invocation — a bare `bash` — was
+#   never executed here, because the sandbox this was written in denies bare `bash`. the
+#   residual risk is small and named: the suite `source`s `src/brains.auth.sh` under `set -u`,
+#   so a top-level reference to a variable the runner does not set would abort the run. that
+#   risk used to be much larger, when the suite sourced the whole 4,300-line `bash_aliases.sh`
+#   monolith and inherited every unrelated alias's environment assumptions. the extraction to
+#   `src/brains.auth.sh` cut that surface to self-contained lines that reference only `$HOME`
+#   — which every runner sets.
 name: test.brains.auth
 
 on:
