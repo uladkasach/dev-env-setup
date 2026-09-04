@@ -254,8 +254,8 @@ RULES=(
 #    interpolates `$pnpm_want`, so the strip's `[^$]*$` clause does not fire (q8 —
 #    the strip is a reader too, and it has its own blind spot).
 #
-#    ⇒ so the rule needs its OWN exempt, and it needs `src/zshrc.sh` judged: its
-#      `npm install -g pnpm` at :367 runs in a HUMAN's shell, where
+#    ⇒ so the rule needs its OWN exempt, and it needs `2.5.zsh`'s `zshrc.sh`
+#      judged: its `npm install -g pnpm` at :367 runs in a HUMAN's shell, where
 #      `grove.web.sh` is never sourced — the same reason four files sit in
 #      `EXCLUDED`, which was enumerated from `2.7.aliases`'s assets and so never
 #      considered `2.5.zsh`'s.
@@ -409,9 +409,9 @@ scan_one() {
 #      undeclared rule.
 ######################################################################
 EXCLUDED=(
-  src/bash_aliases.sh   # copied to $HOME — a human's interactive shell
-  src/ductwork.sh       # sourced BY bash_aliases, same shell
-  src/termwork.sh       # sourced BY bash_aliases, same shell
+  src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh   # copied to $HOME — a human's interactive shell
+  src/grove.provision/2.shell/2.7.aliases/ductwork.sh       # sourced BY bash_aliases, same shell
+  src/grove.provision/2.shell/2.7.aliases/termwork.sh       # sourced BY bash_aliases, same shell
   src/backup_env.sh     # human-run utility, reads the machine and writes OUT
   src/util.yubikey.ssh.sh
 )
@@ -484,7 +484,7 @@ scan_fetch_is_verified() {
   #      and `|| return 0` reads a 141 as "no fetch here" — a false ✔ on the
   #      one claim this reader exists to make.
   #
-  #    ⚠️ its reach today is one file: `src/bash_aliases.sh`, whose stripped
+  #    ⚠️ its reach today is one file: `2.7.aliases`'s `bash_aliases.sh`, whose stripped
   #      body is 73262 bytes. that file carries no wire call, so the defect
   #      cost no row — the CLAIM was false, not the outcome bad, and that is
   #      the reason it is fixed (`rule.forbid.failhide`).

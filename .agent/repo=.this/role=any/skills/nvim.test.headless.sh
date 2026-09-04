@@ -10,7 +10,7 @@
 #         proves nvim-side behavior in CI / agent loops without a live editor.
 #
 # usage:
-#   nvim.test.headless.sh --check src/init.lua            # parse only (no exec)
+#   nvim.test.headless.sh --check src/grove.provision/4.terminal/4.5.nvim/init.lua  # parse only (no exec)
 #   nvim.test.headless.sh --run tests/foo.test.lua        # run a lua test file
 #   nvim.test.headless.sh --run tests/foo.test.lua --clean # run with clean config (-u NONE)
 #   nvim.test.headless.sh --lua "print(1+1)"              # run an inline lua snippet

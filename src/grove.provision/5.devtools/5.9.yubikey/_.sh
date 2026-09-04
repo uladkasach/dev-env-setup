@@ -9,7 +9,7 @@
 #   - 📜 confirmed 2026-07-30: `SSH_AUTH_SOCK` is declared in NO file of this repo
 #   - ⇒ the agent could be installed and ssh would still not talk to it
 #
-# 🛑 a phase may NEVER append an export to `src/bash_aliases.sh`
+# 🛑 a phase may NEVER append an export to `2.7.aliases`'s `bash_aliases.sh`
 #   - that writes machine → repo, where it must be repo → machine
 #   - its path is a hardcoded main checkout, so a WORKTREE run edits main's file
 #   - ⇒ `SSH_AUTH_SOCK` is DECLARED content there, installed by `2.7.aliases`

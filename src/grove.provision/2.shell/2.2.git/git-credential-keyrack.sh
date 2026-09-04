@@ -370,7 +370,7 @@ if [[ -z "$REPO" ]]; then
   echo "  fix: export GIT_CREDENTIAL_KEYRACK_REPO with the checkout's path." >&2
   echo "    for this shell only:" >&2
   echo "      export GIT_CREDENTIAL_KEYRACK_REPO=\$HOME/git/more/dev-env-setup" >&2
-  echo "    to make it stick, declare it in src/zshenv.sh and apply the bundle —" >&2
+  echo "    to make it stick, declare it in 2.5.zsh's zshenv.sh and apply the bundle —" >&2
   echo "    NOT by an edit to ~/.zshenv, which this repo owns and diffs:" >&2
   echo "      rhx grove.provision --what 2.5.zsh --mode apply" >&2
   exit 0

@@ -210,7 +210,7 @@ source ~/.bash_aliases 2>/dev/null || true
 #    it is exactly the stale-copy hazard this block refuses to inherit.
 ######################################################################
 if ! command -v __duct_strip_escapes >/dev/null 2>&1; then
-  _auth_gh_ductwork="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/src/ductwork.sh"
+  _auth_gh_ductwork="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
   if [[ -r "$_auth_gh_ductwork" ]]; then
     # shellcheck disable=SC1090
     source "$_auth_gh_ductwork"

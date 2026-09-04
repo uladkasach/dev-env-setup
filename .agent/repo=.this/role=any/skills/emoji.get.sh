@@ -7,7 +7,7 @@
 #         sourced and never pays this fork or rhx's node boot.
 #
 # .note = the 5-rank logic is NOT restated here. it is sourced from
-#         src/emoji.zsh, the file that actually ships. an earlier draft
+#         2.9.emoji's emoji.zsh, the file that actually ships. an earlier draft
 #         copied the ranks into this file and the contract brief
 #         documented "they must stay in sync" — which is a duplicate
 #         with a note attached rather than a fix. if TAB and this
@@ -69,7 +69,7 @@ done
 
 # source the shipped widget for `_emoji_lookup`. its zle/bindkey block
 # is guarded on `[[ -o interactive ]]`, so this is inert here.
-WIDGET="${0:A:h}/../../../../src/emoji.zsh"
+WIDGET="${0:A:h}/../../../../src/grove.provision/2.shell/2.9.emoji/emoji.zsh"
 if [[ ! -f $WIDGET ]]; then
   print -u2 "✋ widget absent: $WIDGET"
   exit 2

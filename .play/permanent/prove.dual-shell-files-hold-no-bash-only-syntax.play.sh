@@ -4,7 +4,7 @@
 #         zsh, and prove the `git backup` changed-file parse agrees in BOTH
 #
 # 🛑 .the class
-#   - `src/bash_aliases.sh`, `src/ductwork.sh`, `src/termwork.sh` are sourced by BOTH shells: an agent's bash, and via `src/zshrc.sh:204` the human's INTERACTIVE zsh
+#   - `2.7.aliases`'s `bash_aliases.sh`, `ductwork.sh`, `termwork.sh` are sourced by BOTH shells: an agent's bash, and via `2.5.zsh`'s `zshrc.sh` the human's INTERACTIVE zsh
 #   - every line in them is read twice, by two dialects
 #   - `rule.forbid.bare-globs-in-dual-shell-files` records six members of this family
 #   - five FAIL LOUD under zsh, one does not:
@@ -71,13 +71,14 @@ cd "$ROOT" || exit 2
 # .what = 1. the SET — declared once, in the only place that can be authoritative
 #
 # ⚠️ .why
-#   - a grep cannot discover this set: "sourced by zsh" is a fact about `src/zshrc.sh`, not the file itself
+#   - a grep cannot discover this set: "sourced by zsh" is a fact about `zshrc.sh`, not the file itself
 #   - the set reads OUT of zshrc rather than a hand-typed list
 #   - a hand list could not report the file somebody adds to zshrc tomorrow
 ######################################################################
-ZSHRC="$ROOT/src/zshrc.sh"
+ZSHRC_REL="src/grove.provision/2.shell/2.5.zsh/zshrc.sh"
+ZSHRC="$ROOT/$ZSHRC_REL"
 if [[ ! -r "$ZSHRC" ]]; then
-  echo "   └─ 🌙 no src/zshrc.sh, so the dual-shell set cannot be derived" >&2
+  echo "   └─ 🌙 no $ZSHRC_REL, so the dual-shell set cannot be derived" >&2
   exit 2
 fi
 
@@ -85,7 +86,7 @@ fi
 # .what = THE CLOSURE IS TRANSITIVE — one hop is not the set
 #
 # 🛑 .why
-#   - `src/zshrc.sh:203-204` names ONE file:
+#   - `zshrc.sh` names ONE file:
 #
 #       # note: ~/.bash_aliases sources ductwork + termwork itself, so zsh gets
 #       #       them via this
@@ -107,9 +108,9 @@ fi
 ####################################################################
 _tracked_for() {   # installed path -> tracked source, or empty
   case "$1" in
-    *.bash_aliases.ductwork.sh) echo "src/ductwork.sh" ;;
-    *.bash_aliases.termwork.sh) echo "src/termwork.sh" ;;
-    *.bash_aliases)             echo "src/bash_aliases.sh" ;;
+    *.bash_aliases.ductwork.sh) echo "src/grove.provision/2.shell/2.7.aliases/ductwork.sh" ;;
+    *.bash_aliases.termwork.sh) echo "src/grove.provision/2.shell/2.7.aliases/termwork.sh" ;;
+    *.bash_aliases)             echo "src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh" ;;
     *)                          echo "" ;;
   esac
 }
@@ -139,7 +140,7 @@ while [[ "${#QUEUE[@]}" -gt 0 ]]; do
 done
 
 if [[ "${#SUBJECTS[@]}" -eq 0 ]]; then
-  echo "   └─ 🌙 the source chain from src/zshrc.sh reaches no tracked file" >&2
+  echo "   └─ 🌙 the source chain from $ZSHRC_REL reaches no tracked file" >&2
   echo "      · either the source lines moved, or this derivation went blind" >&2
   echo "      · a clean page over an empty set proves no claim" >&2
   exit 2

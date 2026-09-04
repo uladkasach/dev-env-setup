@@ -32,7 +32,7 @@
 
 set -uo pipefail
 
-# locate + source src/brains.auth.sh, and strip the rhx `--skill` token into ${ARGS[@]}
+# locate + source brains.auth.sh, and strip the rhx `--skill` token into ${ARGS[@]}
 # shellcheck disable=SC1091
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/brains.auth.bootstrap.sh"
 

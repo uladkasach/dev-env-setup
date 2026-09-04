@@ -65,7 +65,7 @@ set -uo pipefail
 #    tree is judged against this tree, and an installed copy may be older
 ######################################################################
 if ! command -v __duct_strip_escapes >/dev/null 2>&1; then
-  _aws_ec2_ductwork="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/src/ductwork.sh"
+  _aws_ec2_ductwork="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
   if [[ -r "$_aws_ec2_ductwork" ]]; then
     # shellcheck disable=SC1090
     source "$_aws_ec2_ductwork"

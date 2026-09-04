@@ -180,7 +180,7 @@ done
 ######################################################################
 _skill_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 _repo_root="$(cd -- "$_skill_dir/../../../.." && pwd)"
-_ductwork="$_repo_root/src/ductwork.sh"
+_ductwork="$_repo_root/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
 
 if [[ ! -r "$_ductwork" ]]; then
   echo "✋ ductwork is absent from this checkout" >&2

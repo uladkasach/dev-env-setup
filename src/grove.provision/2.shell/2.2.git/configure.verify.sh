@@ -136,7 +136,7 @@ grove_provision_2_2_git_configure_verify() {
     echo "        never as a handle whose body was renamed out from under it" >&2
     echo "      ⇒ ~/.bash_aliases is present and parses, so 2.7.aliases is green;" >&2
     echo "        this seam is the one thing only this bundle can see" >&2
-    echo "      fix: define it in src/bash_aliases.sh, or drop the alias from" >&2
+    echo "      fix: define it in 2.7.aliases's bash_aliases.sh, or drop the alias from" >&2
     echo "        2.2.git/configure.upsert.sh — the two must name one set" >&2
     failed=$(( failed + 1 ))
   elif [[ ! -f "$aliases_file" ]]; then

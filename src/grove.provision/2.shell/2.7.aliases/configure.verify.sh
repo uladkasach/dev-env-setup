@@ -77,7 +77,7 @@ grove_provision_2_7_aliases_configure_verify() {
     if [[ -n "$unsourced" ]]; then
       _verify_fail "~/.bash_aliases carries no source line for: $unsourced" \
         "⇒ installed and inert — no error, no alert, namespace absent" \
-        "fix: add [[ -f ~/<name> ]] && source ~/<name> to src/bash_aliases.sh"
+        "fix: add [[ -f ~/<name> ]] && source ~/<name> to this bundle's bash_aliases.sh"
     else
       echo "   • every copied member is named by a source line ✔"
     fi

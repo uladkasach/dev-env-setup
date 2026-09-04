@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ######################################################################
 # .what = snapshot + assertion tests for the brains.auth.* render and
-#         classification leaves in src/brains.auth.sh
+#         classification leaves in brains.auth.sh
 #
 # .why  = brains.auth.* is three commands a human drives directly, with dozens
 #         of output variants, and a dotfiles repo has no test harness to catch
@@ -2031,7 +2031,7 @@ _is 'gettoken.absent-stays-quiet' '' "$(_gt_says 2)"
 # ⚠️ these cases no longer clamp seven independent copies of the guard — they clamp that each
 #   entry point still ROUTES to the one copy that owns it. the guard was hand-rolled at every
 #   entry point when these cases were written; it is now two shared definitions:
-#     the three orchestrators   -> `_brains_auth_reach_from_flag`   (src/brains.auth.sh)
+#     the three orchestrators   -> `_brains_auth_reach_from_flag`   (brains.auth.sh)
 #     the three proxies + this  -> `brains.auth.bootstrap.sh`       (this dir)
 #   the per-entry-point case is still the right shape after that consolidation, because the
 #   failure mode simply moved: a future edit that re-inlines a parse in ONE command restores
@@ -2309,12 +2309,13 @@ _is 'callleaf.refresh-pipefail-stays-inside' 'off' "$(_pipefail_after_refresh)"
 #   must re-verify and one rename silently breaks. every entry point sources this file, so a
 #   wrong root turns all four commands into loud non-functional surfaces at once.
 #   these clamp the PROPERTY that replaced it: the walk stops at the directory that actually
-#   holds `src/brains.auth.sh`, at whatever depth it sits.
+#   holds `brains.auth.sh`, at whatever depth it sits.
 _BOOT="$SKILL_DIR/brains.auth.bootstrap.sh"
+_BOOT_REL='src/grove.provision/2.shell/2.7.aliases/brains.auth.sh'
 _boot_finds_root() {   # $1 = how deep to bury a fake bootstrap below a fake root
   local root d i
   root="$(mktemp -d)"
-  mkdir -p "$root/src"; printf ': # a stand-in source\n' > "$root/src/brains.auth.sh"
+  mkdir -p "$root/$(dirname "$_BOOT_REL")"; printf ': # a stand-in source\n' > "$root/$_BOOT_REL"
   d="$root"; for (( i = 0; i < $1; i++ )); do d="$d/lvl$i"; done
   mkdir -p "$d"; cp "$_BOOT" "$d/brains.auth.bootstrap.sh"
   ( source "$d/brains.auth.bootstrap.sh" >/dev/null 2>&1; printf '%s' "$BRAINS_AUTH_SRC" )
@@ -2322,21 +2323,21 @@ _boot_finds_root() {   # $1 = how deep to bury a fake bootstrap below a fake roo
 }
 # the real depth (4) must work — the behavior the hop count had
 case "$(_boot_finds_root 4)" in
-  */src/brains.auth.sh) _is 'boot.finds-root-at-depth-4' 'found' 'found' ;;
-  *)                    _is 'boot.finds-root-at-depth-4' 'found' 'LOST the root' ;;
+  */"$_BOOT_REL") _is 'boot.finds-root-at-depth-4' 'found' 'found' ;;
+  *)              _is 'boot.finds-root-at-depth-4' 'found' 'LOST the root' ;;
 esac
 # ...and so must a depth the hop count could never have reached. this is the whole delta: a
 # rename or one more nested level no longer breaks every entry point at once.
 case "$(_boot_finds_root 7)" in
-  */src/brains.auth.sh) _is 'boot.finds-root-at-any-depth' 'found' 'found' ;;
-  *)                    _is 'boot.finds-root-at-any-depth' 'found' 'LOST the root' ;;
+  */"$_BOOT_REL") _is 'boot.finds-root-at-any-depth' 'found' 'found' ;;
+  *)              _is 'boot.finds-root-at-any-depth' 'found' 'LOST the root' ;;
 esac
 # and a bootstrap with NO such root above it must fail loud rather than hand back a path that
 # does not exist — `[[ -f ]]` on a hop-count guess would have named a path, not a cause
 _boot_orphaned() {
   local root d; root="$(mktemp -d)"; d="$root/a/b"
   mkdir -p "$d"; cp "$_BOOT" "$d/brains.auth.bootstrap.sh"
-  # ⚠️ redirect order is load-bearing: `2>&1` must point stderr at the capture FIRST, then
+  # ⚠️ redirect order is load-bear: `2>&1` must point stderr at the capture FIRST, then
   #   `>/dev/null` moves stdout away. the reverse (`>/dev/null 2>&1`) sends the very message
   #   we came to read into the void, and the case then reports 'silent' about a leaf that
   #   spoke — a false red that reads exactly like a real regression.
@@ -2344,8 +2345,8 @@ _boot_orphaned() {
   rm -rf "$root"
 }
 case "$(_boot_orphaned)" in
-  *'no src/brains.auth.sh in any parent'*) _is 'boot.orphaned-fails-loud' 'named' 'named' ;;
-  *)                                       _is 'boot.orphaned-fails-loud' 'named' 'silent or unnamed' ;;
+  *"no $_BOOT_REL in any parent"*) _is 'boot.orphaned-fails-loud' 'named' 'named' ;;
+  *)                                _is 'boot.orphaned-fails-loud' 'named' 'silent or unnamed' ;;
 esac
 # ⚠️ a SOURCED file's top-level assignments land in the CALLER's namespace, where `local` is
 #   unavailable to contain them. this preamble's header promises it leaves EXACTLY two names
@@ -2580,7 +2581,7 @@ _is 'snap.orphan-roster-is-populated' 'found' \
   "$([[ -n "$_SNAP_ASKED" ]] && echo found || echo 'EMPTY ROSTER — every baseline would read as an orphan')"
 
 # ---------------------------------------------------------------- the header count cannot lie
-# ⚠️ `src/brains.auth.sh`'s own preamble advertises this suite's size, and it drifted to ~100
+# ⚠️ `brains.auth.sh`'s own preamble advertises this suite's size, and it drifted to ~100
 #   cases wrong before a reviewer caught it by eye. a doc pointer a reader trusts for a sense
 #   of coverage is worse than none once it is stale. so the number is no longer maintained by
 #   discipline — it is asserted, and any case added without a touch of that header turns this

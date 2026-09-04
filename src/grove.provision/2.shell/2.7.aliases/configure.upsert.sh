@@ -27,6 +27,14 @@
 #   - it copied MAIN's aliases while the run came from `_worktrees/…`
 #   - ⇒ a pushed branch's change never landed, and the symptom was "my edit had no effect"
 #
+# ⚠️ .other readers hold their OWN pointer to these files
+#   - a skill family (`git.grove.*`, `aws.ec2.get`, `term.*`, `wire.verify`,
+#     `termwork.test`, `brains.auth.*`) and a permanent play walk to, or
+#     hardcode, this bundle's collocated path directly — never through
+#     `GROVE_SRC` or this bundle's dispatch
+#   - ⇒ a rename or a further move here must update those readers too;
+#     grep the tree for the bare filename before you move it again
+#
 # guarantee:
 #   - idempotent: one copy per member, so a re-run converges
 ######################################################################

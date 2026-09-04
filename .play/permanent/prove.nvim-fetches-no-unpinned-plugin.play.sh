@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = prove `src/init.lua` fetches NO plugin unless a pin names it
+# .what = prove `4.5.nvim`'s `init.lua` fetches NO plugin unless a pin names it
 #
 # .why
 #   - lazy.nvim bootstraps at `--branch=stable`; the other 13 repos carry NO ref
@@ -47,8 +47,8 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SRC_INIT="$ROOT/src/init.lua"
-SRC_LOCK="$ROOT/src/lazy-lock.json"
+SRC_INIT="$ROOT/src/grove.provision/4.terminal/4.5.nvim/init.lua"
+SRC_LOCK="$ROOT/src/grove.provision/4.terminal/4.5.nvim/lazy-lock.json"
 
 WORK=""
 # ⚠️ condition 1: the restore is unconditional
@@ -235,9 +235,9 @@ fi
 ######################################################################
 echo "   ├─ D. the config as it stood BEFORE the fix  (the clamp must bite)"
 
-if ! git -C "$ROOT" show HEAD:src/init.lua > "$WORK/old.init.lua" 2>/dev/null \
+if ! git -C "$ROOT" show HEAD:src/grove.provision/4.terminal/4.5.nvim/init.lua > "$WORK/old.init.lua" 2>/dev/null \
    || [[ ! -s "$WORK/old.init.lua" ]]; then
-  echo "   │  🌙 git holds no HEAD:src/init.lua to compare against, so the RED"
+  echo "   │  🌙 git holds no HEAD:init.lua to compare against, so the RED"
   echo "   │     direction is UNPROVEN here"
 elif grep -q 'lazy_pinned' "$WORK/old.init.lua"; then
   echo "   │  🌙 HEAD already carries the pin, so there is no un-fixed config to"

@@ -48,7 +48,7 @@
 #    revision, and then the sink a reader audits is not the sink that ran.
 ######################################################################
 if ! command -v __duct_strip_escapes >/dev/null 2>&1; then
-  _grove_ops_ductwork="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/src/ductwork.sh"
+  _grove_ops_ductwork="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
   if [[ -r "$_grove_ops_ductwork" ]]; then
     # shellcheck disable=SC1090
     source "$_grove_ops_ductwork"

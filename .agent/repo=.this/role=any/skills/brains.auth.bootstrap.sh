@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ######################################################################
 # .what = the shared preamble every brains.auth skill proxy needs:
-#         locate this worktree's src/brains.auth.sh, source it, and strip
+#         locate this worktree's brains.auth.sh, source it, and strip
 #         the `--skill <value>` token the rhx wrapper injects.
 #
 # .why  = three proxies each carried a byte-identical copy of this block —
@@ -14,7 +14,7 @@
 #
 # .note = this file is SOURCED, never executed. it leaves EXACTLY two names
 #         behind for the caller, and no others:
-#           $BRAINS_AUTH_SRC — the sourced src/brains.auth.sh path
+#           $BRAINS_AUTH_SRC — the sourced brains.auth.sh path
 #           ${ARGS[@]}       — the caller's args, minus the --skill token
 #         the transient walk variables are unset before the source line, so a
 #         proxy or the harness inherits no incidental globals from here.
@@ -39,20 +39,25 @@
 #   so we walk up and stop at the directory that actually holds what we want.
 #   the search states the intent, cannot be off by one, and survives any
 #   reshuffle of the levels between here and the root.
+#
+# ⚠️ the landmark is the FILE's collocated bundle path — `brains.auth.sh` is
+#   owned by the `2.7.aliases` bundle, which is where its own configure phase
+#   copies it from. a rename of that bundle dir must update this landmark too.
 _BRAINS_AUTH_BOOTSTRAP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_BRAINS_AUTH_REL='src/grove.provision/2.shell/2.7.aliases/brains.auth.sh'
 BRAINS_AUTH_SRC=''
 _BRAINS_AUTH_WALK="$_BRAINS_AUTH_BOOTSTRAP_DIR"
 while [[ "$_BRAINS_AUTH_WALK" != / ]]; do
-  if [[ -f "$_BRAINS_AUTH_WALK/src/brains.auth.sh" ]]; then
-    BRAINS_AUTH_SRC="$_BRAINS_AUTH_WALK/src/brains.auth.sh"
+  if [[ -f "$_BRAINS_AUTH_WALK/$_BRAINS_AUTH_REL" ]]; then
+    BRAINS_AUTH_SRC="$_BRAINS_AUTH_WALK/$_BRAINS_AUTH_REL"
     break
   fi
   _BRAINS_AUTH_WALK="$(dirname "$_BRAINS_AUTH_WALK")"
 done
 
 [[ -n "$BRAINS_AUTH_SRC" ]] || {
-  echo "💥 no src/brains.auth.sh in any parent of ${_BRAINS_AUTH_BOOTSTRAP_DIR}" >&2
-  echo "   this file must live inside a checkout that carries src/brains.auth.sh" >&2
+  echo "💥 no $_BRAINS_AUTH_REL in any parent of ${_BRAINS_AUTH_BOOTSTRAP_DIR}" >&2
+  echo "   this file must live inside a checkout that carries $_BRAINS_AUTH_REL" >&2
   exit 1
 }
 

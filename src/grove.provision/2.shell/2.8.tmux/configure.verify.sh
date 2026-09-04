@@ -224,7 +224,7 @@ grove_provision_2_8_tmux_configure_verify() {
     echo "        inherits it at spawn, so apps EMIT only 8-colour codes" >&2
     echo "      ⇒ INVISIBLE beside a correct terminal-features line: the outward" >&2
     echo "        path renders a truecolor no app ever sends" >&2
-    echo "      fix: declare it in src/tmux.conf, then re-apply this bundle" >&2
+    echo "      fix: declare it in this bundle's tmux.conf, then re-apply this bundle" >&2
     failed=$(( failed + 1 ))
   elif ! command -v infocmp >/dev/null 2>&1; then
     echo "   🌙 default-terminal is '$term_declared'; infocmp is absent, so whether"

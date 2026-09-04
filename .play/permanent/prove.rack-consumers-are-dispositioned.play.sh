@@ -129,8 +129,8 @@ SELF_REL=""
 #   - the row records the decision; it never avoids it
 ######################################################################
 CENSUS=(
-  "src/bash_aliases.sh|2|MIXED|:57 AWS_PROFILE → export (NAME). :3650 a DSN → mktemp 0700 tmpfs + config 0600 + trap rm (MEMORY, RAM-only)"
-  "src/git-credential-keyrack.sh|1|MEMORY|:404 GITHUB_TOKEN → stdout, git's credential-helper protocol. git holds no copy; it re-asks per fetch"
+  "src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh|2|MIXED|:57 AWS_PROFILE → export (NAME). :3650 a DSN → mktemp 0700 tmpfs + config 0600 + trap rm (MEMORY, RAM-only)"
+  "src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh|1|MEMORY|:404 GITHUB_TOKEN → stdout, git's credential-helper protocol. git holds no copy; it re-asks per fetch"
   "src/grove.provision/5.devtools/5.4.gh/configure.upsert.sh|1|PERSISTS|:207 GITHUB_TOKEN → gh auth login --with-token → ~/.config/gh/hosts.yml CLEARTEXT. THE one open finding — see the block below"
   "src/grove.provision/5.devtools/5.13.reach/configure.verify.sh|1|NAME|:60 AWS_PROFILE → compared against the declared name"
   "src/grove.provision/5.devtools/5.12.rack/configure.verify.sh|2|MEMORY|:72/:155 fetches to prove the rack ANSWERS on this seat; the bytes are counted and compared, never stored"

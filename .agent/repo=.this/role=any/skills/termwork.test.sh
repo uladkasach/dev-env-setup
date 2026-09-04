@@ -63,8 +63,8 @@ if [[ "$MODE" == "shellcheck" ]]; then
   # source the REPO copy of zshrc (the change may not be synced to ~/.zshrc yet);
   # this redefines _set_terminal_title + re-adds the precmd hook. then a fresh
   # prompt (via cd) fires the hook, which pushes @repo/@branch.
-  echo "   ├─ sources repo src/zshrc.sh (tests the repo change, not ~/.zshrc)"
-  tmux send-keys -t "$S" "source '$RROOT/src/zshrc.sh'" Enter
+  echo "   ├─ sources repo zshrc.sh (tests the repo change, not ~/.zshrc)"
+  tmux send-keys -t "$S" "source '$RROOT/src/grove.provision/2.shell/2.5.zsh/zshrc.sh'" Enter
   sleep 1
   tmux send-keys -t "$S" "cd '$RROOT'" Enter
   sleep 1.5
@@ -140,7 +140,7 @@ if [[ "$MODE" == "demo" ]]; then
   RROOT=$(git -C "$SDIR" rev-parse --show-toplevel 2>/dev/null || true)
   [[ -n "$RROOT" ]] || RROOT=$(cd "$SDIR/../../../.." && pwd)
   # shellcheck disable=SC1090
-  source "$RROOT/src/termwork.sh"
+  source "$RROOT/src/grove.provision/2.shell/2.7.aliases/termwork.sh"
 
   TREE="twdemo"
   echo "🐢 termwork demo — poppin a role window..."
@@ -185,7 +185,7 @@ if [[ "$MODE" == "demo" ]]; then
   # (the deployed ~/.zshrc may lack the change; this previews it). the precmd hook
   # fires on the next prompt — which the banner send below triggers.
   for role in mechanic foreman; do
-    term.send --via kitty --on "$TREE" --for "$role" --what "source '$RROOT/src/zshrc.sh'" >/dev/null 2>&1
+    term.send --via kitty --on "$TREE" --for "$role" --what "source '$RROOT/src/grove.provision/2.shell/2.5.zsh/zshrc.sh'" >/dev/null 2>&1
   done
   sleep 0.5
 
@@ -250,7 +250,7 @@ fi
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)
 [[ -n "$REPO_ROOT" ]] || REPO_ROOT=$(cd "$SCRIPT_DIR/../../../.." && pwd)
-TERMWORK_SRC="$REPO_ROOT/src/termwork.sh"
+TERMWORK_SRC="$REPO_ROOT/src/grove.provision/2.shell/2.7.aliases/termwork.sh"
 if [[ ! -f "$TERMWORK_SRC" ]]; then
   echo "💥 termwork.test: cannot find termwork.sh at '$TERMWORK_SRC'" >&2
   exit 1
