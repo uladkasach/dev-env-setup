@@ -19,6 +19,9 @@
 #   - the opt-out shipped in claude 2.0.71 (anthropics/claude-code#13878)
 #   - (`term=prompt-suggestion`)
 #
+# .permissions.defaultMode=acceptEdits starts every session with file edits
+#   applied without a prompt (shift+tab still cycles modes live)
+#
 # ⚠️ the prompt-suggestion flag belongs in `env`, and the installer nag does not
 #   - claude reads it mid-session, well after settings load
 #   - the installation checks run at BOOT, before settings are read at all
@@ -42,7 +45,7 @@
 ######################################################################
 
 grove_provision_5_3_brains_configure_upsert() {
-  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false"}, "disableClaudeAiConnectors": true}'
+  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false"}, "disableClaudeAiConnectors": true, "permissions": {"defaultMode": "acceptEdits"}}'
   local settings="$HOME/.claude/settings.json"
 
   if ! mkdir -p "$HOME/.claude"; then

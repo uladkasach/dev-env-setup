@@ -18,6 +18,41 @@
 # the pins live in this bundle's `_.sh` (GROVE_BRAIN_{CLAUDE,CODEX}_PIN) —
 # both halves read them: the installs below and the verify's probes
 
+_grove_provision_5_3_brains_prune_claude_shadows() {
+  ##################################################################
+  # .what = uninstall @anthropic-ai/claude-code from every fnm node version
+  # .why  = `fnm env --use-on-cd` puts fnm's multishell bin ahead of
+  #   $PNPM_HOME on some shells, and the $PNPM_HOME prepend is order-
+  #   sensitive (`5.1.node/configure.upsert.sh`). so a stray
+  #   `npm install -g @anthropic-ai/claude-code` — or claude's own
+  #   native-installer migration — can outrank the pinned pnpm copy on
+  #   PATH, with no other check to notice the swap. the verify CAN detect
+  #   the resulting drift (it asks the live binary), but a re-apply that
+  #   never removes the shadow would redden forever
+  #   (`rule.require.one-command-provision`, the re-apply-loops-forever shape)
+  ##################################################################
+  local fnm_home="${FNM_DIR:-$HOME/.local/share/fnm}"
+  local nodedir pruned=0
+
+  for nodedir in "$fnm_home"/node-versions/*/installation; do
+    [[ -d "$nodedir/lib/node_modules/@anthropic-ai/claude-code" ]] || continue
+
+    # invoke npm by absolute path, via its own node — the interactive `npm`
+    # shell function routes to pnpm when no package-lock.json is present, so
+    # a bare `npm uninstall -g` here would remove the pnpm copy we mean to keep
+    "$nodedir/bin/node" "$nodedir/bin/npm" uninstall -g @anthropic-ai/claude-code >/dev/null 2>&1 || {
+      echo "   ✋ failed to prune npm-global claude-code shadow at $nodedir" >&2
+      echo "      fix: '$nodedir/bin/node' '$nodedir/bin/npm' uninstall -g @anthropic-ai/claude-code" >&2
+      return 1
+    }
+    echo "   • pruned npm-global claude-code shadow at $(basename "$(dirname "$nodedir")")"
+    pruned=1
+  done
+
+  [[ "$pruned" -eq 1 ]] || true
+  return 0
+}
+
 grove_provision_5_3_brains_provision_upsert() {
   if ! command -v pnpm >/dev/null 2>&1; then
     echo "   ✋ pnpm is absent — the robot brains cannot install" >&2
@@ -50,6 +85,10 @@ grove_provision_5_3_brains_provision_upsert() {
   web_pnpm install -g declastruct declastruct-aws || return 1
 
   web_pnpm install -g "@openai/codex@$GROVE_BRAIN_CODEX_PIN" || return 1
+
+  # prune a shadow BEFORE the pinned install, so PATH order cannot leave a
+  # stray npm-global copy outranking the pnpm one this line converges on
+  _grove_provision_5_3_brains_prune_claude_shadows || return 1
 
   web_pnpm install -g \
     --allow-build=@anthropic-ai/claude-code \

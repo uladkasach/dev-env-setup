@@ -36,15 +36,16 @@ grove_provision_5_3_brains_configure_verify() {
     '.env.DISABLE_AUTOUPDATER:"1":the auto-updater' \
     '.env.DISABLE_UPDATES:"1":every self-update path' \
     '.env.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION:"false":the prompt suggestion' \
-    '.disableClaudeAiConnectors:true:the claude.ai connector fetch'; do
+    '.disableClaudeAiConnectors:true:the claude.ai connector fetch' \
+    '.permissions.defaultMode:"acceptEdits":the accept-edits default mode'; do
     path="${pair%%:*}"
     want="${pair#*:}"; want="${want%%:*}"
     live="$(jq -c "$path" "$settings" 2>/dev/null)"
 
     if [[ "$live" == "$want" ]]; then
-      echo "   • ${pair##*:} is off ✔"
+      echo "   • ${pair##*:} holds the declared value ✔"
     else
-      echo "   ✋ ${pair##*:} is NOT off — $path reads ${live:-absent}, want $want" >&2
+      echo "   ✋ ${pair##*:} is NOT declared — $path reads ${live:-absent}, want $want" >&2
       echo "      ⇒ a merged file can hold the key at the wrong value, so its" >&2
       echo "        presence alone proves neither the patch nor its effect" >&2
       echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
