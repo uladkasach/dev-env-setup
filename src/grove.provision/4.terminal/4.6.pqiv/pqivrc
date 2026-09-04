@@ -1,0 +1,13 @@
+[options]
+zoom-level=1.0
+disable-scaling=1
+
+[keybindings]
+h { shift_x(50) }
+j { shift_y(-50) }
+k { shift_y(50) }
+l { shift_x(-50) }
+gg { set_shift_align_corner(N) }
+G { set_shift_align_corner(S) }
+<Control>j { set_scale_level_relative(0.9) }
+<Control>k { set_scale_level_relative(1.1) }

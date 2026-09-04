@@ -1,0 +1,8 @@
+[Unit]
+Description=Check for runaway processes
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/machine_resource_procs_monitor
+StandardOutput=journal
+StandardError=journal

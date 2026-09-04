@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<!--
+  .what = a SEAT-SCOPED imagemagick policy. it closes the coder classes that
+          hand a file to another program or interpret it as a program, and it
+          leaves every raster format this repo actually renders untouched.
+
+  .why  = `4.5.nvim` installs imagemagick, because image.nvim converts an image
+          in the tree nvim has open. that tree is written by `git.grove.pull`,
+          which is bytes a GROVE named — and a grove is ASSUMED COMPROMISED.
+
+          the debian default at `/etc/ImageMagick-6/policy.xml` describes ITSELF
+          as an "open security policy" and warns in its own comment that it
+          "might present security vulnerabilities in less regulated conditions".
+          it closes `path @*` and the URL/HTTPS/HTTP delegates, and declares NO
+          coder rule at all. an absent coder rule is a PERMITTED coder rule.
+
+          measured on this box 2026-08-31, imagemagick 6.9.12:
+            ghostscript PRESENT at /usr/bin/gs, /usr/bin/ghostscript
+            a benign .eps read as coder PS — the ghostscript reach is live
+            12 of the 16 coders below carried by the build, all open
+
+  .where = `${XDG_CONFIG_HOME:-$HOME/.config}/ImageMagick/policy.xml`
+
+  ⚠️ .why the SEAT path and not /etc
+       measured 2026-08-31: a policy at the seat path BITES with no env var
+       that names it, on both the `$XDG_CONFIG_HOME` route and the
+       `$HOME/.config` fallback. `identify -list policy` reports it as a second
+       `Path:` beside `/etc/ImageMagick-6/policy.xml`.
+
+       so the holder needs NO root — which matters because the CAMPER seat is
+       the seat that runs the editor and holds no sudo. a box-wide write would
+       have to be owned by `ground`, and every camper would then depend on a
+       fact only the other seat could set (rule.require.seam-claims-have-an-owner).
+
+  ⚠️ .this file is COPIED, never symlinked
+       so `configure.verify` can `cmp` the installed copy against this checkout
+       and catch a stale one (rule.require.repo-as-source-of-truth).
+-->
+<policymap>
+
+  <!--
+    1. the GHOSTSCRIPT class.
+       PS/PS2/PS3/EPS/PDF/XPS are not decoded in-process — imagemagick execs
+       `gs` and hands it the file. so a coder rule here is the difference
+       between "a grove chose some bytes" and "a grove chose the input to an
+       interpreter that has had remote-code-execution CVEs of its own".
+  -->
+  <policy domain="coder" rights="none" pattern="{PS,PS2,PS3,EPS,PDF,XPS}" />
+
+  <!--
+    2. the INTERPRETED class.
+       MVG and MSL are not image formats at all — they are draw/automation
+       languages that imagemagick executes. MSL is XML with file read and write
+       verbs. this is the ImageTragick class.
+
+       ⚠️ MAGICK is here because it is the pseudo-coder that lets a file name
+          its own coder, which would re-open every line above.
+  -->
+  <policy domain="coder" rights="none" pattern="{MSL,MVG,MAGICK}" />
+
+  <!--
+    3. the LOCAL-READ / LOCAL-EXEC class.
+       TEXT and PLT read a local path. SHOW and WIN spawn a display program.
+       LABEL and CAPTION render text through a font stack. EPHEMERAL DELETES
+       its input after read, which is a write primitive dressed as a decoder.
+
+       none of the six formats `src/init.lua` declares renderable
+       (png jpg jpeg gif webp avif) reaches any of these.
+  -->
+  <policy domain="coder" rights="none" pattern="{TEXT,SHOW,WIN,PLT,LABEL,CAPTION,EPHEMERAL}" />
+
+  <!--
+    4. every DELEGATE.
+       a delegate is a line in `delegates.xml` that execs another program.
+       the debian default closes three (URL, HTTPS, HTTP) and leaves the rest.
+
+       ⚠️ MEASURED to cost zero here: all six renderable formats still read
+          with this line in force. if a box's build routes one of them through
+          a delegate, `configure.verify`'s cost claim goes ✋ and names this
+          line — the verify asks BOTH halves, so a too-wide policy is caught
+          rather than discovered later as a broken image render.
+  -->
+  <policy domain="delegate" rights="none" pattern="*" />
+
+</policymap>

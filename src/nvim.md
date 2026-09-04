@@ -1,1 +1,0 @@
-../.agent/repo=.this/role=any/briefs/nvim.md

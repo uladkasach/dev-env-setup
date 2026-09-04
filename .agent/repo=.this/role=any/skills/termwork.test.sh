@@ -39,10 +39,10 @@ done
 
 # ── shellcheck mode: does the REAL shell push @repo/@branch inside tmux? ──────
 # .why = tmuxcheck sets @repo/@branch by hand; this proves the OTHER half — that
-#        _set_terminal_title in zshrc actually pushes them. it launches a real
-#        login zsh inside a tmux pane, cd's into this repo, waits for the precmd
-#        hook to fire, then reads the pane options back. catches a broken/renamed
-#        hook before a human ever reloads.
+#        _set_terminal_title in zshrc pushes them. it launches a real login zsh
+#        inside a tmux pane, cds into this repo, waits for the precmd hook, then
+#        reads the pane options back. catches a broken or renamed hook before a
+#        human reloads.
 if [[ "$MODE" == "shellcheck" ]]; then
   echo "🐢 shell push check — does zsh feed tmux?"
   echo ""
@@ -152,9 +152,9 @@ if [[ "$MODE" == "demo" ]]; then
   tmux has-session -t "$TREE/foreman"  2>/dev/null || tmux new-session -d -s "$TREE/foreman"  -c "$RROOT"
   echo "   ├─ ducts: $TREE/mechanic, $TREE/foreman"
 
-  # preview the NEW status line WITHOUT touching the deployed config: set the repo/
-  # branch format scoped to THESE sessions only (no -g, so the human's other sessions
-  # keep their status). mirrors src/tmux.conf's status-left/right.
+  # preview the status line WITHOUT a touch to the deployed config: scope the
+  # repo/branch format to THESE sessions only (no -g, so the human's other
+  # sessions keep their status). mirrors src/tmux.conf's status-left/right.
   for S in "$TREE/mechanic" "$TREE/foreman"; do
     tmux set -t "$S" status-left  " #{@repo} "   >/dev/null 2>&1
     tmux set -t "$S" status-right " #{@branch} " >/dev/null 2>&1
@@ -226,7 +226,11 @@ if [[ "$MODE" == "clean" ]]; then
   if command -v pgrep >/dev/null 2>&1; then
     while IFS= read -r pid; do
       [[ -n "$pid" ]] || continue
-      if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Eq 'twtest-|twdemo'; then
+      # ⚠️ `grep -E … >/dev/null`, never `grep -Eq`. a MATCH says this pid is
+      #    ours to reap, and a match is what makes `-q` exit early, SIGPIPE the
+      #    `tr`, and hand pipefail its 141 — so the window would survive the
+      #    cleanup that named it (`gotcha.pipefail-grep-q`)
+      if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -E 'twtest-|twdemo' >/dev/null; then
         kill "$pid" 2>/dev/null && { echo "   ├─ killed kitty pid: $pid"; killed=$((killed+1)); }
       fi
     done < <(pgrep -x kitty 2>/dev/null)

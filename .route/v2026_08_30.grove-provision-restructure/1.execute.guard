@@ -1,0 +1,89 @@
+# guard for the tasklist execution stone
+#
+# .what = gates the stone on a peer review by the mechanic role's own rubrics
+#
+# .why  = the stone renames skills, deletes plays, and narrows a rule's exemption set.
+#         every one of those is a change a reader will trust without a re-read, so the
+#         review is the last place a wrong one can be caught.
+
+artifacts:
+  # the progress record — one row per tasklist item, done or skipped alike
+  - "$route/1.execute.yield.md"
+
+reviews:
+  self:
+    - slug: has-two-edits-per-delete
+      say: |
+        review every file this stone DELETED.
+
+        the playbooks readme states it flatly: **a delete is TWO edits** — the file goes,
+        and every line that named it says what became of it.
+
+        for each deletion, ask:
+        - did i grep for the filename before i removed it?
+        - does every inbound reference now say what became of it, or does it point at a void?
+        - is the record of WHY it went somewhere a reader will find it?
+
+        a reference to an absent file is worse than the file it points at, because a reader
+        follows it and learns the repo lies about its own contents.
+
+        fix every broken pointer before you continue.
+
+    - slug: has-evidence-per-done-row
+      say: |
+        review every ✔ row in the yield.
+
+        `rule.require.trust-but-verify` binds the author of a record as much as its reader.
+        a ✔ that names no command is a claim, not a measurement.
+
+        for each ✔ row, ask:
+        - does it name the command i ran, and what that command answered?
+        - or does it merely assert the item is done?
+        - for a rename: did i actually invoke the new name, or only edit the file?
+
+        ⚠️ the sharpest case is a MOVED CLAMP. a clamp folded into `test` that has not been
+        RUN in its new home is a check nobody has seen bite there
+        (`gotcha.a-check-that-cries-wolf-gets-silenced`, `.the corollary`).
+
+        downgrade every unevidenced ✔ to a 🌙, or go get the evidence.
+
+    - slug: has-not-widened-the-ask
+      say: |
+        review for work this stone did that the tasklist did not ask for.
+
+        `rule.forbid.inflate-an-additive-ask` binds here. the tasklist holds 22 named items.
+
+        for each change in the diff, ask:
+        - which tasklist item asked for this?
+        - if none: did i add it "while i was in there"?
+        - did a rename become a refactor?
+        - did a delete become a rewrite?
+
+        an unasked change rides in on the trust the asked ones earned. flag it or revert it.
+
+    - slug: has-preserved-the-rung-step-split
+      say: |
+        review every place this stone touched the `rung` / `step` vocabulary.
+
+        the split was settled 2026-08-30 and it is NOT cosmetic:
+        - `rung` = an ordered member of a READ-ONLY ladder that halts
+        - `step` = the same shape that WRITES
+
+        the conflation of the two produced a wrong repair for a wrong-subject defect, one
+        hour after that defect was recorded. the full account is the 2026-08-30 dispute in
+        `term=rung._.choice.reason.md`.
+
+        for each occurrence, ask:
+        - does this ladder WRITE? then its members are steps, never rungs
+        - when i cite a number, did i name which ladder it belongs to?
+
+        `step 2` and `rung 2` are different questions. fix every unqualified number.
+
+  peer:
+    - slug: mechanic-rubrics
+      run: $rhx review.by --repo ehmpathy --role mechanic --diffs since-main --mode pull --output "$output"
+      budget: 3
+      level: 1
+
+judges:
+  - $rhachet run --repo bhrain --skill route.stone.judge --mechanism reviewed? --stone $stone --route $route --allow-blockers 0 --allow-nitpicks 3

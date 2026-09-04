@@ -17,15 +17,18 @@ continuation while you type, or a proposed follow-up prompt after a turn. `tab` 
 
 **the contract** (landed 2026-08-03):
 
-- `src/install_env.pt5.devtools.sh` → `configure_robot_brains` — the patch that writes
+- `src/grove.provision/5.devtools/5.3.brains/configure.upsert.sh` — the patch that merges
   `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` into `~/.claude/settings.json`
-- `.agent/repo=.this/role=any/briefs/howto.silence-claude-cli-nags.md` — the "prompt suggestions"
+- `src/grove.provision/5.devtools/5.3.brains/configure.verify.sh` — reads the value back,
+  since a merged file can hold the key at the wrong value
+- `.agent/repo=.this/role=any/briefs/desktop/system/howto.silence-claude-cli-nags.md` — the "prompt suggestions"
   section, which names the feature and its polarity trap
 
 **the origin:**
 
-- `.behavior/v2026_08_02.fix-claude-suggestion/0.wish.md` — where the concept entered this repo
-- `.behavior/v2026_08_02.fix-claude-suggestion/1.vision.yield.md` — "their words vs our words"
+- the concept entered this repo on 2026-08-02, from a behavior route that was never
+  committed. 🛑 **do not cite that route by path** — no file of it has ever existed in the
+  checkout, so a pointer at one reads like a lost record rather than a route simply not kept
 - vendor contract: `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` (claude-code ≥ 2.0.71)
 
 ## .the collision that makes this term load-bearing

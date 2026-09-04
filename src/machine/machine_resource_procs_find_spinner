@@ -1,0 +1,98 @@
+#!/bin/bash
+#############################
+# machine_resource_procs_find_spinner
+# finds processes with CPU time / elapsed time ratio > 0.5
+# that have been running for 30+ minutes
+#############################
+
+KILL_MODE=""
+MIN_ELAPSED=1800  # 30 minutes in seconds
+MIN_RATIO=50      # 50% CPU ratio threshold
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --kill)
+      KILL_MODE="all"
+      if [[ -n "$2" && "$2" != --* ]]; then
+        KILL_MODE="$2"
+        shift
+      fi
+      shift
+      ;;
+    --min-minutes)
+      MIN_ELAPSED=$(( $2 * 60 ))
+      shift 2
+      ;;
+    --min-ratio)
+      MIN_RATIO="$2"
+      shift 2
+      ;;
+    *)
+      echo "Usage: machine_resource_procs_find_spinner [--kill [<prefix>]] [--min-minutes N] [--min-ratio N]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+SPINNER_PIDS=""
+SPINNER_INFO=""
+
+# get user processes with elapsed and cpu time
+while read -r pid etimes cputimes comm; do
+  [[ -z "$pid" ]] && continue
+  [[ "$etimes" -lt "$MIN_ELAPSED" ]] && continue
+
+  # calculate ratio (percentage)
+  if [[ "$etimes" -gt 0 ]]; then
+    ratio=$(( (cputimes * 100) / etimes ))
+  else
+    ratio=0
+  fi
+
+  if [[ "$ratio" -ge "$MIN_RATIO" ]]; then
+    elapsed_min=$(( etimes / 60 ))
+    cpu_min=$(( cputimes / 60 ))
+    SPINNER_PIDS+="$pid "
+    SPINNER_INFO+="$pid ($comm): ${ratio}% CPU over ${elapsed_min}m (${cpu_min}m CPU time)\n"
+  fi
+done < <(ps -u "$USER" -o pid=,etimes=,cputimes=,comm= 2>/dev/null)
+
+if [[ -z "$SPINNER_PIDS" ]]; then
+  echo "🐈 lets prowl..."
+  echo "└─🌕 spinner"
+  echo "  └─✨ none caught"
+  exit 0
+fi
+
+echo "🐈 lets prowl..."
+echo "└─🌕 spinner"
+# format as tree entries
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  echo "  ├─🦎 $line"
+done <<< "$(echo -e "$SPINNER_INFO")"
+echo "  └─🪄 kill -9 $SPINNER_PIDS"
+
+if [[ -n "$KILL_MODE" ]]; then
+  echo ""
+  if [[ "$KILL_MODE" == "all" ]]; then
+    echo "Kill all spinner processes..."
+    kill -9 $SPINNER_PIDS 2>/dev/null
+  else
+    # filter by prefix
+    FILTERED_PIDS=""
+    for pid in $SPINNER_PIDS; do
+      comm=$(cat /proc/$pid/comm 2>/dev/null || echo "")
+      if [[ "$comm" == *"$KILL_MODE"* ]]; then
+        FILTERED_PIDS+="$pid "
+      fi
+    done
+    if [[ -z "$FILTERED_PIDS" ]]; then
+      echo "No spinner processes matching '$KILL_MODE'"
+    else
+      echo "Kill spinner processes matching '$KILL_MODE': $FILTERED_PIDS"
+      kill -9 $FILTERED_PIDS 2>/dev/null
+    fi
+  fi
+  echo "Done."
+fi

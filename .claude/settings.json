@@ -556,6 +556,7 @@
       "Bash(rhx git.commit.uses allow:*)",
       "Bash(rhx git.commit.uses set:*)",
       "Bash(sed:*)",
+      "Bash(ssh:*)",
       "Bash(tee:*)",
       "Edit(*/**/.route/**)",
       "Edit(.branch/.bind/*)",

@@ -1,0 +1,8 @@
+[Unit]
+Description=Snapshot the kitty session when the battery is low
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/kitty_snap_lowbatt
+StandardOutput=journal
+StandardError=journal

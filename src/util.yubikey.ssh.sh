@@ -103,7 +103,40 @@ set_sshkey_into_yubikey() {
     return 1
   fi
 
-  local tmp_key="/tmp/yubikey-import-$$.pem"
+  ####################################################################
+  # 🛑 the key lands in a PRIVATE dir, never at a predictable /tmp path
+  #
+  #    a `/tmp/yubikey-import-$$.pem` puts the highest value asset this repo
+  #    ever writes to disk — an unencrypted ssh private key — at a guessable
+  #    path in a 1777 dir. two costs:
+  #
+  #      the `>` and the `cp` CREATE the file, and only the next line chmods it.
+  #      so the key is world-readable for that window, at a path any local uid
+  #      can watch for.
+  #
+  #      worse, a symlink pre-planted at `/tmp/yubikey-import-<pid>.pem` sends
+  #      the key wherever the squatter aims — and `shred -u` then destroys the
+  #      SYMLINK and leaves their copy intact, so the cleanup reports success
+  #      over a key that was successfully stolen.
+  #
+  # .why a private DIR rather than a chmod-first file
+  #      `mktemp -d` makes the directory 0700 before it exists to anyone else,
+  #      so there is no window and no path to pre-plant — the containment is
+  #      structural rather than a race this code has to win
+  #      (`rule.require.solve-at-cause`). it is the same idiom `web_tempdir`
+  #      already uses for every wire fetch in `src/grove.web.sh`.
+  ####################################################################
+  local tmp_dir tmp_key
+  tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/yubikey-import.XXXXXXXX")" || {
+    echo "error: could not make a private temp dir for the key"; return 1; }
+  chmod 700 "$tmp_dir"
+  tmp_key="$tmp_dir/key.pem"
+
+  # ⚠️ the dir goes on EVERY exit path — a failed ykman import too. a plain
+  #    last line would leave an unencrypted key behind whenever the import
+  #    broke, which is the one run where a human stops to read the error
+  trap 'shred -u "$tmp_key" 2>/dev/null; rm -rf "$tmp_dir"' RETURN
+
   local should_backup=false
 
   # check dependencies
@@ -121,22 +154,33 @@ set_sshkey_into_yubikey() {
   if ykman piv access verify-pin --pin 123456 &>/dev/null; then
     echo "PIV PIN is still default (123456). set a new PIN for security."
     echo ""
-    read -sp "enter new PIN (6-8 digits): " new_pin
-    echo ""
-    read -sp "confirm new PIN: " confirm_pin
-    echo ""
 
-    if [[ "$new_pin" != "$confirm_pin" ]]; then
-      echo "error: PINs do not match"
+    ####################################################################
+    # 🛑 .the new PIN is NEVER held in a variable, and never reaches argv
+    #
+    # `--pin 123456` is the PUBLISHED PIV default and is not a secret, so it
+    # stays a flag. the NEW pin is a secret, and argv is world-readable at
+    # `/proc/<pid>/cmdline` for the life of the call — the exact hazard
+    # `plan.grove-credentials.md` states as a rule:
+    #
+    #   "never pass a secret in argv. argv is visible in `ps` to any user."
+    #
+    # ⚠️ a `read -sp` upstream does NOT save it. an unechoed read keeps the
+    #    pin off the SCREEN; the leak is the execve one line later. this file
+    #    already argued at length about key material at rest and walked past
+    #    its own twin two lines above — one hazard named in detail reads as a
+    #    guard against THE hazard
+    #    (`inventory.security-checks.md`, `.a guard that names one hazard`).
+    #
+    # ⇒ so ykman prompts for it directly. ykman asks twice, confirms the
+    #   match, and enforces the 6-8 digit policy itself — so the hand-rolled
+    #   read + confirm + length check it replaced were a second holder of a
+    #   rule ykman already owns (m.9), and the copy is what leaked.
+    ####################################################################
+    ykman piv access change-pin --pin 123456 || {
+      echo "error: PIN not changed"
       return 1
-    fi
-
-    if [[ ${#new_pin} -lt 6 ]] || [[ ${#new_pin} -gt 8 ]]; then
-      echo "error: PIN must be 6-8 digits"
-      return 1
-    fi
-
-    ykman piv access change-pin --pin 123456 --new-pin "$new_pin"
+    }
     echo "PIN updated."
   else
     echo "PIN already configured (not default)."
@@ -177,8 +221,12 @@ set_sshkey_into_yubikey() {
   echo "generate self-signed certificate..."
   ykman piv certificates generate -s "$key_name" 9a -
 
+  # ⚠️ the RETURN trap above shreds it too, so this line is the ANNOUNCEMENT and
+  #    the trap is the guarantee. `shred -u` is idempotent enough (an absent
+  #    file is a no-op), and the trap is what covers the paths that never reach
+  #    this line at all
   echo "delete local key..."
-  shred -u "$tmp_key"
+  shred -u "$tmp_key" 2>/dev/null
 
   echo ""
   echo "done. public key:"
