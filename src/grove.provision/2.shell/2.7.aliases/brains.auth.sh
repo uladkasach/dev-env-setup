@@ -22,7 +22,7 @@
 #   the file, the source line, and the cp in the sync alias.
 #
 # vision: .behavior/v2026_07_28.brain-budget-utilization/1.vision.yield.md
-# tests:  rhx brains.auth.test   (301 cases, hermetic, no network, no real ~/.claude)
+# tests:  rhx brains.auth.test   (317 cases, hermetic, no network, no real ~/.claude)
 #         ⚠️ this number is ASSERTED, not maintained by hand — `header.count-matches-the-suite`
 #           reads it back out of this very line and compares it to the suite's own total. it
 #           drifted ~100 cases wrong once, when it was only a promise. now a case added
@@ -2171,12 +2171,32 @@ _brains_auth_node_for_reach() {
 #   function's exit code IS curl's — a network failure is still catchable by the caller.
 _brains_auth_usage_reply() {
   local ua="$1" access="$2"
-  printf 'header = "Authorization: Bearer %s"\n' "$access" \
-    | curl -sS -m "$_BRAINS_AUTH_HTTP_TIMEOUT" -w $'\n%{http_code}' "$_BRAINS_AUTH_USAGE_URL" \
-      -H "anthropic-beta: ${_BRAINS_AUTH_ANTHROPIC_BETA}" \
-      -H "User-Agent: ${ua}" \
-      -H "Content-Type: application/json" \
-      -K -
+  # ⚠️ the subshell + explicit `set +o pipefail` are the contract, not tidiness. this leaf
+  #   promises its exit code IS curl's — `_brains_auth_node_via_access` reads `$?` right after
+  #   the capture and maps non-zero to `curl_failed`. but this is a PIPELINE, and this file is
+  #   sourced into whatever shell the human runs, so a caller with `pipefail` on (a common
+  #   shell option, and one the twin below already turns on for itself) changes what `$?`
+  #   means here.
+  #   the concrete break: curl exits before it drains stdin — a fast failure, or simply a
+  #   short read — and `printf` takes SIGPIPE, exit 141. under pipefail the pipeline reports
+  #   141 instead of curl's status, so a call that WORKED reads as `curl_failed` and the human
+  #   is told the endpoint is unreachable. that is the same confidently-wrong class as the
+  #   shape gate above, one layer down.
+  #   this is NOT hypothetical: the clamp `callleaf.usage-passes-curl-ok` went red with `141`
+  #   intermittently, and only when the suite ran under a pipe — the flake WAS the defect.
+  #   `set +o pipefail` inside a subshell makes the answer curl's own, whatever the caller set,
+  #   and cannot leak back out. the twin `_brains_auth_refresh_reply` uses the same subshell for
+  #   the OPPOSITE choice — it needs pipefail ON, because a jq sits mid-pipeline whose failure
+  #   must not be masked by curl's success. same containment, opposite need; both explicit.
+  (
+    set +o pipefail
+    printf 'header = "Authorization: Bearer %s"\n' "$access" \
+      | curl -sS -m "$_BRAINS_AUTH_HTTP_TIMEOUT" -w $'\n%{http_code}' "$_BRAINS_AUTH_USAGE_URL" \
+        -H "anthropic-beta: ${_BRAINS_AUTH_ANTHROPIC_BETA}" \
+        -H "User-Agent: ${ua}" \
+        -H "Content-Type: application/json" \
+        -K -
+  )
 }
 
 # .what = classify a usage reply into one usage node ($1=ua, $2=reach, $3=access token)
@@ -2225,16 +2245,6 @@ _brains_auth_node_via_access() {
   #   renders `💥 http_200`, which is precisely the defect that reached a live run here once.
   #   the fence makes the success path structurally unable to reach an error node.
   if [[ "$code" != 200 ]]; then
-    # ⚠️ the 5xx / other-4xx split below is NOT cosmetic, and this leaf is the second place it
-    #   had to be learned. its twin `_brains_auth_mint_access` once collapsed every non-401
-    #   into one code, so a 503 from anthropic rendered "refresh token dead (run:
-    #   brains.auth.set)" — a browser re-auth prescribed to a human to repair someone else's
-    #   outage. that was fixed there and NOT here, so this leaf still folded every other 4xx
-    #   into a generic `http_<n>` that the severity table's default calls a `malfunction` —
-    #   ours to fix, exit 1 — when a 403 (a token without the scope) is squarely the caller's.
-    #   same defect, opposite direction: there a server fault read as the human's, here a
-    #   human fault reads as ours. a comment two functions up already called these two
-    #   "twins"; the twin now matches.
     case "$code" in
       401) jq -nc --arg d "$detail" '{error:"token_expired", detail:$d}';  return ;;
       429) jq -nc --arg d "$detail" '{error:"rate_limited",  detail:$d}';  return ;;
@@ -2260,10 +2270,26 @@ _brains_auth_node_via_access() {
     jq -nc --arg c "${code:-unknown}" --arg d "$detail" '{error:("http_"+$c), detail:$d}'; return
   fi
 
-  # trust a 200 only if the expected windows are actually present — a drifted endpoint
-  # shape must fail loud, never render a confidently-wrong "0% used, all clear" (the
-  # worst-direction failure for a budget-warning tool)
-  if ! jq -e '(.five_hour|type)=="object" and (.seven_day|type)=="object"' <<< "$body" >/dev/null 2>&1; then
+  # trust a 200 only if the expected numbers are actually there — a drifted endpoint shape must
+  # fail loud, never render a confidently-wrong "0% used, all clear" (the worst-direction
+  # failure for a tool whose only job is to warn about a budget)
+  #
+  # ⚠️ the test asks whether `.utilization` is a NUMBER, not merely whether the window is an
+  #   object, and that distinction is the whole guard. an object-only test passes
+  #   `{"five_hour":{"utilization":"n/a"}}`, and every step downstream then turns that string
+  #   into a confident zero rather than refuse it:
+  #     1. the render reads `.five_hour.utilization // 0` — but jq's `//` fires on null/false
+  #        ONLY, and a non-empty string is truthy, so the fallback never runs and "n/a" flows on
+  #     2. `_brains_auth_round` hands it to awk's `printf "%.0f"`, which coerces any
+  #        non-numeric string to 0 without a word
+  #   the account renders `session ░░░░░░░░░░ 0% used` — a full-budget all-clear for an account
+  #   whose real number was never read. that is worse than a refusal by a wide margin, and it is
+  #   precisely the class this gate exists to close: it closed the ABSENT-window half and left
+  #   the present-but-unreadable half open. both halves now route to `unexpected_shape`.
+  #   the null case rides along for free — `(null|type)` is "null", not "number" — so an
+  #   endpoint that starts to omit the value is caught by this test rather than by `// 0`.
+  if ! jq -e '(.five_hour.utilization|type)=="number" and (.seven_day.utilization|type)=="number"' \
+       <<< "$body" >/dev/null 2>&1; then
     _brains_auth_error_node 'unexpected_shape'
     return
   fi
@@ -2606,16 +2632,20 @@ _brains_auth_ident_err_for_arc() {
 #   those two branches sit side by side in the orchestrator and only one had been pulled out,
 #   which is exactly the drift that lets a convention quietly become a one-off — a reader of
 #   the pair could not tell whether "inline" or "extracted" was the rule.
-# .note = the profile read is the LOCAL file claude keeps, never a network call. that is the
-#   whole reason this hint can exist here at all: the empty-store branch runs before the
+# .note = `$1` is the name claude's LOCAL profile reports, or empty. the caller reads it and
+#   hands it in, rather than this leaf opening the file itself. that split is the point: every
+#   render/decision leaf in this file is a pure function of its arguments so it can be snapped
+#   directly, and a single leaf that read a file would leave a reader of the pair unable to
+#   tell whether "pure" or "touches i/o" was the rule.
+# .note = the caller's read is of the LOCAL file claude keeps, never a network call. that is
+#   the whole reason this hint can exist at all: the empty-store branch runs before the
 #   identity read, because that read mints against the api and would cost a 15s timeout to
 #   answer a question already in hand. see the caller's ⚠️ for the measurement.
 # .note = it emits, and does NOT return the code — the caller derives that from the shared
 #   severity table, so a render is never the place an exit code is decided.
 _brains_auth_render_no_subscriptions() {
-  local seen
+  local seen="${1:-}"
   echo "🐢 no claude subscriptions in the global keyrack yet"
-  seen="$(_brains_auth_creds_field "$_BRAINS_AUTH_LIVE_PROFILE" '.oauthAccount.emailAddress')"
   # attributed to claude on purpose: this name can lag the live token, so the sentence says
   # whose view it is rather than assert it as fact
   [[ -n "$seen" ]] \
@@ -2755,7 +2785,10 @@ _brains_auth_usage() {
       _brains_auth_emit_error 'no_subscriptions'
       return "$(_brains_auth_code_for_error 'no_subscriptions')"
     fi
-    _brains_auth_render_no_subscriptions >&2
+    # the profile read lives HERE, not in the render, so the render stays a pure leaf like
+    # every other one in this file (see its `.note`). free: a local file, never the network.
+    _brains_auth_render_no_subscriptions \
+      "$(_brains_auth_creds_field "$_BRAINS_AUTH_LIVE_PROFILE" '.oauthAccount.emailAddress')" >&2
     return "$(_brains_auth_code_for_error 'no_subscriptions')"
   fi
 
