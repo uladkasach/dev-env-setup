@@ -19,11 +19,13 @@ one still wins are not a shadow; one install that wins over the pin is.
 
 ## .refs
 
-**the contract** (landed 2026-08-25, branch `casey/pin-claude-code-version`):
+**the contract** (landed 2026-08-25, branch `casey/pin-claude-code-version`; rehomed by the
+`install_env.*` → `grove.provision` reorg, which deleted the files this block first named):
 
-- `src/install_env.pt5.devtools.sh` → `prune_claude_code_shadows` — the operation named with it
-- `src/install_env.pt5.devtools.sh` → `configure_robot_brains` — the verify step whose failure
-  message names the cause: *"another claude install outranks the pinned pnpm copy on PATH"*
+- `src/grove.provision/5.devtools/5.3.brains/provision.upsert.sh` →
+  `_grove_provision_5_3_brains_prune_claude_shadows` — the operation named with it
+- `src/grove.provision/5.devtools/5.3.brains/provision.upsert.sh` — the header that names the
+  cause: *"can outrank the pinned pnpm copy on PATH, with no other check to notice the swap"*
 
 **the origin:**
 
