@@ -1,1 +1,1 @@
-../../../../src/emoji.index.build.sh
+../../../../src/grove.provision/2.shell/2.9.emoji/emoji.index.build.sh

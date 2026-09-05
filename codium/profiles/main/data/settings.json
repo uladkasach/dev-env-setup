@@ -304,7 +304,7 @@
   "github.copilot.advanced": {},
   "vsicons.dontShowNewVersionMessage": true,
   "terminal.integrated.customGlyphs": false,
-  "security.workspace.trust.untrustedFiles": "open",
+  "security.workspace.trust.untrustedFiles": "prompt",
   "github.copilot.editor.enableAutoCompletions": true,
   "files.associations": {
     "*.src": "shellscript"

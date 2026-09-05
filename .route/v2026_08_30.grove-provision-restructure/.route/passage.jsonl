@@ -1,0 +1,17 @@
+{"stone":"1.execute","status":"blocked"}
+{"stone":"1.execute","status":"arrived","reason":"entered guard reviews"}
+{"stone":"1.execute","status":"blocked","blocker":"review.self","reason":"review.self required: has-two-edits-per-delete"}
+{"stone":"1.execute","status":"arrived","reason":"entered guard reviews"}
+{"stone":"1.execute","status":"blocked","blocker":"review.self","reason":"review.self required: has-two-edits-per-delete"}
+{"stone":"1.execute","status":"arrived","reason":"entered guard reviews"}
+{"stone":"1.execute","status":"blocked","blocker":"review.self","reason":"review.self required: has-two-edits-per-delete"}
+{"stone":"1.execute","status":"promised","reason":"promised review.self: has-two-edits-per-delete"}
+{"stone":"1.execute","status":"promised","reason":"promised review.self: has-evidence-per-done-row"}
+{"stone":"1.execute","status":"promised","reason":"promised review.self: has-not-widened-the-ask"}
+{"stone":"1.execute","status":"promised","reason":"promised review.self: has-preserved-the-rung-step-split"}
+{"stone":"1.execute","status":"arrived","reason":"entered guard reviews"}
+{"stone":"1.execute","status":"blocked"}
+{"stone":"1.execute","status":"arrived","reason":"entered guard reviews"}
+{"stone":"1.execute","status":"blocked"}
+{"stone":"1.execute","status":"arrived","reason":"entered guard reviews"}
+{"stone":"1.execute","status":"passed"}

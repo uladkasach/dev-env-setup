@@ -27,7 +27,7 @@
 #   evidence, not by assumption — which is the only way a ⚠️ in a guard should ever come down
 #   (`hazard.a-clamp-can-lie-the-same-way-code-can.md`).
 #
-#   the risk it named is retired with it: the suite `source`s `src/brains.auth.sh` under
+#   the risk it named is retired with it: the suite `source`s `brains.auth.sh` under
 #   `set -u`, so a top-level reference to a variable the runner does not set would have aborted
 #   the run. it does not. that surface was once far larger — the suite used to source the whole
 #   4,300-line `bash_aliases.sh` monolith and inherit every unrelated alias's environment
@@ -38,8 +38,8 @@ name: test.brains.auth
 on:
   push:
     paths:
-      - 'src/brains.auth.sh'
-      - 'src/bash_aliases.sh'
+      - 'src/grove.provision/2.shell/2.7.aliases/brains.auth.sh'
+      - 'src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh'
       # ⚠️ `**`, not `*`. github path globs follow gitignore semantics, where a single `*`
       #   never crosses a `/` — so `brains.auth.*` matched the harness and the proxies but NOT
       #   `brains.auth.test.snap/*.snap`, one segment deeper. that left the gate blind to
@@ -50,8 +50,8 @@ on:
       - '.github/workflows/test.brains.auth.yml'
   pull_request:
     paths:
-      - 'src/brains.auth.sh'
-      - 'src/bash_aliases.sh'
+      - 'src/grove.provision/2.shell/2.7.aliases/brains.auth.sh'
+      - 'src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh'
       # ⚠️ `**`, not `*`. github path globs follow gitignore semantics, where a single `*`
       #   never crosses a `/` — so `brains.auth.*` matched the harness and the proxies but NOT
       #   `brains.auth.test.snap/*.snap`, one segment deeper. that left the gate blind to
@@ -90,7 +90,7 @@ jobs:
       - name: assert the suite and its baselines are tracked
         run: |
           for f in \
-            'src/brains.auth.sh' \
+            'src/grove.provision/2.shell/2.7.aliases/brains.auth.sh' \
             '.agent/repo=.this/role=any/skills/brains.auth.test.sh' \
             '.agent/repo=.this/role=any/skills/brains.auth.bootstrap.sh' \
             '.agent/repo=.this/role=any/skills/brains.auth.usage.sh' \

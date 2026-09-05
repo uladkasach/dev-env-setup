@@ -1,0 +1,110 @@
+#!/bin/bash
+#############################
+# machine_resource_procs_monitor (monitor daemon)
+# calls machine_resource_procs_find_runaway every 2 min, machine_resource_procs_find_orphan every 1 hr
+#############################
+
+STATE_DIR="$HOME/.local/state"
+COOLDOWN_FILE="$STATE_DIR/runaway_monitor.cooldown"
+COOLDOWN_SECONDS=600  # 10 minutes between resource alerts
+ORPHAN_RUN_COUNTER="$STATE_DIR/runaway_monitor.orphan-counter"
+ORPHAN_CHECK_INTERVAL=30  # check orphans every 30 runs (1 hour at 2-min intervals)
+
+mkdir -p "$STATE_DIR"
+
+# import graphical session env for notify-send (works on both X11 and Wayland)
+#
+# 🛑 .why a `case` over three names, and NEVER `eval`
+#
+#    this read `eval "$(systemctl --user show-environment | grep …)"` until
+#    2026-08-31. `show-environment` prints in a form MEANT for eval — which is
+#    the whole hazard: every byte of every value it prints becomes CODE in this
+#    daemon, which runs as the human, on the box that holds the keyrack.
+#
+#    the manager's environment is not a constant. `systemctl --user
+#    set-environment` writes it, and so does every other process already alive
+#    as this user. so a single write of `DISPLAY=:0;curl …|sh` makes this
+#    daemon run that on its next tick — and it ticks every 2 minutes, forever,
+#    with no prompt and no log a human reads. an eval turns a data channel into
+#    an execution channel, permanently.
+#
+#    ⇒ the fix states the ALLOWED shape rather than a filter on the bad one
+#      (`rule.require.solve-at-cause`): exactly three names are honored, each
+#      assigned DIRECTLY. a value is then only ever a string — it can carry no
+#      `;`, no `$(`, no backtick that means a thing, because it is never
+#      parsed as a command.
+#
+# ⚠️ `IFS='='` splits on the FIRST `=` only, so a dbus address keeps its own
+#    `=` (`unix:path=/run/user/1000/bus` survives intact).
+#
+# ⚠️ a value systemd chose to QUOTE arrives with its quotes literal here, where
+#    `eval` would have stripped them. that is the correct trade: none of these
+#    three holds a space in any real session, so a quoted value means an odd
+#    one — and an odd value is exactly what this block must not unwrap.
+if [[ -z "$DBUS_SESSION_BUS_ADDRESS" ]]; then
+  while IFS='=' read -r _env_key _env_value; do
+    case "$_env_key" in
+      DISPLAY) export DISPLAY="$_env_value" ;;
+      WAYLAND_DISPLAY) export WAYLAND_DISPLAY="$_env_value" ;;
+      DBUS_SESSION_BUS_ADDRESS) export DBUS_SESSION_BUS_ADDRESS="$_env_value" ;;
+    esac
+  done < <(systemctl --user show-environment 2>/dev/null)
+  unset _env_key _env_value
+fi
+
+#############################
+# runaway check (every run)
+#############################
+if command -v machine_resource_procs_find_runaway &>/dev/null; then
+  RUNAWAY_JSON=$(machine_resource_procs_find_runaway --json 2>/dev/null)
+  LOAD_HIGH=$(echo "$RUNAWAY_JSON" | grep -o '"load_high": [0-9]*' | grep -o '[0-9]*')
+  MEM_LOW=$(echo "$RUNAWAY_JSON" | grep -o '"mem_low": [0-9]*' | grep -o '[0-9]*')
+
+  if [[ "$LOAD_HIGH" == "1" || "$MEM_LOW" == "1" ]]; then
+    # check cooldown
+    SHOULD_ALERT=1
+    if [[ -f "$COOLDOWN_FILE" ]]; then
+      last_alert=$(cat "$COOLDOWN_FILE" 2>/dev/null)
+      if [[ "$last_alert" =~ ^[0-9]+$ ]]; then
+        now=$(date +%s)
+        if (( now - last_alert < COOLDOWN_SECONDS )); then
+          SHOULD_ALERT=0
+        fi
+      fi
+    fi
+
+    if [[ $SHOULD_ALERT -eq 1 ]]; then
+      RUNAWAY_MSG=$(machine_resource_procs_find_runaway 2>/dev/null)
+      notify-send -u critical "🔥 System Resource Alert" "$RUNAWAY_MSG"
+      date +%s > "$COOLDOWN_FILE"
+      logger -t runaway_monitor "ALERT: $RUNAWAY_JSON"
+    fi
+  else
+    # clear cooldown when system recovers
+    rm -f "$COOLDOWN_FILE"
+  fi
+fi
+
+#############################
+# orphan check (1/hr)
+#############################
+ORPHAN_COUNT=$(cat "$ORPHAN_RUN_COUNTER" 2>/dev/null || echo 0)
+if ! [[ "$ORPHAN_COUNT" =~ ^[0-9]+$ ]]; then
+  ORPHAN_COUNT=0
+fi
+ORPHAN_COUNT=$((ORPHAN_COUNT + 1))
+
+if (( ORPHAN_COUNT >= ORPHAN_CHECK_INTERVAL )); then
+  echo 0 > "$ORPHAN_RUN_COUNTER"
+
+  if command -v machine_resource_procs_find_orphan &>/dev/null; then
+    ORPHAN_OUTPUT=$(machine_resource_procs_find_orphan 2>/dev/null)
+    # check if orphans found (output contains 🪲 prey emoji)
+    if [[ "$ORPHAN_OUTPUT" == *"🪲"* ]]; then
+      notify-send -u normal "🐈 Orphan Caught" "$ORPHAN_OUTPUT"
+      logger -t runaway_monitor "ORPHAN_ALERT: found orphan processes"
+    fi
+  fi
+else
+  echo "$ORPHAN_COUNT" > "$ORPHAN_RUN_COUNTER"
+fi

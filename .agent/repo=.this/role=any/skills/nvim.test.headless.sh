@@ -10,7 +10,7 @@
 #         proves nvim-side behavior in CI / agent loops without a live editor.
 #
 # usage:
-#   nvim.test.headless.sh --check src/init.lua            # parse only (no exec)
+#   nvim.test.headless.sh --check src/grove.provision/4.terminal/4.5.nvim/init.lua  # parse only (no exec)
 #   nvim.test.headless.sh --run tests/foo.test.lua        # run a lua test file
 #   nvim.test.headless.sh --run tests/foo.test.lua --clean # run with clean config (-u NONE)
 #   nvim.test.headless.sh --lua "print(1+1)"              # run an inline lua snippet
@@ -125,7 +125,15 @@ if [[ "$MODE" == "check" ]]; then
     say_bad "nvim exited $CODE"
     exit 1  # malfunction: nvim itself crashed
   fi
-  if echo "$OUT" | grep -q 'SYNTAX OK'; then
+  # ⚠️ every match in this file is `grep … >/dev/null`, never `grep -q`. `-q`
+  #    exits at the first match, the `echo` subshell takes a SIGPIPE, and
+  #    pipefail hands the pipeline that 141 (`gotcha.pipefail-grep-q`). the two
+  #    fail-marker reads below are the dangerous polarity: a MATCH means the
+  #    human's test FAILED, so a false 141 falls past the marker branch and
+  #    reaches `say_ok "test passed"` — a failed test reported as a pass, which
+  #    is `rule.forbid.failhide` exactly. and an nvim stack traceback is the
+  #    large output that makes the SIGPIPE likely
+  if echo "$OUT" | grep 'SYNTAX OK' >/dev/null; then
     say_ok "parse clean"
     exit 0
   fi
@@ -144,7 +152,7 @@ if [[ "$MODE" == "run" ]]; then
   echo ""
   # a fail marker means the user's test/code failed → constraint (exit 2).
   # a bare non-zero exit with NO marker means nvim itself crashed → malfunction.
-  if echo "$OUT" | grep -Eq 'FAIL|SYNTAX ERROR|E[0-9]+:|stack traceback'; then
+  if echo "$OUT" | grep -E 'FAIL|SYNTAX ERROR|E[0-9]+:|stack traceback' >/dev/null; then
     say_bad "fail marker in output"
     exit 2  # constraint: the user's test/lua failed
   fi
@@ -171,7 +179,7 @@ if [[ "$MODE" == "lua" ]]; then
   echo ""
   # a lua error marker means the user's snippet is broken → constraint (exit 2).
   # a bare non-zero exit with no marker means nvim itself crashed → malfunction.
-  if echo "$OUT" | grep -Eq 'E[0-9]+:|stack traceback'; then
+  if echo "$OUT" | grep -E 'E[0-9]+:|stack traceback' >/dev/null; then
     say_bad "lua errored"
     exit 2  # constraint: the user's lua snippet has an error to fix
   fi

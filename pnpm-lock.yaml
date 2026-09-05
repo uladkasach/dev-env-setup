@@ -9,7 +9,7 @@ importers:
   .:
     devDependencies:
       rhachet:
-        specifier: ^1.47.3
+        specifier: 1.47.3
         version: 1.47.3(zod@4.3.4)
       rhachet-brains-anthropic:
         specifier: ^0.4.3

@@ -2,7 +2,7 @@
 ######################################################################
 # .what = proxy to the brains.auth.usage alias from THIS worktree
 #
-# .why  = the alias lives in src/brains.auth.sh, but a human's shell may
+# .why  = the alias lives in brains.auth.sh, but a human's shell may
 #         have an older copy loaded. this skill sources this worktree's
 #         copy and calls the function, so `rhx brains.auth.usage` always
 #         runs the current code — no manual re-source needed.
@@ -16,7 +16,7 @@
 
 set -uo pipefail
 
-# locate + source src/brains.auth.sh, and strip the rhx `--skill` token into ${ARGS[@]}
+# locate + source brains.auth.sh, and strip the rhx `--skill` token into ${ARGS[@]}
 # shellcheck disable=SC1091
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/brains.auth.bootstrap.sh"
 

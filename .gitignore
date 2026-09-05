@@ -2,5 +2,42 @@ node_modules
 *.local.json
 *.bak.*
 .log/
+
+# scratch drafts — dispatch bodies, probe output. they are written fast and
+# reviewed loosely, so they are the likeliest place for an account id, an arn,
+# or a hostname to slip into a PUBLIC repo (rule.forbid.dox-in-public-repo)
 .temp/
+
+# skill scratch — progress sentinels, rmsafe's trash, captured tool output.
+# every path under it is a WORKING NOTE a skill wrote for itself, so it is
+# per-machine by nature and belongs in no commit. same dox exposure as .temp/
 .agent/.cache/
+
+# PLAYS — a play lives in one of exactly two dirs, and only ONE is ignored.
+#
+#   .play/temporary/   IGNORED (below). a probe written to answer one question
+#                      and then discarded, or a rollback that un-converges a
+#                      test box. neither is a durable claim about this repo.
+#   .play/permanent/   TRACKED. a discrimination probe under
+#                      `rule.forbid.repair-plays` exception 2 — a clamp that
+#                      must reach every box, so its absence cannot be silent.
+#
+# 🛑 there is no third dir. `.agent/playbooks/` is forbidden.
+#
+# ⚠️ the ignore below is not a convenience — it is an ENFORCEMENT. a scratch
+# play that is never committed cannot rot into a clamp nobody runs, and a check
+# earns its keep by RUNNING, not by a seat in a directory
+# (gotcha.a-check-that-cries-wolf-gets-silenced, m.13).
+#
+# what a scratch play proved belongs in a BRIEF, as a measurement stated inline.
+# what a run must prove belongs in `git.grove.provision test`.
+#
+# either dir is reachable by slug — the sender resolves it, and halts if a name
+# is held by both:
+#   rhx git.grove.send <grove> --play <name>
+#   rhx play.run --play <name>            # tracked plays, on THIS box
+.play/temporary/
+
+# a RUNTIME lock — it names one machine's live process, so a commit of it
+# either lies to the next machine or blocks it
+.claude/scheduled_tasks.lock

@@ -1,0 +1,73 @@
+execute every item of the tasklist
+- in $route/0.tasklist.md
+
+.why = the tasklist was written 2026-08-30 from a live session's findings. it holds 22 items
+across 6 sections, and its order is load-bear: section A settles a name fork that sections
+B and C both depend on.
+
+---
+
+## .the order
+
+**A first, and halt on it.** A1 asks whether the family is `grove.provision` (noun-first,
+the extant 17 skills) or `provision.grove` (`rule.require.treestruct`'s `[verb][...noun]`).
+that answer decides every file B and C rename.
+
+⚠️ **A1 is a fulcrum whose rework is NOT clean** — a wrong guess renames 17 skills plus every
+brief, playbook, and howto that names them, and the reverse costs the same again. per
+`rule.always.defer-fulcrums-to-last` this is the rare case that earns a halt rather than a
+best-guess. surface it, take the human's answer, then drive.
+
+then B → C → D → E → F. within each section the items are independent unless the item says
+otherwise.
+
+## .the bar each item must clear
+
+| the item | is done when |
+|---|---|
+| a rename | every caller found by grep names the new word, and `rhx <new>` runs |
+| a delete | **TWO edits** — the file goes, AND every line that named it says what became of it |
+| a rule change | the rule's `.enforcement` section states the new bound |
+| a new dir | it is gitignored where the tasklist says so, and a brief names its purpose |
+
+## .what to NOT do
+
+- ⛔ do not fold a clamp into `test` without a run of that clamp first. a clamp moved
+  unverified is a clamp nobody has seen bite in its new home
+  (`gotcha.a-check-that-cries-wolf-gets-silenced`, `.the corollary`)
+- ⛔ do not delete a play until its two-question census answer is written down. the readme's
+  test is *"does any file CITE it, and is that citation a REACH or a FOOTNOTE?"* — an
+  undocumented delete cannot be audited
+- ⛔ do not repair E1 (rung 3's self-referential probe) by a guess. it needs a no-tmux box,
+  and the infra image ships tmux — so either summon a box that lacks it, or record why the
+  item stays open
+
+## .track progress in the yield
+
+after each item, append a row. the yield is the record a reader consults to learn what
+became of the tasklist, so a SKIPPED item needs a row as much as a done one.
+
+```md
+| item | verdict | what happened |
+|---|---|---|
+| A1 | ✔ done | human chose `grove.provision`; the extant family stands |
+| C2 | ⚠️ partial | 38 exhibits deleted; 4 held — each cited by a REACH, listed below |
+| E1 | 🌙 open | needs a no-tmux box; recorded inline at grove.ready.verify.sh |
+```
+
+⚠️ a `✔` row owes its EVIDENCE — the command run and what it answered, not a claim that it
+was run (`rule.require.trust-but-verify`).
+
+---
+
+reference
+- $route/0.tasklist.md
+- .agent/playbooks/.readme.md — the tool/clamp/exhibit split, and the cull test
+- .agent/repo=.this/role=any/briefs/grove/play/rule.forbid.repair-plays.md — the exception D3 retires
+- .agent/repo=.this/role=any/briefs/domain.terms/term=grove.bootstrap._.choice._.md — why `boot`
+- .agent/repo=.this/role=any/briefs/domain.terms/term=rung._.choice._.md — the rung/step split
+- .agent/repo=.this/role=any/briefs/grove/provision/rule.require.one-command-provision.md — what `boot` must hold
+
+---
+
+emit into $route/1.execute.yield.md

@@ -10,7 +10,7 @@
 #             owner-readable. never touches kitty remote control,
 #             never reads /proc/<pid>/environ (secrets stay unread).
 #             keeps allow_remote_control=no fully intact.
-#             see .agent/repo=.this/role=any/briefs/rule.require.security-paramount.md
+#             see .agent/repo=.this/role=any/briefs/creds/rule.require.security-paramount.md
 #
 # usage:
 #   kitty.snapshot.terminals.sh            # human tree (default)

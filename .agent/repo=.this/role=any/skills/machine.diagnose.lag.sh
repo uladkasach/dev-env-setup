@@ -18,11 +18,17 @@ if [[ "${1:-}" == "--quick" ]]; then
   QUICK_MODE=1
 fi
 
-# ensure snapshot command exists
+# the snapshot command must be installed
+#
+# ⚠️ the fix is the INSTALL PROCEDURE, not a source+call by hand. this line used
+#    to read `source .../install_env.pt1.system.performance.sh &&
+#    install_machine_usage_snapshot` — a one-off command, which
+#    rule.require.install-via-procedures forbids, and which broke the day that
+#    file was deleted. `1.7.usage` owns this command now.
 if ! command -v machine_usage_snapshot &>/dev/null; then
-  echo "⚠️  machine_usage_snapshot not found"
-  echo "   run: source ~/git/more/dev-env-setup/src/install_env.pt1.system.performance.sh && install_machine_usage_snapshot"
-  exit 1
+  echo "✋ machine_usage_snapshot is absent from PATH"
+  echo "   fix: cd ~/git/more/dev-env-setup && rhx grove.provision --what 1.7.usage --mode apply"
+  exit 2
 fi
 
 echo "🔍 capture snapshot..."

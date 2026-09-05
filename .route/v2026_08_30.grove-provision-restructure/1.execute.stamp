@@ -1,0 +1,20 @@
+🦉 the way speaks for itself
+
+🗿 route.stone.set
+   ├─ stone = 1.execute
+   ├─ passage = allowed
+   ├─ guard
+   │  ├─ artifacts
+   │  │   └─ $route/1.execute.yield.md
+   │  ├─ reviews
+   │  │   └─ r1: mechanic-rubrics (l1, 1/3)
+   │  │       ├─ constraint ✋
+   │  │       ├─ terminal — does not block higher levels
+   │  │       ├─ given: .route/v2026_08_30.grove-provision-restructure/.reviews/peer/1.execute._.review.i003.1b9deffb2f5f9fcd47.r001._.given.by_peer.mechanic-rubrics.md
+   │  │       └─ taken: .route/v2026_08_30.grove-provision-restructure/.reviews/peer/1.execute._.review.i003.1b9deffb2f5f9fcd47.r001._.taken.by_self.mechanic-rubrics.md
+   │  └─ judges
+   │      └─ j1: $rhachet run --repo bhrain --skill route.stone.judge --mechanism reviewed? --stone $stone --route $route --allow-blockers 0 --allow-nitpicks 3
+   │          └─ finished 1.1s ✓
+   │
+   └─ the way continues, run
+      └─ rhx route.drive

@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+######################################################################
+# .what = a two-stage low-battery guard that snapshots the kitty session
+#
+# .why  a snapshot at all
+#         a laptop that dies takes the window/pwd map with it, and that map
+#         is the expensive part of a session — a human can reopen ten kitty
+#         windows in a minute, but cannot recall which ten directories they
+#         were at. the snap is cheap and is read back by
+#         briefs/desktop/term/howto.restore-kitty-session.md
+#
+# .why  TWO stages and not one
+#         one snap at 5% is a single point of failure: if the box sleeps,
+#         suspends, or the timer misses its window in that last band, the
+#         map is lost. the 10% snap is the durable one; the 5% snap is the
+#         fresher one. either alone is worse than both.
+#
+# .why  each stage fires ONCE per discharge episode
+#         the timer polls every 3 minutes, so a box left at 7% would snap
+#         twenty times an hour and bury the useful snaps under noise. the
+#         two marker files make each stage one-shot, and both are cleared
+#         the moment the box is back on power or back above the warn band —
+#         so the stages re-arm on the NEXT descent, not on a plateau.
+#
+# .why  it declines silently when there is no battery
+#         a desktop and a grove both have no BAT0. this is installed by a
+#         bundle that already declines off-screen, but the guard is also
+#         reachable by hand, so it answers honestly rather than errors.
+#
+# ⚠️ .why it calls the INSTALLED snapper and not a checkout path
+#         this file lives at `~/.local/bin`, invoked by systemd at battery
+#         time. it has no `$GROVE_SRC`, no cwd it can trust, and no way to
+#         learn which checkout installed it — so it must name an absolute
+#         path that holds forever.
+#
+#         it names `~/.local/bin/kitty.snap`, which the SAME bundle phase
+#         installs from `src/machine/`. the two therefore arrive together or
+#         not at all, and `4.3.4.snapshot`'s verify diffs both against the
+#         checkout.
+#
+#         a path into a canonical git clone is worse twice over: the guard then
+#         depends on a repo that stays cloned at one spot
+#         (`rule.require.bundles-own-their-dependencies`), and the file it names
+#         lives outside `src/` — the deployable unit — so a box provisioned by
+#         `git.grove.push --from src` gets this guard and never the snapper it
+#         calls.
+#
+# .security
+#         reads only /sys/class/power_supply and, through the snapper, /proc.
+#         it never touches kitty remote control and never reads an env
+#         block. see briefs/creds/rule.require.security-paramount.md
+######################################################################
+
+WARN=10  # first snap on descent past this
+CRIT=5   # second snap on descent past this
+BATT="/sys/class/power_supply/BAT0"
+SNAP_DIR="$HOME/.kitty/snaps"
+MARK_WARN="$SNAP_DIR/.lowbatt.warn.snapped"
+MARK_CRIT="$SNAP_DIR/.lowbatt.crit.snapped"
+SNAPPER="$HOME/.local/bin/kitty.snap"
+
+# no battery -> decline
+[[ -r "$BATT/capacity" && -r "$BATT/status" ]] || exit 0
+
+cap=$(cat "$BATT/capacity" 2>/dev/null)
+status=$(cat "$BATT/status" 2>/dev/null)
+[[ "$cap" =~ ^[0-9]+$ ]] || exit 0
+
+# re-arm both stages when on power, or when back above the warn band, so a
+# snap fires only on DESCENT.
+# ⚠️ the literal below is the value the kernel writes into BAT0/status. it is
+#    a kernel string, not prose, so it is spelled exactly as the kernel does.
+if [[ "$status" != "Discharging" || "$cap" -gt "$WARN" ]]; then
+  rm -f "$MARK_WARN" "$MARK_CRIT"
+  exit 0
+fi
+
+mkdir -p "$SNAP_DIR"
+
+# ⚠️ the snapper is invoked through `bash`, not executed directly. the exec bit
+#    is not carried by every path a checkout arrives on (a zip, an archive, a
+#    noexec mount), and a guard that fails at 5% battery because of a mode bit
+#    would lose exactly the map it exists to save.
+
+# critical band: snap once past 5%
+if [[ "$cap" -le "$CRIT" ]]; then
+  [[ -f "$MARK_CRIT" ]] && exit 0
+  bash "$SNAPPER" --save >/dev/null 2>&1
+  touch "$MARK_CRIT"
+  logger -t kitty_snap_lowbatt "battery ${cap}% (<=${CRIT}%) — snapped kitty session"
+  exit 0
+fi
+
+# warn band: 5% < cap <= 10%, snap once
+[[ -f "$MARK_WARN" ]] && exit 0
+bash "$SNAPPER" --save >/dev/null 2>&1
+touch "$MARK_WARN"
+logger -t kitty_snap_lowbatt "battery ${cap}% (<=${WARN}%) — snapped kitty session"

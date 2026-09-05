@@ -1,0 +1,383 @@
+#!/usr/bin/env bash
+######################################################################
+# machine_usage_snapshot — capture comprehensive system state for lag diagnosis
+#
+# usage:
+#   machine_usage_snapshot              # snapshot to ~/.cache/machine.usage.snapshots/
+#   machine_usage_snapshot --stdout     # print to stdout instead of file
+#   machine_usage_snapshot --dir /path  # custom output directory
+#
+# captures:
+#   - timestamp, hostname, kernel
+#   - load average (1, 5, 15 min) vs cores
+#   - cpu usage breakdown (user, system, iowait, idle)
+#   - memory stats (total, avail, used, cached, buffers, swap)
+#   - top 15 cpu processes with full details
+#   - top 15 mem processes with full details
+#   - d-state processes (blocked on I/O)
+#   - zombie processes
+#   - disk I/O stats
+#   - file descriptor usage
+#   - network connection counts
+#   - recent kernel messages (dmesg)
+#   - temperatures (if sensors available)
+######################################################################
+
+set -euo pipefail
+
+SNAPSHOT_DIR="$HOME/.cache/machine.usage.snapshots"
+STDOUT_MODE=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --stdout)
+      STDOUT_MODE=1
+      shift
+      ;;
+    --dir)
+      SNAPSHOT_DIR="$2"
+      shift 2
+      ;;
+    *)
+      echo "Usage: machine_usage_snapshot [--stdout] [--dir /path]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# timestamp for filename and content
+TS=$(date '+%Y-%m-%d_%H-%M-%S')
+TS_HUMAN=$(date '+%Y-%m-%d %H:%M:%S %Z')
+
+# output destination
+if [[ $STDOUT_MODE -eq 1 ]]; then
+  exec 3>&1
+else
+  mkdir -p "$SNAPSHOT_DIR"
+  OUTFILE="$SNAPSHOT_DIR/snapshot.$TS.txt"
+  exec 3>"$OUTFILE"
+fi
+
+emit() {
+  echo "$@" >&3
+}
+
+emit "╔══════════════════════════════════════════════════════════════════╗"
+emit "║  MACHINE USAGE SNAPSHOT                                          ║"
+emit "║  $TS_HUMAN"
+emit "╚══════════════════════════════════════════════════════════════════╝"
+emit ""
+
+# --- system info ---
+emit "┌─ SYSTEM ────────────────────────────────────────────────────────┐"
+emit "│ hostname: $(hostname)"
+emit "│ kernel:   $(uname -r)"
+emit "│ uptime:   $(uptime -p)"
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- load average ---
+CORES=$(nproc)
+read -r LOAD1 LOAD5 LOAD15 _ < /proc/loadavg
+emit "┌─ LOAD AVERAGE ──────────────────────────────────────────────────┐"
+emit "│ cores: $CORES"
+emit "│ load:  $LOAD1 (1m)  $LOAD5 (5m)  $LOAD15 (15m)"
+emit "│ ratio: $(echo "scale=2; $LOAD1 / $CORES" | bc) (1m)  $(echo "scale=2; $LOAD5 / $CORES" | bc) (5m)  $(echo "scale=2; $LOAD15 / $CORES" | bc) (15m)"
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- cpu breakdown ---
+emit "┌─ CPU BREAKDOWN ─────────────────────────────────────────────────┐"
+if command -v mpstat &>/dev/null; then
+  MPSTAT_OUT=$(mpstat 1 1 2>/dev/null | tail -1 | awk '{printf "│ user: %s%%  system: %s%%  iowait: %s%%  idle: %s%%\n", $3, $5, $6, $12}' || true)
+  if [[ -n "$MPSTAT_OUT" ]]; then
+    emit "$MPSTAT_OUT"
+  else
+    emit "│ (mpstat output unavailable)"
+  fi
+else
+  # fallback: parse /proc/stat
+  read -r _ user nice system idle iowait _ < /proc/stat
+  total=$((user + nice + system + idle + iowait))
+  emit "│ user: $((user * 100 / total))%  system: $((system * 100 / total))%  iowait: $((iowait * 100 / total))%  idle: $((idle * 100 / total))%"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- memory ---
+MEM_TOTAL_KB=$(awk '/MemTotal/{print $2}' /proc/meminfo)
+MEM_AVAIL_KB=$(awk '/MemAvailable/{print $2}' /proc/meminfo)
+MEM_FREE_KB=$(awk '/MemFree/{print $2}' /proc/meminfo)
+MEM_CACHED_KB=$(awk '/^Cached/{print $2}' /proc/meminfo)
+MEM_BUFFERS_KB=$(awk '/Buffers/{print $2}' /proc/meminfo)
+MEM_USED_KB=$((MEM_TOTAL_KB - MEM_AVAIL_KB))
+MEM_TOTAL_GB=$(echo "scale=1; $MEM_TOTAL_KB / 1048576" | bc)
+MEM_AVAIL_GB=$(echo "scale=1; $MEM_AVAIL_KB / 1048576" | bc)
+MEM_USED_GB=$(echo "scale=1; $MEM_USED_KB / 1048576" | bc)
+MEM_CACHED_GB=$(echo "scale=1; $MEM_CACHED_KB / 1048576" | bc)
+MEM_AVAIL_PCT=$((MEM_AVAIL_KB * 100 / MEM_TOTAL_KB))
+
+# swap
+SWAP_TOTAL_KB=$(awk '/SwapTotal/{print $2}' /proc/meminfo)
+SWAP_FREE_KB=$(awk '/SwapFree/{print $2}' /proc/meminfo)
+SWAP_USED_KB=$((SWAP_TOTAL_KB - SWAP_FREE_KB))
+if [[ $SWAP_TOTAL_KB -gt 0 ]]; then
+  SWAP_TOTAL_GB=$(echo "scale=1; $SWAP_TOTAL_KB / 1048576" | bc)
+  SWAP_USED_GB=$(echo "scale=1; $SWAP_USED_KB / 1048576" | bc)
+  SWAP_USED_PCT=$((SWAP_USED_KB * 100 / SWAP_TOTAL_KB))
+else
+  SWAP_TOTAL_GB="0"
+  SWAP_USED_GB="0"
+  SWAP_USED_PCT=0
+fi
+
+emit "┌─ MEMORY ─────────────────────────────────────────────────────────┐"
+emit "│ total:     ${MEM_TOTAL_GB}G"
+emit "│ used:      ${MEM_USED_GB}G ($((100 - MEM_AVAIL_PCT))%)"
+emit "│ available: ${MEM_AVAIL_GB}G (${MEM_AVAIL_PCT}%)"
+emit "│ cached:    ${MEM_CACHED_GB}G"
+emit "│ swap:      ${SWAP_USED_GB}G / ${SWAP_TOTAL_GB}G (${SWAP_USED_PCT}%)"
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- top cpu processes ---
+emit "┌─ TOP 15 CPU PROCESSES ───────────────────────────────────────────┐"
+# 🛑 .why `awk 'NR>=2 && NR<=16'` and NOT `head -16 | tail -15` — measured 2026-08-13
+#
+#    this file runs under `set -euo pipefail` (line 26), and `head -N` EXITS the
+#    instant it has N lines. that closes the pipe, `ps` takes SIGPIPE, the
+#    pipeline reports 141, and `-e` ABORTS the whole snapshot right here.
+#
+#    it is size-dependent, which is why it never showed up: a pipe buffer holds
+#    64KB, and `ps aux` measured 29812 bytes over 188 lines on a grove — about
+#    159 bytes a line. so `ps` finishes into the buffer and exits 0 whenever the
+#    box has fewer than ~412 processes, and every ordinary run passed.
+#
+# ⚠️ past ~412 processes it aborts — and that is precisely the runaway-process
+#    condition this tool exists to capture. this very box has hit 641 procs (a
+#    leaked-daemon incident), so the snapshot would have died at this line on the
+#    one day a human needed it, and left a truncated file that reads as complete.
+#    it runs unattended from a systemd timer with output redirected away, so no
+#    one would have seen the abort either (`gotcha.pipefail-grep-q`).
+#
+#    `awk` reads the stream to the end, so the producer is never signalled. the
+#    `NR>=2` also drops ps's header, which is what the old `| tail -15` was for.
+ps aux --sort=-%cpu | awk 'NR>=2 && NR<=16' | while read -r user pid cpu mem vsz rss tty stat start time cmd; do
+  # dead-on-read: process exited between the ps snapshot and this re-read.
+  # report it as exited rather than fake an age from system uptime.
+  if [[ ! -r /proc/$pid/stat ]]; then
+    emit "│ [exited]"
+    emit "│   pid=$pid  cpu=${cpu}%  mem=${mem}%  (gone before re-read)"
+    emit "│"
+    continue
+  fi
+  comm=$(cat /proc/$pid/comm 2>/dev/null || echo "?")
+  cwd=$(readlink /proc/$pid/cwd 2>/dev/null | sed "s|^$HOME|~|" || echo "?")
+  # elapsed time — only trust a real start time; else show "?"
+  clk_tck=$(getconf CLK_TCK)
+  uptime_sec=$(awk '{print int($1)}' /proc/uptime)
+  # ⚠️ `|| true` because awk exits 2 when it cannot OPEN the file, and this
+  #    command runs under `set -e`. the -r guard above is checked microseconds
+  #    earlier, so a process that exits in between takes the WHOLE capture down —
+  #    silently, since 2>/dev/null eats awk's message but not its status. the
+  #    file then ends mid-section and reads as a complete snapshot.
+  #    measured 2026-07-30: reproduced on every run driven from inside
+  #    `grove.provision`, whose own subprocess churn is what makes the top-cpu
+  #    pid vanish; a bare run from a quiet shell almost never hit it.
+  starttime=$(awk '{print $22}' /proc/$pid/stat 2>/dev/null || true)
+  elapsed="?"
+  if [[ -n "$starttime" && "$starttime" -gt 0 ]]; then
+    start_sec=$((starttime / clk_tck))
+    elapsed_sec=$((uptime_sec - start_sec))
+    elapsed_min=$((elapsed_sec / 60))
+    elapsed_hr=$((elapsed_min / 60))
+    if [[ $elapsed_hr -gt 0 ]]; then
+      elapsed="${elapsed_hr}h$((elapsed_min % 60))m"
+    elif [[ $elapsed_min -gt 0 ]]; then
+      elapsed="${elapsed_min}m"
+    else
+      elapsed="${elapsed_sec}s"
+    fi
+  fi
+  emit "│ $comm"
+  emit "│   pid=$pid  cpu=${cpu}%  mem=${mem}%  elapsed=$elapsed"
+  emit "│   cwd=$cwd"
+  emit "│   cmd=${cmd:0:70}"
+  emit "│"
+done
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- top mem processes ---
+emit "┌─ TOP 15 MEM PROCESSES ───────────────────────────────────────────┐"
+# `awk` rather than `head | tail` for the same reason as the cpu block above:
+# `head` exits early, SIGPIPEs `ps`, and `-e` + `pipefail` abort the snapshot
+ps aux --sort=-%mem | awk 'NR>=2 && NR<=16' | while read -r user pid cpu mem vsz rss tty stat start time cmd; do
+  comm=$(cat /proc/$pid/comm 2>/dev/null || echo "?")
+  rss_mb=$((rss / 1024))
+  emit "│ $comm"
+  emit "│   pid=$pid  mem=${mem}% (${rss_mb}MB)  cpu=${cpu}%"
+  emit "│   cmd=${cmd:0:70}"
+  emit "│"
+done
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- d-state processes (blocked on I/O) ---
+emit "┌─ D-STATE PROCESSES (blocked on I/O) ─────────────────────────────┐"
+# ⚠️ the cap is `NR<=10` inside awk, NOT a `| head -10`. under this file's
+#    `set -euo pipefail`, a `head` that exits at its tenth line SIGPIPEs the
+#    stage before it, pipefail reports 141, and `-e` aborts the whole snapshot.
+#    it would abort at exactly >10 blocked processes — the io-thrash condition
+#    this section exists to record (gotcha.pipefail-grep-q, .the head variant)
+DSTATE=$(ps aux | awk '$8 ~ /D/ && ++n<=10 {print $2, $11}')
+if [[ -n "$DSTATE" ]]; then
+  echo "$DSTATE" | while read -r pid cmd; do
+    emit "│ pid=$pid  cmd=$cmd"
+  done
+else
+  emit "│ (none)"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- zombie processes ---
+emit "┌─ ZOMBIE PROCESSES ───────────────────────────────────────────────┐"
+# same cap-inside-awk as the d-state block above, for the same reason: a
+# `| head -10` here would abort the snapshot at exactly >10 zombies
+ZOMBIES=$(ps aux | awk '$8 == "Z" && ++n<=10 {print $2, $11}')
+if [[ -n "$ZOMBIES" ]]; then
+  echo "$ZOMBIES" | while read -r pid cmd; do
+    emit "│ pid=$pid  cmd=$cmd"
+  done
+else
+  emit "│ (none)"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- disk I/O ---
+emit "┌─ DISK I/O ───────────────────────────────────────────────────────┐"
+if command -v iostat &>/dev/null; then
+  # `awk` does the skip-3-and-cap-10 that `tail -n +4 | head -10` did, so the
+  # cap cannot SIGPIPE its producer. the `|| true` remains for iostat's OWN
+  # failure, which the empty-check below reports rather than swallows
+  IOSTAT_OUT=$(iostat -dx 1 1 2>/dev/null | awk 'NR>=4 && NR<=13' || true)
+  if [[ -n "$IOSTAT_OUT" ]]; then
+    echo "$IOSTAT_OUT" | while read -r line; do
+      emit "│ $line"
+    done
+  else
+    emit "│ (no iostat output)"
+  fi
+else
+  emit "│ (iostat not available; install sysstat)"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- file descriptors ---
+emit "┌─ FILE DESCRIPTORS ───────────────────────────────────────────────┐"
+FD_USED=$(cat /proc/sys/fs/file-nr | awk '{print $1}')
+FD_MAX=$(cat /proc/sys/fs/file-nr | awk '{print $3}')
+emit "│ used: $FD_USED / $FD_MAX"
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- network connections ---
+emit "┌─ NETWORK CONNECTIONS ────────────────────────────────────────────┐"
+if command -v ss &>/dev/null; then
+  ESTABLISHED=$(ss -t state established | wc -l)
+  TIME_WAIT=$(ss -t state time-wait | wc -l)
+  LISTEN_COUNT=$(ss -tln | wc -l)
+  emit "│ established: $ESTABLISHED  time-wait: $TIME_WAIT  listen: $LISTEN_COUNT"
+else
+  emit "│ (ss not available)"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- recent kernel messages ---
+emit "┌─ RECENT KERNEL MESSAGES (last 20) ───────────────────────────────┐"
+DMESG_OUT=$(dmesg --time-format iso 2>/dev/null | tail -20 || true)
+if [[ -n "$DMESG_OUT" ]]; then
+  echo "$DMESG_OUT" | while read -r line; do
+    emit "│ ${line:0:70}"
+  done
+else
+  emit "│ (dmesg not accessible - may require sudo)"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- temperatures ---
+emit "┌─ TEMPERATURES ───────────────────────────────────────────────────┐"
+if command -v sensors &>/dev/null; then
+  # 🛑 the prior form was `sensors | grep -E … | head -10`, and under this
+  #    file's `set -euo pipefail` it held TWO aborts, not one:
+  #      1. `head` exits at its tenth line → SIGPIPEs grep → 141 → `-e` aborts.
+  #         a box with more than ten thermal readings is ordinary, not extreme
+  #      2. `grep` exits 1 when it matches no line at all → pipefail → `-e`
+  #         aborts. so a box with `sensors` installed and no matching label
+  #         killed the whole snapshot, at its last section, output redirected away
+  #    awk caps without an early exit and exits 0 on an empty match, so both go
+  sensors 2>/dev/null | awk '/(Core|temp|Tctl|Tdie)/ && ++n<=10' | while read -r line; do
+    emit "│ $line"
+  done
+else
+  # fallback: check thermal zones
+  for tz in /sys/class/thermal/thermal_zone*/temp; do
+    if [[ -f "$tz" ]]; then
+      name=$(basename "$(dirname "$tz")")
+      temp=$(cat "$tz" 2>/dev/null || echo "0")
+      temp_c=$((temp / 1000))
+      emit "│ $name: ${temp_c}°C"
+    fi
+  done
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- process counts ---
+emit "┌─ PROCESS COUNTS ─────────────────────────────────────────────────┐"
+TOTAL_PROCS=$(ps aux | wc -l)
+ACTIVE=$(ps aux | awk '$8 ~ /R/ {count++} END {print count+0}')
+IDLE=$(ps aux | awk '$8 ~ /S/ {count++} END {print count+0}')
+emit "│ total: $TOTAL_PROCS  active: $ACTIVE  idle: $IDLE"
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+# --- top open files by process ---
+emit "┌─ TOP 10 PROCESSES BY OPEN FILES ─────────────────────────────────┐"
+# collect open file counts safely
+OPEN_FILES_DATA=$(
+  # `awk 'NR<=100'` rather than `head -100`, per the cpu block's measurement.
+  # `ps -eo pid` writes ~7 bytes a line, so ~9300 processes would be needed to
+  # outrun a 64KB pipe buffer and make `head` bite here — far past this box's
+  # worst measured count. it is written this way anyway, because a cap that is
+  # safe only below some process count is a defect that waits for its condition
+  for pid in $(ps -eo pid --no-headers 2>/dev/null | awk 'NR<=100'); do
+    if [[ -d /proc/$pid/fd ]]; then
+      count=$(ls -1 /proc/$pid/fd 2>/dev/null | wc -l || echo "0")
+      comm=$(cat /proc/$pid/comm 2>/dev/null || echo "?")
+      echo "$count $pid $comm"
+    fi
+  # the `|| true` remains for the per-pid `ls`/`cat` above, which race a process
+  # that exits mid-loop. the cap is awk's, so it adds no failure of its own
+  done 2>/dev/null | sort -rn | awk 'NR<=10' || true
+)
+if [[ -n "$OPEN_FILES_DATA" ]]; then
+  echo "$OPEN_FILES_DATA" | while read -r count pid comm; do
+    emit "│ $comm (pid=$pid): $count open files"
+  done
+else
+  emit "│ (no data)"
+fi
+emit "└─────────────────────────────────────────────────────────────────┘"
+emit ""
+
+emit "═══════════════════════════════════════════════════════════════════"
+
+if [[ $STDOUT_MODE -eq 0 ]]; then
+  echo "📸 snapshot saved: $OUTFILE"
+fi

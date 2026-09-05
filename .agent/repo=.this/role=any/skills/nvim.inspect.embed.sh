@@ -143,7 +143,7 @@ inspect_one() {
   if [[ $DO_STRACE -eq 1 ]]; then
     echo "🕵️  strace sample (2s, needs sudo — the actual hot syscalls):"
     if command -v strace >/dev/null 2>&1; then
-      timeout 2 sudo strace -f -p "$pid" -e trace=all -c 2>/tmp/nvim-inspect-strace."$pid" || true
+      timeout -k 2 2 sudo strace -f -p "$pid" -e trace=all -c 2>/tmp/nvim-inspect-strace."$pid" || true
       sed 's/^/   /' /tmp/nvim-inspect-strace."$pid" 2>/dev/null | head -30 || echo "   (strace produced no output / permission denied)"
     else
       echo "   (strace not installed)"

@@ -6,3 +6,46 @@ extends:
 env.prod: null
 env.test: null
 env.all: null
+
+# the camp account is where groves live. every git.grove.* skill and
+# aws.ec2.get --env camp resolves AWS_PROFILE from here — without this
+# declaration they fail with "no AWS_PROFILE in the keyrack for env=camp",
+# and a bare `keyrack unlock --env camp` matches no key and silently succeeds
+env.camp:
+  - AWS_PROFILE
+
+  # the box's github credential, drawn by `git-credential-keyrack` so that a
+  # plain `git clone`/`git pull` over https authenticates with no gh, no ssh key,
+  # and no token exported into a shell.
+  #
+  # ⚠️ it is declared under `camp` and NOT `prep`, and it is `GITHUB_TOKEN` and
+  #    NOT `EHMPATHY_SEATURTLE_GITHUB_TOKEN`, because those name a DIFFERENT
+  #    credential: the seaturtle key is the mechanic's own commit/push token,
+  #    with its own owner and its own rotation. this one belongs to the BOX.
+  #    to reuse the mechanic's key here would tie a grove's ability to clone to
+  #    the rotation of a robot's commit identity.
+  #
+  #    `camp` is already this repo's word for grove infrastructure — see the
+  #    AWS_PROFILE note above — so a grove's github token is a camp credential
+  #    by the same logic that puts its aws profile here.
+  #
+  #    the helper reads it as `@all.camp.GITHUB_TOKEN`. `@all` is a REQUIREMENT:
+  #    a box credential belongs to no single org, and git invokes a credential
+  #    helper from whatever clone the human stands in.
+  #
+  # ✔ PROVEN end to end 2026-08-05 at rhachet@1.45.1: read cold on grove-1
+  #    (40 bytes, a classic pat), and it served a private clone over plain https
+  #    from BOTH orgs plus `gh repo list` on both.
+  #    — re-proven on every provision by `git.grove.provision test`, whose suite
+  #      step clones ahbode/svc-chat over plain https
+  #
+  # ⚠️ the pat needs BOTH scopes. `repo` serves the CLONE; `read:org` serves
+  #    DISCOVERY. one with only `repo` clones every repo you name and cannot
+  #    tell you what there is to name — see define.github-auth-two-paths.
+  #
+  # 📜 this block read "BLOCKED as of 2026-08-03 — keyrack cannot READ an `@all`
+  #    slug" until 2026-08-05. resolved upstream. the lesson that outlived it:
+  #    a `✔ set` is a claim about the ENTRY and says none of the SLUG that names
+  #    it — two sessions read it as "the credential is placed" and were wrong
+  #    both times, at the cost of a real pat each. see domain.terms/term=entry.
+  - GITHUB_TOKEN

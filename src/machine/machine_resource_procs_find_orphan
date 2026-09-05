@@ -1,0 +1,67 @@
+#!/bin/bash
+#############################
+# machine_resource_procs_find_orphan
+# finds processes whose cwd was deleted
+#############################
+
+KILL_MODE=""
+if [[ "$1" == "--kill" ]]; then
+  KILL_MODE="all"
+  if [[ -n "$2" && "$2" != --* ]]; then
+    KILL_MODE="$2"
+  fi
+fi
+
+ORPHAN_PIDS=""
+ORPHAN_INFO=""
+
+for pid in $(ps -u "$USER" -o pid= 2>/dev/null); do
+  # skip if we can't read the cwd (process may have exited)
+  cwd=$(readlink /proc/$pid/cwd 2>/dev/null) || continue
+
+  # check if cwd is deleted or doesn't exist
+  if [[ "$cwd" == *"(deleted)"* ]] || [[ ! -d "$cwd" ]]; then
+    comm=$(cat /proc/$pid/comm 2>/dev/null || echo "unknown")
+    ORPHAN_PIDS+="$pid "
+    ORPHAN_INFO+="$pid ($comm): $cwd\n"
+  fi
+done
+
+if [[ -z "$ORPHAN_PIDS" ]]; then
+  echo "🐈 lets prowl..."
+  echo "└─🌕 orphan"
+  echo "  └─✨ no strays"
+  exit 0
+fi
+
+echo "🐈 lets prowl..."
+echo "└─🌕 orphan"
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  echo "  ├─🪲 $line"
+done <<< "$(echo -e "$ORPHAN_INFO")"
+echo "  └─🪄 kill -9 $ORPHAN_PIDS"
+
+if [[ -n "$KILL_MODE" ]]; then
+  echo ""
+  if [[ "$KILL_MODE" == "all" ]]; then
+    echo "Kill all orphan processes..."
+    kill -9 $ORPHAN_PIDS 2>/dev/null
+  else
+    # filter by prefix
+    FILTERED_PIDS=""
+    for pid in $ORPHAN_PIDS; do
+      comm=$(cat /proc/$pid/comm 2>/dev/null || echo "")
+      if [[ "$comm" == *"$KILL_MODE"* ]]; then
+        FILTERED_PIDS+="$pid "
+      fi
+    done
+    if [[ -z "$FILTERED_PIDS" ]]; then
+      echo "No orphan processes matching '$KILL_MODE'"
+    else
+      echo "Kill orphan processes matching '$KILL_MODE': $FILTERED_PIDS"
+      kill -9 $FILTERED_PIDS 2>/dev/null
+    fi
+  fi
+  echo "Done."
+fi
