@@ -14,10 +14,10 @@ is filed under, derived from the token rather than invented by a human.
 
 ## .refs
 where the term is declared / used:
-- src/brains.auth.sh                                  # `--reach`, `_brains_auth_is_reach`
-- src/brains.auth.sh                                  # `_brains_auth_active_reach`, `_brains_auth_reaches`
-- src/brains.auth.sh                                  # `_brains_auth_reach_from_flag`, `_brains_auth_has_reach`
-- src/brains.auth.sh                                  # `_brains_auth_node_for_reach`
+- src/grove.provision/2.shell/2.7.aliases/brains.auth.sh                                  # `--reach`, `_brains_auth_is_reach`
+- src/grove.provision/2.shell/2.7.aliases/brains.auth.sh                                  # `_brains_auth_active_reach`, `_brains_auth_reaches`
+- src/grove.provision/2.shell/2.7.aliases/brains.auth.sh                                  # `_brains_auth_reach_from_flag`, `_brains_auth_has_reach`
+- src/grove.provision/2.shell/2.7.aliases/brains.auth.sh                                  # `_brains_auth_node_for_reach`
 - .agent/repo=.this/role=any/skills/brains.auth.usage.sh
 - .agent/repo=.this/role=any/skills/brains.auth.use.sh
 - .agent/repo=.this/role=any/skills/brains.auth.set.sh

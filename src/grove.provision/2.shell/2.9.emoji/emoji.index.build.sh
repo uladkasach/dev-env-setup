@@ -38,10 +38,10 @@
 #       is an emoji, rather than hand-roll a codepoint range.
 #
 # usage:
-#   bash src/emoji.index.build.sh --cldr <annotations.json> \
-#                                 --list <emoji-test.txt> \
-#                                 --into <emoji.tsv>
-#   bash src/emoji.index.build.sh --check <emoji.tsv>
+#   bash src/grove.provision/2.shell/2.9.emoji/emoji.index.build.sh \
+#          --cldr <annotations.json> --list <emoji-test.txt> --into <emoji.tsv>
+#   bash src/grove.provision/2.shell/2.9.emoji/emoji.index.build.sh \
+#          --check <emoji.tsv>
 #
 # guarantee:
 #   - it reaches NO network; both inputs are handed to it

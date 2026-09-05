@@ -8,7 +8,7 @@
 #   - it is silent about whether ❤️ and ⚠️ made it through the FE0F strip
 #   - 📜 both of those are defects this transform has shipped
 #   - ⇒ the check is the same `--check` the build runs on itself
-#   - declared ONCE in `src/emoji.index.build.sh`
+#   - declared ONCE in this bundle's own `emoji.index.build.sh`
 #   - (`rule.require.identical-bundle-composition`)
 #
 # ⚠️ it also tests the STAMP against the checkout

@@ -1,1 +1,1 @@
-../../../../src/emoji.test.zsh
+../../../../src/grove.provision/2.shell/2.9.emoji/emoji.test.zsh

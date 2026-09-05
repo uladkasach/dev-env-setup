@@ -131,7 +131,8 @@ SELF_REL=""
 CENSUS=(
   "src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh|2|MIXED|:57 AWS_PROFILE → export (NAME). :3650 a DSN → mktemp 0700 tmpfs + config 0600 + trap rm (MEMORY, RAM-only)"
   "src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh|1|MEMORY|:404 GITHUB_TOKEN → stdout, git's credential-helper protocol. git holds no copy; it re-asks per fetch"
-  "src/grove.provision/5.devtools/5.4.gh/configure.upsert.sh|1|PERSISTS|:207 GITHUB_TOKEN → gh auth login --with-token → ~/.config/gh/hosts.yml CLEARTEXT. THE one open finding — see the block below"
+  "src/grove.provision/5.devtools/5.4.gh/configure.upsert.sh|1|PERSISTS|:207 GITHUB_TOKEN → gh auth login --with-token → ~/.config/gh/hosts.yml CLEARTEXT. an OPEN finding — see its justification below"
+  "src/grove.provision/2.shell/2.7.aliases/brains.auth.sh|1|PERSISTS|:894 the parked claude oauth token → ~/.claude/.credentials.json on a swap. ACCEPTED, not open — see its justification below"
   "src/grove.provision/5.devtools/5.13.reach/configure.verify.sh|1|NAME|:60 AWS_PROFILE → compared against the declared name"
   "src/grove.provision/5.devtools/5.12.rack/configure.verify.sh|2|MEMORY|:72/:155 fetches to prove the rack ANSWERS on this seat; the bytes are counted and compared, never stored"
   ".agent/repo=.this/role=any/skills/git.grove.auth.github.set.sh|1|MEMORY|:389 a reachability PROBE, redirected to /dev/null on the remote"
@@ -299,15 +300,53 @@ for c in "${CENSUS[@]}"; do
   [[ "$class" == "PERSISTS" ]] && PERSIST_N=$((PERSIST_N + 1))
 done
 
+# ⚠️ .why this is a PER-ROW loop and not one prose block
+#   - it was one block, hardcoded to gh's remediation, and it was correct
+#     while gh was the only PERSISTS row
+#   - a second PERSISTS row made the SAME block print "2 consumer(s)" over
+#     advice that names only gh — verdict right, subject wrong
+#     (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4)
+#   - ⇒ the class already demands "every row carries its own justification";
+#     now the reader enforces that rather than trust it
 if [[ "$PERSIST_N" -gt 0 ]]; then
   echo "   └─ 🛑 $PERSIST_N consumer(s) WRITE a rack secret to disk"
-  echo "      · this is the ✋ row in inventory.security-checks.md, and it stands"
-  echo "      · the delta is PERSISTENCE PAST REVOCATION, not initial access:"
-  echo "        a seat that can read the copy could already read the rack"
-  echo "      · so 'rotate the credential' does NOT evict — the old pat must be"
-  echo "        REVOKED at github.com/settings/tokens"
-  echo "      · fix at cause: gh reads GH_TOKEN from its ENV and persists none"
-  echo "        of it. blocked on a from-scratch grove to prove"
+  for c in "${CENSUS[@]}"; do
+    IFS='|' read -r p _n class _note <<<"$c"
+    [[ "$class" == "PERSISTS" ]] || continue
+    echo "      ·"
+    echo "      · $p"
+    case "$p" in
+      *5.4.gh/configure.upsert.sh)
+        echo "        OPEN — this is the ✋ row in inventory.security-checks.md, and it stands"
+        echo "        the delta is PERSISTENCE PAST REVOCATION, not initial access:"
+        echo "        a seat that can read the copy could already read the rack"
+        echo "        so 'rotate the credential' does NOT evict — the old pat must be"
+        echo "        REVOKED at github.com/settings/tokens"
+        echo "        fix at cause: gh reads GH_TOKEN from its ENV and persists none"
+        echo "        of it. blocked on a from-scratch grove to prove"
+        ;;
+      *2.7.aliases/brains.auth.sh)
+        echo "        ACCEPTED — the write IS the product, not a side effect of it:"
+        echo "        'brains.auth use' exists to install a parked oauth token as the"
+        echo "        live claude login, so a swap that wrote no file would perform"
+        echo "        none of what a human asked for. there is no at-cause fix that"
+        echo "        keeps the command"
+        echo "        the bounds that make it acceptable, each read off the code:"
+        echo "         - the sink is claude's OWN credential store, which claude"
+        echo "           writes itself on every login — this adds no new secret file"
+        echo "         - :1154 chmod 700 the auth dir; :1519 chmod 600 the temp BEFORE"
+        echo "           the secret lands, then an atomic mv, so no window is 0644"
+        echo "         - :1460 the PRIOR token is parked back to the rack rather than"
+        echo "           left behind, so a swap moves one copy, never forks two"
+        ;;
+      *)
+        echo "        ✋ no justification recorded"
+        echo "        a PERSISTS row is a live security decision; record where the"
+        echo "        value lands and why that is acceptable, then add its arm here"
+        FAIL=$((FAIL + 1))
+        ;;
+    esac
+  done
 fi
 
 if [[ "$FAIL" -gt 0 ]]; then

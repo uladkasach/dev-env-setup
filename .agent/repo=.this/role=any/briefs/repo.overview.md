@@ -123,7 +123,8 @@ rhx grove.provision --for cloud                  # as a grove would see it
 `--mode plan` is the default and is a **survey**: it short-circuits every `*.upsert`
 but ALWAYS runs every `*.verify`, so a plan tells you what is already true.
 
-from a shell, `grove.provision` is the same command (`src/bash_aliases.sh`).
+from a shell, `grove.provision` is the same command
+(`src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`).
 `grove.provision.<part>` names are pure synonyms for `--what <slug>`, kept only so
 `<TAB>` completes; they are deliberately not grown.
 

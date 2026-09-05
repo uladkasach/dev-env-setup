@@ -16,7 +16,7 @@ names. a case never seen red is a guess with a clamp's name on it.
 ## .refs
 where the term is declared / used:
 - .agent/repo=.this/role=any/skills/brains.auth.test.sh   # every case in the suite is a clamp
-- .agent/repo=.this/role=any/briefs/hazard.a-clamp-can-lie-the-same-way-code-can.md
+- .agent/repo=.this/role=any/briefs/evidence/hazard.a-clamp-can-lie-the-same-way-code-can.md
 - .agent/repo=ehmpathy/role=mechanic/briefs/practices/work.flow/diagnose/rule.require.clamp-edge-cases.md
 
 ## .reason

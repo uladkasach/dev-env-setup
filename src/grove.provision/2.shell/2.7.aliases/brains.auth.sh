@@ -54,7 +54,7 @@
 # .map = this file stays ONE file on purpose — it runs under `set -uo pipefail` when a proxy
 #   sources it, and a split would put that guarantee at the mercy of source order. what a split
 #   would have bought is navigability, so the regions are marked instead. to list them:
-#       grep '^# ══' src/brains.auth.sh
+#       grep '^# ══' src/grove.provision/2.shell/2.7.aliases/brains.auth.sh
 #   §1 constants · §2 trace · §3 token mint · §4 identity ladder · §5 render leaves
 #   §6 keyrack i/o · §7 command: set · §8 credential-file i/o · §9 command: use
 #   §10 usage fetch + sweep · §11 error tables · §12 render · §13 command: usage

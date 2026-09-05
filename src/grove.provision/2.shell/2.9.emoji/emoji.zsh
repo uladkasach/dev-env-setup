@@ -9,7 +9,8 @@
 #
 # .who owns this file
 #         `2.9.emoji`'s CONFIGURE phase copies it to `~/.zshrc.emoji.sh`,
-#         and `src/zshrc.sh` sources that copy after compinit and fzf.
+#         and `2.5.zsh`'s `zshrc.sh` sources that copy after compinit
+#         and fzf.
 #         the INDEX it reads is the same bundle's PROVISION phase.
 #
 # usage:

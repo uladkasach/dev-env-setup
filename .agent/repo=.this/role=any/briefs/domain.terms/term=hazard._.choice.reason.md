@@ -20,7 +20,7 @@ it also matches how the corpus already spoke: `howto.review-public-repo-hazards`
 - claim      = `gotcha.` is the declared prefix. `.readme.md` defines it as *"a trap, with the
                measurement that found it"*, and every one of the 9 is a trap. one prefix per
                concept is the whole point of `rule.forbid.domain-term-synonyms`, so the 9
-               should be renamed and the ~15 by-name citations in `src/brains.auth.sh` updated
+               should be renamed and the ~15 by-name citations in `src/grove.provision/2.shell/2.7.aliases/brains.auth.sh` updated
                to match.
 - counter    = they are not one concept. read the `.what` of each of the 9 and the split is
                plain: every one states a property in the PRESENT tense — *"any value handed to

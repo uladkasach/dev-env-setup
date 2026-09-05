@@ -20,8 +20,8 @@
 #         (`rule.require.upgrade-entries-verify-themselves`).
 #
 # usage:
-#   zsh src/emoji.test.zsh                # tests the widget beside it
-#   zsh src/emoji.test.zsh /path/to/widget
+#   zsh src/grove.provision/2.shell/2.9.emoji/emoji.test.zsh
+#   zsh src/grove.provision/2.shell/2.9.emoji/emoji.test.zsh /path/to/widget
 #
 # guarantee:
 #   - asserts the buffer AND the zle fall-through target, so a "literal
