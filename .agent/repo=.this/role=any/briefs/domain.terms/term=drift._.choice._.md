@@ -38,6 +38,39 @@ the existence.**
 - install drift is repaired by **convergence** — re-run the upsert, which is what a
   `configure.upsert` exists to do
 
+## 🛑 .install drift has TWO causes, and a content check can name NEITHER
+
+`cmp` answers *"do these differ?"*. it says no part of *why*, and there are two whys:
+
+| the cause | which side moved | how often |
+|---|---|---|
+| the MACHINE was edited, and the repo was never told | the live copy | rare |
+| the REPO moved ahead, and no apply has run yet | the declaration | **every edit** |
+
+⚠️ the second is the common one by a wide margin — an edit to a `configure.upsert`'s payload
+drifts the box until the next apply — and it is the one this term's own prose under-served.
+the section below argues the *machine-edited* case at length, because that is the case where
+the recency question bites. a reader who takes that as the definition writes a message that
+names the rare cause on the common path.
+
+📜 measured 2026-09-07. `4.5.nvim`'s backup guard printed, on a routine apply:
+
+```
+⚠️ init.lua DRIFTED from the checkout — kept <bak>
+   ⇒ a machine-side edit the repo has not been told about. read the
+     diff, move each part worth a keep INTO the checkout
+```
+
+the `.bak` held exactly the two lines that apply had just replaced. no machine-side edit
+existed, and no part was worth a keep. the ACTION was right — keep the copy, always, since
+the guard cannot know — and the REASON was invented.
+
+⇒ **so a drift message states the FACT and names no cause.** it hands over the one command
+that separates them (`diff <bak> <src>`) and lets the human read. a message that guesses the
+rare cause on the common path is a false ✋ on a schedule, which is how a true drift report
+earns a reader who skips it (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4 — the
+verdict is right and the sentence under it names the wrong subject).
+
 ## .stale is not drift
 
 `stale` names ONE side, and presumes a verdict on which side is right. `drift` names the

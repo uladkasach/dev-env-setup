@@ -79,6 +79,45 @@ verdict about the CALLER's PATH dressed as a verdict about the box.
 ⚠️ and a shell is the trap because its staleness is invisible — a pane looks identical
 whatever its `PATH` holds, and the answer it gives is a plausible, specific absence.
 
+## 🛑 .a live read of a tree ANOTHER AUTHOR holds is stale before it prints
+
+the two measurements above both fail on a subject that sat still. this one fails on a subject
+that did not — and it is the shape with no repair at all in the read.
+
+⇒ measured 2026-09-07, in this repo's own worktree. a `git status` named 8 untracked term files
+and a 280-line unstaged diff, all a peer's. i read that list as the inventory of their work and
+reported it as such. **90 minutes later two more files existed** — the very clamp whose absence i
+had just named as the reason to withhold their change:
+
+```
+15:26:30  .play/permanent/prove.breaker-spares-cached-buffers.probe.lua
+15:27:47  .play/permanent/prove.breaker-spares-cached-buffers.play.sh
+```
+
+the read was correct at its instant, through a carrier that held no state, and about a subject
+that changed while the conclusion was still under composition.
+
+### .the third shape, beside the two above
+
+| case | what is stale | the repair |
+|---|---|---|
+| the aged verdict (2026-08-15) | the VERDICT — read once, cited later | re-run it |
+| the stale carrier (2026-08-25) | the CARRIER — a pane older than its subject | reboot the duct, then read |
+| **a live author** (2026-09-07) | **the SUBJECT — still under edit** | **none. ask the author** |
+
+⇒ the first two are repaired by a better read. **this one is not**, because no read is fast
+enough to outrun a hand still at the keyboard. a second `git status` would age the same way.
+
+⚠️ and it is the most confident of the three. an aged verdict has a timestamp to distrust; a
+stale carrier gives a suspicious absence. a fresh `git status` over a live tree gives a
+COMPLETE-LOOKING list, and its incompleteness is invisible by construction —
+`gotcha.a-check-that-cries-wolf-gets-silenced` m.12, where a count is true of the subset the
+reader could see.
+
+⇒ **a tree with a second author is live state, and a verdict about their work is a verdict about
+live state.** report it as transient, or do not report it — the rule this term already serves
+(`rule.require.judge-declared-state-not-live-state`), applied to a subject that is a person.
+
 ## .why it is bare, not `grove.live`
 same allowance as its pair (`term=declared`): the word means exactly the same of a grove's
 swap, a tree's session, or a tree's PATH, so it spans contexts rather than belongs to one. a

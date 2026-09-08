@@ -56,15 +56,51 @@ measures against it.
 `fuser` until it confirms the hold took, and **declines** rather than report a verdict about a
 world it failed to build (`gotcha.a-check-that-cries-wolf-gets-silenced`, q5).
 
-## ⚠️ .`armed` / `disarmed` is a DIFFERENT word, and it is not this one
+## ⚠️ .`arm` the VERB is a DIFFERENT word, in two places, and neither is this one
 
-`3.3.desktop` speaks of a keybind as **armed** (it does work) or **disarmed** (rewritten to
-`true`, a no-op). that is an adjective about a CONTROL; this term is a noun about a play's
-measurement. one english root, two parts of speech, two contexts that never meet.
+this term is a **noun** — a member of a play's measurement. two other senses share the english
+root and are the right word where they sit. recorded here so a reader never crosses them.
 
-⇒ recorded here rather than forbidden, because the keybind sense predates this term and is
-the right word there. what a reader must not do is read `the LockScreen action is ARMED ✔`
-as a claim about a play arm.
+| where | part of speech | sense |
+|---|---|---|
+| this term | noun | one member of a play's measurement in one direction |
+| `3.3.desktop` | adjective | a keybind **armed** (it does work) or **disarmed** (rewritten to `true`, a no-op) |
+| `4.5.nvim` | **verb** | to open a state in which a key carries another sense, until a key outside the set closes it |
+
+⇒ a reader must not read `the LockScreen action is ARMED ✔` as a claim about a play arm, nor
+`boundary_repeat_arm` as one.
+
+### 🛑 the nvim verb: `arm` and `disarm` are BOTH acts — and each is a KEY
+
+`<C-d><C-j>` **arms** the diff-boundary repeat: in that buffer, `<C-j>` emits another boundary
+jump instead of its usual half-page scroll. any key outside
+`{<C-d> <C-j> <C-k> <S-CR>}` **disarms** it
+(`boundary_repeat_arm` / `boundary_repeat_armed` / `boundary_repeat_keeps`).
+
+| | what it is |
+|---|---|
+| **arm** | an ACT — a key press opens the state |
+| **disarm** | an ACT — a key press outside the vocabulary closes it |
+
+⇒ **the pair is symmetric, and there is no clock at all.** `boundary_repeat_armed()` also asks
+*"am i in the buffer that armed this?"*, so a move away makes the arm **inert** — that is a
+SCOPE test, never a cancellation.
+
+📜 this row said the opposite twice, and each correction was measured.
+
+**2026-09-06 (i)** — the behavior inventory read *"move to another buffer → disarm"*. a hermetic
+probe walked away and back in one pass: `100 → 102`, the jump, not a scroll. ⇒ a lapse-word
+used for a **scope test**.
+
+**2026-09-06 (ii)** — this row then read *"disarm is a LAPSE; only the idle timeout disarms"*.
+that was true of a `BOUNDARY_REPEAT_IDLE_MS = 1500` that the same day retired. the timer was a
+**proxy** for *"did the ctrl hold end?"*, and a proxy is what a wall-clock guess buys: it let a
+stray `w` keep the arm live AND killed an arm that merely paused. the vocabulary answers the
+same question deterministically.
+
+⇒ **the lesson both corrections share: a word for a MECHANISM outlives the mechanism.** `lapse`
+was chosen to describe a timeout, so it went stale the hour the timeout did. name the ACT, and
+the word survives the next repair.
 
 ## .the direction it sits in
 a play's numbered sections are its **directions**; arms are the members of one direction. so

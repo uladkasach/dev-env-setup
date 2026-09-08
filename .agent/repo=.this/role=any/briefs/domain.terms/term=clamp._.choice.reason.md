@@ -85,3 +85,18 @@ a judgment the word had to be sharp enough to express:
   of the source preamble and compares it to the suite's own tally, so the `+ 1` in its arithmetic
   is deliberate. it is the clamp on the honesty of the number a reader trusts for a sense of how
   much is clamped.
+
+## .the `check` forbid earns its keep — measured 2026-09-06
+
+four days after the dispute above closed, a rule was drafted for the mechanic role as
+**`rule.require.checks-discriminate`**. the forbidden synonym, in a rule NAME — and a rule name is
+a contract, so this is `rule.forbid.domain-term-synonyms` squarely. the human caught it; it
+shipped as `rule.forbid.clamps-cry-wolf`.
+
+⇒ the worth of the forbid is not that `check` reads worse. it is that `check` is the word a
+traveler reaches for **by reflex**, days after the argument that settled it. a synonym recorded
+and not enforced is a synonym that returns.
+
+⚠️ `gotcha.a-check-that-cries-wolf-gets-silenced.md` still carries the word in its own FILENAME,
+and is cited by name from roughly ten places. left in place until disturbed, per the rule's own
+allowance — recorded here so the next traveler reads it as a known debt, never as precedent.

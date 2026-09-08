@@ -85,6 +85,7 @@ function use.ahction.prod { _use_aws_profile prod "$@"; }
 function use.whodis.prod { _use_aws_profile prod "$@"; }
 function use.ehmpathy.test { _use_aws_profile test "$@"; }
 function use.ehmpathy.demo { _use_aws_profile test "$@"; }
+function use.ehmpathy.camp { _use_aws_profile camp "$@"; }
 function use.ehmpathy.root { _use_aws_profile sudo "$@"; }
 function use.aether.test { _use_aws_profile test "$@"; }
 function use.aether.prep { _use_aws_profile prep "$@"; }

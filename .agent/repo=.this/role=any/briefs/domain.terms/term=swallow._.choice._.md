@@ -49,6 +49,23 @@ a swallowed signal leaves a residue **indistinguishable from a legitimate value*
 that is `rule.forbid.failhide`'s mechanism, named. the rule forbids the outcome;
 this word names what produced it.
 
+## ⚠️ .a swallow needs NO redirect — a whole HOP can be the channel
+
+every ref below is a shell carrier: a `2>/dev/null`, a `$( )`, an arg-parse arm. so the word
+reads as a shell concern, and its reach is wider than that.
+
+📜 measured 2026-09-06. nvim writes `CSI > 1 u` to negotiate the kitty keyboard protocol. under
+`kitty → tmux → nvim`, **tmux consumes it in transit** — a bare `CSI > 11 u` never reaches
+kitty at all, and the app gets no signal that it was consumed.
+
+⇒ so the channel that swallows may be a **process on the route**, never only a redirect in the
+caller's own line. the tell is unchanged: ask what sits BETWEEN the writer and its reader.
+
+⚠️ and the drift it caught was mine. that route was first written up as *"tmux **eats** the flag
+request"* — the one word this term forbids for exactly this case. it took the outbound/inbound
+table above to see it: the request LEAVES nvim, so tmux is the channel, not a receiver.
+`howdoes.a-key-event-reaches-nvim` carries the corrected pair.
+
 ## .refs
 - .agent/repo=.this/role=any/briefs/grove/provision/rule.require.grove-provision-as-the-only-entrypoint.md:131  # the pair, in one sentence
 - .agent/repo=.this/role=any/skills/shell.syntax.verify.sh:68 # `--paths` swallowed in silence
