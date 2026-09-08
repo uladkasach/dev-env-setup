@@ -26,6 +26,21 @@ a sink has three properties, and a reader with fewer is not one:
    notice that NAMES a remote file. so a one-stream sink can be correct, and it turns
    incorrect the moment somebody widens the flags. see the `.reason`.
 
+## ⚠️ .this word is BARE, and audio wants it too
+
+`sink` here is a SECURITY concept and carries no boundary — which is arrears under
+`rule.require.boundary-qualified-terms`, left in place until disturbed rather than swept
+(a bulk rename is a blocker under that same rule).
+
+⚠️ the near-collision is live: pipewire's model pairs a **sink** (an output) with a **source**
+(a capture endpoint), and this repo now records audio. so:
+
+- an audio output is `audio.record.sink`, **never bare** — see `term=audio.record.source`
+- a bare `sink` in this repo means THIS concept, and only this one
+
+⇒ stated here rather than only there, because the reader at risk is the one who reaches for
+the audio sense and greps `term=sink*` first.
+
 ## .refs
 
 - `src/ductwork.sh` — `__duct_strip_escapes`, the sink itself

@@ -46,6 +46,36 @@ verdict about the capability. it recorded which family somebody had reached firs
 ⇒ and the repair cost **one** `term.operations.sh` plus five thin dispatchers. the price of the
 rule sits far under the price of the habit.
 
+## 🛑 .measured again — 2026-09-06, and this time the ad-hoc form HID A DEFECT
+
+`audio.record.probe` refused a take with *"MUTED"*. the human: *"why does it show muted? my mic is
+defo not muted"* — a suspected false ✋, which is the failure that gets a check silenced
+(`gotcha.a-check-that-cries-wolf-gets-silenced`).
+
+to diagnose it i typed four raw reads: `pactl get-default-source`, `pactl list short sources`,
+`pactl get-source-mute`, `pactl get-source-volume`. the human's read:
+
+> **"why dont you write a skill for this instead?"** … *"instead of adhoc"*
+
+⇒ the repair was `audio.record.source.get`, and **writing it surfaced a defect the raw commands
+could not**. the probe's mute reader was:
+
+```sh
+__audio_source_muted() { [[ "$(pactl get-source-mute "$1" 2>/dev/null)" == *yes* ]]; }
+```
+
+a boolean over a call that can FAIL. so `pactl` erroring and `pactl` answering `Mute: no` took the
+same branch — *"the box could not answer"* was reported as *"the box said fine"*, a textbook
+`rule.forbid.failhide`. the skill forced a three-valued reader (`yes` / `no` / `?`), and the same
+pass found a second silent-source hazard the probe never checked: a source at **0% volume** is
+silent with its mute flag clear.
+
+> **the ad-hoc form answers the question and inspects no part of the tool that raised it.** a skill
+> must name its own contract, and that act is what finds the bug beside the question.
+
+⇒ so the cost of ad-hoc is not merely *"the next traveler re-derives it"*. it is that a raw command
+run for a diagnosis leaves the diagnosed component exactly as broken as it found it.
+
 ## 🛑 .the escape hatch this retires
 
 `rule.require.reach-for-the-skill-before-adhoc-shell` used to close with:

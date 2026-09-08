@@ -19,21 +19,16 @@
 #     1.6.procs      the runaway-process concern — finders, monitor, killer
 #     1.7.usage      the two machine-usage report commands
 #     1.8.tmpfiles   the daily /tmp prune, so boot stays fast
+#     1.9.audio      the mic capture chain (pw-record, pactl, notify-send)
 #
-# .why there is no `1.4.performance`, and why nearly all apply to EVERY box
-#   - "performance" is an OUTCOME, so no bundle can install it or own it —
-#     a dir named for a quality collects whatever a writer felt was related
-#     (`rule.require.bundle-names-name-their-subject`)
+# .why nearly all apply to EVERY box
 #   - a screen-gate reads "no EFFECT here" as "cannot be HELD here"; a
 #     keyboard remap with no keyboard is a harmless declaration, so `1.1`
 #     through `1.5` apply everywhere
-#
-# ⚠️ .why `1.6.procs` is the ONE that splits
-#   - its `1.6.2.monitor` output is `notify-send`, which needs a desktop bus
-#   - a grove holds no such bus, so that timer would reach nobody forever
-#   - ⇒ the decline is "no bus here", never "no effect here"
-#   - `1.6.1.finders` installs everywhere, and a grove needs it most
-#   - the decline lives in the leaf that owns the fact (rule.require.identical-bundle-composition)
+#   - ⚠️ `1.6.procs` is the one that SPLITS: `1.6.2.monitor` speaks through
+#     `notify-send`, which needs a desktop bus a grove has not got — so the
+#     decline is "no bus here", never "no effect here", and it lives in the
+#     leaf that owns the fact (`rule.require.identical-bundle-composition`)
 #
 # usage:
 #   rhx grove.provision --what 1.system --mode apply
@@ -48,4 +43,5 @@ grove_provision_1_system() {
   bundle.upgrade 1.6.procs
   bundle.upgrade 1.7.usage
   bundle.upgrade 1.8.tmpfiles
+  bundle.upgrade 1.9.audio
 }

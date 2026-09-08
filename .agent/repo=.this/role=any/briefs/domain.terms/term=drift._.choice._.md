@@ -82,6 +82,27 @@ copy holds the newer bytes. this repo answers that case by fiat, not by recency:
 declaration wins, always (`rule.require.repo-as-source-of-truth`), which is exactly why the
 verify's message says *"DIFFERS from"* rather than *"is older than"*.
 
+### ⚠️ so `stale` is forbidden as a SYNONYM, never as a word
+
+where the wrong side IS settled, `stale` names it correctly and `drift` is the looser word.
+this repo settles it three ways, and only the first two were written down:
+
+| how the verdict is fixed | the winner | example |
+|---|---|---|
+| by **fiat** | the declaration | `~/.bash_aliases` vs the checkout — the checkout wins even when the live copy holds newer bytes |
+| by **recency** | 🛑 nobody — rejected above | — |
+| by **construction** | the artifact the other side describes | a wav's 44-byte header vs its own pcm |
+
+⇒ the third is the one a reader must not fold into the first. a wav is a header plus appended
+samples, and `pw-record` revises the two size fields only at close — so a take cut mid-flight
+leaves a header that UNDERSTATES a file it cannot be wrong about. the pcm is the artifact; the
+header is a claim about it. there is no case where the header wins.
+
+so `audio.record.header.set` recomputes both fields from `wc -c` and reads neither: with the
+winner fixed by construction, the other side needs no evidence beyond its own subject. the
+reader that spots the disagreement is still named for the RELATION —
+`__audio_header_drifted` — and only the message names the side.
+
 ## ⚠️ .why an existence test cannot see it
 
 this is the whole reason the concept is worth a word:
@@ -127,6 +148,7 @@ hides which revision a box actually ran.
 - src/bash_aliases.sh                                           # declaration drift, the `brains` incident
 - src/grove.for.sh / src/grove.env.sh / src/grove.pkg.sh     # "two homes drift", the deletion fix
 - src/bundle.upgrade.sh                                         # derived in one place, so the two cannot drift
+- .agent/repo=.this/role=any/skills/audio.record.operations.sh   # `__audio_header_drifted` — the by-construction verdict
 
 ⚠️ `3.2.theme` is the counter-example worth reading: a drift check over
 `cosmic.gtk.desert.css` reported drift on **every healthy box**, because COSMIC regenerates
