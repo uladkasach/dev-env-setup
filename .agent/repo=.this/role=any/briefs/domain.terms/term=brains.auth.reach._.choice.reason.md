@@ -35,6 +35,32 @@ it is *reachable at* an address it already owns. the name is discovered, never a
                namespaced by its command, so `--reach` is unambiguous where it is typed. no
                contract, snapshot, or clamp changed. dispute closed the day it was raised.
 
+#### 🛑 the move was a COPY, and the old home stood for four days
+
+📜 measured 2026-09-07. `term=reach._.choice._.md` and `term=reach._.choice.reason.md` were
+still on disk, byte-identical to these two but for the name and this dispute entry. so the
+resolution above said *"the file moves"* and what happened was a copy — the defeated side kept
+its home, at the exact address a reader consults first.
+
+⇒ **it bit on the day it was found.** a round used a bare `reach` in the transport sense, went
+to `term=reach._.choice._.md` to test for a collision, and was told the bare word names an
+oauth email — an answer this repo had already resolved against, delivered with a term file's
+full authority. a stale home does not read as stale; it reads as the glossary.
+
+⇒ the repair is the one `term=drift` prescribes for **declaration drift**: deletion, never a
+second sync. both bare files are gone. no file pointed at them but themselves, which is the
+tell — a term nobody cites, beside a prefixed twin everybody cites, is a home that lost its
+dispute and was never evicted.
+
+⚠️ **so a `resolution` that says "the file moves" is owed a check that it MOVED.** a rename is
+two operations and the glossary shows only the one that adds. one call answers it:
+
+```sh
+rhx grepsafe --pattern 'term=<old>\.'
+```
+
+a hit that is only the file's own self-reference means the old home survives with no reader.
+
 ### dispute: sub / slug  —  raised 2026-08-31  —  status: RESOLVED (adopt `reach`)
 
 - raised.by  = the implementation of `brains.auth.*`, against its own first design

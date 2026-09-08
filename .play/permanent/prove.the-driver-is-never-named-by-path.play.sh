@@ -63,14 +63,37 @@ else                                                                _root="$HOME
 fi
 
 ######################################################################
-# the CARVE-OUTS — the two sites the rule names, and no third
+# the CARVE-OUTS — the sites the rule names, and no other
 #
-# each is a skill that OWNS the drive and sends to a box where `rhx` cannot be
-# found. the discriminator is who types it: a skill may, a human never.
+# each lands on a box whose `rhx` resolves NO repo skill, so the path form is
+# the only surface that exists there.
+#
+# ⚠️ this read *"a skill may, a human never"* until 2026-09-08. that was the
+#    wrong discriminator: carve-outs 1 and 2 are both skills, so the TYPIST
+#    looked like the rule. it is the FAR SIDE's reach, and the rule's carve-out
+#    3 is a human at a keyboard against a box that resolves no skill.
 ######################################################################
 CARVED=(
   ".agent/repo=.this/role=any/skills/git.grove.provision.boot.sh"
   ".agent/repo=.this/role=any/skills/git.grove.auth.github.set.sh"
+
+  # ── the RULE ITSELF. a rule must be able to spell what it forbids.
+  #
+  # 🛑 .this file was RED at HEAD and no reader acted on it — measured 2026-09-08.
+  #    two of its three hits predate any edit: its `.the rule` banner (`NEVER
+  #    bash src/…`) and its note that the parent rule once modeled the same
+  #    violation. both spell the banned form ON PURPOSE, in the file whose whole
+  #    job is to ban it.
+  #
+  # ⚠️ the play's own header already records this shape as m.10 — *a correction
+  #    that quotes the dead form re-creates it* — and its fix was the ELLIPSIS
+  #    escape. that escape serves prose, and it CANNOT serve carve-out 3, whose
+  #    worked example must stay pasteable to be worth its place.
+  #
+  # ⇒ so the file is carved whole, as `rule.require.one-command-provision.md`
+  #   already is. the cost is real and named: a genuine violation added to this
+  #   file will not redden here. it is the reader of the rule who catches that.
+  ".agent/repo=.this/role=any/briefs/grove/provision/rule.forbid.the-driver-by-path.md"
 
   # ── the BARE-BOX class: prose that documents the FIRST apply on a new grove.
   #

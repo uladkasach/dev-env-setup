@@ -462,17 +462,60 @@ grove_env_derive() {
   # .why it is derived at all, when no step reads it: it is what makes a run
   #      traceable. a machine provisioned from a dirty tree is a machine whose
   #      state matches no commit, and the `+` is the only record of that
+  #
+  # 🛑 .`git -C "$checkout"`, and the toplevel test beside it — NEVER a bare `git`
+  #
+  #    a bare `git rev-parse` reads whatever dir the CALLER stands in, then walks
+  #    UP from there. neither half is the subject: this line claims to name the
+  #    code that RUNS, and the caller's cwd is unrelated to it.
+  #
+  #    📜 measured 2026-09-08 on `grove-ahbode-v20260811`, camper seat. a duct
+  #       pane sits wherever it was last left, and that one sat in
+  #       `$HOME/git/ehmpathy/rhachet-roles-ehmpathy`. so an apply of THIS repo
+  #       reported:
+  #
+  #         🌲 grove.provision done — … · commit v1.38.12@2ad9911
+  #
+  #       `v1.38.12` is rhachet-roles-ehmpathy's tag. the checkout it converged
+  #       holds no `.git` at all (`git status` there: `fatal: not a git
+  #       repository`), so the honest answer was `none@none`.
+  #
+  #    ⚠️ and the three seats that DID print `none@none` were no better off —
+  #       their panes simply sat somewhere with no repo overhead. all four
+  #       answers were an accident of cwd, and two were right by luck. a verdict
+  #       that happens to be correct was still never read
+  #       (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4 — the row is right
+  #       and the sentence beneath it names the wrong subject).
+  #
+  # 🛑 .why `-C` ALONE is not the fix
+  #
+  #    `git -C <dir>` still walks up the parents. a `pushed` checkout carries no
+  #    `.git` by design (`term=provenance`), so an ancestor repo would answer for
+  #    it and the stamp would be foreign again — the same defect, one dir over.
+  #
+  #    ⇒ so the test is whether the checkout IS the repo root, never whether some
+  #      repo can be reached from it. `--show-toplevel` answers exactly that.
+  #
+  # .note `${BASH_SOURCE[0]}` and not `$GROVE_SRC`: `grove.for.sh:49` calls this
+  #       with no `GROVE_SRC` set. this file lives in the checkout's `src/`, so
+  #       its own path names the checkout for EVERY caller — and it names the
+  #       tree that actually runs, which is the subject the line claims.
   ####################################################################
   if [[ -z "${GROVE_ENV_COMMIT:-}" ]]; then
-    local gitref="" hash="" dirty=""
-    if hash="$(git rev-parse --short HEAD 2>/dev/null)"; then
-      gitref="$(git describe --tags --exact-match 2>/dev/null \
-        || git rev-parse --abbrev-ref HEAD 2>/dev/null)"
-      git diff --quiet 2>/dev/null || dirty="+"
-      git diff --cached --quiet 2>/dev/null || dirty="+"
+    local checkout="" top="" gitref="" hash="" dirty=""
+    checkout="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd -P)"
+    top="$(git -C "$checkout" rev-parse --show-toplevel 2>/dev/null || true)"
+
+    if [[ -n "$checkout" && "$top" == "$checkout" ]]; then
+      hash="$(git -C "$checkout" rev-parse --short HEAD 2>/dev/null)"
+      gitref="$(git -C "$checkout" describe --tags --exact-match 2>/dev/null \
+        || git -C "$checkout" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+      git -C "$checkout" diff --quiet 2>/dev/null || dirty="+"
+      git -C "$checkout" diff --cached --quiet 2>/dev/null || dirty="+"
       export GROVE_ENV_COMMIT="${gitref:-unknown}@${hash}${dirty}"
     else
-      # a bootstrap runs before any checkout exists, so there is no commit to name
+      # a bootstrap runs before any checkout exists, and a PUSHED checkout holds
+      # no `.git` by design — both are honestly nameless (`term=provenance`)
       export GROVE_ENV_COMMIT="none@none"
     fi
   fi

@@ -43,24 +43,73 @@ four costs, in order of how often each has bitten:
 carried a row reading *"upgrade this machine → `bash src/grove.provision._.sh`"* in its `.the rule`
 table. the rule that declares the one door named the wrong handle.
 
-## ⚠️ .the TWO carve-outs, and why each is real
-
-both are a **skill that owns the drive**, sending the command to a box where `rhx` cannot be
-reached. neither is ever a line a human types.
+## ⚠️ .the THREE carve-outs, and why each is real
 
 | # | site | why the path form survives |
 |---|---|---|
 | 1 | `git.grove.provision.boot.sh` — its `UPGRADE` string | it is sent to a **bare** box. on a first apply the repo is present and `rhx` is not installed at all; there is no skill to call |
 | 2 | `git.grove.auth.github.set.sh` — its `PROVE_ONE_BUNDLE` string | the send is a `bash -lc`, which reads no `.zshrc`, so `rhx` is not on PATH on the far side (`gotcha.a-tool-found-by-path-answers-only-a-human`, rung 4) |
+| 3 | a **ONE-BUNDLE apply on a grove**, sent over a duct | a grove's `rhx` runs and resolves **no repo skill**. this is the routine way a change reaches a grove |
 
-⇒ the discriminator is **who types it**, never how it looks:
+⇒ the discriminator is **which BOX the command lands on**:
 
-> a **skill** that owns the drive may name the driver by path, when the far side cannot find
-> `rhx`. a **human or an agent at a keyboard** never may.
+> on a box where `rhx` resolves the skill, the path form is a blocker — no exception.
+> on a box where it does not, the path form is the only form there is.
+
+⚠️ **that sentence replaced *"a skill may; a human never may"*, and the swap is the point.**
+carve-outs 1 and 2 are both skills, so the typist looked like the discriminator. the
+discriminator is whether the FAR SIDE's `rhx` resolves the skill — and carve-out 3 is a human
+at a keyboard against a far side that cannot.
 
 ⚠️ each carve-out must state its trigger inline, beside the string
-(`rule.require.exemptions-name-their-trigger`). a third site that copies the shape without the
+(`rule.require.exemptions-name-their-trigger`). a fourth site that copies the shape without the
 reason is a violation, not a carve-out — and it will look identical.
+
+### 🛑 carve-out 3, measured 2026-09-07
+
+a `4.5.nvim` change was owed to two groves. the sanctioned form was sent over the duct and
+answered:
+
+```
+BadRequestError: no skill "grove.provision" found in any linked role
+tip: did you `npx rhachet roles link` the --role this skill comes from?
+```
+
+`rhx` itself RAN, so this is **not** `gotcha.a-tool-found-by-path-answers-only-a-human` — that
+one is about PATH. this is the rhachet ROLE LINK, a different link entirely, and **no bundle
+links roles on a grove**:
+
+```sh
+rhx grepsafe --pattern 'roles link' --glob 'src/**/*.sh'   # → 0 matches
+```
+
+⇒ so a grove is DESIGNED with its repo skills out of reach, rather than drifted into it. the
+path form is not a shortcut there; it is the only door — and carve-outs 1 and 2 already lean on
+exactly that fact.
+
+⚠️ **what the over-tight draft cost, before this carve-out was written.** the rule read as a
+flat ban, so the next move looked like `rule.forbid.adhoc-shell`'s *"an absent skill is the
+defect to fix"* — and a whole `git.grove.provision drive` verb was half-written for an operation
+the human does routinely. the human stopped it: *"why do you need to drive one on the grove?
+just apply the bundle against the grove. its done all the time."*
+
+⇒ **an over-tight rule buys a build, never a fix.** where a rule seems to forbid a routine
+operation, the likelier read is that the rule's SCOPE is wrong.
+
+### the routine form
+
+```sh
+rhx git.grove.push <seat> --from . --into git/more/dev-env-setup --mode apply
+rhx git.grove.send <seat> --reply --within 900 \
+  --what 'bash $HOME/git/more/dev-env-setup/src/grove.provision._.sh --what <slug> --mode apply'
+```
+
+ground first, then the camper (`rule.require.one-command-provision`). `--reply` carries the
+driver's own exit code, and 97 means the duct gave no answer at all
+(`gotcha.the-duct-returns-the-send-not-the-answer`).
+
+⚠️ this converges ONE bundle and gates no box. a grove is RAISED by
+`rhx git.grove.provision boot <name> --mode apply`, which still holds every clause above.
 
 ## .the forwarder is not a third entrypoint
 
@@ -75,16 +124,22 @@ works through the skill on the day it lands.
 > **does this line start with `rhx`?**
 
 - yes → correct
-- no, and it is a skill that sends to a box where `rhx` is unreachable, with the trigger stated
+- no, and it lands on a box whose `rhx` resolves no repo skill, with the trigger stated
   inline → a carve-out
 - no, otherwise → a blocker, and the fix is a one-for-one substitution
 
+⚠️ the second arm asks whether the FAR SIDE's `rhx` resolves the skill, never who typed the
+line. a grove qualifies; this machine never does.
+
 ## .enforcement
 
-- `bash|sh|source <any path ending in grove.provision._.sh>` in a howto, a brief, a fix-text,
-  a readme, a comment, or a command a human is handed = **blocker**
-- the same, typed by an agent at a shell = **blocker**
-- a third carve-out added with no trigger stated inline = **blocker**
+- `bash|sh|source <any path that ends in grove.provision._.sh>` aimed at a box whose `rhx`
+  resolves the skill — a howto, a brief, a fix-text, a readme, a comment, or a command a human
+  is handed = **blocker**
+- the same, typed by an agent at a shell against THIS machine = **blocker**
+- a fourth carve-out added with no trigger stated inline = **blocker**
+- a NEW SKILL written to wrap a carve-out 3 send = **blocker**; the human does this routinely,
+  and a wrapper adds a component while the far side still resolves no skill
 - a carve-out whose trigger no longer holds — `rhx` IS reachable on that far side — kept anyway
   = **blocker** (`rule.forbid.exemption-as-habit`)
 - a NEW forwarder beside `rhx grove.provision` = **blocker**, under the parent rule; this rule
@@ -96,4 +151,7 @@ works through the skill on the day it lands.
 - `rule.require.invoke-rhx-by-its-bare-name` — how the `rhx` call itself is written
 - `rule.require.install-via-procedures` — never hand a human a one-off command
 - `rule.require.one-command-provision` — what the one command must achieve
-- `gotcha.a-tool-found-by-path-answers-only-a-human` — why carve-out 2 exists
+- `gotcha.a-tool-found-by-path-answers-only-a-human` — why carve-out 2 exists. ⚠️ it is about
+  PATH; carve-out 3 is about the rhachet ROLE LINK, which is a different link
+- `rule.forbid.adhoc-shell` — its *"entool it"* mandate, and the one case where that mandate
+  misfires: an operation the human already does routinely (carve-out 3)

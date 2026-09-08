@@ -10,6 +10,11 @@ from kittens.tui.handler import result_handler
 #   - nvim yanks it via <C-S-c> -> "+y
 #   - every other app reads a ctrl+c-family key as interrupt, so it is never sent
 #   - fail closed: an app we cannot confirm as allowed gets none of it
+#
+# ⚠️ the allowlist is ONE of three reasons to forward, not the only one. it is
+#   the only one that names an APP; the other two hold because no app is in the
+#   loop at all — tmux copy-mode swallows the key, and over ssh the far tmux
+#   decides. all three are gathered in `handle_result` at the bottom.
 FORWARD_ALLOWLIST = {'nvim'}
 
 
@@ -59,16 +64,17 @@ def _tmux_client_tty(pids: list) -> str:
     return ''
 
 
-def _tmux_active_command(client_tty: str) -> str:
-    # ask tmux for the command in the active pane of this client's session
-    #   - fail closed (return '') on any error, so the caller forwards none
+def _tmux_active_pane(client_tty: str) -> tuple:
+    # ask tmux about the active pane of this client's session
+    #   - returns (command, in_copy_mode)
+    #   - fail closed (return ('', False)) on any error, so the caller forwards none
     try:
         clients = subprocess.check_output(
             ['tmux', 'list-clients', '-F', '#{client_tty}\t#{session_name}'],
             timeout=1,
         ).decode()
     except Exception:
-        return ''
+        return ('', False)
     session = ''
     for line in clients.splitlines():
         parts = line.split('\t')
@@ -76,23 +82,43 @@ def _tmux_active_command(client_tty: str) -> str:
             session = parts[1]
             break
     if not session:
-        return ''
+        return ('', False)
     try:
         panes = subprocess.check_output(
             ['tmux', 'list-panes', '-t', session, '-F',
-             '#{pane_active} #{pane_current_command}'],
+             '#{pane_active}\t#{pane_in_mode}\t#{pane_current_command}'],
             timeout=1,
         ).decode()
     except Exception:
-        return ''
+        return ('', False)
     for line in panes.splitlines():
-        if line.startswith('1 '):
-            return line[2:].strip()
-    return ''
+        parts = line.split('\t')
+        if len(parts) == 3 and parts[0] == '1':
+            return (parts[2].strip(), parts[1].strip() == '1')
+    return ('', False)
 
 
 def _subtree_has_ssh(pids: list) -> bool:
     # the LOCAL half of a remote duct: kitty → zsh → ssh → (far host) tmux → nvim
+    #
+    # 🛑 a REMOTE duct cannot be judged from HERE, so the judgment moves THERE
+    #   - the far host runs nvim; this box runs only the ssh client, so every
+    #     local reader (/proc, tmux, foreground_processes) answers 'ssh'
+    #   - 📜 that read as "an unknown app", so the allowlist sent no forward and
+    #     a visual-mode ctrl+c was a silent no-op on every grove
+    #   - ⚠️ it read as WORKING, because the copy branch always runs: a kitty
+    #     mouse-drag still copied and still toasted. one path green hid the
+    #     other path dead
+    #
+    # ⇒ so kitty DELIVERS and tmux DECIDES
+    #   - ssh is a byte pipe, so CSI 99;6u rides it to the far tmux
+    #   - `tmux.conf` (2.8.tmux) binds `-n C-S-c` and relays it only into an
+    #     nvim pane — the SAME gate a local duct meets, so both paths agree
+    #   - ⇒ this box asks only "is there an ssh hop?", never "what is out there?"
+    #
+    # ⚠️ the invariant holds: this is never the ^C byte, so it cannot interrupt
+    #   any receiver. a far host with no tmux at all is the one loose end — it
+    #   gets an inert escape at a shell prompt, never a signal
     #
     # comm alone is enough HERE, unlike for tmux
     #   - comm holds 15 chars, and 'ssh' is 3, so it is never truncated
@@ -112,6 +138,28 @@ def _window_pids(window) -> list:
     return [root] + _subtree(root, _child_map())
 
 
+def _local_tmux_in_copy_mode(pids: list) -> bool:
+    # is the active pane of a LOCAL tmux held in copy-mode?
+    #
+    # 🛑 copy-mode is its own reason to forward, INDEPENDENT of the allowlist
+    #   - the allowlist asks "does this app yank the key?"; in copy-mode there
+    #     is no app in the loop at all. tmux swaps to the `copy-mode-vi` table
+    #     and swallows every key, so none reaches the pane's process
+    #   - ⇒ the key cannot land as an interrupt, which is the whole invariant
+    #   - `tmux.conf` binds it there to copy-selection-and-cancel
+    #
+    # ⚠️ without this the local duct is the one that stays dead: over ssh the
+    #   branch below already delivers unconditionally, so a REMOTE copy-mode
+    #   works while the same key on the LAPTOP does not. `pane_current_command`
+    #   in copy-mode is still `zsh`, so the allowlist rejects it
+    if not pids:
+        return False
+    client_tty = _tmux_client_tty(pids)
+    if not client_tty:
+        return False
+    return _tmux_active_pane(client_tty)[1]
+
+
 def _focused_app(window, pids: list) -> str:
     # name the app the human actively drives in this window
     #   - through tmux that is the active pane's command
@@ -121,7 +169,7 @@ def _focused_app(window, pids: list) -> str:
         return ''
     client_tty = _tmux_client_tty(pids)
     if client_tty:
-        return _tmux_active_command(client_tty)
+        return _tmux_active_pane(client_tty)[0]
     # no tmux: the window's own foreground process
     try:
         for proc in window.child.foreground_processes:
@@ -133,6 +181,33 @@ def _focused_app(window, pids: list) -> str:
     except Exception:
         pass
     return _comm(pids[-1]) if pids else ''
+
+
+def _is_copy_receiver(window, pids: list) -> bool:
+    # may this destination be handed the copy key (CSI 99;6u)?
+    #
+    # 🛑 the question is ELIGIBILITY, never IDENTITY — "may this be handed the
+    #   key?", not "what is this?". three disjoint situations qualify, and they
+    #   share no property but the verdict, so no app-name test can express the
+    #   set. that is why this returns a VERDICT and `_focused_app` (a name) is
+    #   only one of its three inputs
+    #
+    # | the receiver                   | why the key cannot land as ^C          |
+    # |--------------------------------|----------------------------------------|
+    # | an allowlisted app (nvim)      | it YANKS the key — <C-S-c> -> "+y      |
+    # | a local tmux pane in copy-mode | tmux swallows it; no process reads     |
+    # | a duct past an ssh hop         | the far tmux decides; ssh is a pipe    |
+    #
+    # ⚠️ fail closed is the shared discipline: every reader below answers ''
+    #   or False when unsure, so an unknown focus is judged NOT a receiver
+    #
+    # ⚠️ the order is a COST order, not a correctness one — this is a plain OR.
+    #   the allowlist runs first because the copy-mode read shells out to tmux
+    if _focused_app(window, pids) in FORWARD_ALLOWLIST:
+        return True
+    if _local_tmux_in_copy_mode(pids):
+        return True
+    return _subtree_has_ssh(pids)
 
 
 @result_handler(no_ui=True)
@@ -150,32 +225,12 @@ def handle_result(args, answer, target_window_id, boss: Boss) -> None:
             ['notify-send', '-t', '1200', '-a', 'kitty', 'copied to clipboard']
         )
 
-    # forward branch — send the copy key ONLY to an allowed receiver (nvim)
+    # forward branch — hand the copy key to a copy-receiver, and to none other
     #   - so it can never land on claude-cli or a shell or an unknown TUI
-    #   - fail closed: an unknown focus gets no forward
+    #   - ONE walk of /proc feeds the verdict, so its three reasons cannot read
+    #     two different snapshots of one window
     pids = _window_pids(window)
-    if _focused_app(window, pids) in FORWARD_ALLOWLIST:
-        window.write_to_child(b'\x1b[99;6u')
-        return
-
-    # 🛑 a REMOTE duct cannot be judged from HERE, so the judgment moves THERE
-    #   - the far host runs nvim; this box runs only the ssh client, so every
-    #     local reader (/proc, tmux, foreground_processes) answers 'ssh'
-    #   - 📜 that read as "an unknown app", so the branch above sent no forward
-    #     and a visual-mode ctrl+c was a silent no-op on every grove
-    #   - ⚠️ it read as WORKING, because the copy branch above always runs: a
-    #     kitty mouse-drag still copied and still toasted. one path green hid
-    #     the other path dead
-    #
-    # ⇒ so kitty DELIVERS and tmux DECIDES
-    #   - ssh is a byte pipe, so CSI 99;6u rides it to the far tmux
-    #   - `src/tmux.conf` binds `-n C-S-c` and relays it only into an nvim pane
-    #   - that gate is the SAME one for a local duct, so both paths agree
-    #
-    # ⚠️ the invariant holds: this is never the ^C byte, so it cannot interrupt
-    #   any receiver. a far host with no tmux at all is the one loose end — it
-    #   gets an inert escape at a shell prompt, never a signal
-    if _subtree_has_ssh(pids):
+    if _is_copy_receiver(window, pids):
         window.write_to_child(b'\x1b[99;6u')
 
 

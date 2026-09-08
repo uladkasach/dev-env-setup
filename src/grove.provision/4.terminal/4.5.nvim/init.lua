@@ -175,6 +175,7 @@ do
   local log_path = vim.fn.stdpath('state') .. '/selfwatch.log'
   local warn_rss_kb = 800 * 1024   -- 0.8 GB: start to log the trend
   local soft_rss_kb = 1200 * 1024  -- 1.2 GB: trip the breaker (below MemoryHigh=1.5G)
+  local log_max_bytes = 2 * 1024 * 1024  -- 2 MB: cap the trend log, keep one rotation
   local tripped = false
   local cpu_last = nil
 
@@ -215,34 +216,288 @@ do
     return n
   end
 
+  -- .what = the lua gc heap, in kb
+  --
+  -- .why  = THE discriminator. rss is the sum of lua-managed memory and native
+  --         allocations, and the two have opposite fixes. with only rss we can
+  --         say a core leaks; we cannot say what leaks.
+  --           lua climbs with rss -> a lua-side leak: a table, a closure, or a
+  --             callback retained by a plugin. reachable, so findable.
+  --           lua flat, rss climbs -> a NATIVE leak: image data, parser state,
+  --             libuv handles, or a c extension. lua gc will never reclaim it,
+  --             and `collectgarbage` in the breaker is pure ceremony.
+  --         the trip log showed rss +17M with bufs and ts both flat, which is
+  --         the unattributed case this number exists to split.
+  local function get_lua_kb()
+    local ok, kb = pcall(collectgarbage, 'count')
+    if not ok then return 0 end
+    return math.floor(kb)
+  end
+
+  -- .what = total extmarks across every buffer and namespace
+  --
+  -- .why  = extmarks are the classic invisible nvim leak: a plugin that sets a
+  --         mark per line per refresh and never clears the prior batch grows
+  --         without a single new buffer. gitsigns, neominimap, and diagnostics
+  --         all set them heavily here, so this is the highest-prior suspect
+  --         for growth while bufs stays flat.
+  --
+  -- .note = this SAMPLES; it is not a census. a full walk is buffers ×
+  --         namespaces api calls, and this config has been observed at 14,691
+  --         buffers — roughly 300k calls per tick, every 30s. that walk would
+  --         cost more than the leak it hunts, and it would cost the most on
+  --         precisely the core that leaks worst. the guard would become the
+  --         load, which is the stampede failure in a new coat.
+  --
+  --         so: at most 40 loaded buffers, each capped at 5000 marks, and the
+  --         total is scaled back up by the sample ratio. the number is an
+  --         estimate and is used only as a trend, never as a true count.
+  local sample_max = 40
+  local function count_extmarks()
+    local total, seen, loaded = 0, 0, 0
+    local ok = pcall(function()
+      local namespaces = vim.api.nvim_get_namespaces()
+      local bufs = vim.api.nvim_list_bufs()
+      for _, buf in ipairs(bufs) do
+        if vim.api.nvim_buf_is_loaded(buf) then
+          loaded = loaded + 1
+          if seen < sample_max then
+            seen = seen + 1
+            for _, ns in pairs(namespaces) do
+              total = total + #vim.api.nvim_buf_get_extmarks(buf, ns, 0, -1, { limit = 5000 })
+            end
+          end
+        end
+      end
+    end)
+    if not ok then return -1 end
+    if seen == 0 then return 0 end
+    -- scale the sample to the full loaded population
+    return math.floor(total * (loaded / seen))
+  end
+
+  -- .what = live channels (jobs, rpc peers, ptys) and libuv handles
+  --
+  -- .why  = a job spawned per refresh and never closed leaks a channel plus its
+  --         buffers, and shows up in neither bufs nor lua. gitsigns shells out
+  --         to git per buffer per change, so a close that is missed on error
+  --         accumulates here first.
+  local function count_chans()
+    local ok, chans = pcall(vim.api.nvim_list_chans)
+    if not ok then return -1 end
+    return #chans
+  end
+
   local function append_log(line)
+    -- rotate at the cap: a core that lives for days writes this log the whole
+    -- time, and an unbounded trend log becomes its own disk + io burden
+    -- (observed at 7.2MB, itself written amid a swap storm)
+    local stat = vim.uv.fs_stat(log_path)
+    if stat and stat.size > log_max_bytes then
+      os.remove(log_path .. '.1')
+      os.rename(log_path, log_path .. '.1')
+    end
     local f = io.open(log_path, 'a')
     if not f then return end
     f:write(line .. '\n')
     f:close()
   end
 
+  -- 🛑 .what = the buffers a wipe must NEVER touch, however well they match
+  --
+  -- .why  = a breaker RECLAIMS, so its predicate is a delete contract — and the
+  --         set it may reclaim is NOT the set it is safe to reclaim. neominimap
+  --         creates ONE scratch buffer at module load
+  --         (`neominimap/buffer/internal.lua:25`), gives it the plugin's own
+  --         filetype, and holds it as a bare integer for the life of the
+  --         process. it is never recreated and never revalidated.
+  --
+  --         so it is indistinguishable from a leaked minimap buffer by any
+  --         property visible from outside: same filetype, same buftype, equally
+  --         unmodified. the wipe below matched it, and every later refresh threw
+  --         for the whole session.
+  --
+  -- ✔ .MEASURED 2026-09-06, headless, BOTH arms, against the live config:
+  --
+  --      ARM=control  empty_buffer=2 valid_after=true   refresh_ok=true
+  --      ARM=break    empty_buffer=2 valid_after=false  refresh_ok=false
+  --                   err=…split/internal.lua:159: Invalid buffer id: 2
+  --
+  --      ⚠️ the control arm is what earns the break arm. a break arm alone
+  --         proves the buffer went invalid; it says none of whether the config
+  --         was already broken. the pair names the WIPE as the cause.
+  --
+  -- ⚠️ .this is a LIST, not a lookup, because the exclusion is a claim per
+  --      plugin. a second plugin that caches a buffer needs its own line here,
+  --      and its absence is the same defect again.
+  local function get_buffers_unwipeable()
+    local keep = {}
+    local ok, internal = pcall(require, 'neominimap.buffer.internal')
+    if ok and type(internal) == 'table' and type(internal.empty_buffer) == 'number' then
+      keep[internal.empty_buffer] = true
+    end
+    return keep
+  end
+
   -- disable the heaviest handlers to halt growth, then reclaim
-  local function trip_breaker(rss_mb)
+  --
+  -- .note = the reclaim is MEASURED, not assumed. `collectgarbage` frees only
+  --         lua-managed memory, so on a native leak it reclaims 0MB while the
+  --         notification still claims a remedy was applied. the before/after
+  --         pair is recorded so the log states which happened, and a future
+  --         reader can tell a breaker that works from a ceremonial one.
+  -- 🛑 .`get_keep` is an INJECTED READER, and it is an argument on purpose
+  --
+  -- ⚠️ .it is deliberately NOT called a "seam"
+  --      this repo already spends that word on one sense — the link BETWEEN two
+  --      components, owned by neither (`rule.require.seam-claims-have-an-owner`,
+  --      which carries an audit table of every one). the industry sense (feathers:
+  --      a place to alter behavior without an edit there) is a DIFFERENT concept,
+  --      and to spend one word on both is the overload the glossary exists to
+  --      prevent (`rule.forbid.domain-term-ambiguity`).
+  --
+  --      ⇒ the extant vocabulary already had the right word: this is
+  --        `rule.require.dependency-injection` — an injected dependency with a
+  --        shipped default. cite, do not coin.
+  --
+  -- .what = an optional reader for the keep-set. the shipped caller (the timer,
+  --         below) passes none, so the local `get_buffers_unwipeable` is what
+  --         runs in anger, always.
+  --
+  -- .why  — a discrimination probe must neuter the EXCLUSION and change no other
+  --         part of the trip, or several checks redden and none is implicated
+  --         (`rule.forbid.repair-plays`, exception 2, condition 3). measured
+  --         2026-09-07: the first break arm swapped
+  --         `_G.nvim_selfwatch.get_buffers_unwipeable`, and BOTH arms went green.
+  --         the `_G` field holds a COPY OF THE REFERENCE; the call below reads a
+  --         local UPVALUE. so the break neutered a holder nobody reads, and the
+  --         control arm's ✔ proved none of what it claimed (term=bite).
+  --
+  --         ⇒ the arm looked like evidence and was a false ✔. the injected reader
+  --           is what makes the break reach the reader in anger.
+  --
+  -- ⚠️ .why NOT read through `_G` here
+  --      that would make the two halves symmetric and one line shorter — and it
+  --      would hand every plugin that shares this lua state a write handle on a
+  --      DELETE contract. `_G` is writable by all of them, so a plugin that
+  --      clobbers the table would silently empty the keep-set and the breaker
+  --      would destroy the buffer this exclusion exists to spare.
+  --
+  --      an argument cannot be clobbered. the caller either passes a reader or
+  --      does not, and the shipped caller does not.
+  local function trip_breaker(rss_mb, get_keep)
     tripped = true
     _G.nvim_selfwatch_tripped = true
-    pcall(vim.cmd, 'Neominimap off')
+
+    -- the full census BEFORE the breaker acts. a trip is the single most
+    -- valuable sample the watchdog ever takes, and it previously threw every
+    -- dimension away — it logged only rss, which names no culprit.
+    local lua_before = get_lua_kb()
+    local marks_before = count_extmarks()
+    local chans_before = count_chans()
+    local ts_before = count_ts_bufs()
+    local bufs_before = #vim.api.nvim_list_bufs()
+
+    -- read the keep-set BEFORE the disable, while the module is still loaded.
+    -- `get_keep` is the probe's injected reader (see the header); absent it, the
+    -- shipped reader is what runs — which is every call the timer ever makes
+    local keep = (get_keep or get_buffers_unwipeable)()
+
+    pcall(vim.cmd, 'Neominimap Disable')
     for _, buf in ipairs(vim.api.nvim_list_bufs()) do
       pcall(vim.treesitter.stop, buf)
     end
+
+    -- .what = wipe the leaked minimap buffers
+    --
+    -- .why  = `Neominimap Disable` hides the minimap WINDOWS; it does not delete
+    --         their buffers, so the memory the trip fired over stays held. the
+    --         breaker therefore reported a remedy while the leak was untouched,
+    --         which is why 63 trips accrued rather than one.
+    --
+    --         measured: 2,709 of 2,714 buffers in a tripped core were minimap
+    --         buffers. they are the leak, so they are what a breaker must
+    --         reclaim.
+    --
+    -- .note = ONLY buffers whose filetype is `neominimap`, only unmodified ones,
+    --         and NEVER one the plugin caches (see `get_buffers_unwipeable`). a
+    --         wipe is destructive, and the two things this breaker must not
+    --         destroy are unsaved human work and unrebuildable plugin state.
+    local wiped = 0
+    pcall(function()
+      for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        local ok, ft = pcall(function() return vim.bo[buf].filetype end)
+        local ok2, mod = pcall(function() return vim.bo[buf].modified end)
+        if ok and ok2 and ft == 'neominimap' and not mod and not keep[buf] then
+          if pcall(vim.api.nvim_buf_delete, buf, { force = true, unload = false }) then
+            wiped = wiped + 1
+          end
+        end
+      end
+    end)
+
     collectgarbage('collect')
+
+    local rss_after = get_self_rss_kb()
+    local reclaimed_mb = rss_after and (rss_mb - math.floor(rss_after / 1024)) or -1
+
     pcall(vim.fn.jobstart, {
       'notify-send', '-u', 'critical', '-a', 'nvim',
       'nvim self-watchdog tripped',
-      ('rss %dMB — disabled minimap + treesitter to stop a leak. see %s')
-        :format(rss_mb, log_path),
+      ('rss %dMB, wiped %d minimaps, reclaimed %dMB — see %s')
+        :format(rss_mb, wiped, reclaimed_mb, log_path),
     })
-    append_log(('%s TRIP rss_mb=%d pid=%d — disabled minimap+treesitter')
-      :format(os.date('%Y-%m-%dT%H:%M:%S'), rss_mb, vim.fn.getpid()))
+    append_log(('%s TRIP rss_mb=%d reclaimed_mb=%d wiped=%d kept=%d lua_kb=%d marks=%d chans=%d bufs=%d ts=%d pid=%d')
+      :format(os.date('%Y-%m-%dT%H:%M:%S'), rss_mb, reclaimed_mb, wiped,
+        vim.tbl_count(keep), lua_before, marks_before, chans_before,
+        bufs_before, ts_before, vim.fn.getpid()))
   end
 
+  -- 🛑 .the contract, made REACHABLE — because an unreachable one cannot be clamped
+  --
+  -- .what = the two halves of the breaker's delete contract, exposed on `_G` so a
+  --         probe can call the SHIPPED code rather than restate it.
+  --
+  -- .why  — a `local` inside this `do` block is not merely inconvenient, it is
+  --         STRUCTURALLY untestable. the round that shipped `get_buffers_unwipeable`
+  --         proved it with a probe that rebuilt the keep-set inline, which is one set
+  --         with two readers — and the half that runs in anger is the half no arm
+  --         touched (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.9).
+  --
+  --         so the probe went green while the shipped `require` path was unproven. a
+  --         rename upstream, a typo in the module name, a `pcall` that swallows: each
+  --         leaves the arm green and the box broken.
+  --
+  -- ⚠️ .`trip_breaker` is exposed for the same reason and it is the sharper gap
+  --      no arm has ever crossed 1.2GB, so the ORDER claim above — read the keep-set
+  --      BEFORE the disable — was reasoned and never measured. a probe that drives a
+  --      real trip is the only route that settles it.
+  --
+  -- ⚠️ .this grants no privilege that was not already there
+  --      every plugin shares this lua state and `_G` is writable by all of them. the
+  --      exposure buys a testable contract at no isolation cost — and an untestable
+  --      contract has already cost one measured defect.
+  --
+  -- .refs = `.play/permanent/prove.breaker-spares-cached-buffers.play.sh`
+  _G.nvim_selfwatch = {
+    get_buffers_unwipeable = get_buffers_unwipeable,
+    trip_breaker = trip_breaker,
+  }
+
   local timer = vim.uv.new_timer()
+  local last_run_s = 0
   timer:start(30000, 30000, vim.schedule_wrap(function()
+    -- guard the catch-up stampede. when the event loop is starved — the box
+    -- deep in swap, this core unscheduled for minutes — libuv fires a repeat
+    -- timer ONCE PER MISSED INTERVAL the moment it regains cpu. observed: 40
+    -- fires inside a single second, each one a /proc read, a buffer walk, and
+    -- a log append. the watchdog then piles work on the machine exactly when
+    -- it can least afford it, so the guard against a leak becomes a load of
+    -- its own. the wall clock is the truth; drop any fire that lands early.
+    local now_s = os.time()
+    if now_s - last_run_s < 25 then return end
+    last_run_s = now_s
+
     local rss = get_self_rss_kb()
     if not rss then return end
     local cpu = get_self_cpu_ticks()
@@ -250,10 +505,19 @@ do
     cpu_last = cpu
 
     -- log a compact trend line once we cross the warn line (low volume)
+    --
+    -- .note = lua_kb, marks, and chans are recorded because rss ALONE cannot
+    --         attribute a leak. a prior trend showed rss +17M with bufs and ts
+    --         both flat, which named no culprit and left the breaker with no
+    --         lever. each added field splits a distinct suspect:
+    --           lua_kb : lua-side leak vs native leak (the primary split)
+    --           marks  : an extmark leak (gitsigns/minimap/diagnostics)
+    --           chans  : a job/channel leak (a shell-out never closed)
     if rss >= warn_rss_kb then
-      append_log(('%s rss_mb=%d cpu_ticks=%d bufs=%d ts=%d tripped=%s cwd=%s')
-        :format(os.date('%Y-%m-%dT%H:%M:%S'), math.floor(rss / 1024), cpu_delta,
-          #vim.api.nvim_list_bufs(), count_ts_bufs(), tostring(tripped),
+      append_log(('%s rss_mb=%d lua_kb=%d cpu_ticks=%d bufs=%d ts=%d marks=%d chans=%d tripped=%s cwd=%s')
+        :format(os.date('%Y-%m-%dT%H:%M:%S'), math.floor(rss / 1024), get_lua_kb(),
+          cpu_delta, #vim.api.nvim_list_bufs(), count_ts_bufs(),
+          count_extmarks(), count_chans(), tostring(tripped),
           vim.fn.getcwd()))
     end
 
@@ -262,6 +526,186 @@ do
       trip_breaker(math.floor(rss / 1024))
     end
   end))
+end
+
+-- ─────────────────────────────────────────────────────────────────
+-- error scribe: stream every error this nvim throws into one log
+-- .what = capture errors from both channels — vim.notify (what a
+--         plugin reports) and the message history (what the runtime
+--         throws: "Error in coroutine", "Error executing ... callback",
+--         E-codes) — and append them to a durable log, deduped by
+--         signature with a repeat count.
+-- .why  = errors scroll off the screen and die with the session, so a
+--         flake seen once is unreviewable an hour later. one durable
+--         log lets us rank by frequency and fix the loudest offender
+--         instead of the most recently remembered one.
+-- .log  = stdpath('state')/errors.log  (rotates at 2MB -> errors.log.1)
+-- .read = rhx nvim.errors.review
+-- ─────────────────────────────────────────────────────────────────
+do
+  local log_path = vim.fn.stdpath('state') .. '/errors.log'
+  local rotate_bytes = 2 * 1024 * 1024
+  local repeat_secs = 120  -- same signature within window just counts, no new line
+  local pid = vim.fn.getpid()
+  local seen = {}          -- signature -> { count, written, last }
+
+  -- lines that mark the START of an error worth a record
+  local error_heads = {
+    '^E%d+:',                       -- E5108, E903, ...
+    '^Error ',                      -- "Error in coroutine", "Error executing ..."
+    'Error detected while',
+    'Error executing',
+    'Error in ',
+    '^Vim%(.-%):',                  -- Vim(lua):E5108: ...
+    '^%s*Vim:E%d+',
+  }
+
+  local function matches_any(line, patterns)
+    for _, p in ipairs(patterns) do
+      if line:match(p) then return true end
+    end
+    return false
+  end
+
+  -- collapse a message into a stable signature, so `buffer id: 15968` and
+  -- `buffer id: 15970` count as one repeat of one error, not two novel ones
+  local function as_signature(msg)
+    return (msg:gsub('%d+', '#'):gsub('%s+', ' '):sub(1, 240))
+  end
+
+  local function rotate_if_big()
+    local st = vim.uv.fs_stat(log_path)
+    if st and st.size > rotate_bytes then
+      pcall(vim.uv.fs_rename, log_path, log_path .. '.1')
+    end
+  end
+
+  local function append(line)
+    rotate_if_big()
+    local f = io.open(log_path, 'a')
+    if not f then return end
+    f:write(line .. '\n')
+    f:close()
+  end
+
+  -- record one error; writes at most one line per signature per window
+  local function capture(source, msg)
+    if type(msg) ~= 'string' or msg == '' then return end
+    local sig = as_signature(msg)
+    local entry = seen[sig] or { count = 0, written = 0, last = 0 }
+    seen[sig] = entry
+    entry.count = entry.count + 1
+    -- keep the on-disk text of the first hit, so the exit tally writes text
+    -- byte-identical to the live lines. otherwise the reader reads one fault
+    -- as two, and the rank it exists to produce is wrong.
+    entry.text = entry.text or msg:gsub('\n', ' \\n '):sub(1, 900)
+
+    local now = os.time()
+    if entry.written > 0 and (now - entry.last) < repeat_secs then return end
+    entry.written = entry.count
+    entry.last = now
+
+    append(('%s pid=%d src=%s n=%d cwd=%s | %s'):format(
+      os.date('%Y-%m-%dT%H:%M:%S'), pid, source, entry.count, vim.fn.getcwd(),
+      entry.text))
+  end
+  _G.nvim_errorlog = { path = log_path, capture = capture }
+
+  -- channel 1: vim.notify — what plugins report as their own failure
+  local function wrap_notify(orig)
+    return function(msg, level, opts)
+      if (level or vim.log.levels.INFO) >= vim.log.levels.WARN then
+        local src = (level or 0) >= vim.log.levels.ERROR and 'notify.error' or 'notify.warn'
+        pcall(capture, src, type(msg) == 'string' and msg or vim.inspect(msg))
+      end
+      return orig(msg, level, opts)
+    end
+  end
+  local our_notify = wrap_notify(vim.notify)
+  vim.notify = our_notify
+  -- re-wrap after plugins load: noice/nvim-notify replace vim.notify wholesale
+  vim.api.nvim_create_autocmd('VimEnter', {
+    callback = function()
+      if vim.notify ~= our_notify then
+        our_notify = wrap_notify(vim.notify)
+        vim.notify = our_notify
+      end
+    end,
+  })
+
+  -- channel 2: message history — what the runtime throws past vim.notify
+  -- .why = an error from a libuv timer or a decoration provider never
+  --        touches vim.notify; it lands only in :messages. that is
+  --        exactly the class that halts the ui, so it is the class we
+  --        most need on record.
+  -- the cursor anchors on CONTENT, not on a line index.
+  -- .why = :messages is a fixed-size circular history (~500 lines). once it
+  --        fills, the line COUNT holds steady while the content still rolls,
+  --        so an index cursor pins past the end and the poll goes permanently
+  --        deaf — precisely in the long sessions where errors matter most.
+  --        an anchor on the last line's text survives the roll: we find that
+  --        line again wherever it drifted to, and resume after it.
+  local msgs_anchor = nil
+  local function drain_messages()
+    local ok, res = pcall(vim.api.nvim_exec2, 'messages', { output = true })
+    if not ok or not res or not res.output then return end
+    local lines = vim.split(res.output, '\n', { plain = true })
+
+    -- resume just after the last line we processed. search backward so a
+    -- repeated line resolves to its most recent occurrence. if the anchor is
+    -- absent (history rolled entirely between polls), rescan from the top —
+    -- over-capture is the safe direction; the dedup collapses the repeats,
+    -- whereas a skip loses the error for good.
+    local start = 1
+    if msgs_anchor then
+      for k = #lines, 1, -1 do
+        if lines[k] == msgs_anchor then start = k + 1 break end
+      end
+    end
+    if #lines > 0 then msgs_anchor = lines[#lines] end
+
+    local i = start
+    while i <= #lines do
+      if matches_any(lines[i], error_heads) then
+        -- gather the body that belongs to this head, so the record names
+        -- the culprit file, not just the symptom.
+        -- .why = the head is often a bare banner ("Error in command line:")
+        --        whose payload sits on the NEXT lines. we take every
+        --        non-blank line until the next head, bounded — an extra
+        --        line of context is cheap; a lost traceback forfeits the
+        --        whole point of the log.
+        local chunk = { lines[i] }
+        local j = i + 1
+        while j <= #lines and #chunk < 10
+          and lines[j] ~= ''
+          and not matches_any(lines[j], error_heads) do
+          chunk[#chunk + 1] = lines[j]
+          j = j + 1
+        end
+        capture('messages', table.concat(chunk, '\n'))
+        i = j
+      else
+        i = i + 1
+      end
+    end
+  end
+
+  local timer = vim.uv.new_timer()
+  timer:start(5000, 5000, vim.schedule_wrap(drain_messages))
+
+  -- flush at exit: drain what arrived since the last poll, then record the
+  -- final tally of any storm that was collapsed by the repeat window
+  vim.api.nvim_create_autocmd('VimLeavePre', {
+    callback = function()
+      pcall(drain_messages)
+      for _, entry in pairs(seen) do
+        if entry.count > entry.written then
+          append(('%s pid=%d src=tally n=%d cwd=%s | %s'):format(
+            os.date('%Y-%m-%dT%H:%M:%S'), pid, entry.count, vim.fn.getcwd(), entry.text))
+        end
+      end
+    end,
+  })
 end
 
 -- cache git root per buffer (avoids subprocess on every statusline render)
@@ -280,6 +724,85 @@ local function get_git_root(bufnr)
   end
   return git_root_cache[bufnr]
 end
+
+-- diff boundary repeat: lets ctrl stay down across emits
+--
+-- three input forms reach the same jump. see the behavior inventory:
+-- .agent/repo=.this/role=any/briefs/inventory.of=behaviors.via=nvim.case=diff-boundary-nav.md
+--   1. (ctrl+d, ctrl+j) -> emit, (ctrl+d, ctrl+j) -> emit, ...   ctrl free to lift
+--   2. ctrl+( (d,j) -> emit, (d,j) -> emit, ... )                ctrl held, d+j re-tapped
+--   3. ctrl+d+( j -> emit, j -> emit, ... )                      ctrl held, j alone repeats
+--
+-- forms 1 and 2 are ONE keystream — <C-d><C-j> either way, because a ctrl lift
+-- between two chords leaves no trace in the keycodes. both always worked.
+--
+-- form 3 needs this arm: the ctrl-held chord re-points ctrl+j at another boundary
+-- jump instead of its usual half page scroll, until a key outside the set ends it.
+--
+-- the disarm on ctrl lift costs no code: ctrl-held j arrives as <C-j> (kitty
+-- rewrites it to <S-CR>), while a ctrl-lifted j arrives as plain `j`, which is
+-- never rebound. so the moment ctrl comes up, `j` is a normal motion again.
+--
+-- 🛑 a ctrl RELEASE is UNREACHABLE here, and it is nvim that drops it, not tmux.
+--    measured 2026-09-06 -- see howdoes.a-key-event-reaches-nvim.md:
+--      · tmux relays `CSI 57442;1:3u` (ctrl release) byte for byte
+--      · nvim decodes the PRESS of that same key to U+E062
+--      · nvim yields NO key at all for any `:3u` release
+--    so the arm cannot end on the lift. it ends on the VOCABULARY instead.
+local BOUNDARY_REPEAT_KEEP = {}
+for _, k in ipairs({ '<C-d>', '<C-j>', '<C-k>', '<S-CR>' }) do
+  BOUNDARY_REPEAT_KEEP[#BOUNDARY_REPEAT_KEEP + 1] =
+    vim.api.nvim_replace_termcodes(k, true, false, true)
+end
+
+-- ⚠️ on_key hands the WHOLE resolved chord as one string, never one key per call:
+--    `<C-d><C-j>` arrives as `04 0a`, not as `04` then `0a`. so the test is whether
+--    the string DECOMPOSES into vocabulary members, not whether it IS one.
+--    no member is a prefix of another (04 / 0a / 0b / 80 fc 02 0d), so a greedy
+--    walk is exact.
+local function boundary_repeat_keeps(s)
+  local i = 1
+  while i <= #s do
+    local step = nil
+    for _, v in ipairs(BOUNDARY_REPEAT_KEEP) do
+      if s:sub(i, i + #v - 1) == v then step = #v break end
+    end
+    if not step then return false end
+    i = i + step
+  end
+  return true
+end
+
+local boundary_repeat = { live = false, bufnr = -1, down = nil, up = nil }
+
+local function boundary_repeat_arm(down, up)
+  boundary_repeat.down = down
+  boundary_repeat.up = up
+  boundary_repeat.bufnr = vim.api.nvim_get_current_buf()
+  boundary_repeat.live = true
+end
+
+-- armed only while the vocabulary holds AND we are still in the buffer that armed it
+local function boundary_repeat_armed()
+  return boundary_repeat.live
+    and boundary_repeat.bufnr == vim.api.nvim_get_current_buf()
+end
+
+-- ⚠️ the disarm is a KEY, never a clock. any key outside the four above ends the
+--    arm, so `<C-d><C-j><C-j> w` leaves `w` normal and the next <C-j> a half page.
+--    on_key runs BEFORE the keymap fires, so an arm survives the keys that set it.
+--
+-- 🛑 read `typed`, and NEVER fall back to `key`.
+--    measured 2026-09-06: whenever a LUA keymap resolves, on_key reports
+--    `key = 80 fd 67` -- K_LUA, nvim's internal "a callback runs" pseudo-key. it
+--    carries no trace of which key was struck, so a fallback to it disarms on
+--    every mapped key. a `key`-fallback draft broke exactly the form-3 repeat it
+--    was meant to serve.
+vim.on_key(function(_, typed)
+  if not boundary_repeat.live then return end
+  if not typed or typed == '' then return end
+  if not boundary_repeat_keeps(typed) then boundary_repeat.live = false end
+end)
 
 -- shared diff boundary navigation
 local function navigate_diff_boundary(direction, get_chunks, fallback)
@@ -706,16 +1229,27 @@ local PLUGIN_SPEC = {
           gs.prev_hunk({ navigation_message = false })
         end)
       end
+      -- the ctrl-HELD chords also arm the repeat, so a bare ctrl+j / ctrl+k goes
+      -- on to emit jumps while ctrl stays down (form 3). the ctrl-LIFTED chords
+      -- (<C-d>j / <C-d>k) do not arm — ctrl is already up, so form 3 is moot.
+      local function boundary_down_arm()
+        boundary_down()
+        boundary_repeat_arm(boundary_down, boundary_up)
+      end
+      local function boundary_up_arm()
+        boundary_up()
+        boundary_repeat_arm(boundary_down, boundary_up)
+      end
       vim.keymap.set('n', '<C-d>j', boundary_down, { desc = 'Next diff boundary' })
       vim.keymap.set('n', '<C-d>k', boundary_up, { desc = 'Prev diff boundary' })
-      vim.keymap.set('n', '<C-d><C-j>', boundary_down, { desc = 'Next diff boundary' })
-      vim.keymap.set('n', '<C-d><C-k>', boundary_up, { desc = 'Prev diff boundary' })
+      vim.keymap.set('n', '<C-d><C-j>', boundary_down_arm, { desc = 'Next diff boundary' })
+      vim.keymap.set('n', '<C-d><C-k>', boundary_up_arm, { desc = 'Prev diff boundary' })
       -- kitty remaps ctrl+j -> shift+enter (the `map ctrl+j send_key shift+enter`
-      -- line in grove.provision/4.terminal/4.3.kitty/4.3.2.emulator/configure.upsert.sh),
+      -- line in grove.provision/4.terminal/4.3.kitty/4.3.2.emulator/kitty.conf),
       -- so ctrl-held <C-d><C-j> never delivers <C-j> to
       -- nvim — it arrives as <S-CR>. map that too so "ctrl held down" next-diff
       -- works. ctrl+k is untouched by kitty, so prev needs no equivalent.
-      vim.keymap.set('n', '<C-d><S-CR>', boundary_down, { desc = 'Next diff boundary' })
+      vim.keymap.set('n', '<C-d><S-CR>', boundary_down_arm, { desc = 'Next diff boundary' })
       -- ctrl+d s = stage, u = unstage, x = discard
       local function stage_buffer()
         gs.stage_buffer()
@@ -798,7 +1332,7 @@ local PLUGIN_SPEC = {
       --      the set_buf path. pcall + silent! so quit never blocks on this.
       vim.api.nvim_create_autocmd({ 'QuitPre', 'VimLeavePre' }, {
         callback = function()
-          pcall(vim.cmd, 'silent! Neominimap off')
+          pcall(vim.cmd, 'silent! Neominimap Disable')
         end,
       })
 
@@ -820,7 +1354,7 @@ local PLUGIN_SPEC = {
         if after_win then
           local cur_win = vim.api.nvim_get_current_win()
           vim.api.nvim_set_current_win(after_win)
-          vim.cmd('Neominimap refresh')
+          vim.cmd('Neominimap Refresh')
           vim.defer_fn(function()
             if vim.api.nvim_win_is_valid(cur_win) then
               vim.api.nvim_set_current_win(cur_win)
@@ -856,7 +1390,7 @@ local PLUGIN_SPEC = {
         end,
       })
       -- ctrl+m to toggle
-      vim.keymap.set('n', '<C-m>', '<cmd>Neominimap toggle<cr>', { desc = 'Toggle minimap' })
+      vim.keymap.set('n', '<C-m>', '<cmd>Neominimap Toggle<cr>', { desc = 'Toggle minimap' })
 
       -- make minimap unfocusable — immediately redirect focus away
       vim.api.nvim_create_autocmd('WinEnter', {
@@ -1581,14 +2115,24 @@ local PLUGIN_SPEC = {
               vim.cmd('normal! [c')
             end)
           end
+          -- ctrl-HELD chords arm the repeat (form 3); ctrl-lifted ones do not.
+          -- see the gitsigns block above for the full rationale.
+          local function boundary_down_arm()
+            boundary_down()
+            boundary_repeat_arm(boundary_down, boundary_up)
+          end
+          local function boundary_up_arm()
+            boundary_up()
+            boundary_repeat_arm(boundary_down, boundary_up)
+          end
           vim.keymap.set('n', '<C-d>j', boundary_down, { buffer = true, desc = 'Next diff boundary' })
           vim.keymap.set('n', '<C-d>k', boundary_up, { buffer = true, desc = 'Prev diff boundary' })
-          vim.keymap.set('n', '<C-d><C-j>', boundary_down, { buffer = true, desc = 'Next diff boundary' })
-          vim.keymap.set('n', '<C-d><C-k>', boundary_up, { buffer = true, desc = 'Prev diff boundary' })
+          vim.keymap.set('n', '<C-d><C-j>', boundary_down_arm, { buffer = true, desc = 'Next diff boundary' })
+          vim.keymap.set('n', '<C-d><C-k>', boundary_up_arm, { buffer = true, desc = 'Prev diff boundary' })
           -- kitty remaps ctrl+j -> shift+enter, so ctrl-held <C-d><C-j> reaches
           -- nvim as <S-CR>; map it so next-diff works with ctrl held (see the
           -- gitsigns block above for the full rationale). ctrl+k is untouched.
-          vim.keymap.set('n', '<C-d><S-CR>', boundary_down, { buffer = true, desc = 'Next diff boundary' })
+          vim.keymap.set('n', '<C-d><S-CR>', boundary_down_arm, { buffer = true, desc = 'Next diff boundary' })
           -- 'o' to open file in new tab
           vim.keymap.set('n', 'o', function()
             local bufname = vim.api.nvim_buf_get_name(0)
@@ -1720,10 +2264,9 @@ local PLUGIN_SPEC = {
       ss.setup({
         at_edge = 'stop',  -- don't wrap navigation at window edges
       })
-      -- navigate between windows
+      -- navigate between windows. only left/right — ctrl+j/ctrl+k are half-page
+      -- scroll (see the scroll keymaps near the bottom of this file).
       vim.keymap.set('n', '<C-h>', ss.move_cursor_left)
-      vim.keymap.set('n', '<C-j>', ss.move_cursor_down)
-      vim.keymap.set('n', '<C-k>', ss.move_cursor_up)
       vim.keymap.set('n', '<C-l>', ss.move_cursor_right)
       -- helper: update codediff explorer width after manual resize
       local function update_codediff_explorer_width()
@@ -2051,7 +2594,40 @@ vim.keymap.set('n', '<C-e>', function()
   end
 end, { noremap = true, silent = true })
 
--- ctrl+h/j/k/l = navigate between windows (configured in smart-splits plugin above)
+-- ctrl+h/l = navigate between windows left/right (smart-splits plugin above)
+
+-- ctrl+j / ctrl+k = half page down / up in normal mode. vim's native <C-d>/<C-u>
+-- are taken by the gitsigns diff prefix, so the home-row pair carries the scroll.
+-- zz recenters so the cursor stays mid-screen across repeats.
+-- note: kitty remaps ctrl+j -> shift+enter (the `map ctrl+j send_key
+-- shift+enter` line in
+-- grove.provision/4.terminal/4.3.kitty/4.3.2.emulator/kitty.conf),
+-- so under kitty a bare ctrl+j arrives as <S-CR>. bind
+-- both so this works in kitty and in terminals that pass ctrl+j through.
+-- the <C-d>j / <C-d><C-j> diff-boundary chords are unaffected: they start with
+-- <C-d>, so nvim resolves them as their own mappings before ctrl+j is seen.
+-- while a diff-boundary repeat is armed (a ctrl-held <C-d><C-j> fired in this
+-- buffer, with no off-vocabulary key since), these keys emit the next/prev
+-- boundary instead — that is form 3, `ctrl+d+( j -> emit, j -> emit, ... )`. the
+-- scroll is LENT to the repeat, and any key outside {<C-d> <C-j> <C-k> <S-CR>}
+-- returns it. a lifted ctrl sends plain `j`, which both disarms and never reaches
+-- here at all. see the boundary_repeat block near navigate_diff_boundary.
+local function half_page(dir)
+  return function()
+    if boundary_repeat_armed() then
+      local go = dir == 'down' and boundary_repeat.down or boundary_repeat.up
+      if go then
+        go()
+        boundary_repeat_arm(boundary_repeat.down, boundary_repeat.up)
+        return
+      end
+    end
+    vim.cmd('normal! ' .. (dir == 'down' and vim.keycode('<C-d>') or vim.keycode('<C-u>')) .. 'zz')
+  end
+end
+vim.keymap.set('n', '<C-j>', half_page('down'), { noremap = true, desc = 'Half page down' })
+vim.keymap.set('n', '<S-CR>', half_page('down'), { noremap = true, desc = 'Half page down' })
+vim.keymap.set('n', '<C-k>', half_page('up'), { noremap = true, desc = 'Half page up' })
 
 -- ctrl+z = undo, ctrl+shift+z = redo (standard keybinds)
 vim.keymap.set('n', '<C-z>', 'u', { noremap = true })
