@@ -118,6 +118,36 @@ reader could see.
 live state.** report it as transient, or do not report it — the rule this term already serves
 (`rule.require.judge-declared-state-not-live-state`), applied to a subject that is a person.
 
+## 🛑 .the SCOPE — "never carries a verdict" holds where live is a CONSEQUENCE
+
+the `.the pair` clause above reads as an absolute, and the rule it cites is not one:
+`rule.require.judge-declared-state-not-live-state` enforces on *"a **config check** whose
+verdict rests on live state **where a declaration exists**"*.
+
+⇒ both qualifiers are load-bear, because the rule's whole argument is that **live is a
+consequence of declared** — rebuilt at boot, so it goes quiet exactly when it matters, and a
+live "repair" is undone by the declaration that reinstates it.
+
+**where live is NOT a consequence of any declaration, that argument does not reach**, and a
+live verdict is the only honest one available:
+
+| the subject | declared says | live says | which may judge |
+|---|---|---|---|
+| swap, a unit, a mount | what every boot will do | this boot only | **declared** |
+| a mic's signal | mute flag, volume, not-a-monitor | what the mic returns | **live** |
+
+`audio.record.source.get` reads the declared half and `audio.record.probe` measures the live
+half, and the split exists because they **disagree**: a hardware mute switch, a dead jack, or
+an app that holds the device exclusively all read declared-healthy and return bit-exact
+silence. no declaration on that box predicts the signal, so a declared-only verdict is a
+`rule.forbid.failhide` — it reports fine over a mic that hears none.
+
+⚠️ the shelf-life clause still binds it in full: the probe's verdict ages in seconds, which
+is why `audio.record.start` re-runs it at every take rather than cite a prior one.
+
+⇒ **the test is not "is this live?" but "does a declaration DETERMINE this?"** yes → judge the
+declaration. no → the live read is the subject, and it carries the verdict.
+
 ## .why it is bare, not `grove.live`
 same allowance as its pair (`term=declared`): the word means exactly the same of a grove's
 swap, a tree's session, or a tree's PATH, so it spans contexts rather than belongs to one. a
@@ -127,6 +157,8 @@ binds the two halves — to prefix one and not the other would break the pair.
 ## .refs
 where the term is declared / used:
 - .agent/repo=.this/role=any/briefs/evidence/rule.require.judge-declared-state-not-live-state.md
+- .agent/repo=.this/role=any/skills/audio.record.probe.sh — measures the live half
+- .agent/repo=.this/role=any/skills/audio.record.source.get.sh — reads the declared half
 
 ## .reason
 see the ref-level cluster beside this choice:

@@ -74,8 +74,31 @@ term=exhibit._.choice.reason.md:64                 # uncited → an exhibit or a
 ```
 
 the sense-A contradiction is a **live defect**, not a doc nit: the bundle header describes a
-condition its own script does not test. two of three sites say *cwd deleted*; the `_.sh` says
+condition its own reader does not test. two of three sites say *cwd deleted*; the `_.sh` says
 *parent gone*. a reader who trusts the bundle header will hunt the wrong hazard.
+
+### 🛑 a SIXTH reach — 2026-09-07, with this cluster already written
+
+diagnosing `audio.record.start`, the seal phase was found to keep running after `rhx` had
+already exited and returned the human's prompt. the sentence reached for was *"the work
+carried on orphaned"* — the plain unix reading: **a child whose parent is gone.**
+
+⇒ that is the KINSHIP sense, which is precisely the reading `1.6.1.finders/_.sh:7` states and
+the implementation does not test. so the sixth reach landed on the one sense this file already
+names as the outlier, in an unrelated subsystem, four days later.
+
+⚠️ **and the cluster existed the whole time.** it was not consulted before the word was used;
+it was consulted after, at the conform-or-dispute step, which is what caught it. that is the
+durable finding:
+
+> **an ambiguous term is not repaired by a file that documents the ambiguity.** the word
+> arrives faster than the check does, so the record catches the drift on review and never at
+> the keyboard.
+
+⇒ so this reach is **evidence for the split**, not a seventh sense to add: it strengthens the
+claim side of the open dispute and settles none of the four questions below. the audio sentence
+was reworded rather than adopted (`rule.forbid.domain-term-synonyms` — adhere, or dispute,
+never drift).
 
 ## .the open questions the human owns
 
