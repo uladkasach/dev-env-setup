@@ -2,7 +2,7 @@
 
 ## 🛑 .the rule, in one line
 
-# **NEVER `bash src/grove.provision._.sh`. THE DRIVER IS REACHED THROUGH `rhx`, ALWAYS.**
+# **NEVER `bash …/grove.provision._.sh`. THE DRIVER IS REACHED THROUGH `rhx`, ALWAYS.**
 
 | you want to converge… | you type |
 |---|---|
@@ -40,8 +40,14 @@ four costs, in order of how often each has bitten:
    contradicting its own rule teaches the opposite, with the rule's authority behind it.
 
 ⚠️ **and this rule's own parent modeled the violation.** `rule.require.grove-provision-as-the-only-entrypoint`
-carried a row reading *"upgrade this machine → `bash src/grove.provision._.sh`"* in its `.the rule`
+carried a row reading *"upgrade this machine → `bash …/grove.provision._.sh`"* in its `.the rule`
 table. the rule that declares the one door named the wrong handle.
+
+⚠️ **and that quote carries an ellipsis on purpose.** to cite the dead form verbatim is to
+re-create it — a reader copies the headline and gets the banned command, with this rule's own
+authority behind it. so the convention is: **a path that carries `…` is prose; a path a reader
+could paste is a call.** `prove.the-driver-is-never-named-by-path` reads that difference, and it
+reddened THIS file on 2026-09-07 for the very sentence above.
 
 ## ⚠️ .the THREE carve-outs, and why each is real
 

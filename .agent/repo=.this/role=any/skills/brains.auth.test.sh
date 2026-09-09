@@ -59,13 +59,14 @@ SNAPS="$SKILL_DIR/brains.auth.test.snap"
 
 # locate + source src/brains.auth.sh, and strip the rhx `--skill` token into ${ARGS[@]}
 #
-# ⚠️ this file used to carry its OWN copy of that preamble, `--skill` hang-guard and all —
-#   a THIRD copy of a guard the shared bootstrap exists to hold once, and its comment had
-#   already shortened away from the original. the argument for the copy was that this file
-#   takes a flag the proxies do not (`--resnap`), but that conflates two things: the SHARED
-#   half is the hang guard, the UNIQUE half is one flag. the shared half is shared now, and
+# 🛑 no LOCAL copy of that preamble, whatever the one flag seems to argue
+#   the case for a copy is that this file takes a flag the proxies do not
+#   (`--resnap`) — and that conflates two halves: the SHARED half is the
+#   `--skill` hang guard, the UNIQUE half is one flag. the shared half is shared;
 #   the unique half is read below from the args the bootstrap hands back.
-#   the copy was worst here of all three: a hang in a test run reads as a slow suite.
+#
+#   ⚠️ a third copy is worst HERE of all three sites: a hang in a test run reads
+#   as a slow suite, so nobody looks for it.
 # shellcheck disable=SC1091
 source "$SKILL_DIR/brains.auth.bootstrap.sh"
 
@@ -74,13 +75,13 @@ ALIASES="$BRAINS_AUTH_SRC"
 # the one flag the proxies do not take. read from ${ARGS[@]}, which the bootstrap already
 # stripped the --skill token out of.
 #
-# ⚠️ an unrecognized flag is REFUSED, not ignored — and the prior version ignored it, which is
-#   a defect of exactly the kind this file exists to catch. `--resnp` ran in verify mode in
-#   silence, so on a seeded checkout the operator believes they re-pinned the baselines while
-#   the suite merely re-read them; the baselines they meant to update stay stale and the run
-#   looks green. an instrument that quietly drops its own input cannot be trusted to report a
-#   dropped input anywhere else. this mirrors `_brains_auth_say_unknown_arg`, the discipline
-#   the three production commands already carry (`rule.require.failfast`).
+# 🛑 an unrecognized flag is REFUSED, never ignored — a defect of exactly the kind this file
+#   exists to catch. a silently-dropped `--resnp` runs in verify mode, so on a seeded checkout
+#   the operator believes they re-pinned the baselines while the suite merely re-read them;
+#   the baselines they meant to update stay stale and the run looks green. an instrument that
+#   quietly drops its own input cannot be trusted to report a dropped input anywhere else.
+#   this mirrors `_brains_auth_say_unknown_arg`, the discipline the three production commands
+#   already carry (`rule.require.failfast`).
 RESNAP=0
 for _a in ${ARGS[@]+"${ARGS[@]}"}; do
   case "$_a" in
@@ -158,14 +159,14 @@ echo "🧪 brains.auth — render + classification"
 # ---------------------------------------------------------------- fixtures
 # fixed timestamps, so the rendered weekday + clock are identical everywhere.
 FIXTURE_HEALTHY='{
-  "surfer@ehmpath.com": {
+  "surfer@example.com": {
     "five_hour": { "utilization": 58.0, "resets_at": "2026-06-15T09:00:00+00:00" },
     "seven_day": { "utilization": 31.0, "resets_at": "2026-06-19T17:00:00+00:00" }
   }
 }'
 
 FIXTURE_OPUS='{
-  "surfer@ehmpath.com": {
+  "surfer@example.com": {
     "five_hour": { "utilization": 91.0, "resets_at": "2026-06-15T09:00:00+00:00" },
     "seven_day": { "utilization": 64.0, "resets_at": "2026-06-19T17:00:00+00:00" },
     "seven_day_opus": { "utilization": 40.0, "resets_at": null }
@@ -173,21 +174,21 @@ FIXTURE_OPUS='{
 }'
 
 FIXTURE_MIXED='{
-  "kai@ehmpath.com": { "error": "refresh_rejected" },
-  "surfer@ehmpath.com": {
+  "kai@example.com": { "error": "refresh_rejected" },
+  "surfer@example.com": {
     "five_hour": { "utilization": 3.0, "resets_at": "2026-06-15T09:00:00+00:00" },
     "seven_day": { "utilization": 9.0, "resets_at": "2026-06-19T17:00:00+00:00" }
   }
 }'
 
 FIXTURE_ALL_DEAD='{
-  "kai@ehmpath.com": { "error": "refresh_rejected" },
-  "moana@ehmpath.com": { "error": "no_token" }
+  "kai@example.com": { "error": "refresh_rejected" },
+  "moana@example.com": { "error": "no_token" }
 }'
 
 FIXTURE_ALL_BROKEN='{
-  "kai@ehmpath.com": { "error": "refresh_rejected" },
-  "moana@ehmpath.com": { "error": "rate_limited" }
+  "kai@example.com": { "error": "refresh_rejected" },
+  "moana@example.com": { "error": "rate_limited" }
 }'
 
 # ---------------------------------------------------------------- the render
@@ -196,7 +197,7 @@ _snap 'render.healthy' \
 
 # the "← signed in" mark is a claim of fact, so which row carries it is snapped
 _snap 'render.signed-in-mark' \
-  "$(_brains_auth_render "$FIXTURE_HEALTHY" 'surfer@ehmpath.com' | _normalize)"
+  "$(_brains_auth_render "$FIXTURE_HEALTHY" 'surfer@example.com' | _normalize)"
 
 _snap 'render.opus-row' \
   "$(_brains_auth_render "$FIXTURE_OPUS" | _normalize)"
@@ -254,8 +255,8 @@ _snap 'bar.boundaries' "${_bars%$'\n'}"
 # the wire format `<uuid>\t<email>` is known ONLY to these two accessors, so
 # they are pinned: a change to the packed shape must break here, loudly.
 _snap 'identity.accessors' \
-  "uuid -> $(_brains_auth_uuid_of_who "abc-123"$'\t'"kai@ehmpath.com")
-email -> $(_brains_auth_email_of_who "abc-123"$'\t'"kai@ehmpath.com")"
+  "uuid -> $(_brains_auth_uuid_of_who "abc-123"$'\t'"kai@example.com")
+email -> $(_brains_auth_email_of_who "abc-123"$'\t'"kai@example.com")"
 
 # ---------------------------------------------------------------- the reach shape
 # one validator now serves all three commands, so its verdicts are pinned here.
@@ -263,7 +264,7 @@ email -> $(_brains_auth_email_of_who "abc-123"$'\t'"kai@ehmpath.com")"
 # validator that quietly blessed it would let `--reach @all` through on `use`, where
 # a swap to "every account" names no account at all.
 _reaches=''
-for r in 'kai@ehmpath.com' 'a.b+c@sub.domain.co' '@all' 'kai' 'kai@ehmpath' \
+for r in 'kai@example.com' 'a.b+c@sub.domain.co' '@all' 'kai' 'kai@ehmpath' \
          'kai @ehmpath.com' 'kai@@ehmpath.com' ''; do
   if _brains_auth_is_reach "$r"; then _reaches+="ok   '${r}'"$'\n'
   else _reaches+="no   '${r}'"$'\n'; fi
@@ -291,8 +292,8 @@ _BRAINS_AUTH_LIVE_PROFILE="$_SWAPDIR/.claude.json"
 
 # ⚠️ and the redirect is VERIFIED, not merely written. every case below writes fixtures — some
 #   deliberately corrupt — through these two variables, so a path that still points into $HOME
-#   destroys the human's live claude config. the comment above used to be the only guard, and a
-#   comment cannot fail a run. this can.
+#   destroys the human's live claude config. the comment above is not a guard — a comment
+#   cannot fail a run. this can.
 for _p in "$_BRAINS_AUTH_LIVE_CREDS" "$_BRAINS_AUTH_LIVE_PROFILE"; do
   case "$_p" in
     "$_SWAPDIR"/*) ;;
@@ -344,7 +345,7 @@ _is 'park.good.out' "$_ORT" "$(_brains_auth_park_read)"
 # the prior file (above) is the one this swap replaces, so both invariants are observable:
 # the foreign key must survive, and a .bak of the PRIOR content must be left behind.
 rm -f "${_BRAINS_AUTH_LIVE_CREDS}.bak"
-_brains_auth_install_creds 'kai@ehmpathy.com' "$_OAT" "$_ORT" 3600 'user:inference user:profile' 'max'
+_brains_auth_install_creds 'kai@example.com' "$_OAT" "$_ORT" 3600 'user:inference user:profile' 'max'
 _is 'install.rc' '0' "$?"
 
 # a key claude keeps beside .claudeAiOauth must survive the swap — we replace one block of
@@ -367,7 +368,7 @@ _snap 'install.payload' \
 
 # an absent prior file is a valid start state (a first-ever login), not a hard failure
 rm -f "$_BRAINS_AUTH_LIVE_CREDS" "${_BRAINS_AUTH_LIVE_CREDS}.bak"
-_brains_auth_install_creds 'kai@ehmpathy.com' "$_OAT" "$_ORT" 3600 '' 'pro' >/dev/null 2>&1
+_brains_auth_install_creds 'kai@example.com' "$_OAT" "$_ORT" 3600 '' 'pro' >/dev/null 2>&1
 _is 'install.from-absent.rc' '0' "$?"
 # with no scopes supplied the default pair is written, never an empty list
 _is 'install.default-scopes' 'user:inference user:profile' \
@@ -520,9 +521,9 @@ _is 'sweep.every-reach-keyed' 'a@x.com b@x.com c@x.com d@x.com e@x.com' \
 #   is `[[ -t 2 ]]`, and this is what proves it — the suite itself runs with stderr captured,
 #   so a regression that drops the tty test shows up here rather than in a human's log.
 # .note = this uses its OWN seam rather than `_usage_union`, because that one discards stderr
-#   INSIDE its subshell — so a `2>&1` at the call site would capture an empty string and the
-#   case would pass no matter what. that is precisely the toothless-clamp shape
-#   `rule.require.clamp-edge-cases` forbids, and the first draft of this case had it.
+#   INSIDE its subshell — so a `2>&1` at the call site captures an empty string and the case
+#   passes no matter what. that is precisely the toothless-clamp shape
+#   `rule.require.clamp-edge-cases` forbids.
 _prog_out="$(
   eval "_brains_auth_reaches()        { printf '%s' '$_five'; return 0; }"
   eval "_brains_auth_active_reach()   { printf '%s' 'a@x.com'; return 0; }"
@@ -704,21 +705,20 @@ _is 'tokenerr.keyrack-outranks-shape' 'keyrack_unreadable' \
   "$(_brains_auth_token_err 1 'sk-ant-api03-xyz')"
 
 # ---- the empty-store render, as a leaf
-# ⚠️ this branch used to be inlined while `_brains_auth_render_identity_blocked` sat right
-#   beside it as an extracted leaf — so a reader of the pair could not tell whether "inline"
-#   or "extracted" was the convention, and only one of the two was snappable without a driven
-#   sweep. both are leaves now, and both are snapped here.
+# ⚠️ BOTH renders are extracted leaves, and both are snapped here. one inlined beside one
+#   extracted leaves a reader unable to tell which is the convention, and only the extracted
+#   half is snappable without a driven sweep.
 # ⚠️ this helper does the profile read the ORCHESTRATOR does, then hands the name to the
-#   render — because the render is a pure leaf and no longer opens the file itself. the two
-#   lines below are the caller's two lines, so this still covers profile-file → rendered text
-#   end to end; what it no longer does is let a render reach for a global.
+#   render — because the render is a PURE leaf and opens no file itself. the two lines below
+#   are the caller's two lines, so this still covers profile-file → rendered text end to end,
+#   and it does so without a render that reaches for a global.
 _render_no_subs_when() {
   printf '%s' "$1" > "$_BRAINS_AUTH_LIVE_PROFILE"
   _brains_auth_render_no_subscriptions \
     "$(_brains_auth_creds_field "$_BRAINS_AUTH_LIVE_PROFILE" '.oauthAccount.emailAddress')"
 }
 _snap 'coldstart.no-subs.names-the-live-account' \
-  "$(_render_no_subs_when '{"oauthAccount":{"emailAddress":"kai@ehmpathy.com"}}')"
+  "$(_render_no_subs_when '{"oauthAccount":{"emailAddress":"kai@example.com"}}')"
 # and with no live login, the hint line must be ABSENT rather than render an empty name
 _snap 'coldstart.no-subs.no-login-omits-the-hint' \
   "$(_render_no_subs_when '{}')"
@@ -730,10 +730,10 @@ _is 'coldstart.no-subs.torn-profile-omits-the-hint' 'omitted' \
      esac)"
 # ⚠️ the render must be a PURE function of its argument — it renders the name it is HANDED,
 #   and never the one the profile file happens to hold. this is the clamp on that: the file on
-#   disk says `moana@x.com`, the argument says `kai@x.com`, and the argument must win. the leaf
-#   used to open the file itself, and under that shape this case reads `moana@x.com` — a leaf
-#   that ignores its own input, which is the whole reason a pure-vs-i/o mixup is a defect and
-#   not a style note. it also proves the file read moved OUT rather than merely got shadowed.
+#   disk says `moana@x.com`, the argument says `kai@x.com`, and the argument must win. a leaf
+#   that opened the file itself reads `moana@x.com` here — a leaf that ignores its own input,
+#   which is the whole reason a pure-vs-i/o mixup is a defect and not a style note. it also
+#   proves the file read lives OUTSIDE the leaf rather than merely gets shadowed.
 _is 'coldstart.no-subs.render-is-pure' 'kai@x.com' \
   "$( printf '%s' '{"oauthAccount":{"emailAddress":"moana@x.com"}}' > "$_BRAINS_AUTH_LIVE_PROFILE"
       _brains_auth_render_no_subscriptions 'kai@x.com' \
@@ -778,14 +778,13 @@ _is 'sync.corrupt-profile.rc'   '1' "$?"
 _is 'sync.corrupt-profile.loud' '1' "$([[ -n "$_sync_out" ]] && echo 1 || echo 0)"
 
 # ---------------------------------------------------------------- the severity table
-# severity used to be recovered by a prefix-match on the hint's ✋/💥 glyph, which made a
-# DISPLAY string decide the exit code automation reads. it is data now, and both surfaces read
-# it — so this pins that they cannot disagree.
+# severity is DATA, never a prefix-match on the hint's ✋/💥 glyph — a match on the glyph lets
+# a DISPLAY string decide the exit code automation reads. both surfaces read the data, so this
+# pins that they cannot disagree.
 #
-# the EXIT CODE column is snapped beside the severity for the same reason the glyph is: it was
-# the last half of the contract still hand-typed at each call site, so the table and the codes
-# it implies were two facts a reader had to reconcile. now they render side by side, and a
-# severity that flips drags its code into the diff with it.
+# the EXIT CODE column is snapped beside the severity for the same reason the glyph is: a code
+# hand-typed at each call site makes the table and the codes it implies two facts a reader must
+# reconcile. side by side, a severity that flips drags its code into the diff with it.
 _sev=''
 for e in "${_ERRORS[@]}"; do
   _sev+="$(printf '%-28s %-12s %s  exit %s' "$e" \
@@ -846,10 +845,10 @@ _is 'use.refuse-outranks-noop' 'refuse_unverified' \
 #   expired access + a named profile   -> 2 unverified (a name that may LAG the live token)
 #   expired access + an empty profile  -> 1 unknown    (a login exists but cannot be named)
 #
-# .note = the profile redirect used to sit HERE, beside its first reader. that is what made the
-#   defect: two profile-sync sections were later added ABOVE this line, and they wrote their
-#   fixtures to the real ~/.claude.json. the redirect now lives with the creds one at the top,
-#   where no future section can be inserted before it.
+# .note = the profile redirect lives at the TOP, with the creds one — never here, beside its
+#   first reader. 📜 measured: with the redirect here, two profile-sync sections were added
+#   ABOVE this line and wrote their fixtures to the real ~/.claude.json. at the top, no future
+#   section can be inserted before it.
 
 # a creds file whose access token expired long ago — this is the state an idle terminal lands
 # in within the hour, so it is the common case, not an exotic one
@@ -864,11 +863,11 @@ _is 'arc.no-creds.rc'  '0' "$_rc"
 _is 'arc.no-creds.out' ''  "$_out"
 
 _expired_creds
-printf '%s' '{"oauthAccount":{"accountUuid":"u-1","emailAddress":"kai@ehmpathy.com"}}' \
+printf '%s' '{"oauthAccount":{"accountUuid":"u-1","emailAddress":"kai@example.com"}}' \
   > "$_BRAINS_AUTH_LIVE_PROFILE"
 _out="$(_brains_auth_active_reach 'ua')"; _rc=$?
 _is 'arc.unverified.rc'  '2'                 "$_rc"
-_is 'arc.unverified.out' 'kai@ehmpathy.com'  "$_out"
+_is 'arc.unverified.out' 'kai@example.com'  "$_out"
 
 _expired_creds
 printf '%s' '{}' > "$_BRAINS_AUTH_LIVE_PROFILE"
@@ -887,7 +886,7 @@ _is 'arc.unknown.out' ''  "$_out"
 #   against the account that is truly live rotates its token out from under an open session —
 #   so an unverified name may never authorize it. display may guess; a mutation may not.
 _expired_creds
-printf '%s' '{"oauthAccount":{"accountUuid":"u-1","emailAddress":"kai@ehmpathy.com"}}' \
+printf '%s' '{"oauthAccount":{"accountUuid":"u-1","emailAddress":"kai@example.com"}}' \
   > "$_BRAINS_AUTH_LIVE_PROFILE"
 
 # .what = mask the per-run temp dir out of a message that quotes a file path
@@ -897,8 +896,8 @@ printf '%s' '{"oauthAccount":{"accountUuid":"u-1","emailAddress":"kai@ehmpathy.c
 _maskdir() { sed -E "s#${_SWAPDIR}#<tmp>#g"; }
 
 _snap 'identity.usage-refuses-unverified.json' \
-  "$(_brains_auth_usage --reach kai@ehmpathy.com --json 2>&1 | _maskdir)"
-_brains_auth_usage --reach kai@ehmpathy.com --json >/dev/null 2>&1
+  "$(_brains_auth_usage --reach kai@example.com --json 2>&1 | _maskdir)"
+_brains_auth_usage --reach kai@example.com --json >/dev/null 2>&1
 _code 'identity.usage-refuses-unverified.exit' 2 "$?"
 
 # ⚠️ the refusal a human reads is snapped BESIDE the display below on purpose. the two are
@@ -906,7 +905,7 @@ _code 'identity.usage-refuses-unverified.exit' 2 "$?"
 #   them together can judge that at a glance; two separate snapshots could each read fine on
 #   its own and still contradict each other.
 _snap 'identity.usage-refuses-unverified.tree' \
-  "$(_brains_auth_usage --reach kai@ehmpathy.com 2>&1 | _maskdir)"
+  "$(_brains_auth_usage --reach kai@example.com 2>&1 | _maskdir)"
 
 # the DISPLAY still names the account — caveated, never silent
 _snap 'identity.use-shows-unverified' "$(_brains_auth_use 2>&1 | _maskdir)"
@@ -914,12 +913,12 @@ _snap 'identity.use-shows-unverified' "$(_brains_auth_use 2>&1 | _maskdir)"
 _expired_creds
 printf '%s' '{}' > "$_BRAINS_AUTH_LIVE_PROFILE"
 _snap 'identity.usage-refuses-unknown' \
-  "$(_brains_auth_usage --reach kai@ehmpathy.com --json 2>&1 | _maskdir)"
-_brains_auth_usage --reach kai@ehmpathy.com --json >/dev/null 2>&1
+  "$(_brains_auth_usage --reach kai@example.com --json 2>&1 | _maskdir)"
+_brains_auth_usage --reach kai@example.com --json >/dev/null 2>&1
 _code 'identity.usage-refuses-unknown.exit' 2 "$?"
 
 # a swap must refuse on BOTH non-verified codes — it is the mutation, so it is the strict one
-_brains_auth_use --reach kai@ehmpathy.com >/dev/null 2>&1
+_brains_auth_use --reach kai@example.com >/dev/null 2>&1
 _code 'identity.use-refuses-unknown.exit' 2 "$?"
 
 # ---------------------------------------------------------------- the swap sequence
@@ -1045,9 +1044,8 @@ _store_with() {
 # .note = `_brains_auth_set_token` is stubbed to PRINT its reach rather than write a keyrack, so
 #   the case observes the decision itself instead of a side effect two layers away.
 # .note = the reach is emitted behind a `REACH:` marker and cut back out, because `set` also
-#   prints its own sign-in banner to stdout. an unmarked capture would compare the decision
-#   against four lines of prose and read as a failure while the code was correct — which is
-#   exactly what the first draft of these three cases did.
+#   prints its own sign-in banner to stdout. an unmarked capture compares the decision against
+#   four lines of prose and reads as a failure while the code is correct.
 _store_reach_when() {
   local says="$1" out; shift
   out="$(
@@ -1074,18 +1072,18 @@ _store_reach_when() {
 #   that promise is kept, and a regression that flipped the precedence would file a live token
 #   under an account nobody will ever look it up by. it fails SILENTLY: `set` reports success,
 #   and the loss surfaces rounds later as an unrelated `usage` miss.
-_is 'set.token-identity-outranks-flag' 'kai@ehmpathy.com' \
-  "$(_store_reach_when 'kai@ehmpathy.com' --reach 'wrong@example.com')"
+_is 'set.token-identity-outranks-flag' 'kai@example.com' \
+  "$(_store_reach_when 'kai@example.com' --reach 'wrong@example.com')"
 # the same precedence with no flag at all — the common case, where the token is the only source
-_is 'set.token-identity-with-no-flag' 'kai@ehmpathy.com' \
-  "$(_store_reach_when 'kai@ehmpathy.com')"
+_is 'set.token-identity-with-no-flag' 'kai@example.com' \
+  "$(_store_reach_when 'kai@example.com')"
 # and the fallback the flag exists FOR: the token declines to say who it is, so the supplied
 # name is all there is. a precedence fix must not cost us this one.
 _is 'set.flag-is-the-fallback' 'named@example.com' \
   "$(_store_reach_when '' --reach 'named@example.com')"
 
 # ---- the isolation boundary must not survive a failed mktemp
-# ⚠️ `authdir="$(mktemp -d)"` used to go unchecked, and that ONE unread rc inverts the whole
+# ⚠️ `authdir="$(mktemp -d)"` must be CHECKED — that ONE unread rc inverts the whole
 #   promise of this command. a full tmpfs hands back an EMPTY string, and bash carries an empty
 #   string forward as happily as a path: `chmod 700 ""` fails unread, the trap arms on an empty
 #   path, and the login is invoked with `CLAUDE_CONFIG_DIR=""` — which does NOT aim claude at a
@@ -1101,7 +1099,7 @@ _set_with_dead_mktemp() {
     # if the guard is absent, this marker proves the login was reached with an empty authdir
     eval "_brains_auth_login_isolated() { printf 'LOGIN-RAN-WITH:[%s]\n' \"\$1\"; }"
     eval "_brains_auth_extract_refresh() { printf ''; return 1; }"
-    _brains_auth_set --reach 'kai@ehmpathy.com' 2>&1
+    _brains_auth_set --reach 'kai@example.com' 2>&1
   )
 }
 _MKT="$(_set_with_dead_mktemp)"
@@ -1141,12 +1139,12 @@ _code 'store.mint-malfunction-exits-1' 1 "$?"
 _snap 'swap.mint-rejected.says' \
   "$(_swap_with '{"ok":false,"error":"refresh_rejected","code":401}' 2>&1 | _maskdir)"
 
-# ⚠️ the drift clamp. this branch used to hand-roll its OWN case over the same error codes,
-#   with three named arms and a generic `*)` catch-all. so a code the shared table has a
-#   precise hint for — `no_access_token`, "the oauth flow may have changed" — fell through
-#   to "refresh was rejected", and the human was sent to re-auth a token that was fine.
-#   the sweep and the swap now read the SAME hint for the same failure, and this is what
-#   proves it: the expected text is built from the table, so a second copy cannot satisfy it.
+# ⚠️ the drift clamp. a branch that hand-rolls its OWN case over the same error codes — three
+#   named arms and a generic `*)` catch-all — drops a code the shared table has a precise hint
+#   for: `no_access_token`, "the oauth flow may have changed", falls through to "refresh was
+#   rejected", and the human is sent to re-auth a token that was fine. the sweep and the swap
+#   must read the SAME hint for the same failure, and this is what proves it: the expected text
+#   is built from the table, so a second copy cannot satisfy it.
 _out="$(_swap_with '{"ok":false,"error":"no_access_token","code":200}' 2>&1)"
 case "$_out" in
   *"$(_brains_auth_fix_for_error no_access_token)"*)
@@ -1240,11 +1238,11 @@ _is 'beta.header-sent-by-every-call' '3' \
 #   verdicts (whoami falls back to the profile; node_for_reach names `active_token_expired`)
 #   off ONE read of the file.
 # ⚠️ these probes MUTATE a fixture later cases read, so the prior content is saved HERE and
-#   restored BELOW — after the last probe, in file order. the first draft of this block only
-#   `rm -f`'d at the end, which left the file ABSENT for every case downstream and surfaced as
+#   restored BELOW — after the last probe, in file order. 📜 an `rm -f` at the end instead
+#   leaves the file ABSENT for every case downstream, and surfaces as
 #   `cat: .../.credentials.json: No such file` plus a stray `jq: parse error` in an unrelated
-#   later case. that is failure shape 3 in hazard.a-clamp-can-lie-the-same-way-code-can.md,
-#   committed by the very round that wrote the brief.
+#   later case — failure shape 3 in hazard.a-clamp-can-lie-the-same-way-code-can.md, committed
+#   by the very round that wrote the brief.
 _LC_SAVED=''
 _LC_HAD=0
 [[ -f "$_BRAINS_AUTH_LIVE_CREDS" ]] && { _LC_SAVED="$(cat "$_BRAINS_AUTH_LIVE_CREDS")"; _LC_HAD=1; }
@@ -1393,12 +1391,12 @@ case "$(_swap_when_decider_says 'proceed')" in
 esac
 
 # ---- a stale profile after a successful swap must not report a clean success
-# ⚠️ the sync used to end in `|| true`, which threw its rc away: the command closed with a
-#   clean tree and exit 0 while `~/.claude.json` still named the PRIOR account. that is not
-#   cosmetic — `_brains_auth_whoami` falls back to that very profile whenever the live access
-#   token has expired, and that identity gates every later read. so a discarded rc here makes
-#   a later `brains.auth.usage` name the wrong account as signed-in, and the one signal that
-#   would have warned a caller was the code we dropped.
+# 🛑 the sync's rc must be READ, never closed with `|| true`. a discarded rc lets the command
+#   finish with a clean tree and exit 0 while `~/.claude.json` still names the PRIOR account.
+#   that is not cosmetic — `_brains_auth_whoami` falls back to that very profile whenever the
+#   live access token has expired, and that identity gates every later read. so a discarded rc
+#   here makes a later `brains.auth.usage` name the wrong account as signed-in, and the one
+#   signal that would warn a caller is the code that was dropped.
 _swap_with_stale_profile() {
   (
     eval "_brains_auth_active_reach()  { printf '%s' 'moana@x.com'; return 0; }"
@@ -1498,9 +1496,10 @@ _snap 'cas.changed.says' \
 #   are clamped, because a regression either way is a silent security defect: a leaked secret
 #   at rest, or a deleted last copy.
 # ⚠️ the fixture is a REAL credentials shape that holds the same token as the live file, and
-#   both halves of that matter. it was `printf 'x'` until the strand guard landed, and the
-#   suite caught the drift itself: an unparseable `.bak` is now (correctly) treated as a
-#   strand, so the swap refused and never reached the park these two cases are about. the
+#   both halves of that matter. 📜 a `printf 'x'` fixture stopped working the day the strand
+#   guard landed, and the suite caught that drift itself: an unparseable `.bak` is correctly
+#   treated as a strand, so the swap refuses and never reaches the park these two cases are
+#   about. the
 #   token must match the live one for the same reason — a DIFFERENT token is a strand, which
 #   is the case the `strand.*` block below owns. here we want the redundant copy: the shape a
 #   swap that died between the `cp` and the write leaves behind.
@@ -1612,7 +1611,7 @@ _saved_prof="$(cat "$_BRAINS_AUTH_LIVE_PROFILE")"
 printf '{"claudeAiOauth":{' > "$_BRAINS_AUTH_LIVE_CREDS"   # truncated mid-object
 # the profile is seeded rather than assumed — earlier cases in this file rewrite it, and a
 # clamp whose verdict depends on what ran before it is a clamp that reports the wrong thing
-printf '{"oauthAccount":{"accountUuid":"u-stale","emailAddress":"stale@ehmpathy.com"}}' \
+printf '{"oauthAccount":{"accountUuid":"u-stale","emailAddress":"stale@example.com"}}' \
   > "$_BRAINS_AUTH_LIVE_PROFILE"
 
 case "$( ( curl() { return 7; }; _brains_auth_whoami 'ua/1' ) 2>&1 >/dev/null )" in
@@ -1625,7 +1624,7 @@ esac
 _is 'failhide.whoami-still-answers-unverified' '2' \
   "$( ( curl() { return 7; }; _brains_auth_whoami 'ua/1' >/dev/null 2>&1; echo $? ) )"
 
-case "$( ( _brains_auth_install_creds 'kai@ehmpathy.com' 'acc' "$_ORT" 3600 '' 'max' ) 2>&1 >/dev/null )" in
+case "$( ( _brains_auth_install_creds 'kai@example.com' 'acc' "$_ORT" 3600 '' 'max' ) 2>&1 >/dev/null )" in
   *'could not be parsed'*) _is 'failhide.install-says-keys-dropped' 'said' 'said' ;;
   *)                       _is 'failhide.install-says-keys-dropped' 'said' 'MUTED — foreign keys gone quietly' ;;
 esac
@@ -1697,11 +1696,11 @@ _is 'mint.server-error-is-ours' 'malfunction|constraint' \
   "$(_brains_auth_severity_for_error refresh_server_error)|$(_brains_auth_severity_for_error refresh_rejected)"
 
 # ⚠️ `.code` means "the http status of the exchange that produced this verdict", and a caller
-#   may branch on it to split a dead token from a transient fault. the decode-failure fallback
-#   used to claim `200` — a healthy exchange asserted over a body we could not read, which is
-#   a lie in the one field that exists to be trusted. 0 is what "no status obtained" already
-#   means here (`refresh_curl_failed` uses it), and it is the truth for a verdict about an
-#   unreadable body.
+#   may branch on it to split a dead token from a transient fault. a decode-failure fallback
+#   that claims `200` asserts a healthy exchange over a body nobody could read — a lie in the
+#   one field that exists to be trusted. 0 is what "no status obtained" already means here
+#   (`refresh_curl_failed` uses it), and it is the truth for a verdict about an unreadable
+#   body.
 _unreadable_mint="$( ( eval "_brains_auth_refresh_reply() { printf '%s\n200' 'NOT JSON {{'; }"
                        _brains_auth_mint_access 'ua/1' 'tok' ) )"
 _is 'mint.unreadable-body-is-named' 'refresh_unreadable' \
@@ -1710,25 +1709,25 @@ _is 'mint.unreadable-body-claims-no-200' '0' \
   "$(_brains_auth_mint_field "$_unreadable_mint" code)"
 
 # ---- the error-node writer, the accessor's other half
-# eleven early returns emit a failure node, and one of them used to interpolate a variable
-# into a hand-built JSON string. that was latent — the value only ever came from a fixed
-# literal set — but the round trip is what makes the invariant checkable rather than argued,
-# so it is pinned against a value that WOULD have broken the template.
+# eleven early returns emit a failure node, and a variable interpolated into a hand-built JSON
+# string is the latent defect there — latent because the value only ever comes from a fixed
+# literal set. the round trip is what makes the invariant checkable rather than argued, so it
+# is pinned against a value that WOULD break such a template.
 _is 'errnode.round-trips' 'no_token' \
   "$(_brains_auth_get_error "$(_brains_auth_error_node 'no_token')")"
-# ⚠️ a quote in the code must not escape the string. under the old template this emitted
-#   `{"error":"a"b"}` — unparseable, so `_brains_auth_get_error` returned EMPTY, and an empty
-#   error reads as a HEALTHY account. a malformed node did not look like a failure; it looked
+# ⚠️ a quote in the code must not escape the string. a hand-built template emits
+#   `{"error":"a"b"}` — unparseable, so `_brains_auth_get_error` returns EMPTY, and an empty
+#   error reads as a HEALTHY account. a malformed node does not look like a failure; it looks
 #   like a success, which is the exact worst direction for a budget-warning tool.
 _is 'errnode.escapes-quotes' 'a"b' \
   "$(_brains_auth_get_error "$(_brains_auth_error_node 'a"b')")"
 
-# ---- the sign-in state reader, and the three causes it used to flatten into one
-# `_brains_auth_extract_refresh` once muted BOTH streams, so three separate causes all read
-# as "empty": no state file at all, a state file we cannot parse, and a state file that
-# simply held no ort-shaped value. only the third is benign, yet the caller reported the same
-# hint for all three — "did the browser approval complete?" — which sends a human back to redo
-# a login that already succeeded. the exit code now names each cause; this pins that it does.
+# ---- the sign-in state reader, and the three causes a muted read flattens into one
+# `_brains_auth_extract_refresh` must not mute BOTH streams: muted, three separate causes all
+# read as "empty" — no state file at all, a state file nobody can parse, and a state file that
+# simply holds no ort-shaped value. only the third is benign, yet the caller then reports the
+# same hint for all three — "did the browser approval complete?" — which sends a human back to
+# redo a login that already succeeded. the exit code names each cause; this pins that it does.
 _XDIR="$(mktemp -d)"
 
 # rc 1 = neither file was there. the sign-in wrote no state at all.
@@ -1866,11 +1865,11 @@ _is 'race.late-writeback-still-recovers' '' \
   "$(_brains_auth_get_error "$(_race_with_late_writeback)")"
 
 # ---- the retry loop must not multiply keyrack subprocesses
-# ⚠️ the unlock used to sit inside `_brains_auth_get_token`, and that call is NOT once per
-#   account: the rotation-race recovery above re-reads the token up to `_BRAINS_AUTH_RACE_TRIES`
-#   more times. so a `--reach @all` sweep over N dead accounts spawned up to 4N
-#   `rhx keyrack unlock` subprocesses to read N secrets, and the extra 3N bought no information
-#   at all — the unlock is idempotent and holds for the rest of the command.
+# 🛑 the unlock must sit OUTSIDE `_brains_auth_get_token` — that call is NOT once per account:
+#   the rotation-race recovery above re-reads the token up to `_BRAINS_AUTH_RACE_TRIES` more
+#   times. inside, a `--reach @all` sweep over N dead accounts spawns up to 4N
+#   `rhx keyrack unlock` subprocesses to read N secrets, and the extra 3N buy no information at
+#   all — the unlock is idempotent and holds for the rest of the command.
 #   that is not a tidiness point on this machine: a keyrack-daemon accumulation once filled
 #   zram and drove the desktop into disk-swap thrash. and the multiplier peaks on DEAD
 #   accounts — exactly the state a human re-reads over and over while they repair them.
@@ -1949,23 +1948,24 @@ _is 'unlock.reset-restores-the-unlock' '2' "$(_unlocks_after_a_reset)"
 # ---- the two keyrack failures, and why they must never share a node
 # a keyrack read fails for two causes with OPPOSITE fixes: the key was never stored (a human
 # runs `brains.auth.set`), or the keyrack could not be read at all — locked, no daemon, no host
-# manifest (a sign-in is powerless; an unlock or a retry is the move). they used to share one
-# `keyrack_failed` node, classified `constraint`, hinted "not stored yet (run: brains.auth.set)".
-# so a locked keyrack sent the human through a browser flow that could not fix it, and an
-# automated consumer read a transient fault as permanent and never retried.
+# manifest (a sign-in is powerless; an unlock or a retry is the move). one shared
+# `keyrack_failed` node — classified `constraint`, hinted "not stored yet (run: brains.auth.set)"
+# — sends a locked-keyrack human through a browser flow that cannot fix it, and lets an
+# automated consumer read a transient fault as permanent and never retry.
 _is 'keyrack.absent-is-the-callers'     'constraint'  "$(_brains_auth_severity_for_error keyrack_absent)"
 _is 'keyrack.unreadable-is-ours'        'malfunction' "$(_brains_auth_severity_for_error keyrack_unreadable)"
 # ⚠️ and the hint TEXTS must differ, not merely the severities. one text for both would send
 #   the human to the wrong command while the exit code quietly said the right one.
-# ⚠️ the glyph is STRIPPED before the compare, and that is the point. the first draft of this
-#   clamp compared the whole hint and stayed GREEN under a deliberate collapse — because the
-#   severities already differ, the two glyphs differ, so two identical texts still compared as
-#   "different". a clamp that cannot go red is a guess; this one compares only the words.
-# ⚠️ the strip is `${x#* }` (drop through the first space), NOT `cut -c3-`. the second draft
-#   used cut and ALSO stayed green: cut counts BYTES, and ✋ is three bytes while 💥 is four, so
-#   two identical texts still compared as different by their glyph remnants. two drafts of this
-#   one clamp failed to bite for two different reasons — which is the whole argument for the
-#   dogfood step rather than a reasoned "this looks right".
+# 🛑 the glyph is STRIPPED before the compare, and that is the point. a compare of the WHOLE
+#   hint stays GREEN under a deliberate collapse — the severities already differ, so the two
+#   glyphs differ, so two identical texts still compare as "different". a clamp that cannot go
+#   red is a guess; this one compares only the words.
+# 🛑 the strip is `${x#* }` (drop through the first space), NOT `cut -c3-`. cut counts BYTES,
+#   and ✋ is three bytes while 💥 is four, so under cut two identical texts ALSO compare as
+#   different — by their glyph remnants.
+#
+#   ⇒ 📜 two drafts of this one clamp failed to bite, for those two different reasons. that is
+#   the whole argument for the dogfood step over a reasoned "this looks right".
 _kra_full="$(_brains_auth_fix_for_error keyrack_absent)";     _kra="${_kra_full#* }"
 _kru_full="$(_brains_auth_fix_for_error keyrack_unreadable)"; _kru="${_kru_full#* }"
 _is 'keyrack.hint-texts-differ' 'differ' \
@@ -1998,7 +1998,7 @@ _token_rc_when_keyrack_exits() {
   local code="$1"
   (
     eval "rhx() { [[ \$2 == unlock ]] && return 0; echo 'keyrack: the daemon is not up' >&2; return $code; }"
-    _brains_auth_get_token 'kai@ehmpathy.com' >/dev/null 2>&1
+    _brains_auth_get_token 'kai@example.com' >/dev/null 2>&1
   )
 }
 _token_rc_when_keyrack_exits 2; _is 'gettoken.exit2-is-absent'     '2' "$?"
@@ -2013,7 +2013,7 @@ _token_rc_when_keyrack_exits 7; _is 'gettoken.unknown-exit-is-ours' '1' "$?"
 _gt_says() {
   (
     eval "rhx() { [[ \$2 == unlock ]] && return 0; echo 'keyrack: the daemon is not up' >&2; return $1; }"
-    _brains_auth_get_token 'kai@ehmpathy.com' 2>&1 >/dev/null
+    _brains_auth_get_token 'kai@example.com' 2>&1 >/dev/null
   )
 }
 case "$(_gt_says 1)" in
@@ -2028,14 +2028,13 @@ _is 'gettoken.absent-stays-quiet' '' "$(_gt_says 2)"
 # guard is real. `timeout` is what makes it a clamp rather than a hope — without it, a
 # regression would HANG this suite instead of fail it.
 # all SEVEN entry points are clamped, not a sample.
-# ⚠️ these cases no longer clamp seven independent copies of the guard — they clamp that each
-#   entry point still ROUTES to the one copy that owns it. the guard was hand-rolled at every
-#   entry point when these cases were written; it is now two shared definitions:
+# ⚠️ these cases clamp that each entry point ROUTES to the one copy that owns it — never seven
+#   independent copies of the guard. there are two shared definitions:
 #     the three orchestrators   -> `_brains_auth_reach_from_flag`   (brains.auth.sh)
 #     the three proxies + this  -> `brains.auth.bootstrap.sh`       (this dir)
-#   the per-entry-point case is still the right shape after that consolidation, because the
-#   failure mode simply moved: a future edit that re-inlines a parse in ONE command restores
-#   the hang in that one command alone, and only a per-command case would catch it.
+#   the per-entry-point case is still the right shape under a shared guard, because the failure
+#   mode moves rather than vanishes: an edit that re-inlines a parse in ONE command restores
+#   the hang in that one command alone, and only a per-command case catches it.
 timeout 5 bash -c "source '$ALIASES'; _brains_auth_usage --reach" >/dev/null 2>&1
 _code 'guard.usage.reach-without-value' 2 "$?"
 timeout 5 bash -c "source '$ALIASES'; _brains_auth_use --reach" >/dev/null 2>&1
@@ -2103,11 +2102,11 @@ case "${_nt#*|}" in
   *) _is 'notty.login-leaf-says-it-never-ran' 'said' "silent — reads as a failed login" ;;
 esac
 # the caller must HONOR that rc rather than fall through to the extract's absent-token message.
-# ⚠️ asserted POSITIVELY — "the tty cause reaches the surface" — not negatively as "the browser
-#   message is absent". the first draft did the latter and stayed GREEN with the guard defeated,
-#   because an absent string is also absent when the path never reaches that line at all. a
-#   negative assertion cannot tell "the bug is fixed" from "the code never ran", which is the
-#   failhide shape hazard.a-clamp-can-lie-the-same-way-code-can.md names.
+# 🛑 asserted POSITIVELY — "the tty cause reaches the surface" — never negatively as "the
+#   browser message is absent". a negative assertion stays GREEN with the guard defeated,
+#   because an absent string is also absent when the path never reaches that line at all. it
+#   cannot tell "the bug is fixed" from "the code never ran", which is the failhide shape
+#   hazard.a-clamp-can-lie-the-same-way-code-can.md names.
 _nts="$(_notty '_brains_auth_set')"
 case "${_nts#*|}" in
   *'needs a real terminal'*) _is 'notty.set-surfaces-the-tty-cause' 'surfaced' 'surfaced' ;;
@@ -2302,13 +2301,14 @@ _pipefail_after_refresh() {
 _is 'callleaf.refresh-pipefail-stays-inside' 'off' "$(_pipefail_after_refresh)"
 
 # -------------------------------------------------- the bootstrap finds the root by landmark
-# ⚠️ the root used to be reached by a hop count — `$dir/../../../..`, four steps, chosen for
-#   this exact layout. the count was right, but a reviewer read `role=any` as two directories
-#   and filed it as a blocker, and that misread is the point: a positional count re-derives a
-#   fact from a directory convention nobody promised to keep, so it is a claim every reader
-#   must re-verify and one rename silently breaks. every entry point sources this file, so a
-#   wrong root turns all four commands into loud non-functional surfaces at once.
-#   these clamp the PROPERTY that replaced it: the walk stops at the directory that actually
+# 🛑 the root is reached by LANDMARK, never by a hop count — `$dir/../../../..`, four steps,
+#   fitted to one exact layout. such a count can be RIGHT and still be unreadable: a reviewer
+#   read `role=any` as two directories and filed a blocker against a correct one. that misread
+#   is the point — a positional count re-derives a fact from a directory convention nobody
+#   promised to keep, so it is a claim every reader must re-verify and one rename silently
+#   breaks. every entry point sources this file, so a wrong root turns all four commands into
+#   loud non-functional surfaces at once.
+#   these clamp the PROPERTY the landmark buys: the walk stops at the directory that actually
 #   holds `brains.auth.sh`, at whatever depth it sits.
 _BOOT="$SKILL_DIR/brains.auth.bootstrap.sh"
 _BOOT_REL='src/grove.provision/2.shell/2.7.aliases/brains.auth.sh'
@@ -2321,13 +2321,13 @@ _boot_finds_root() {   # $1 = how deep to bury a fake bootstrap below a fake roo
   ( source "$d/brains.auth.bootstrap.sh" >/dev/null 2>&1; printf '%s' "$BRAINS_AUTH_SRC" )
   rm -rf "$root"
 }
-# the real depth (4) must work — the behavior the hop count had
+# the real depth (4) must work — the one depth a hop count also reaches
 case "$(_boot_finds_root 4)" in
   */"$_BOOT_REL") _is 'boot.finds-root-at-depth-4' 'found' 'found' ;;
   *)              _is 'boot.finds-root-at-depth-4' 'found' 'LOST the root' ;;
 esac
-# ...and so must a depth the hop count could never have reached. this is the whole delta: a
-# rename or one more nested level no longer breaks every entry point at once.
+# ...and so must a depth no hop count could reach. that is the whole property: a rename or one
+# more nested level must not break every entry point at once.
 case "$(_boot_finds_root 7)" in
   */"$_BOOT_REL") _is 'boot.finds-root-at-any-depth' 'found' 'found' ;;
   *)              _is 'boot.finds-root-at-any-depth' 'found' 'LOST the root' ;;
@@ -2412,23 +2412,23 @@ esac
 
 # ---------------------------------------------------------------- the --sub deprecation
 # ⚠️ `--sub` is the pre-reach name. it still parses everywhere — muscle memory must land — but
-#   an alias that works in total silence is an alias nobody ever abandons, so it now announces
-#   that it is superseded. these clamp the three properties that make the notice honest:
-_out="$(_brains_auth_reach_from_flag --sub kai@ehmpathy.com 2>&1 >/dev/null)"
+#   an alias that works in total silence is an alias nobody ever abandons, so it announces that
+#   it is superseded. these clamp the three properties that make the notice honest:
+_out="$(_brains_auth_reach_from_flag --sub kai@example.com 2>&1 >/dev/null)"
 case "$_out" in
   *'--reach is the term now'*) _is 'deprecation.sub-says-so' 'noted' 'noted' ;;
   *)                           _is 'deprecation.sub-says-so' 'noted' "silent: ${_out}" ;;
 esac
 # it must still WORK — a deprecation that breaks the caller is a removal wearing a nicer word
-_is 'deprecation.sub-still-parses' 'kai@ehmpathy.com' \
-  "$(_brains_auth_reach_from_flag --sub kai@ehmpathy.com 2>/dev/null)"
+_is 'deprecation.sub-still-parses' 'kai@example.com' \
+  "$(_brains_auth_reach_from_flag --sub kai@example.com 2>/dev/null)"
 # and the canonical name must stay QUIET — a notice on every `--reach` is noise that trains
 # the eye to skip the one line that matters
 _is 'deprecation.reach-is-quiet' '' \
-  "$(_brains_auth_reach_from_flag --reach kai@ehmpathy.com 2>&1 >/dev/null)"
+  "$(_brains_auth_reach_from_flag --reach kai@example.com 2>&1 >/dev/null)"
 # the notice rides stderr, so a `--json` consumer's stdout is untouched by it
-_is 'deprecation.notice-off-stdout' 'kai@ehmpathy.com' \
-  "$(_brains_auth_reach_from_flag --sub kai@ehmpathy.com 2>/dev/null)"
+_is 'deprecation.notice-off-stdout' 'kai@example.com' \
+  "$(_brains_auth_reach_from_flag --sub kai@example.com 2>/dev/null)"
 
 # ---------------------------------------------------------------- active verdict (read mode)
 # ⚠️ the no-arg READ of `brains.auth.use` used to test `(( arc == 1 ))` / `(( arc == 2 ))` at
@@ -2490,10 +2490,10 @@ _is 'union.veto-already-listed'   'no'  "$(_ok 0 '@all' 'a@x.com' "$_union_list"
 _is 'union.partial-match-is-not-a-match' 'yes' "$(_ok 0 '@all' 'a@x.co' "$_union_list")"
 
 # ---------------------------------------------------------------- the .bak is verified, not assumed
-# ⚠️ existence is not integrity. the backup copy's exit status used to be discarded, so a copy
-#   that died partway — a full disk is the plausible one, since a secret write follows at once —
-#   left a `.bak` that PASSES `[[ -f ]]`. every downstream rescue promise tests only for the
-#   file, so a human would have been sent to restore from a truncated one.
+# 🛑 existence is not integrity. a discarded exit status on the backup copy lets a copy that
+#   died partway — a full disk is the plausible one, since a secret write follows at once —
+#   leave a `.bak` that PASSES `[[ -f ]]`. every downstream rescue promise tests only for the
+#   file, so a human is then sent to restore from a truncated one.
 _bak_probe() {  # $1 = 'short' to simulate a copy that came out wrong
   local d rc out
   d="$(mktemp -d)"
@@ -2532,8 +2532,8 @@ _is 'bakverify.short-copy-names-the-cause' 'named' \
     esac)"
 
 # ---------------------------------------------------------------- the dependency preflight
-# ⚠️ the harness leans on five tools beyond bash, and its own comment used to claim "bash + jq".
-#   an absent `setsid` turned the entire notty.* section into a wall of `command not found`
+# ⚠️ the harness leans on five tools beyond bash, so a comment that names "bash + jq" is short by
+#   three. 📜 an absent `setsid` turned the entire notty.* section into a wall of `command not found`
 #   reds that read as failures of the CODE, not of the host — the misattributed cause
 #   `rule.require.errors-name-the-fix` forbids. the preflight names the tool instead.
 _SELF="$SKILL_DIR/brains.auth.test.sh"
@@ -2581,11 +2581,11 @@ _is 'snap.orphan-roster-is-populated' 'found' \
   "$([[ -n "$_SNAP_ASKED" ]] && echo found || echo 'EMPTY ROSTER — every baseline would read as an orphan')"
 
 # ---------------------------------------------------------------- the header count cannot lie
-# ⚠️ `brains.auth.sh`'s own preamble advertises this suite's size, and it drifted to ~100
-#   cases wrong before a reviewer caught it by eye. a doc pointer a reader trusts for a sense
-#   of coverage is worse than none once it is stale. so the number is no longer maintained by
-#   discipline — it is asserted, and any case added without a touch of that header turns this
-#   red with both numbers on screen.
+# 🛑 `brains.auth.sh`'s own preamble advertises this suite's size, so the number is ASSERTED
+#   rather than kept true by discipline — any case added without a touch of that header turns
+#   this red, with both numbers on screen.
+#   📜 kept by discipline it drifted ~100 cases wrong, and a reviewer caught it by eye. a doc
+#   pointer a reader trusts for a sense of coverage is worse than none once it is stale.
 # .note = it must run LAST, and it counts ITSELF: PASS+FAIL is read before `_is` increments,
 #   so the header's figure is that total plus this one case. that self-inclusion is why the
 #   `+ 1` is here rather than a bug — remove it and the header would have to under-report by

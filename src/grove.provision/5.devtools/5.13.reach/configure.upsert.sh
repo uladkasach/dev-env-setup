@@ -45,31 +45,58 @@ grove_provision_5_13_reach_configure_upsert() {
   fi
 
   ####################################################################
-  # 1. the ROLE — read from infrastructure's own declaration, never recalled
+  # 🛑 declare THIS org before any `aws.reach.set` runs
+  #   - that skill's own `keyrack set` resolves a NAMED org against the
+  #     `keyrack.yml` in scope, and the scratch root is `5.12.rack`'s
+  #   - `5.12.rack` runs FIRST and its loop leaves the LAST org it wired
+  #     declared there, so this phase must never inherit that leftover
+  #   - 📜 measured: with `ehmpathy` left declared, all three rows died on
+  #     `org "ahbode" does not match keyrack.yml org "ehmpathy"`, AFTER each
+  #     had already written its `~/.aws/config` body — a half-applied pair
+  #   - ⇒ one fact, two consumers: `5.12.rack` OWNS the scratch declaration,
+  #     and every borrower re-states the org it needs
+  #   - (`rule.forbid.two-writers-on-one-artifact`,
+  #      `gotcha.a-check-that-cries-wolf-gets-silenced`, m.9)
   ####################################################################
-  local role
-  role="$(grove_provision_5_13_reach_role)"
+  local gitroot
+  gitroot="$(grove_provision_5_12_rack_gitroot)"
+  grove_provision_5_12_rack_declare_org "$gitroot" "$org" || return 1
 
-  if [[ -z "$role" ]]; then
-    echo "   • declined — the grove role name is not readable on this box"
-    echo "     ⇒ it is DECLARED in ahbode/infrastructure:"
-    echo "       provision/aws.auth/resources.role-names.ts → GROVE_ROLE_NAME"
-    echo "     ⇒ that repo is a clone, so this declines until 5.10.repos has run:"
-    echo "       rhx grove.provision --what 5.10.repos --mode apply"
-    echo "     🛑 it is NOT guessed. a role name that does not exist refuses with"
-    echo "        the same AccessDenied as a role that excludes this box, so a"
-    echo "        guess turns a readable gap into a false 'no access' report"
-    return 0
-  fi
-  echo "   • role (read from infrastructure's declaration): $role"
-
-  ####################################################################
-  # 2. one env at a time
-  ####################################################################
-  local failed=0 pair env dkey account
+  # 1. one env at a time. ⚠️ the role is read INSIDE the loop — the rows no
+  #    longer share a role, so a hoisted read writes one name into every profile
+  local failed=0 pair rest env dkey rkey role account
   for pair in $(grove_provision_5_13_reach_envs); do
     env="${pair%%:*}"
-    dkey="${pair##*:}"
+    rest="${pair#*:}"
+    dkey="${rest%%:*}"
+    rkey="${rest##*:}"
+
+    # ⚠️ halt a 2-field row here: `${rest##*:}` would hand back the declapract
+    #    key, whose empty role read looks like "infrastructure is not cloned"
+    if [[ "$rest" != *:* ]]; then
+      echo "   ✋ the row for '${env}' names no role key" >&2
+      echo "      ⇒ a row is '<env>:<declapractKey>:<roleKey>' — see 5.13.reach/_.sh" >&2
+      failed=1
+      continue
+    fi
+
+    ##################################################################
+    # the ROLE — read from infrastructure's own declaration, never recalled
+    ##################################################################
+    role="$(grove_provision_5_13_reach_role "$rkey")"
+
+    if [[ -z "$role" ]]; then
+      echo "   • ${org}.${env} declined — GROVE_ROLE_NAME.${rkey} is not readable here"
+      echo "     ⇒ it is DECLARED in ahbode/infrastructure:"
+      echo "       provision/aws.auth/resources.role-names.ts → GROVE_ROLE_NAME"
+      echo "     ⇒ that repo is a clone, so this declines until 5.10.repos has run:"
+      echo "       rhx grove.provision --what 5.10.repos --mode apply"
+      echo "     🛑 it is NOT guessed. a role name that does not exist refuses with"
+      echo "        the same AccessDenied as a role that excludes this box, so a"
+      echo "        guess turns a readable gap into a false 'no access' report"
+      continue
+    fi
+    echo "   • ${env} role (read from infrastructure's declaration): $role"
 
     # ⚠️ the account is read and PASSED, never printed, since it is dox
     #   - (`rule.forbid.dox-in-public-repo`)

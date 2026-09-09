@@ -3,7 +3,7 @@
 # .what = give this box an aws identity in every env its repos test against
 #
 # .why
-#   - `5.6.aws` gives the box a camp badge; a suite targets dev/prep
+#   - `5.6.aws` gives the box a camp badge; a suite targets test/prep/prod
 #   - the camp role has no rights there, so every suite is AccessDenied
 #   - a bundle drives the skill: a hand step is a forbidden fourth step
 #
@@ -17,8 +17,8 @@
 #   | role    | ahbode/infrastructure → provision/aws.auth/resources.role-names.ts |
 #   | account | any ahbode repo → declapract.use.yml → awsAccountId.<key>          |
 #
-# .note  = declapract says `dev` where the rack says `test` — one account, two
-#          vocabularies, stated and never inferred
+# .note  = the rack's env and declapract's account key are two vocabularies, mapped
+#          per row in `_envs` and never inferred from each other
 # .order = after `5.10.repos`; both sources are clones
 # .refs  = howdoes.a-box-reach-an-aws-account.md — every .why below, in full
 # usage  = rhx grove.provision --what 5.13.reach --mode apply
@@ -27,17 +27,25 @@
 # .what = the owner every keyrack call in this repo passes
 grove_provision_5_13_reach_owner() { printf 'ehmpath'; }
 
-# .what = the org whose accounts this box reaches into
-# .why  = the shape is per-org already, so a second org is a row, not a rewrite
+# .what = the ONE org whose accounts this box reaches into
+# ⚠️ a second org is a REWRITE, not a row — this returns a scalar
+#   - every reader below takes it as one value: `_account` globs `~/git/<org>/`,
+#     the upsert declares it once, the verify compares against it
+#   - 📜 `5.12.rack` carried this same scalar and the same "just a row" comment,
+#     and the second org cost a `<org>:<env>,<env>` table plus a loop in BOTH
+#     of its halves — the comment promised cheap and the change was not
+#   - ⇒ a second org here owes that AND a row in `5.12.rack`'s `_declared`,
+#     since the scratch yml this bundle reads against is that bundle's
 grove_provision_5_13_reach_org() { printf 'ahbode'; }
 
-# .what = the envs to wire, and the declapract key each reads its account from
-# .why `prod` is ABSENT
-#   - a different account and a different tier
-#   - `GROVE_ROLE_NAME` offers only `prodReader` there
-#   - to wire it widens this box's blast radius for an unasked capability
-#   - a human who wants it runs `--env prod`: a grant, not a convergence
-grove_provision_5_13_reach_envs() { printf 'test:dev prep:prep'; }
+# .what = the envs to wire, as `<env>:<declapractKey>:<roleKey>`
+# 🛑 every env here must ALSO sit in `5.12.rack`'s `_declared ahbode` — else the set
+#      writes the profile body, then fails on the rack name. a half-applied pair
+# .note = test borrows prep's account key; declapract retired `dev`
+# .note = prod is reader by infra's design — a power role is a separate call
+grove_provision_5_13_reach_envs() {
+  printf 'test:prep:prepPower prep:prep:prepPower prod:prod:prodReader'
+}
 
 # .what = where the role names are declared
 # .why  = a grep, not `node` — the file is a dependency-free constants module
@@ -45,25 +53,15 @@ grove_provision_5_13_reach_rolesrc() {
   printf '%s/git/ahbode/infrastructure/provision/aws.auth/resources.role-names.ts' "$HOME"
 }
 
-# .what = the GROVE_ROLE_NAME key each env's role is declared under
-# .why  = test and prep are one account and one tier; the split that made these
-#         roles exist is per-TIER, not per-env
-grove_provision_5_13_reach_rolekey() { printf 'prepPower'; }
-
 # .what = read the grove role name out of infrastructure's own declaration
-# 🛑 .why it anchors on GROVE_ROLE_NAME, never OIDC_ROLE_NAME
-#   - both blocks sit in one file and both hold a `prepPower` key
-#   - `OIDC_ROLE_NAME` is declared ABOVE it, so a bare key grep takes it first
-#   - that role trusts an OIDC principal, so it rejects this box
-# .why ONE file, where `..._reach_account` demands agreement across all
-#   - there is exactly ONE `infrastructure` clone per box
-#   - the value is clamped by `reach_clamp --assume`, which excludes newline
-#   - a profile is a convenience, never a boundary
-#   - the account id has neither, which is why IT gets the agreement check
+# 🛑 anchor on GROVE_ROLE_NAME — the OIDC block above it holds the SAME keys, and
+#      its `prodReader` differs by one segment, so a bare grep looks right
+# .why = no default key: it would compose the prep role against the prod account
 grove_provision_5_13_reach_role() {
   local src key
   src="$(grove_provision_5_13_reach_rolesrc)"
-  key="${1:-$(grove_provision_5_13_reach_rolekey)}"
+  key="${1:-}"
+  [[ -n "$key" ]] || return 2
   [[ -f "$src" ]] || return 1
 
   # take the GROVE_ROLE_NAME block only, then the key within it

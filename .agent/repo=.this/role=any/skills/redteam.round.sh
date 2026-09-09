@@ -161,12 +161,12 @@ _class_name() {
 
 # 🛑 the class SET is derived from `_class_name`, never re-typed
 #
-#    📜 it had THREE holders before class 5 was added: these case arms, a
-#      `for n in 1 2 3 4` loop, and a `valid: 1 2 3 4` refusal string. two of
-#      the three would have gone stale the moment a class was appended, and the
-#      run would have READ a different list than it EXECUTED — the exact shape
-#      that hid two subjects in `prove.tool-defaults-are-bounded`, and that
-#      `prove.rack-consumers-are-dispositioned` hit again the same day.
+#    ⚠️ a hand-typed list — a `for n in 1 2 3 4` loop, a `valid: 1 2 3 4`
+#      refusal string — is a SECOND holder of a set the case arms already own,
+#      and it goes stale the moment a class is appended. the run then READS a
+#      different list than it EXECUTES, which is the shape that hid two subjects
+#      in `prove.tool-defaults-are-bounded` and that
+#      `prove.rack-consumers-are-dispositioned` hit again the same day (m.9).
 _class_ids() {
   local n=1
   while [[ -n "$(_class_name "$n")" ]]; do
@@ -179,36 +179,37 @@ _class_ids() {
 ######################################################################
 # 🛑 .the LIST rides STDOUT, and the REFUSAL rides stderr — MEASURED
 #
-#    the first cut sent both to stderr, which reads as tidy and is a false ✔ in
-#    one of the two arms:
+#    to send both to stderr reads as tidy and is a false ✔ in one of the two
+#    arms:
 #
 #      `rhx` buffers a skill's stderr and relays it ONLY on a NON-ZERO exit.
 #
-#    so `--classes` — which exits 0 — printed the banner and NOT ONE ROW. the
-#    refusal arm was fine (it exits 2, so its stderr arrived), which is what
-#    makes this shape hard to see: the half that works is the half you test
-#    while you write it.
+#    so `--classes` — which exits 0 — prints the banner and NOT ONE ROW, while
+#    the refusal arm is fine (it exits 2, so its stderr arrives). that asymmetry
+#    is what makes the shape hard to see: the half that works is the half you
+#    test while you write it.
 #
 #    ⇒ the split is by ROLE, not by tidiness. `--classes` is an ANSWER the
 #      caller asked for → stdout. an absent `--class` is a REFUSAL → stderr,
 #      with a non-zero exit to carry it.
 ######################################################################
 ######################################################################
-# 🛑 .the RECENCY of a class is DERIVED, and it used to be TYPED
+# 🛑 .the RECENCY of a class is DERIVED, never TYPED
 #
-# 📜 measured 2026-09-03, redteam round 24 (F5). this block carried the line
-#    `class 5 has NEVER been swept`, hardcoded on the day class 5 was added and
-#    FALSE two days later — round 22 swept it, and so did round 24. i read my
-#    own tool and relayed that sentence to a human as a fact about the repo.
+# 📜 measured 2026-09-03, redteam round 24 (F5). a hardcoded
+#    `class 5 has NEVER been swept` was written the day class 5 was added and
+#    was FALSE two days later — round 22 swept it, and so did round 24. the
+#    sentence was read off this tool and relayed to a human as a fact about the
+#    repo.
 #
 #    ⇒ one fact, two holders (m.9). the LEDGER knows which class each round
-#      swept, and this string claimed to know it too. the string is the copy
-#      that no act of running a round can correct.
+#      swept, and a typed string claims to know it too. the string is the copy
+#      no round can correct, however many times it runs.
 #
 #    ⚠️ and it decays in the worst possible direction. a stale `never swept`
 #      aims every future round at a class already worked twice — so the yield
 #      is spent, and whichever class is genuinely cold stays unswept. the tool
-#      whose whole job is to pick a target was misdirecting the pick.
+#      whose whole job is to pick a target then misdirects the pick.
 #
 # ⚠️ .the BOUND of this reader, stated because a count is a claim about a set
 #    only headings of the shape `round N — YYYY-MM-DD, class M` carry a class,

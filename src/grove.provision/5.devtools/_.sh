@@ -45,4 +45,10 @@ grove_provision_5_devtools() {
   bundle.upgrade 5.11.usql
   bundle.upgrade 5.10.repos
   bundle.upgrade 5.13.reach
+
+  # 🛑 LAST, and the order is load-bear — it asks the rack for keys addressed
+  #   through the profiles `5.12.rack` names and `5.13.reach` fills in. asked
+  #   any earlier it measures a box mid-provision and blames a human for a key
+  #   that was fine
+  bundle.upgrade 5.16.keys
 }

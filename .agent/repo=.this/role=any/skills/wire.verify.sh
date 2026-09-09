@@ -94,12 +94,12 @@ done
 #    name the SUBJECT?).
 #
 #    ⇒ this skill lives INSIDE the checkout it reads, so its own path is the
-#      one anchor that cannot drift with the cwd. `--root` stays the explicit
-#      override, and is now the only way to point elsewhere.
+#      one anchor that cannot drift with the cwd. `--root` is the explicit
+#      override, and the only way to point this at another tree.
 #
 # ⚠️ and the checkout test asks GIT, never `-d .git`: a WORKTREE's `.git` is a
 #    FILE (a `gitdir:` pointer), not a directory — and a worktree is where this
-#    repo does its work, so `-d` was red on the common path.
+#    repo does its work, so a bare `-d` is red on the common path.
 ######################################################################
 if [[ -z "$ROOT" ]]; then
   SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

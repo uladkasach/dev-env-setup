@@ -85,8 +85,76 @@ clusters of their own. deliberate:
 the second nearly happened already: the ellipsis style above is that defect in embryo. it was
 caught by a sweep rather than by an argument, so no dispute exists to record — yet.
 
+## 🛑 .the dummy set is CLOSED — measured 2026-09-07, on this very file's twin
+
+`dox.verify` exited 1 with a large count, most of them addresses this repo invented for its
+own fixtures. one reader read the COUNT as a cry-wolf and widened the say file's `.what is NOT
+dox` list to exempt four `@`-prefixes wholesale.
+
+**that was wrong on the merits, and a dream caught the SAME DAY said so:**
+
+> *"an UNDECLARED dummy is indistinguishable from a real address to any reader — human or
+> clamp. that is the whole reason `term=dox` names one dummy rather than a convention where
+> each author coins their own."*
+> — `.dream/2026_09_07.brains-auth-fixtures-use-an-undeclared-dummy.dream.md`
+
+⇒ the check was **correct**. one dummy is declared; the rest are fixtures that drifted off the
+convention, and the repair is to move them ONTO the declared dummy — never to admit them to it.
+
+### 🔴 .the exemption would have hidden a REAL address — measured on the walk, 2026-09-08
+
+the human refused the sampled verdict — *"i've mis-read that check twice now and won't vouch
+for it from a sample"* — and a line-by-line walk of all 58 found what a sample could not:
+
+```
+.behavior/…/5.1.execution.from_vision.yield.md:219      # ⚠️ redacted below, see the 🛑
+  1. **re-auth four accounts** — `<user>@…`, `<user>@gmail.com`,
+     `<user>@…`, `seaturtle@ehmpath.com` hold dead refresh tokens.
+```
+
+a personal gmail and two org addresses, in a sentence that asserts they are **real accounts
+with real dead tokens**. redacted on contact.
+
+🛑 **and one of those four had already been mis-filed as a fixture — HERE, in this section's
+first draft**, which listed it among "addresses this repo invented". it appears in exactly two
+places in the tree: that re-auth list, and the draft that called it invented. it is in no test
+file, so the mis-file rested on the shape of the address and no read of its use.
+
+⇒ so the prefix exemption would have made the checker **blind to a real address**, and the
+account of the exemption **published one**. that is `gotcha…cries-wolf` m.4 twice in one
+edit: the verdict was right and the SUBJECT was wrong, both times.
+
+⚠️ 📜 **and the quote above was first pasted VERBATIM** — the record of a redaction re-published
+the three addresses it redacted, and the clamp flagged the new lines within the minute. that is
+m.10 exactly (*"the correction QUOTED the dead pointer it corrected, and so re-created it"*).
+⇒ **a quote is a publication.** redact inside it, and mark the redaction so no reader takes the
+placeholder for the original.
+
+⇒ the durable line, and it is why the exempt set is a closed literal set rather than a prefix
+rule: **a prefix cannot tell an invented address from a real one, because inventedness is not a
+property of the string.** only a declaration is.
+
+### .why the wrong move was so attractive
+
+three defects had to line up, and each is worth its own line:
+
+1. **a false cry-wolf verdict.** `gotcha.a-check-that-cries-wolf-gets-silenced` q1 asks whether
+   the evidence agrees with the verdict. it did — every flagged line WAS an undeclared address.
+   the reader skipped q1 and reasoned from the COUNT instead: *57 hits, therefore noise.*
+   **a tally is not evidence about correctness; it is evidence about volume.**
+2. **a second holder of one set (m.9).** the exempt pattern lives in `dox.verify.sh:229` and is
+   the set's only holder. an exemption list in the term file would be a second declaration,
+   free to drift — and it drifted on the very edit that created it.
+3. **an exemption in place of a fix** — `rule.forbid.exemption-as-habit` exactly: a permission
+   granted so a known defect can stay.
+
+⚠️ and the sharpest part: **the correct answer was already written down, in this repo, dated the
+same day, by the same reader.** the dream was not consulted before the term was widened. so the
+failure was not of judgment but of `rule.always.reuse-pavement-before-improvise` — one glob of
+`.dream/` would have settled it.
+
 ## .disputes
 
 none yet. `secret` is recorded as a forbidden synonym rather than a disputed one, because the
-two are not competing words for one concept — they are two concepts, and the measurement above
-is what demonstrates it.
+two are not two words for one concept — they are two concepts, and the measurement above is what
+demonstrates it.

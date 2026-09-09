@@ -103,7 +103,7 @@ break — but no new contract may use it, and `rule.forbid.domain-term-synonyms`
   `reachshape.*` cases, one of which proved that `use --reach <bare-slug>` used to **stall**
   (exit 124) rather than refuse.
 - **consequence for consumers** — rendered rows are keyed by email, so a `--json` reader takes
-  `.["kai@ehmpathy.com"].five_hour.utilization`. this is a contract change the dispute
+  `.["kai@example.com"].five_hour.utilization`. this is a contract change the dispute
   deliberately accepted.
 - **invariant it serves** — `hazard.claude-oauth-one-holder-per-token.md`. identity must be
   DERIVED from the live token on every run, never remembered, so a login made behind our back

@@ -14,7 +14,8 @@
 #   - (`rule.forbid.dox-in-public-repo`)
 #
 # guarantee:
-#   - read-only: it unlocks into the daemon, and writes no machine state
+#   - it reads the rack and changes no rack state; the one write is this bundle's
+#     own scratch declaration, which it must set to read a NAMED org at all
 #   - it declines where the slug cannot apply, and FAILS where it should hold
 ######################################################################
 
@@ -96,9 +97,8 @@ grove_provision_5_12_rack_configure_verify() {
 #   - (`rule.forbid.dox-in-public-repo`)
 ######################################################################
 grove_provision_5_12_rack_verify_awsprofile() {
-  local key org owner want
+  local key owner want
   key="$(grove_provision_5_12_rack_awsprofile_key)"
-  org="$(grove_provision_5_12_rack_awsprofile_org)"
   owner="$(grove_provision_5_12_rack_slug_owner)"
   want="$(grove_provision_5_12_rack_awsprofile_value)"
 
@@ -127,24 +127,36 @@ grove_provision_5_12_rack_verify_awsprofile() {
   local gitroot
   gitroot="$(grove_provision_5_12_rack_gitroot)"
 
-  local env got
-  for env in $(grove_provision_5_12_rack_awsprofile_envs); do
-    got="$(env -C "$gitroot" rhx keyrack get --owner "$owner" --key "$key" \
-             --org "$org" --env "$env" --unlock --value 2>/dev/null)"
+  # ⚠️ parse the row the SAME way the upsert does — one table, two readers, free
+  #    to drift. a read that split on the wrong field would ask for an env named
+  #    after the org, and every answer would be empty
+  local row org envs env got
+  for row in $(grove_provision_5_12_rack_awsprofile_rows); do
+    org="${row%%:*}"
+    envs="${row#*:}"
 
-    if [[ "$got" != "$want" ]]; then
-      echo "   ✋ the rack returns '${got:-<empty>}' for ${org}.${env}.${key}, wanted '${want}'" >&2
-      echo "      ⇒ every ahbode integration suite on this box dies at" >&2
-      echo "        'AWS_PROFILE not set. keyrack.source() should have set it.'" >&2
-      echo "        — with live ambient credentials one metadata call away" >&2
-      echo "      ⇒ an EMPTY answer means the manifest holds no such entry, which" >&2
-      echo "        this bundle's own upsert writes" >&2
-      echo "      ⇒ a DIFFERENT answer means another writer claimed the slug; read" >&2
-      echo "        it, since a wrong profile fails on permissions much later:" >&2
-      echo "        rhx keyrack list --owner $owner" >&2
-      echo "      fix: rhx grove.provision --what 5.12.rack --mode apply" >&2
-      return 1
-    fi
-    echo "   ✔ the rack returns '${want}' for ${org}.${env}.${key} on this seat"
+    # 🛑 re-declare BEFORE this org's reads — the upsert's loop leaves the LAST
+    #    org declared, and a named-org read resolves against the yml in scope
+    grove_provision_5_12_rack_declare_org "$gitroot" "$org" || return 1
+
+    for env in ${envs//,/ }; do
+      got="$(env -C "$gitroot" rhx keyrack get --owner "$owner" --key "$key" \
+               --org "$org" --env "$env" --unlock --value 2>/dev/null)"
+
+      if [[ "$got" != "$want" ]]; then
+        echo "   ✋ the rack returns '${got:-<empty>}' for ${org}.${env}.${key}, wanted '${want}'" >&2
+        echo "      ⇒ every ${org} integration suite on this box dies at" >&2
+        echo "        'AWS_PROFILE not set. keyrack.source() should have set it.'" >&2
+        echo "        — with live ambient credentials one metadata call away" >&2
+        echo "      ⇒ an EMPTY answer means the manifest holds no such entry, which" >&2
+        echo "        this bundle's own upsert writes" >&2
+        echo "      ⇒ a DIFFERENT answer means another writer claimed the slug; read" >&2
+        echo "        it, since a wrong profile fails on permissions much later:" >&2
+        echo "        rhx keyrack list --owner $owner" >&2
+        echo "      fix: rhx grove.provision --what 5.12.rack --mode apply" >&2
+        return 1
+      fi
+      echo "   ✔ the rack returns '${want}' for ${org}.${env}.${key} on this seat"
+    done
   done
 }
