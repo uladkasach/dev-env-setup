@@ -149,6 +149,7 @@ clk=$(getconf CLK_TCK 2>/dev/null || echo 100)
 total=0; prune_n=0; real_n=0; young_n=0; owned_n=0
 prune_pss=0; prune_swap=0
 targets=""
+prune_origins=""
 
 for pid in $pids; do
   [[ -d "/proc/$pid" ]] || continue
@@ -192,6 +193,19 @@ for pid in $pids; do
   prune_pss=$((prune_pss + ${pss:-0}))
   prune_swap=$((prune_swap + ${swap:-0}))
   targets+="$pid"$'\n'
+
+  # 🛑 the ORIGIN of each pruned daemon, kept rather than discarded.
+  #
+  # .why = a prune bounds the population and stops no mint, so its own counts
+  #        are a chore's receipt. the ORIGIN is the only field that names a
+  #        line upstream can change — `genTempDir` for git.push, `genTempDir`
+  #        for git.set, the jest fixture's $HOME. all three are rhachet's, and
+  #        rhachet is where the allocator fix belongs (`term=daemon`, .reason)
+  #
+  # ⚠️ this was computed on this path and THROWN AWAY until 2026-09-09: only
+  #    `--census` printed it, and the timer never runs `--census`. so every 15
+  #    minutes the one actionable datum was derived and dropped
+  prune_origins+="$(classify_home "$home")"$'\n'
 done
 
 echo "   ├─ found: $total keyrack daemons"
@@ -200,6 +214,33 @@ echo "   ├─ skip (spawner still alive): $owned_n"
 echo "   ├─ skip (younger than ${MIN_AGE_MIN}m): $young_n"
 echo "   ├─ prunable (temp home + spawner dead + aged): $prune_n"
 echo "   ├─ reclaims: $(as_mb "$prune_pss") MB ram + $(as_mb "$prune_swap") MB swap (pss)"
+
+# ── the origin breakdown — the half a count cannot carry
+#
+# 🛑 .why BOTH the count and the breakdown are printed
+#   - the COUNT is the severity: "575 over 76 days" is what justifies an
+#     upstream fix at all, and rhachet owns keyrack, keyrackd, AND every
+#     caller below — so it is actionable by construction, never mere noise
+#   - the BREAKDOWN names WHICH allocator: `genTempDir` under git.push, the
+#     same under git.set, the jest fixture's $HOME. one line each, upstream
+#   - ⇒ a report with one and not the other is half a report
+#
+# ⚠️ .the regression case, and why this prints on EVERY prune
+#   - once an allocator is fixed, its origin should fall to zero and stay
+#     there. a NON-ZERO count for a fixed origin is a REGRESSION, and it
+#     earns a FRESH upstream report — never a shrug that "the prune handles it"
+#   - the prune is a chore that bounds the pool; it is not, and never becomes,
+#     the fix (`term=daemon`, `.the fix belongs in the ALLOCATOR`)
+if [[ -n "$prune_origins" ]]; then
+  echo "   ├─ origins (what to report upstream — rhachet owns every one)"
+  echo "$prune_origins" | sed '/^$/d' | sort | uniq -c | sort -rn \
+    | while read -r n kind; do
+        echo "   │  ├─ $n × $kind"
+      done
+  echo "   │  └─ a non-zero count for an origin already fixed = a REGRESSION,"
+  echo "   │     and it earns a fresh report — the prune is a chore, not the fix"
+fi
+
 echo "   └─ action"
 echo "      ├─"
 echo "      │"

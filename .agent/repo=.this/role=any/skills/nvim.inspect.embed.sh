@@ -40,7 +40,10 @@ while [[ $# -gt 0 ]]; do
     --all) MODE="all"; shift ;;
     --strace) DO_STRACE=1; shift ;;
     -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) echo "⛈️  unknown arg: $1" >&2; exit 2 ;;
+    # absorb harness-injected args; `rhx <skill>` prepends --repo/--role/--skill
+    # to every invocation, so a strict catch-all rejects its own launcher
+    --repo|--role|--skill) shift 2 ;;
+    *) echo "✋ unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
@@ -48,8 +51,8 @@ done
 get_target_pids() {
   case "$MODE" in
     pid)
-      [[ -z "$PID" ]] && { echo "⛈️  --pid requires a value" >&2; exit 2; }
-      [[ -d "/proc/$PID" ]] || { echo "⛈️  no such process: $PID" >&2; exit 2; }
+      [[ -z "$PID" ]] && { echo "✋ --pid requires a value" >&2; exit 2; }
+      [[ -d "/proc/$PID" ]] || { echo "✋ no such process: $PID" >&2; exit 2; }
       echo "$PID"
       ;;
     all)
@@ -72,7 +75,7 @@ read_field() { # file, key
 inspect_one() {
   local pid="$1"
   local statusf="/proc/$pid/status"
-  [[ -r "$statusf" ]] || { echo "⛈️  cannot read $statusf (gone or not yours)" >&2; return 1; }
+  [[ -r "$statusf" ]] || { echo "💥 cannot read $statusf (gone or not yours)" >&2; return 1; }
 
   local comm ppid threads rss state
   comm=$(read_field Name "$statusf")

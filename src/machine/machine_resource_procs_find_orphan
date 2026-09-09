@@ -14,23 +14,59 @@ fi
 
 ORPHAN_PIDS=""
 ORPHAN_INFO=""
+UNSEEN_INFO=""
 
 for pid in $(ps -u "$USER" -o pid= 2>/dev/null); do
   # skip if we can't read the cwd (process may have exited)
   cwd=$(readlink /proc/$pid/cwd 2>/dev/null) || continue
+  comm=$(cat /proc/$pid/comm 2>/dev/null || echo "unknown")
 
-  # check if cwd is deleted or doesn't exist
-  if [[ "$cwd" == *"(deleted)"* ]] || [[ ! -d "$cwd" ]]; then
-    comm=$(cat /proc/$pid/comm 2>/dev/null || echo "unknown")
+  # 🛑 these two tests are NOT one condition, and they were joined by a single
+  #    `||` until 2026-09-06. the join is what put six healthy processes under a
+  #    `kill -9`.
+  #
+  #    the KERNEL attests this one: it appends " (deleted)" itself, once the
+  #    directory's inode is unlinked. universal, and a real stray.
+  if [[ "$cwd" == *"(deleted)"* ]]; then
     ORPHAN_PIDS+="$pid "
     ORPHAN_INFO+="$pid ($comm): $cwd\n"
+    continue
+  fi
+
+  # ⚠️ this one is a fact about THIS OBSERVER, never about the process: the path
+  #    is not visible from here, which a mount namespace or a permission alone
+  #    can cause.
+  #
+  #    measured 2026-09-06: chrome hardens its sandbox — each zygote chdirs into
+  #    /proc/<crashpad-pid>/fdinfo. once that crashpad pid exits, the path no
+  #    longer resolves while every zygote stays healthy. six of them were offered
+  #    for a kill under a banner that claimed the kernel had attested a deletion.
+  #
+  #    ⇒ so it is reported APART, and never joins the kill list.
+  if [[ ! -d "$cwd" ]]; then
+    UNSEEN_INFO+="$pid ($comm): $cwd\n"
   fi
 done
+
+# .what = the unseen set, reported whether or not a stray was found
+# .why  = an unseen path is real and worth a human's eye, and it is never ours
+#         to act on. it prints with no pid list, so a paste cannot kill it.
+print_unseen() {
+  [[ -z "$UNSEEN_INFO" ]] && return 0
+  echo "  │"
+  echo "  ├─🌫️ unseen — the cwd is not visible HERE; the kernel attests no delete"
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    echo "  │  ├─ $line"
+  done <<< "$(echo -e "$UNSEEN_INFO")"
+  echo "  │  └─🪄 read one before you judge it:  ls -l /proc/<pid>/cwd"
+}
 
 if [[ -z "$ORPHAN_PIDS" ]]; then
   echo "🐈 lets prowl..."
   echo "└─🌕 orphan"
-  echo "  └─✨ no strays"
+  echo "  ├─✨ no strays"
+  print_unseen
   exit 0
 fi
 
@@ -40,7 +76,9 @@ while IFS= read -r line; do
   [[ -z "$line" ]] && continue
   echo "  ├─🪲 $line"
 done <<< "$(echo -e "$ORPHAN_INFO")"
-echo "  └─🪄 kill -9 $ORPHAN_PIDS"
+print_unseen
+echo "  ├─🪄 read the family before you cut:  ps -o pid=,ppid=,etimes=,args= -p ${ORPHAN_PIDS// / -p }"
+echo "  └─🪄 then, if idle:  kill -9 $ORPHAN_PIDS"
 
 if [[ -n "$KILL_MODE" ]]; then
   echo ""

@@ -15,6 +15,16 @@ term.synonyms.forbidden:
 - exhibit      (already itemized, and it is SPENT once its result lands elsewhere. a fixture is
                 permanent and re-runs forever — `term=exhibit`)
 
+## ⚠️ .not to be confused with `tmp.fixture`
+a **`tmp.fixture`** is a temp DIRECTORY a test run owns and should have reaped
+(`term=tmp.fixture._.choice._.md`). this one is a synthetic FILE a play feeds its own reader.
+the two share a word and no other property — one has a wanted verdict, the other has an owner.
+
+⚠️ this cluster keeps the bare word only because it was here first. by the glossary's own scope
+test (*"could another domain object take this same word?"* — it demonstrably could, and did) a
+prefix is owed on BOTH sides. `play.fixture` is the candidate; it is left OPEN for the human,
+since a rename here touches the whole play vocabulary.
+
 ## .what
 a synthetic subject a play builds so it can ask a question of its own **reader**: one file per
 shape the reader must classify, each paired with the verdict it must produce and the reason
