@@ -49,6 +49,9 @@ while [[ $# -gt 0 ]]; do
     --orphans) MODE="orphans"; shift ;;
     --zombies) MODE="zombies"; shift ;;
     -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    # absorb harness-injected args; `rhx <skill>` prepends --repo/--role/--skill
+    # to every invocation, so a strict catch-all rejects its own launcher
+    --repo|--role|--skill) shift 2 ;;
     *) echo "✋ unknown arg: $1" >&2; exit 2 ;;
   esac
 done

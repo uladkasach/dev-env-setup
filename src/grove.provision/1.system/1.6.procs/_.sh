@@ -11,13 +11,16 @@
 #     `$GROVE_SRC`, which lets a verify diff installed bytes against
 #     declared ones (`rule.require.repo-as-source-of-truth`)
 #
-# .why three leaves, split by WHO asks
+# .why four leaves, split by WHO asks
 #   - `1.6.1.finders` — a human asks, on demand; applies everywhere, and a
 #     grove that wedges needs them MORE, since no human sits at it
 #   - `1.6.2.monitor` — a timer asks, and alerts through `notify-send`,
 #     which needs a desktop bus, so it declines on a grove
 #   - `1.6.3.earlyoom` — no one asks; its output is the KILL, needs no
 #     screen, so it applies everywhere and a grove needs it most
+#   - `1.6.4.keyrackd` — a timer asks, and its subject is a SECOND population:
+#     the leaked keyrack daemons. it needs no screen either, and it declines
+#     when this checkout does not carry the prune skill
 #   - an absent finder means a wedged box cannot be DIAGNOSED; an absent
 #     earlyoom means it cannot be REACHED — two failures a reader acts on
 #     differently, which is why earlyoom earns its own leaf
@@ -35,4 +38,5 @@ grove_provision_1_6_procs() {
   bundle.upgrade 1.6.1.finders
   bundle.upgrade 1.6.2.monitor
   bundle.upgrade 1.6.3.earlyoom
+  bundle.upgrade 1.6.4.keyrackd
 }

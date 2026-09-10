@@ -151,3 +151,5 @@ no reader ever prompted to check it.
 - `term=probe._.choice._.md` — the near relation that asks the MACHINE rather than the check
 - `term=exhibit._.choice._.md` — the artifact a fixture must not be confused with
 - `term=bite._.choice.reason.md` — why a check proven in one direction is half proven
+- `term=tmp.fixture._.choice._.md` — ⚠️ the OTHER fixture: a temp dir a run owns. the two share
+  a word and no other property; see the disambiguation in this term's say file

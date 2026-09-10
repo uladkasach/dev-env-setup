@@ -1311,7 +1311,26 @@ local PLUGIN_SPEC = {
           minimap_width = 13,
           fix_width = true,
         },
-        exclude_filetypes = { 'neo-tree', 'oil', 'help', 'lazy', 'codediff-explorer' },
+        -- .note = `neominimap` excludes ITSELF, and that clause is the whole
+        --         guard against a self-amplified buffer leak.
+        --
+        --         a minimap is itself a `nofile` scratch buffer. neominimap's
+        --         default `exclude_buftypes` holds `nofile`, so by default a
+        --         minimap can never be given a minimap. the empty list below
+        --         removes that guard on purpose — codediff's panes are `nofile`
+        --         and must be mapped — and it thereby also makes every minimap
+        --         eligible for a minimap of its own.
+        --
+        --         measured 2026-09-03: 2,709 of one core's 2,714 buffers were
+        --         minimap buffers (1,367 typed `neominimap`, 1,342 not yet
+        --         typed) — a near 1:1 ratio, which is the signature of a map
+        --         made for each map. history showed 34,354 buffers in a worse
+        --         core. this is the leak behind 63 watchdog trips.
+        --
+        --         so the filetype exclusion does the narrow job the buftype
+        --         exclusion used to do broadly: minimaps stay off minimaps,
+        --         while codediff's `nofile` panes still get theirs.
+        exclude_filetypes = { 'neo-tree', 'oil', 'help', 'lazy', 'codediff-explorer', 'neominimap' },
         exclude_buftypes = {},  -- allow virtual buffers (for codediff)
         git = {
           enabled = true,

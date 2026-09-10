@@ -1,0 +1,458 @@
+#!/usr/bin/env bash
+######################################################################
+# .what = one-shot machine health report: how it is, and what concerns
+#
+# .why  = a diagnosis must be reachable by BOTH a human and a robot.
+#         the prior form was a bash alias, so an agent could not invoke
+#         it and re-derived every /proc read by hand, every time. a
+#         skill is the durable form: one call, same answer, either way.
+#
+#         the report is bracketed on purpose:
+#           - "heres how it is"    = the aggregates, always shown
+#           - "heres what concerns me" = the subset that crossed a line
+#         a level alone never says whether anyone WAITS on a resource;
+#         psi does, so psi leads the concerns.
+#
+# usage:
+#   machine.usage.diagnose.sh              # full report
+#   machine.usage.diagnose.sh --top 8      # widen the census
+#   machine.usage.diagnose.sh --concerns   # skip to what is wrong
+#
+# options:
+#   --top N     how many names in the census (default 5)
+#   --concerns  print only the concerns, with their fixes
+#   --help, -h  show usage and exit
+#
+# .note = the flag is `--concerns`, not `--quiet`. "quiet" says how LOUD the
+#         output is; this flag says WHICH section prints — and it is not even
+#         quiet when the machine is unwell. one flag, one sense.
+#
+# guarantee:
+#   - read-only; touches no state, mutates no process
+#   - every number is read live from /proc, never cached
+#   - exits 0 always (a report is not a verdict)
+######################################################################
+# .note = `pipefail` is deliberately absent. every census pipeline ends in
+#         `head`, which exits early and hands SIGPIPE to its writer; under
+#         pipefail that reads as a failed pipeline and set -e aborts the
+#         whole report (exit 141). a truncated read is the intent here, not
+#         a fault, so only -e and -u apply.
+set -eu
+
+TOP=5
+QUIET=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --top)      TOP="$2"; shift 2 ;;
+    --concerns) QUIET=1; shift ;;
+    -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    # absorb harness-injected args; `rhx <skill>` prepends --repo/--role/--skill
+    # to every invocation, so a strict catch-all rejects its own launcher
+    --repo|--role|--skill) shift 2 ;;
+    *) echo "✋ unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+######################################################################
+# gather — every aggregate in one pass, so header and concerns agree
+######################################################################
+
+CORES=$(nproc)
+read -r L1 L5 L15 _ < /proc/loadavg
+LOAD_RATIO=$(awk -v l="$L1" -v c="$CORES" 'BEGIN{printf "%.2f", l/c}')
+
+eval "$(awk '
+  /^MemTotal:/      {t=$2}
+  /^MemAvailable:/  {a=$2}
+  /^SwapTotal:/     {st=$2}
+  /^SwapFree:/      {sf=$2}
+  /^SReclaimable:/  {sr=$2}
+  /^AnonPages:/     {an=$2}
+  END {
+    printf "MEM_TOTAL_G=%.1f;", t/1048576
+    printf "MEM_AVAIL_G=%.1f;", a/1048576
+    printf "MEM_USED_PCT=%d;",  ((t-a)/t)*100
+    printf "SWAP_USED_G=%.1f;", (st-sf)/1048576
+    printf "SWAP_PCT=%d;",      (st>0)?(((st-sf)/st)*100):0
+    printf "SLAB_G=%.1f;",      sr/1048576
+    printf "ANON_G=%.1f;",      an/1048576
+  }' /proc/meminfo)"
+
+# iowait + idle from one /proc/stat delta. `top -bn1` reports a since-boot
+# average, which hides a live stall; a 200ms delta shows what is true NOW.
+read -r _ u1 n1 s1 i1 w1 _ < /proc/stat
+sleep 0.2
+read -r _ u2 n2 s2 i2 w2 _ < /proc/stat
+read -r IOWAIT IDLE <<<"$(awk -v a="$((u2-u1))" -v b="$((n2-n1))" -v c="$((s2-s1))" \
+                              -v d="$((i2-i1))" -v e="$((w2-w1))" \
+  'BEGIN{t=a+b+c+d+e; if(t<=0){print "0 0"; exit} printf "%d %d", (e/t)*100, (d/t)*100}')"
+
+# psi is the kernel's own verdict on WHICH resource stalls a task, and the
+# only signal that separates "the box is busy" from "the box waits on X".
+# 2dp: at low values 1dp rounds a real signal down to 0.0.
+psi() { awk '/^some/{sub(/avg60=/,"",$3); printf "%.2f", $3}' "$1" 2>/dev/null || echo "0.00"; }
+PSI_CPU=$(psi /proc/pressure/cpu)
+PSI_IO=$(psi /proc/pressure/io)
+PSI_MEM=$(psi /proc/pressure/memory)
+
+DSTATE=$(awk '{print $3}' /proc/[0-9]*/stat 2>/dev/null | grep -c '^D' || true)
+PROCS=$(ls -d /proc/[0-9]* 2>/dev/null | wc -l)
+TMP_ALL=$(find /tmp -maxdepth 1 -type d 2>/dev/null | wc -l)
+
+# a fixture is a dir a run OWNS and should have reaped. the total /tmp count
+# buries them; the owned subset is the leak dimension. keep in step with
+# tmp.fixture.prune's PATTERNS.
+TMP_FIX=$(find /tmp -maxdepth 1 -type d \
+  \( -name 'rhachet-test-*' -o -name 'rhachet-roles-test-*' \
+     -o -name 'work-test-cwd-*' -o -name 'pii-brain-live-*' \) 2>/dev/null | wc -l)
+
+# census by name. a per-process top-N hides a CLASS: 13 procs at 3% each is
+# the largest holder on the box yet clears every per-process threshold.
+# one awk pass over comm+statm, so no fork per process.
+# .note = rss double-counts shared pages; good enough to rank a class.
+# .note = the source is `ps`, not a /proc/[0-9]* glob. the glob version read
+#         two files per pid and aborted whenever a process exited between
+#         glob expansion and open — awk treats an unreadable input file as
+#         fatal and never reaches its END block, so the whole census came
+#         back empty. that failure is load-correlated: it struck precisely
+#         when process churn was high, which is when the census is wanted.
+#         `ps` walks /proc itself and tolerates the race internally.
+#
+# .note = the top-N cut is `awk NR<=n`, never `head`. head exits early and
+#         hands SIGPIPE to sort, which under set -o pipefail truncates the
+#         capture to empty. awk reads to EOF, so the cut cannot race.
+CENSUS=$(ps -eo comm=,rss= 2>/dev/null \
+  | awk '{ n[$1]++; m[$1] += $2 }
+         END { for (k in n) printf "%d\t%.1f\t%s\n", n[k], m[k]/1048576, k }' \
+  | sort -rn -k2 | awk -v n="$TOP" 'NR<=n' || true)
+
+# a process alive for days that still burns cpu is wedged, not busy. cpu and
+# memory thresholds both miss it; only elapsed-vs-still-active catches it.
+#
+# .note = the `tty == "?"` clause is load-bearing, not a refinement. without
+#         it this indicted three healthy interactive sessions (34h/47h/57h at
+#         ~5% cpu) and proposed `kill -9` for each — a false positive that
+#         costs live work.
+#
+#         `wedged` means alive + on cpu + NO PROGRESS. the first two are
+#         measurable; the third was inferred from duration, and that
+#         inference only holds for work expected to END. a controlling
+#         terminal means a human is attached, and that human IS the progress
+#         the predicate cannot see. no tty, long-lived, still on cpu = a
+#         batch job that should have finished.
+WEDGED_LIST=$(ps -eo etimes=,pcpu=,pid=,tty=,comm= 2>/dev/null \
+  | awk '$1 > 86400 && $2 > 5.0 && $4 == "?" \
+         {printf "%s (pid %s) %dh at %s%% cpu\n", $5, $3, $1/3600, $2}' \
+  | awk 'NR<=3' || true)
+WEDGED=$(printf '%s' "$WEDGED_LIST" | grep -c . || true)
+
+# .what = the nvim self-watchdog's own verdict on the nvim class
+#
+# .why  = nvim 0.11+ runs its editor core as a separate process, and that core
+#         carries an in-process breaker that trips at 1.2G rss. the breaker
+#         already knows what this report has to infer: whether an nvim core
+#         leaks, and whether it leaks by buffer count or by a cause the
+#         instruments cannot name. to re-derive that here would duplicate a
+#         measurement that already exists on disk.
+#
+# .note = the trip count is read over 24h, not since boot. a lifetime total is
+#         monotonic and so can only ever grow — the same trap `total=` sets in
+#         /proc/pressure. a windowed count can fall, which is what makes it
+#         a signal rather than a scoreboard.
+NVIM_LOG="${HOME}/.local/state/nvim/selfwatch.log"
+NVIM_TRIPS=0
+NVIM_LAST=""
+NVIM_LOG_M=0
+if [[ -r "$NVIM_LOG" ]]; then
+  NVIM_SINCE=$(date -d '24 hours ago' '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || echo "0")
+  NVIM_TRIPS=$(awk -v s="$NVIM_SINCE" '/TRIP/ && $1 >= s' "$NVIM_LOG" 2>/dev/null | grep -c . || true)
+  NVIM_LAST=$(awk '/TRIP/{t=$1} END{print t}' "$NVIM_LOG" 2>/dev/null || true)
+  NVIM_LOG_M=$(( $(wc -c < "$NVIM_LOG" 2>/dev/null || echo 0) / 1048576 ))
+fi
+
+# .what = is a live core on a growth trend right now
+#
+# .why  = a trip count is history; this is the present. the watchdog logs a
+#         trend line only once a core crosses 800M, so the mere presence of a
+#         recent line means some core is already past the warn mark and climbs.
+#         the delta between the first and last such line gives the rate, which
+#         is what turns "nvim is big" into "nvim grows at N M/min".
+#
+# .note = the rate comes from the WALL CLOCK, never from the line count. a
+#         first version multiplied lines by 30s, on the assumption that one
+#         line means one 30s tick. that breaks in the exact case this row
+#         exists for: when the box is starved, libuv fires the repeat timer
+#         once per MISSED interval, so dozens of lines land in the same
+#         second. the tick math then divides real growth by fictional minutes
+#         and reports a calm rate for a core in free fall.
+NVIM_RATE=0
+NVIM_BUFS=0
+NVIM_BURST=0
+if [[ -r "$NVIM_LOG" ]]; then
+  NVIM_WIN=$(tail -n 40 "$NVIM_LOG" 2>/dev/null \
+    | awk '/rss_mb=/ {
+             match($0, /rss_mb=[0-9]+/); r = substr($0, RSTART+7, RLENGTH-7)
+             if (n == 0) { r0 = r; t0 = $1 }
+             r1 = r; t1 = $1; n++
+           }
+           END { if (n > 1) printf "%d %d %d %s %s", n, r0, r1, t0, t1 }' || true)
+  if [[ -n "$NVIM_WIN" ]]; then
+    read -r W_N W_R0 W_R1 W_T0 W_T1 <<< "$NVIM_WIN"
+    W_SECS=$(( $(date -d "$W_T1" +%s 2>/dev/null || echo 0) - $(date -d "$W_T0" +%s 2>/dev/null || echo 0) ))
+    # a zero-span window across many lines is a stampede, not a leak rate
+    [[ "$W_SECS" -eq 0 && "$W_N" -ge 10 ]] && NVIM_BURST=1
+    [[ "$W_SECS" -gt 0 && "$W_R1" -gt "$W_R0" ]] && \
+      NVIM_RATE=$(awk -v d="$((W_R1 - W_R0))" -v s="$W_SECS" 'BEGIN{printf "%.0f", d*60/s}')
+  fi
+  NVIM_BUFS=$(tail -n 1 "$NVIM_LOG" 2>/dev/null \
+    | awk '{ match($0, /bufs=[0-9]+/); if (RSTART) print substr($0, RSTART+5, RLENGTH-5); else print 0 }' || echo 0)
+fi
+
+######################################################################
+# report — how it is
+######################################################################
+
+# .what = pick a row glyph from whether that row is implicated below
+#
+# .why  = a glyph that never varies is decoration, and decoration competes
+#         with signal (nielsen 8). when every row read 🌕 the reader had to
+#         cross-reference the header against the concerns by hand to find
+#         the row that mattered. moon phase carries it instead:
+#           🌑 dark = calm, no concern fired from this row
+#           🌕 lit  = this row is why a concern fired
+#         so the eye lands on the implicated row without a second pass.
+moon() { [[ "$1" -eq 1 ]] && printf '🌕' || printf '🌑'; }
+
+# each row's lit/dark state uses the SAME predicate as its concern below,
+# so the two sections can never disagree about what is wrong.
+awk -v r="$LOAD_RATIO" 'BEGIN{exit !(r>1.5)}'  && LIT_LOAD=1  || LIT_LOAD=0
+awk -v p="$PSI_CPU" 'BEGIN{exit !(p>=10)}'     && LIT_SCPU=1  || LIT_SCPU=0
+awk -v p="$PSI_IO"  'BEGIN{exit !(p>=10)}'     && LIT_SIO=1   || LIT_SIO=0
+awk -v p="$PSI_MEM" 'BEGIN{exit !(p>=5)}'      && LIT_SMEM=1  || LIT_SMEM=0
+awk -v s="$SWAP_USED_G" 'BEGIN{exit !(s>0.5)}' && LIT_SWAP=1  || LIT_SWAP=0
+awk -v s="$SLAB_G" 'BEGIN{exit !(s>1.5)}'      && LIT_SLAB=1  || LIT_SLAB=0
+[[ "$MEM_USED_PCT" -ge 85 ]] && LIT_MEM=1 || LIT_MEM=0
+{ [[ "$IOWAIT" -ge 5 ]] || [[ "$DSTATE" -ge 5 ]]; } && LIT_CPU=1 || LIT_CPU=0
+{ [[ "$TMP_FIX" -ge 100 ]] || [[ "$PROCS" -ge 1500 ]]; } && LIT_CNT=1 || LIT_CNT=0
+{ [[ "$NVIM_TRIPS" -ge 1 ]] || [[ "$NVIM_RATE" -ge 5 ]] || [[ "$NVIM_BURST" -eq 1 ]]; } \
+  && LIT_NVIM=1 || LIT_NVIM=0
+LIT_STALL=$(( LIT_SCPU || LIT_SIO || LIT_SMEM ))
+
+if [[ "$QUIET" -eq 0 ]]; then
+  echo ""
+  echo "🐈 heres how it is...  ($(date '+%Y-%m-%d %H:%M') · $(uptime -p 2>/dev/null || echo up))"
+  echo "   │"
+  echo "   ├─ $(moon $LIT_LOAD) load:   ${L1} / ${L5} / ${L15}  (1m/5m/15m on ${CORES} cores)"
+  echo "   ├─ $(moon $LIT_CPU) cpu:    ${IDLE}% idle, ${IOWAIT}% iowait, ${DSTATE} blocked on disk"
+  echo "   ├─ $(moon $LIT_MEM) mem:    ${MEM_USED_PCT}% used, ${MEM_AVAIL_G}G free of ${MEM_TOTAL_G}G"
+  echo "   ├─ $(moon $LIT_SWAP) swap:   ${SWAP_USED_G}G used (${SWAP_PCT}%)"
+  echo "   ├─ $(moon $LIT_SLAB) kernel: ${SLAB_G}G slab (dir cache), ${ANON_G}G anon (heap)"
+  echo "   ├─ $(moon $LIT_STALL) stall:  cpu ${PSI_CPU}%, io ${PSI_IO}%, mem ${PSI_MEM}%  · who waited, last 60s"
+  echo "   ├─ $(moon $LIT_CNT) counts: ${PROCS} procs, ${TMP_ALL} dirs in /tmp (${TMP_FIX} fixtures)"
+  # the nvim breaker's own verdict — read from its log, never re-derived here
+  if [[ "$NVIM_LOG_M" -eq 0 && "$NVIM_TRIPS" -eq 0 && "$NVIM_RATE" -eq 0 && "$NVIM_BURST" -eq 0 ]]; then
+    echo "   ├─ 🌑 nvim:   watchdog quiet — no trip in 24h, no core on a climb"
+  elif [[ "$NVIM_BURST" -eq 1 ]]; then
+    # a burst makes the rate unknowable, so the row must not print one
+    echo "   ├─ $(moon $LIT_NVIM) nvim:   ${NVIM_TRIPS} watchdog trips in 24h, watchdog STAMPEDE, ${NVIM_BUFS} bufs"
+  else
+    echo "   ├─ $(moon $LIT_NVIM) nvim:   ${NVIM_TRIPS} watchdog trips in 24h, +${NVIM_RATE}M/min now, ${NVIM_BUFS} bufs"
+  fi
+  echo "   └─ 🌑 census: who holds the memory, by name"
+  if [[ -z "$CENSUS" ]]; then
+    echo "         └─ 💥 census empty — /proc read yielded no rows"
+  else
+    printf '%s\n' "$CENSUS" | awk -F'\t' -v n="$(printf '%s\n' "$CENSUS" | grep -c .)" \
+      '{printf "         %s %-16s %2d procs  %sG\n", (NR==n ? "└─" : "├─"), $3, $1, $2}'
+    echo "            (rss, so shared pages double-count — ranks classes, not exact totals)"
+  fi
+fi
+
+######################################################################
+# report — lets hunt
+#
+# the aggregates say WHAT is contended; the hunters say WHO. they are
+# separate binaries under ~/.local/bin, laid down by install_env, so the
+# report degrades to a note rather than a failure when they are absent.
+######################################################################
+
+hunt() {
+  # .note = one `local` per name. bash expands the whole line before it makes
+  #         any assignment, so `local a="$1" b="${a}"` reads `a` while it is
+  #         still unset — which set -u turns into a hard abort.
+  local name="$1"
+  local glyph="$2"
+  local bin="$HOME/.local/bin/machine_resource_procs_find_${name}"
+  echo "   │"
+  if [[ ! -x "$bin" ]]; then
+    echo "   ├─${glyph} ${name}"
+    echo "   │ └─ ✋ absent — install via install_machine_resource_observe"
+    return 0
+  fi
+  "$bin" 2>/dev/null | tail -n +2 | sed "1s/└─/├─/; s/^  /│ /; s/^/   /" || true
+}
+
+if [[ "$QUIET" -eq 0 ]]; then
+  echo ""
+  echo "🐈 lets hunt..."
+  hunt spinner "🌕"
+  hunt runaway "🌕"
+  hunt orphan  "🌕"
+fi
+
+######################################################################
+# report — what concerns me
+######################################################################
+
+# .what = record one concern: its severity, what is wrong, and the fix
+#
+# .why  = a concern that names only a symptom leaves the human to guess the
+#         cure, which is the friction the report exists to remove
+#         (rule.require.errors-name-the-fix). so the fix is a REQUIRED
+#         argument — a concern cannot be added without one.
+#
+#         severity is a sort key, never printed. it orders the list so the
+#         first line is the one to act on; without it the reader gets code
+#         order and must rank the findings themselves.
+#           1 = a stall or a wedge — someone waits, or work is lost
+#           2 = a level near its ceiling
+#           3 = a count that will become a level
+concerns=()
+concern() {
+  local severity="$1"
+  local says="$2"
+  local fix="$3"
+  concerns+=("${severity}|${says}|${fix}")
+}
+
+# psi leads: a level says how full a resource is; psi says who waits on it.
+awk -v p="$PSI_CPU" 'BEGIN{exit !(p>=10)}' && \
+  concern 1 "🔥 psi cpu ${PSI_CPU}% — tasks wait on cpu; a spawn storm reads like this" \
+            "measure the fork rate + name its parent:  rhx machine.diagnose.churn"
+
+awk -v p="$PSI_IO" 'BEGIN{exit !(p>=10)}' && \
+  concern 1 "💿 psi io ${PSI_IO}% — tasks wait on disk; the swap-cliff signature" \
+            "find the anon holder:  rhx machine.attribute.memory"
+
+awk -v p="$PSI_MEM" 'BEGIN{exit !(p>=5)}' && \
+  concern 1 "🧨 psi mem ${PSI_MEM}% — tasks wait on reclaim; a real memory shortage" \
+            "find the anon holder:  rhx machine.attribute.memory"
+
+# load without cpu = blocked. the most misread pair on the machine: a high
+# load with a high idle is NOT a busy box, it is a stalled one.
+awk -v r="$LOAD_RATIO" 'BEGIN{exit !(r>1.5)}' && {
+  if [[ "$IDLE" -gt 70 ]]; then
+    concern 1 "🕯️ load ${L1} on ${CORES} cores while ${IDLE}% idle — blocked, not busy" \
+              "read the stall row above; it names which resource they wait on"
+  else
+    concern 2 "🕯️ load ${L1} on ${CORES} cores (${LOAD_RATIO}x) — genuine cpu saturation" \
+              "name the top burners:  ~/.local/bin/machine_resource_procs_find_runaway --full"
+  fi
+}
+
+if [[ "$WEDGED" -ge 1 ]]; then
+  while IFS= read -r w; do
+    [[ -n "$w" ]] && concern 1 "🪤 wedged — alive >24h and still on cpu: ${w}" \
+                              "confirm, then end it:  kill -9 <pid>"
+  done <<<"$WEDGED_LIST"
+fi
+
+[[ "$MEM_USED_PCT" -ge 85 ]] && \
+  concern 2 "🫧 memory ${MEM_USED_PCT}% used, only ${MEM_AVAIL_G}G free" \
+            "charge it to an origin:  rhx machine.attribute.memory"
+
+# anon is the only memory that MUST swap, so it is the leak dimension.
+awk -v s="$SWAP_USED_G" 'BEGIN{exit !(s>0.5)}' && \
+  concern 2 "🌊 swap ${SWAP_USED_G}G in use (${SWAP_PCT}%) — anon at ${ANON_G}G" \
+            "anon is what swaps; find its holder:  rhx machine.attribute.memory"
+
+[[ "$IOWAIT" -ge 5 ]] && \
+  concern 2 "💾 iowait ${IOWAIT}% — disk is a bottleneck" \
+            "usually swap pressure; cut anon first:  rhx machine.attribute.memory"
+
+[[ "$DSTATE" -ge 5 ]] && \
+  concern 2 "⏳ ${DSTATE} procs blocked on disk, uninterruptible" \
+            "they cannot be killed; relieve the disk instead (see swap row)"
+
+# slab is charged to NO process, so ps/top/cgroups are all blind to it.
+# .note = 1.5G, not 2.0G. a threshold set at the peak of one incident can
+#         only ever detect that incident again; set it where the trend is
+#         still cheap to reverse.
+awk -v s="$SLAB_G" 'BEGIN{exit !(s>1.5)}' && \
+  concern 2 "🧊 ${SLAB_G}G kernel slab (dir cache) — charged to no process, so ps is blind" \
+            "usually /tmp churn:  rhx tmp.fixture.prune"
+
+# 100 is deliberately low: a fixture is owned by a run and should die with
+# it, so ANY sizeable resident population is already a defect.
+[[ "$TMP_FIX" -ge 100 ]] && \
+  concern 3 "🗑️ ${TMP_FIX} abandoned fixture dirs — each one feeds the slab above" \
+            "rhx tmp.fixture.prune            (then --mode apply to clear)"
+
+# .note = only when the fixture concern did NOT already fire. two rows for
+#         one problem is cognitive load, not thoroughness (miller 7±2).
+[[ "$TMP_ALL" -ge 5000 && "$TMP_FIX" -lt 100 ]] && \
+  concern 3 "🗑️ ${TMP_ALL} dirs in /tmp — taxes every path lookup and every boot" \
+            "these are not fixtures; inspect by hand before you remove any"
+
+[[ "$PROCS" -ge 1500 ]] && \
+  concern 3 "👥 ${PROCS} procs — that is a spawn leak, not a workload" \
+            "find the orphans:  rhx machine.attribute.memory --orphans"
+
+# .note = a trip is not a failure of the watchdog — it is the watchdog at work.
+#         the concern is that it had to fire AT ALL, and it fires per core, so
+#         a count above 1 in a day says every core reaches 1.2G, not that one
+#         did once. the fix names the log because the log holds the WHY
+#         (bufs vs treesitter vs neither), which this report cannot infer.
+[[ "$NVIM_TRIPS" -ge 1 ]] && \
+  concern 2 "📝 nvim watchdog tripped ${NVIM_TRIPS}× in 24h (last ${NVIM_LAST}) — a core hit 1.2G" \
+            "read which subsystem grew:  rhx nvim.diagnose.watchdog"
+
+# a climb caught mid-flight, before the breaker fires. at 10M/min a core
+# crosses the 1.2G trip line in under an hour, every hour, forever.
+[[ "$NVIM_RATE" -ge 5 ]] && \
+  concern 2 "📈 an nvim core grows +${NVIM_RATE}M/min right now (${NVIM_BUFS} bufs)" \
+            "it trips within the hour; see the trend:  rhx nvim.diagnose.watchdog"
+
+# the watchdog fired dozens of times inside one second — the event loop was
+# starved, so libuv queued one fire per missed interval. the guard against a
+# leak became a load, at the worst possible moment.
+[[ "$NVIM_BURST" -eq 1 ]] && \
+  concern 2 "🌪️ nvim watchdog stampede — dozens of fires in one second" \
+            "the repo has the guard; this box lacks it:  sync.devenv.nvim"
+
+# the watchdog's own log became a burden once. the repo caps it at 2MB and
+# rotates; a log past that cap means the cap never reached this machine.
+[[ "$NVIM_LOG_M" -ge 4 ]] && \
+  concern 3 "📜 nvim selfwatch.log is ${NVIM_LOG_M}M — its rotation cap is absent here" \
+            "the repo caps it at 2M; sync the config:  sync.devenv.nvim"
+
+echo ""
+echo "🐈 heres what concerns me..."
+echo "   │"
+
+if [[ ${#concerns[@]} -eq 0 ]]; then
+  echo "   └─ 🌴 all clear — no threshold crossed"
+  echo ""
+  exit 0
+fi
+
+# sort by severity so the first line is the one to act on. `sort -s` keeps
+# the authored order within a severity, which reads as a deliberate sequence
+# rather than an arbitrary one.
+mapfile -t concerns < <(printf '%s\n' "${concerns[@]}" | sort -s -t'|' -k1,1n)
+
+# each concern renders as a pair: what is wrong, then the move that fixes it.
+# the fix sits on its own indented line so it is copy-pasteable as-is.
+for i in "${!concerns[@]}"; do
+  IFS='|' read -r _ says fix <<<"${concerns[$i]}"
+  if [[ $i -eq $((${#concerns[@]} - 1)) ]]; then
+    echo "   └─ ${says}"
+    echo "      └─ 🪄 ${fix}"
+  else
+    echo "   ├─ ${says}"
+    echo "   │  └─ 🪄 ${fix}"
+    echo "   │"
+  fi
+done
+echo ""

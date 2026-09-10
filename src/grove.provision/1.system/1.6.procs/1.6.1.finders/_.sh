@@ -4,7 +4,8 @@
 #
 #   machine_resource_procs_find_runaway — cpu + memory + swap hogs
 #   machine_resource_procs_find_spinner — a process that burns cpu with no work
-#   machine_resource_procs_find_orphan  — a process whose parent is gone
+#   machine_resource_procs_find_orphan  — a process whose CWD the kernel says is
+#                                         deleted (⚠️ NOT "whose parent is gone")
 #
 # .why  three scripts in ONE bundle
 #         a bundle is a CONCERN. these three answer one question — *what consumes

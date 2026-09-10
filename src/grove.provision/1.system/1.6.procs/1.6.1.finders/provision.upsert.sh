@@ -28,10 +28,16 @@ grove_provision_1_6_1_finders_provision_upsert() {
 
   local failed=0
   local name
+  # ⚠️ `machine_usage_diagnose` is the COMPOSER of the three finders above, and
+  #    it is installed here for the same reason they are: `~/.bash_aliases` is
+  #    sourced by every shell in every dir, so its alias must name a command
+  #    that resolves everywhere. `rhx <skill>` resolves only where rhachet
+  #    roles are linked (`rule.forbid.the-driver-by-path`, carve-out 3)
   for name in \
     machine_resource_procs_find_runaway \
     machine_resource_procs_find_spinner \
-    machine_resource_procs_find_orphan
+    machine_resource_procs_find_orphan \
+    machine_usage_diagnose
   do
     local src="$GROVE_SRC/machine/$name"
     if [[ ! -f "$src" ]]; then

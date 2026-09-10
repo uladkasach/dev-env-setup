@@ -165,20 +165,22 @@ alias use.screencast='flatpak run org.gnome.NetworkDisplays'
 #   grove.provision --what 1.6.1.finders --mode apply
 #   grove.provision --what 1.7.usage --mode apply
 
-_machine_usage_diagnose() {
-  echo ""
-  echo "🐈 lets hunt..."
-  # spinner (first)
-  echo "   │"
-  machine_resource_procs_find_spinner 2>/dev/null | tail -n +2 | sed '1s/└─/├─/; s/^  /│ /; s/^/   /'
-  # runaway (middle)
-  echo "   │"
-  machine_resource_procs_find_runaway 2>/dev/null | tail -n +2 | sed '1s/└─/├─/; s/^  /│ /; s/^/   /'
-  # orphan (last)
-  echo "   │"
-  machine_resource_procs_find_orphan 2>/dev/null | tail -n +2 | sed 's/^/   /'
-}
-alias machine.usage.diagnose='_machine_usage_diagnose'
+# .what = the machine's state, the hunt, then the concerns within it
+#
+# .why  = the report lives in `src/machine/machine_usage_diagnose`, which
+#         `1.6.1.finders` installs to ~/.local/bin — so ONE implementation
+#         serves a human at a prompt and an agent alike, and neither re-derives
+#         the /proc reads by hand.
+#
+# 🛑 .why it names a BARE COMMAND and never `rhx machine.usage.diagnose`
+#   - this file is sourced by EVERY shell, in every directory, on every box
+#   - `rhx <skill>` resolves only where rhachet roles are linked, so an
+#     rhx-shaped alias dies the moment the cwd leaves this repo — and dies on
+#     a grove outright (`rule.forbid.the-driver-by-path`, carve-out 3)
+#   - 📜 an rhx-shaped alias shipped here for one round. the premise was wrong:
+#     agent-invocable does NOT require an rhx skill. a file on PATH is reachable
+#     by a human, an agent, a cron, and a unit — strictly more reach, one file
+alias machine.usage.diagnose='machine_usage_diagnose'
 alias machine.usage.diagnose.spinner='machine_resource_procs_find_spinner'  # sustained high CPU 30+ min
 alias machine.usage.diagnose.runaway='machine_resource_procs_find_runaway --full'  # high CPU/memory right now
 alias machine.usage.diagnose.orphan='machine_resource_procs_find_orphan'    # cwd deleted (stale worktrees)

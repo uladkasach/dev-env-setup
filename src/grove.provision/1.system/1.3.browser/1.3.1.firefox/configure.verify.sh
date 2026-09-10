@@ -169,6 +169,31 @@ grove_provision_1_3_1_firefox_configure_verify() {
     failed=$(( failed + 1 ))
   fi
 
+  # .why = this one is off by default on LINUX only (win/mac ship it on), so its
+  #        absence is invisible to anyone who reads mozilla's docs and assumes
+  #        the documented default. measured 2026-09-06: 39 content processes at
+  #        8.9G on a box that never dropped below the trip threshold.
+  if grep -q 'user_pref("browser.tabs.unloadOnLowMemory", true)' "$prefs"; then
+    echo "   • inactive-tab unload is declared on ✔"
+  else
+    echo "   ✋ browser.tabs.unloadOnLowMemory is NOT declared true" >&2
+    echo "      ⇒ firefox holds every tab it ever opened; on a box under memory" >&2
+    echo "        pressure that reads as a slow MACHINE, never as a browser pref" >&2
+    failed=$(( failed + 1 ))
+  fi
+
+  # .why = the pref above is inert without this one. the default trips at 5% of
+  #        total, which on a 31G box is 1.5G — the machine is already deep in
+  #        swap by then, so the unload fires after the harm it exists to prevent.
+  if grep -q 'user_pref("browser.low_commit_space_threshold_mb", 3072)' "$prefs"; then
+    echo "   • the unload threshold is raised to 3G ✔"
+  else
+    echo "   ✋ browser.low_commit_space_threshold_mb is NOT declared 3072" >&2
+    echo "      ⇒ the unload above still trips, but only at the default 200MB —" >&2
+    echo "        far past the point this box starts to thrash" >&2
+    failed=$(( failed + 1 ))
+  fi
+
   ####################################################################
   # 4. the extensions — named when owed, never failed
   ####################################################################

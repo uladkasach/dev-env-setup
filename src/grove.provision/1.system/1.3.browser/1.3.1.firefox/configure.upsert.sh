@@ -150,6 +150,26 @@ user_pref("extensions.formautofill.creditCards.enabled", false);
 
 // disable gtk emoji picker (ctrl+. conflicts with 1password)
 user_pref("widget.gtk.native-emoji-dialog", false);
+
+// unload inactive tabs once memory runs low.
+// .why = OFF by default on linux, ON by default on win/mac. so a linux box with
+//        a long-lived window pays for every tab it has ever opened: each one is
+//        a full DOM, js heap, jit cache, and gpu buffer, held for as long as the
+//        tab exists. measured 2026-09-06: 39 content processes at 8.9G.
+user_pref("browser.tabs.unloadOnLowMemory", true);
+
+// trip that unload BEFORE the box is desperate.
+// .why = the defaults trip at 200MB free, or 5% of total. on a 31G box 5% is
+//        1.5G — by which point this machine is already deep in swap, so the
+//        remedy arrives after the harm it exists to prevent.
+user_pref("browser.low_commit_space_threshold_mb", 3072);
+user_pref("browser.low_commit_space_threshold_percent", 10);
+
+// cap content processes at 4 (the default is 8 on a box with >= 8 cpus).
+// .cost = tabs that share a process share its fate: one content crash takes
+//         every tab in that process with it. 4 is a deliberate trade, not a
+//         knob to lower further — do NOT set 1.
+user_pref("dom.ipc.processCount", 4);
 EOF
   echo "   • firefox prefs declared in user.js (restart firefox to apply)"
 

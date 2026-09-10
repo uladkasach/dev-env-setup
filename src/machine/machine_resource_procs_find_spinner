@@ -1,13 +1,31 @@
 #!/bin/bash
 #############################
 # machine_resource_procs_find_spinner
-# finds processes with CPU time / elapsed time ratio > 0.5
-# that have been running for 30+ minutes
+# finds long-lived processes whose cpu-time / elapsed-time ratio clears a
+# sustained-burn gate
 #############################
 
 KILL_MODE=""
 MIN_ELAPSED=1800  # 30 minutes in seconds
-MIN_RATIO=50      # 50% CPU ratio threshold
+
+# .what = the cpu-time / elapsed-time ratio above which a long-lived process
+#         counts as a spinner
+#
+# .why  = 50 was too high and left a blind spot. a wedged `npm exec depcheck`
+#         held ~24% of a core for 145 HOURS and this detector reported "none
+#         caught" the whole time — its ratio never reached 50.
+#
+#         a stuck process rarely pegs a full core. it polls, retries, or spins
+#         on a partial wait, so it lands in the teens or twenties. meanwhile
+#         the runaway detector only fires when SYSTEM load crosses cores*1.5,
+#         and then ranks by instantaneous %CPU — which surfaces the 1-second-old
+#         node processes that happen to be at 150% and buries the 6-day
+#         offender at 24%. so neither detector could see it.
+#
+#         15% sustained across 30+ minutes is not normal work; a real task
+#         either finishes or varies. this is the sustained-burn gate, and the
+#         MIN_ELAPSED gate above is what keeps honest work out of the net.
+MIN_RATIO=15
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
