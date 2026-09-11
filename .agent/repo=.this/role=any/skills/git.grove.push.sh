@@ -392,14 +392,15 @@ INTO="${INTO%/}"
 #   produce. so the preview reads the set itself, and a second copy beside the
 #   preview is the two-lists defect (rule.forbid.two-writers-on-one-artifact)
 #
-# 🛑 .the set MOVED to `git.grove.operations.sh` — 2026-08-31
+# 🛑 .why the set lives in `git.grove.operations.sh`, and not here
 #   every reason above is a reason about a BOUNDARY, and this file is one of its
-#   two sides. while the set sat here it was the OUTBOUND half's declaration in
-#   the boundary's voice, and `git.grove.pull` carried every one of these members
-#   back with no exclusion at all — `.git` included, which is the member the
+#   two sides. a set declared HERE is the OUTBOUND half speaking in the whole
+#   boundary's voice, and the inbound half then answers to no declaration at all —
+#   📜 measured 2026-08-31: `git.grove.pull` carried every one of these members
+#   back with no exclusion whatever, `.git` included, which is the member the
 #   block above spends thirty lines on.
 #
-#   ⇒ the set now lives in the file BOTH directions source, so no half can say
+#   ⇒ so the holder is the file BOTH directions source, and no half can say
 #     "never crosses" on the other's behalf. the inbound reason — a pulled `.git`
 #     is grove-authored code a local tool OBEYS — is written beside it there.
 #

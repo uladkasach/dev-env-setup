@@ -99,7 +99,7 @@ in that seat's `$HOME` held no entry for the slug. `keyrack init` alone does not
 
 so a fresh box needs the MANIFEST ENTRY placed once per `$HOME`, and the two seats (`ground`
 and the camper) each need their own. **a central vault does not imply a portable read** —
-`term=entry._.choice._.md` carries the four-way split behind that one word.
+`term=entry._.choice._.md` carries the full cause split behind that one word.
 
 ## 🛑 .do NOT reach for `keyrack set` to wire a manifest entry
 
@@ -118,8 +118,35 @@ recommendation was `keyrack set --vault aws.params` — the command that destroy
 had just proven intact. one human question caught it.
 
 ⇒ this is the open gap under task #60. the manifest is machine state, so it wants a bundle
-(`rule.forbid.repair-plays`), and no unattended command exists to write one yet.
-`keyrack recipient set` writes no secret and is the candidate to measure first; it is unproven.
+(`rule.forbid.repair-plays`), and no unattended command exists to write one.
+
+### 🛑 `keyrack recipient set` is NOT the tool either — it writes a RECIPIENT, never an ENTRY
+
+it was the candidate to measure first, on the ground that it writes no secret. it writes no
+secret and it also writes no entry, so it closes none of this gap:
+
+```js
+// setKeyrackRecipient.js:74
+// re-encrypt to all recipients
+await daoKeyrackHostManifest.set({ upsert: manifestUpdated });
+```
+
+a host manifest holds **two** lists, and the verb touches one of them:
+
+| the list | what it holds | `recipient set` |
+|---|---|---|
+| `recipients` | the pubkeys that may DECRYPT the manifest | ✔ appends, then re-encrypts |
+| `hosts` | the ENTRY per slug — the thing this gap is about | ✋ untouched |
+
+⚠️ and the same read settles the hope beside it, for a REPLICA vault.
+`vaultAdapterOsSecure` seals each value into its own `.age` file, encrypted to the recipient set
+**at write time**. so a recipient added later cannot open a file sealed before it, and a copy of
+that file to a fresh box is ciphertext no one there can read.
+
+⇒ **the FILE cannot travel; the VALUE can.** the one verb that re-encrypts a value is `set`, and
+`set` accepts a pipe — so a box that can READ a value hands it to a box that cannot, over one
+encrypted hop, with no human. that is `git.grove.auth.keys.set`, and it is why a fresh grove's
+vendor keys need no prompt typed on the box.
 
 ⚠️ **`aws.params` is NOT the app token.** a classic PAT stored centrally is still a classic
 PAT — it still expires on github's clock, still needs a human to mint the next, and still
@@ -154,10 +181,34 @@ rhx keyrack list --owner ehmpath
 phase 2's full findings, and the two consequences that will bite whoever resumes it, live in
 `grove.auth.github.roadmap` under `.what a source read established`.
 
-⚠️ **answer both at the prompts; never pipe them.** the secret prompt masks its
-echo, so it reads the terminal rather than stdin. fed a pipe, `set` takes the
-mechanism answer, SKIPS the secret, stores an EMPTY value, and prints `✔ set`
-regardless — a blank that surfaces much later as a token github rejects.
+⚠️ **answer both at the prompts.** a pat is MINTED at github, so no box holds one
+to read — a human types it, and a tty is where they type.
+
+### ✔ a PIPE is legal, and this corrects what stood here
+
+it read *"never pipe them — the secret prompt reads the terminal rather than stdin.
+fed a pipe, `set` takes the mechanism answer, SKIPS the secret, stores an EMPTY
+value, and prints `✔ set` regardless."* measured 2026-08-02, and re-measured
+2026-09-07 at rhachet 1.47.3:
+
+```js
+// promptHiddenInput.js:61
+// non-TTY mode: read ALL stdin content for multiline secrets (e.g., PEM files)
+```
+
+probed end to end against a throwaway key: **18 bytes piped in, 18 bytes read
+back.** so the store is correct.
+
+⇒ and the original had a SECOND cause its own text names without credit: that
+call passed no `--mech`, so the MECHANISM prompt fired first and ate the pipe.
+pass `--mech` and the secret's prompt is the only one left.
+
+> **a pipe that stores a blank is a CALL SHAPE, never a property of keyrack.**
+
+⇒ what this changes: a value that already sits on some box's rack can be
+forwarded with no human at all — `git.grove.auth.keys.set` does exactly that, and
+it is why a grove's vendor keys need no `keyrack set` typed on the box. what it
+does NOT change is this slug, which has no source to read from.
 
 ⚠️ **there is no second `keyrack fill` step.** `set` stores the value itself;
 `fill` re-drives the very same prompts, so a set-then-fill chain sends the pat
@@ -215,7 +266,8 @@ times, at the cost of a real pat each (`term=entry`).
 - a consumer repointed off `@all` to make it answer = **blocker**
 - a `✔ set` reported as "the credential is placed", with no read to back it =
   **blocker** (`rule.forbid.failhide`)
-- a pat piped into `keyrack set` rather than typed at the prompt = **blocker**
+- a `keyrack set` piped a secret with no `--mech` = **blocker**; the mechanism
+  prompt fires first and eats the pipe, so the value stored is a blank
 
 ## .see also
 
@@ -227,11 +279,11 @@ times, at the cost of a real pat each (`term=entry`).
 - `grove.auth.github.roadmap` — the two INDEPENDENT axes: the vault (settled) and the token
   (still a pat)
 
-## 🛑 .`absent 🫧` collapses FOUR states, and each takes a different repair
+## 🛑 .`absent 🫧` collapses FIVE states, and each takes a different repair
 
 the gate proves the read: `git.grove.provision test` clones a private repo over plain https
 on every provision, so a broken credential fails it. what the gate cannot do is say WHICH
-link broke — and `absent 🫧` is one word for four:
+link broke — and `absent 🫧` is one word for five:
 
 | the state | the repair |
 |---|---|
@@ -239,6 +291,14 @@ link broke — and `absent 🫧` is one word for four:
 | a manifest with no entry for the slug | wire the entry |
 | a lapsed session | `rhx keyrack unlock --owner ehmpath --env camp` |
 | an unreadable vault | the box's role cannot read the ssm parameter |
+| a readable vault in the WRONG ACCOUNT | align that org's `AWS_PROFILE` across both boxes |
+
+⚠️ **the last row does not apply to THIS slug, and it is listed because the trap is the
+generalization.** `@all` authenticates by imds, so every box reads its own account and both
+halves of a write agree by construction. a NAMED org authenticates by that org's
+`AWS_PROFILE`, so a laptop and a grove can look in two different parameter stores — measured
+2026-09-06 (`term=entry`, the fifth cause). a reader who carries this table to a named-org
+slug and stops at four rows has one invisible state left.
 
 ⇒ a run that is already broken cannot diagnose itself, so a diagnose is what you REACH FOR
 when the gate reddens — a scratch play under `.play/temporary/`, written to read every link

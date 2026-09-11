@@ -220,10 +220,9 @@ if [[ "$BARE" == "true" && -z "$WHY" ]]; then
   echo "                            (gotcha.a-tool-found-by-path-answers-only-a-human)" >&2
   echo "" >&2
   echo "" >&2
-  echo "   ⚠️ 'a verify needs the remote verdict' is NO LONGER a trigger." >&2
-  echo "      it was one, and it was the most-typed --why in this repo — a duct" >&2
-  echo "      returns the SEND's exit code, so a verify had to leave the duct to" >&2
-  echo "      get an answer. that is now a FEATURE rather than an escape hatch:" >&2
+  echo "   ⚠️ 'a verify needs the remote verdict' is NOT a trigger." >&2
+  echo "      a bare duct returns the SEND's exit code, so that ask is real —" >&2
+  echo "      and --reply answers it inside the duct, so no hatch is owed:" >&2
   echo "        rhx git.grove.send $GROVE --reply --what '<cmd>'" >&2
   echo "      it rides the duct AND returns the command's own output and code" >&2
   echo "" >&2

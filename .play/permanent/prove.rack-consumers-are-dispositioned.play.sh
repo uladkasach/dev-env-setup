@@ -134,6 +134,8 @@ CENSUS=(
   "src/grove.provision/5.devtools/5.4.gh/configure.upsert.sh|1|PERSISTS|:207 GITHUB_TOKEN → gh auth login --with-token → ~/.config/gh/hosts.yml CLEARTEXT. an OPEN finding — see its justification below"
   "src/grove.provision/2.shell/2.7.aliases/brains.auth.sh|1|PERSISTS|:894 the parked claude oauth token → ~/.claude/.credentials.json on a swap. ACCEPTED, not open — see its justification below"
   "src/grove.provision/5.devtools/5.13.reach/configure.verify.sh|1|NAME|:60 AWS_PROFILE → compared against the declared name"
+  "src/grove.provision/5.devtools/5.16.keys/configure.verify.sh|2|MIXED|:59 AWS_PROFILE → --profile for aws sts (NAME). :74 the key → tested -n only; never echoed, never written (MEMORY)"
+  ".agent/repo=.this/role=any/skills/git.grove.auth.keys.set.sh|4|PERSISTS|:479 the value → a pipe → ssh → the grove's OWN rack. ACCEPTED — the placement IS the product; see its justification below. the other three keep no value: :403 → wc -c (a LENGTH), :450/:497 → head -c1 on the far side (an EXIT CODE)"
   "src/grove.provision/5.devtools/5.12.rack/configure.verify.sh|2|MEMORY|:72/:155 fetches to prove the rack ANSWERS on this seat; the bytes are counted and compared, never stored"
   ".agent/repo=.this/role=any/skills/git.grove.auth.github.set.sh|1|MEMORY|:389 a reachability PROBE, redirected to /dev/null on the remote"
   ".agent/repo=.this/role=any/skills/git.grove.wake.sh|1|NAME|:232 AWS_PROFILE → exported for the aws cli"
@@ -338,6 +340,23 @@ if [[ "$PERSIST_N" -gt 0 ]]; then
         echo "           the secret lands, then an atomic mv, so no window is 0644"
         echo "         - :1460 the PRIOR token is parked back to the rack rather than"
         echo "           left behind, so a swap moves one copy, never forks two"
+        ;;
+      *skills/git.grove.auth.keys.set.sh)
+        echo "        ACCEPTED — the write IS the product, as with brains.auth.sh:"
+        echo "        this skill exists to PLACE a replica on a grove, so a run that"
+        echo "        wrote no value would do none of what it was asked. there is no"
+        echo "        at-cause fix that keeps the command"
+        echo "        the bounds that make it acceptable, each read off the code:"
+        echo "         - the sink is the grove's OWN rack, sealed to that box's"
+        echo "           recipients — not a cleartext file. it adds no new secret store"
+        echo "         - :479 the value never lands in a variable, a temp, or an argv:"
+        echo "           stdout goes straight into ssh, and the remote set reads stdin"
+        echo "         - :481 BatchMode=yes, so a failed host key stalls rather than"
+        echo "           prompts a human into a half-open pipe"
+        echo "         - the three sibling reads keep no value at all — a byte COUNT"
+        echo "           at :403, an exit code at :450 and :497"
+        echo "         - a rotation must be RE-PLACED per box; --refresh is that verb,"
+        echo "           so the stale replica is overwritten rather than forked"
         ;;
       *)
         echo "        ✋ no justification recorded"

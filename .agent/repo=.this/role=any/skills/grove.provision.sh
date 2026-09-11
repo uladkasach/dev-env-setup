@@ -91,8 +91,46 @@ done
 # pick the source checkout
 case "$FROM" in
   tree)
-    # the worktree this skill lives in — no hardcoded path, no loaded alias
-    SRC="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)/src"
+    ##################################################################
+    # the checkout this skill lives in — found by a FILE IT HOLDS,
+    # never by how it ARRIVED
+    #
+    # 🛑 `git rev-parse` ALONE is false on every grove
+    #   - the provision PUSHES a checkout, so a grove's carries no `.git`
+    #   - ⇒ `--show-toplevel` fails, the substitution is empty, and SRC
+    #     becomes the literal `/src` — a path that exists on no box:
+    #
+    #       fatal: not a git repository (or any of the parent directories)
+    #       💥 src/ not found at /src
+    #
+    #   - ⇒ so the ONE surface `rule.forbid.the-driver-by-path` routes every
+    #     human through could not run on a grove at all, and that ban's own
+    #     claim — "the ban costs no capability" — was false there
+    #   - 📜 measured 2026-09-06 on grove-ahbode-v20260901
+    #   - this is `define.provision-defect-shapes` shape 8: a check that keys
+    #     on how the repo arrived, not on what it holds
+    ##################################################################
+    SRC=""
+    _dir="$(cd "$(dirname "$0")" && pwd)"
+    while [[ "$_dir" != "/" ]]; do
+      if [[ -f "$_dir/src/grove.provision._.sh" ]]; then SRC="$_dir/src"; break; fi
+      _dir="$(dirname "$_dir")"
+    done
+
+    # ⚠️ git stays as the FALLBACK, never the primary — a worktree whose skill
+    #   is reached through a symlink can sit outside the walk above, and there
+    #   git is the reader that still answers
+    if [[ -z "$SRC" ]]; then
+      _top="$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null || true)"
+      [[ -n "$_top" ]] && SRC="$_top/src"
+    fi
+
+    if [[ -z "$SRC" ]]; then
+      echo "💥 no checkout found above $(dirname "$0")" >&2
+      echo "   ├─ looked for a dir that holds src/grove.provision._.sh" >&2
+      echo "   └─ then asked git, which a pushed checkout cannot answer" >&2
+      exit 1
+    fi
     ;;
   main)
     SRC="${DEV_ENV_SETUP_DIR:-$HOME/git/more/dev-env-setup}/src"

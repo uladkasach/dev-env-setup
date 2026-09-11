@@ -58,7 +58,7 @@ so identity must be **derived from the live credential**, on every read, never r
    `~/.claude.json` → `.oauthAccount.accountUuid` / `.emailAddress`.
 
    ⚠️ **this fallback can be CONFIDENTLY WRONG — measured, not theorized (2026-08-31).**
-   `~/.claude.json` named `vlad@ahbode.com` while the live token in `.credentials.json` actually
+   `~/.claude.json` named `<user>@ahbode.com` while the live token in `.credentials.json` actually
    belonged to `seaturtle@ehmpath.com`. the two files are written at different moments and no
    mechanism keeps them in step, so the profile is a *lagging* record, never a second source of
    truth. a sweep that trusted it rendered seaturtle's budget under vlad's name.

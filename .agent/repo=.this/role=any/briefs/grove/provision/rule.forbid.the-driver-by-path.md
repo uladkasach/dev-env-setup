@@ -2,7 +2,7 @@
 
 ## 🛑 .the rule, in one line
 
-# **NEVER `bash src/grove.provision._.sh`. THE DRIVER IS REACHED THROUGH `rhx`, ALWAYS.**
+# **NEVER `bash …/grove.provision._.sh`. THE DRIVER IS REACHED THROUGH `rhx`, ALWAYS.**
 
 | you want to converge… | you type |
 |---|---|
@@ -40,16 +40,29 @@ four costs, in order of how often each has bitten:
    contradicting its own rule teaches the opposite, with the rule's authority behind it.
 
 ⚠️ **and this rule's own parent modeled the violation.** `rule.require.grove-provision-as-the-only-entrypoint`
-carried a row reading *"upgrade this machine → `bash src/grove.provision._.sh`"* in its `.the rule`
+carried a row reading *"upgrade this machine → `bash …/grove.provision._.sh`"* in its `.the rule`
 table. the rule that declares the one door named the wrong handle.
 
-## ⚠️ .the THREE carve-outs, and why each is real
+⚠️ **and that quote carries an ellipsis on purpose.** to cite the dead form verbatim is to
+re-create it — a reader copies the headline and gets the banned command, with this rule's own
+authority behind it. so the convention is: **a path that carries `…` is prose; a path a reader
+could paste is a call.** `prove.the-driver-is-never-named-by-path` reads that difference, and it
+reddened THIS file on 2026-09-07 for the very sentence above.
+
+## ⚠️ .the FOUR carve-outs, and why each is real
 
 | # | site | why the path form survives |
 |---|---|---|
 | 1 | `git.grove.provision.boot.sh` — its `UPGRADE` string | it is sent to a **bare** box. on a first apply the repo is present and `rhx` is not installed at all; there is no skill to call |
 | 2 | `git.grove.auth.github.set.sh` — its `PROVE_ONE_BUNDLE` string | the send is a `bash -lc`, which reads no `.zshrc`, so `rhx` is not on PATH on the far side (`gotcha.a-tool-found-by-path-answers-only-a-human`, rung 4) |
 | 3 | a **ONE-BUNDLE apply on a grove**, sent over a duct | a grove's `rhx` runs and resolves **no repo skill**. this is the routine way a change reaches a grove |
+| 4 | `git.grove.auth.keys.set.sh` — the fix-text under its `rhx does not run` rung | the rung ahead of it PROVED `rhx` does not run on that box, so `rhx grove.provision` is the very surface reported broken. the send re-applies `5.1.node`, which is what puts `rhx` there |
+
+🛑 **carve-out 4 is measured, not assumed, and that is what makes it the tightest of the four.**
+1 and 2 assert their far side's reach from the shape of the send; 4 reaches its line ONLY on the
+false branch of a probe that asked. ⇒ where a carve-out CAN be earned by a probe rather than
+claimed by a comment, that is the form to prefer — a claimed trigger goes stale in silence, and a
+probed one cannot.
 
 ⇒ the discriminator is **which BOX the command lands on**:
 
@@ -62,7 +75,7 @@ discriminator is whether the FAR SIDE's `rhx` resolves the skill — and carve-o
 at a keyboard against a far side that cannot.
 
 ⚠️ each carve-out must state its trigger inline, beside the string
-(`rule.require.exemptions-name-their-trigger`). a fourth site that copies the shape without the
+(`rule.require.exemptions-name-their-trigger`). a fifth site that copies the shape without the
 reason is a violation, not a carve-out — and it will look identical.
 
 ### 🛑 carve-out 3, measured 2026-09-07
@@ -137,7 +150,7 @@ line. a grove qualifies; this machine never does.
   resolves the skill — a howto, a brief, a fix-text, a readme, a comment, or a command a human
   is handed = **blocker**
 - the same, typed by an agent at a shell against THIS machine = **blocker**
-- a fourth carve-out added with no trigger stated inline = **blocker**
+- a fifth carve-out added with no trigger stated inline = **blocker**
 - a NEW SKILL written to wrap a carve-out 3 send = **blocker**; the human does this routinely,
   and a wrapper adds a component while the far side still resolves no skill
 - a carve-out whose trigger no longer holds — `rhx` IS reachable on that far side — kept anyway
