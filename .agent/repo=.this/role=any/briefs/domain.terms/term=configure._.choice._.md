@@ -53,7 +53,7 @@ reports a **write** rather than a **behavior**. so a configure's report must nam
   git, tmux, codium, sysctl, …)
 - `src/bash_aliases.sh` — several `sync.devenv.*` aliases source a module and call a
   `configure_*`. that is the layer order: a sync may *invoke* a configure; they are not one act
-- `.agent/repo=.this/role=any/briefs/rule.require.install-via-procedures.md` — why a human is
+- `.agent/repo=.this/role=any/briefs/grove/provision/rule.require.install-via-procedures.md` — why a human is
   always told to run the procedure rather than a one-off command
 
 **the origin:**

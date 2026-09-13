@@ -14,6 +14,16 @@
 # .why `pv` is essential — `git backup` hard fail-fasts with no `pv`, so an
 #   absent `pv` blocks a disaster-recovery tool, never a mere nicety
 #   .refs = uladkasach/dev-env-setup#121
+#
+# 🛑 .why `yq` is NOT here, and is its own bundle (`5.17.yq`)
+#   - apt cannot serve it on every box class, so it cannot sit on this list
+#   - measured 2026-09-11: jammy (a grove) offers NO candidate at all — not in
+#     universe, not in backports — while noble (a laptop) offers 3.1.0-3
+#   - ⇒ a name on this list is an apt name, and an apt name that resolves on one
+#     box class and not the other is a bundle that cannot meet
+#     `rule.require.identical-bundle-composition`
+#   - so it moved to a bundle that fetches ONE pinned static binary, which is
+#     the same artifact on every box (`5.17.yq`)
 # .why `xclip` installs on a HEADLESS box — a per-machine list is a second
 #   list to keep, and every prior "has a screen" gate confused EFFECT with HOLD
 #   .refs = gotcha.2-1-toolkit.demo=unzip-cascade-and-per-machine-gates, m2
@@ -21,9 +31,12 @@
 #   - idempotent: apt reports a present package and returns 0
 
 grove_provision_2_1_toolkit_provision_upsert() {
-  # 1. the essentials: jq/tree/ripgrep (json, dir view, search), unzip (fnm,
-  #   nerd fonts, aws cli v2), curl (14 later fetches), gnupg (3 dearmor sites),
-  #   pv (git backup's progress/archive pipe)
+  # 1. the essentials: jq/tree/ripgrep (json, dir view, search), unzip
+  #   (fnm, nerd fonts, aws cli v2), curl (14 later fetches), gnupg (3 dearmor
+  #   sites), pv (git backup's progress/archive pipe)
+  #
+  # ⚠️ every name here must name a package EVERY box class carries. `yq` does
+  #   not, which is why it is a bundle of its own rather than a name on this line
   if ! pkg_install jq tree unzip ripgrep curl gnupg pv; then
     echo "   ✋ an essential toolkit package did not install" >&2
     echo "      ⇒ these are not niceties: unzip alone gates fnm, the nerd fonts," >&2

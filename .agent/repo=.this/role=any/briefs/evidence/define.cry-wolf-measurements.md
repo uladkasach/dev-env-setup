@@ -825,3 +825,72 @@ git ls-files '<dir>/' | wc -l    → 112                        ← the INDEX
 says *"this was deleted"* is a third answer, free to drift from both — m.9's shape with one more
 holder. `rule.require.one-command-provision` records the same trap at a remote boundary, where a
 local record keyed on a name outlived the box that name pointed at.
+
+## .measurement 15 — the subject had NOT SPOKEN YET, and its silence was read as its verdict, 2026-09-13
+
+every measurement above interrogates a READER that holds its subject's answer. this one is the
+case where **the answer had not arrived**, and its absence was scored as an answer.
+
+`keyrack unlock` was run to reach a grove. the harness backgrounded it — correctly, since it
+waits on a browser sso prompt — and its capture file was read at once:
+
+```
+$ cat <task>.output
+(Bash completed with no output)
+```
+
+that was read as *"the command printed no line"*, and a verdict was built on it: **an unlock that
+exits 0, prints no line, and unlocks no key.** the verdict was escalated to the human twice, and
+filed in `.dream/` as a defect against `rhachet`.
+
+**the tool was healthy the whole time.** minutes later the same file held this:
+
+```
+✋ keyrack unlock
+   └─ aws sso login timed out
+      ├─ status: blocked 🚫
+      │  └─ human did not respond to browser sso prompt
+      ├─ robot: halt and escalate
+      │  ├─ do not proceed
+      │  ├─ do not find workarounds
+      │  └─ do not skip credentials
+      └─ fix: rhx keyrack unlock
+```
+
+— plus a per-key roll-up that named `errored 💥` against `absent 🫧` and gave a distinct fix for
+each. it is close to a model diagnostic. **it was accused of silence by a reader who did not
+wait for it.**
+
+### .why q1-q14 all miss it
+
+q1 asks whether the evidence agrees with the verdict, and here it did: an empty capture genuinely
+supports *"it printed no line"*. q2-q14 each interrogate the reader's logic, set, pattern, reach,
+or store — and this reader's logic was sound and its store was the right one.
+
+⇒ the defect is in **WHEN the read happened**, which no question above asks about. every one of
+them presumes a subject that has finished.
+
+### .the shape to watch for
+
+> **an empty capture has TWO causes — *it said none* and *it has not said yet* — and they render
+> identically.** the clock is the one fact that parts them, and the reader does not see the clock.
+
+⚠️ the trap is sharpest where the wait is LEGITIMATE. a fast command that returns empty is
+suspicious; one that hangs on a human's browser prompt is **correct to hang**, so its silence
+feels like data. the more patient the tool, the more credible the false verdict.
+
+⇒ the repair is cheap and mechanical: **read the completion signal, never the clock.** the
+harness announces it; wait for that, then read — and where a verdict is already written against a
+subject, re-read its capture before the verdict ships.
+
+### 🛑 .the corollary — a false ✋ against a HEALTHY tool is the worst grade to hand out
+
+`gotcha.a-check-that-cries-wolf-gets-silenced` opens with the false ✋ as the corrosive half.
+this instance is its extreme: the accused component's own output, once read, was **better** than
+what the accusation asked it to become. the dispatch drafted against it would have spent a
+maintainer's time on a defect that was never there.
+
+⇒ so a defect filed against another party's tool owes one extra check the local case does not:
+**quote its actual output in the report.** the draft here carried `(Bash completed with no
+output)` as its evidence — a capture of the harness, never of the tool. read that line for what
+it plainly says, and the whole verdict falls in one step.

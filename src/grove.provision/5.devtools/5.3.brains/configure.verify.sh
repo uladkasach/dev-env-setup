@@ -37,7 +37,8 @@ grove_provision_5_3_brains_configure_verify() {
     '.env.DISABLE_UPDATES:"1":every self-update path' \
     '.env.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION:"false":the prompt suggestion' \
     '.disableClaudeAiConnectors:true:the claude.ai connector fetch' \
-    '.permissions.defaultMode:"acceptEdits":the accept-edits default mode'; do
+    '.permissions.defaultMode:"acceptEdits":the accept-edits default mode' \
+    '.model:"claude-opus-4-8[1m]":the default model'; do
     path="${pair%%:*}"
     want="${pair#*:}"; want="${want%%:*}"
     live="$(jq -c "$path" "$settings" 2>/dev/null)"
