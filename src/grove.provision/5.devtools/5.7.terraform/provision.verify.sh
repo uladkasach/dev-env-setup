@@ -7,11 +7,6 @@
 ######################################################################
 
 grove_provision_5_7_terraform_provision_verify() {
-  if [[ "$GROVE_ENV_SERVER" != local@* ]]; then
-    echo "   🌙 not applicable — terraform is declined off a human's box"
-    return 0
-  fi
-
   if [[ ! -d "$HOME/.tfenv" ]]; then
     echo "   ✋ tfenv is not installed (~/.tfenv is absent)" >&2
     echo "      ⇒ a stack whose required_version differs from the terraform on" >&2

@@ -9,16 +9,11 @@
 #
 # guarantee:
 #   - an extant ~/.tfenv short-circuits, and `ln -sf` overwrites cleanly
-#   - it DECLINES where no human is, since an apply changes real infra
+#   - it runs on EVERY box class — the authority control is the aws role the box
+#     may assume, never the binary (see this bundle's `_.sh`)
 ######################################################################
 
 grove_provision_5_7_terraform_provision_upsert() {
-  if [[ "$GROVE_ENV_SERVER" != local@* ]]; then
-    echo "   🌙 declined — a terraform apply changes real infrastructure, so it"
-    echo "      wants a human to read the plan (see this bundle's _.sh)"
-    return 0
-  fi
-
   ####################################################################
   # .the pin — tfenv v3.2.2, as the commit that tag points at
   #   - a commit sha IS the integrity check: git verifies every object against

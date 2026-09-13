@@ -42,6 +42,7 @@ turned out to have, and the repair that closed it.
 | 11 | the fixture was obeyed exactly, and the claim it encoded was false of this tree |
 | 12 | the pattern matched a SUBSET, and the total was true of the subset — so it went green |
 | 14 | the reader was right and the SUBJECT had two stores; index and tree disagreed, silently |
+| 15 | the subject had NOT SPOKEN YET, and its silence was scored as its verdict |
 
 ⚠️ m.3 sits after m.4 in the write-up because it was recorded late. the number is a stable
 citation, never a sequence.
@@ -51,7 +52,7 @@ no defect in a reader's logic and so yields no question in `.the test`.
 
 ## .the test
 
-before you trust a check that just went red, ask these thirteen, in order. each reaches a
+before you trust a check that just went red, ask these fourteen, in order. each reaches a
 defect the ones before it cannot. the tag names the measurement that taught it.
 
 **q1 (m.1) — does the output it printed as evidence agree with its verdict?**
@@ -142,6 +143,19 @@ that reached one of them makes the two disagree with no signal. a count is a cla
 and a set with two stores has two true answers.
 ⇒ name the store, or read both and demand they agree. ⚠️ a third store reads from no command at
 all — the record a reader keeps beside the set — which is q12's trap one step out.
+
+**q14 (m.15) — has this subject FINISHED, or did I read it mid-flight?**
+q1-q13 all presume a subject that already spoke. this one asks whether it did. an empty capture has
+**two** causes — *it said none* and *it has not said yet* — and they render identically, so a read
+taken too early scores a silence as a verdict.
+⇒ read the **completion signal**, never the clock. a wait that "felt long enough" is not evidence,
+and the subject that waits longest is the one blocked on a human.
+⚠️ this one lands hardest on a HEALTHY tool, which is the worst grade to hand out: `keyrack unlock`
+sat mid-SSO, and its capture read empty. the verdict — *"exits 0, prints no line"* — was escalated
+to a human twice and dreamt as a defect. its real output, once it spoke, was a textbook
+`✋ aws sso login timed out` with a status, a cause, and a fix.
+⇒ the repair is cheap and it is the same one q1 asks for, one step earlier: **quote the subject's
+output in the report.** a quote of an empty string is visibly not a verdict.
 
 ## 🛑 .measurement 13 — a check NOBODY RUNS decays into a false ✋ on its own
 

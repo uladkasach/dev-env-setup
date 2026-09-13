@@ -31,16 +31,22 @@ grove_provision_1_6_1_finders_provision_verify() {
   # 1 + 2. each is on the box, and matches this checkout
   #
   # ⚠️ `bundle.bin.at`, never `bundle.bin.of` — this bundle's own upsert wrote
-  #    these three into `~/.local/bin` moments ago, and this process's `$PATH`
+  #    these four into `~/.local/bin` moments ago, and this process's `$PATH`
   #    was captured before they existed. a PATH question here reports ✋ on a
   #    box that plainly holds the file. see `bundle.bin.at`'s header for the
   #    measurement.
   ####################################################################
+  # ⚠️ this list must hold EVERY name the upsert copies — `machine_usage_diagnose`
+  #    among them. it is the COMPOSER the `machine.usage.diagnose` alias names, so
+  #    a drift in it is the one a human meets first, and it sat unverified for as
+  #    long as the list read three while the upsert wrote four
+  #    (`rule.require.one-command-provision`: one set, two readers)
   local name
   for name in \
     machine_resource_procs_find_runaway \
     machine_resource_procs_find_spinner \
-    machine_resource_procs_find_orphan
+    machine_resource_procs_find_orphan \
+    machine_usage_diagnose
   do
     local bin
     bin="$(bundle.bin.at "$name")"

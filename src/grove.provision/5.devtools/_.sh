@@ -18,6 +18,9 @@
 #     reads, and reads its own value out of ssm through the aws cli
 #   - `5.10.repos` and `5.13.reach` run last: both need clones only
 #     `5.10.repos` provides
+#   - `5.17.yq` runs FIRST despite the highest digit — it depends on no bundle
+#     in this section at all. its only need is `curl`, which `2.1.toolkit`
+#     already put down a whole section earlier
 #   - .refs = howdoes.5-devtools-dispatch-order.md — the full trace, per swap
 #
 # .why every install here is a BUNDLE, never a function on a roll
@@ -30,6 +33,7 @@
 ######################################################################
 
 grove_provision_5_devtools() {
+  bundle.upgrade 5.17.yq
   bundle.upgrade 5.1.node
   bundle.upgrade 5.2.rust
   bundle.upgrade 5.14.treesitter

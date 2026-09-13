@@ -37,6 +37,36 @@ _grove_provision_5_3_brains_prune_claude_shadows() {
   for nodedir in "$fnm_home"/node-versions/*/installation; do
     [[ -d "$nodedir/lib/node_modules/@anthropic-ai/claude-code" ]] || continue
 
+    ################################################################
+    # 🛑 clear npm's leftover temp dir FIRST, or the uninstall below
+    #    can never succeed on this box again
+    #
+    # npm uninstalls by a RENAME of the package dir to `.<name>-<hash>`
+    # and a delete of that. the hash is derived, not random — so a run
+    # cut partway (a ctrl-c, an oom) leaves the temp dir behind, and
+    # every later uninstall renames onto it and dies `ENOTEMPTY`
+    #   - ⇒ the prune reddens on every apply, with the same fix-text,
+    #     and that hand fix fails for the same reason
+    #   - that is the very re-apply-loops-forever shape the block above
+    #     says this prune exists to prevent (`rule.require.one-command-provision`)
+    #
+    # 📜 measured 2026-09-13 on this laptop: `.claude-code-h65xko2X`
+    #    sat beside `claude-code`, byte-for-byte its twin, and blocked
+    #    `5.3.brains` — so the model key this bundle declares could not
+    #    reach the box at all
+    ################################################################
+    local stale
+    for stale in "$nodedir"/lib/node_modules/@anthropic-ai/.claude-code-*; do
+      [[ -d "$stale" ]] || continue
+      rm -rf "$stale" || {
+        echo "   ✋ could not clear npm's leftover temp dir at $stale" >&2
+        echo "      ⇒ npm renames onto this exact path, so the uninstall below" >&2
+        echo "        fails ENOTEMPTY until it is gone" >&2
+        return 1
+      }
+      echo "   • cleared npm's leftover temp dir → $(basename "$stale")"
+    done
+
     # invoke npm by absolute path, via its own node — the interactive `npm`
     # shell function routes to pnpm when no package-lock.json is present, so
     # a bare `npm uninstall -g` here would remove the pnpm copy we mean to keep
