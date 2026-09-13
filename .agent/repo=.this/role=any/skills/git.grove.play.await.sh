@@ -254,8 +254,8 @@ fi
 #      `pgrep -f` matches the FULL command line of every process, and the ssh
 #      command that carries the pattern contains the pattern. without `-x`-style
 #      care the probe matches itself and reports busy forever. the bracket trick
-#      makes the pattern unable to match its own text — it now brackets the
-#      play name's FIRST CHARACTER, since there is no fixed prefix left to use.
+#      makes the pattern unable to match its own text — it brackets the play
+#      name's FIRST CHARACTER, since there is no fixed prefix to reach for.
 #
 # echoes: the matched pids, or empty when the play is done
 ######################################################################

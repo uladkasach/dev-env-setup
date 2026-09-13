@@ -1,5 +1,5 @@
 
 🧠 claude budget
-   ├─ kai@ehmpath.com: ✋ refresh token dead (run: brains.auth.set)
-   ├─ moana@ehmpath.com: ✋ no token (run: brains.auth.set)
+   ├─ kai@example.com: ✋ refresh token dead (run: brains.auth.set)
+   ├─ moana@example.com: ✋ no token (run: brains.auth.set)
    └─

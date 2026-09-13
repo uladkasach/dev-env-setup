@@ -114,6 +114,16 @@ CARVED=(
   #    non-interactive ssh, which reads no `.zshrc`, so `rhx` is unreachable on
   #    the far side — the same trigger as carve-out 2
   ".agent/repo=.this/role=any/skills/git.grove.ready.verify.sh"
+
+  # ── ONE line, and the tightest trigger of the set: the fix-text under this
+  #    skill's `rhx does not run` rung. the rung AHEAD of it ran
+  #    `rhx keyrack list` on the grove and it failed, so `rhx grove.provision`
+  #    is the very surface the fix-text calls broken. the send re-applies
+  #    `5.1.node`, which is what puts `rhx` on that box at all
+  #
+  # ⚠️ every other fix-text in the file names `rhx`, so the one line is not a
+  #    habit — it is the false branch of a probe (`rule.forbid.exemption-as-habit`)
+  ".agent/repo=.this/role=any/skills/git.grove.auth.keys.set.sh"
 )
 
 # the driver ITSELF is not a caller of itself — its own path appears in it as a

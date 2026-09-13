@@ -46,6 +46,51 @@ its whole life and would have reported an empty rack on a box whose rack was fin
 the fix is the same discipline as `/etc/fstab`: declare it first, then the value has somewhere
 to be found.
 
+### 🛑 .and a credential declaration is COMPOSED, so "which file declares it" has no one answer
+
+every other declaration this term names is ONE file — an fstab, a unit, a cmdline. a
+`keyrack.yml` is not: it carries an `extends:` list, so the effective declaration is assembled
+from several files, each with its own `org:`.
+
+📜 read 2026-09-07, `ahbode/svc-chat`:
+
+```yaml
+org: ahbode                                    # the ROOT
+extends:
+  - .agent/repo=bhrain/role=reviewer/keyrack.yml     # org: ehmpathy
+  - .agent/repo=ehmpathy/role=mechanic/keyrack.yml   # org: ehmpathy
+env.prep:
+  - key: AWS_PROFILE                           # the root's OWN keys — no vendor key at all
+```
+
+⇒ so `FIREWORKS_API_KEY` is declared by a repo the tree merely extends, and every file it
+pulls in pins a DIFFERENT org than the root.
+
+🛑 **and the org axis is what a slug is addressed by**, so the composition rule decides which
+slug a consumer composes — `ahbode.prep.KEY` or `ehmpathy.prep.KEY`. those are two different
+entries, in two different accounts under `aws.params` (`term=entry`, the fifth cause).
+
+✔ **the rule: the org of the TREE wins, never the org the child manifest pins.** settled by the
+human, 2026-09-07:
+
+> *"the roles will still need the orgs version of ahbode.prep.FIREWORKS_API_KEY"*
+
+⇒ so a role's declaration is a **shape**, and the tree supplies the org that addresses it. one
+role manifest yields a different slug per tree it is enrolled in.
+
+⚠️ **and that is why a vendor key is per-ORG rather than per-vendor.** one fireworks account
+may back every row; each org still needs its own entry, because the org is an axis of the
+address AND — under `aws.params` — of the account the read authenticates into.
+
+⚠️ it is settled by INTENT, and the measurement that confirms it is cheap and specific:
+**`keyrack list` from inside the consumer's own checkout**, which prints the slugs it actually
+composes. a read of the manifests does NOT settle it — that is the inference this note refuses,
+and `rule.require.trust-but-verify` covers a human's in-flight sentence too.
+
+⇒ the durable half: **a declaration you can read is not always the declaration in force.** for
+a single-file declaration those are the same fact; for a composed one they are two, and only
+the tool that performs the composition can report the second.
+
 ## .refs
 where the term is declared / used:
 - .agent/repo=.this/role=any/briefs/evidence/rule.require.judge-declared-state-not-live-state.md

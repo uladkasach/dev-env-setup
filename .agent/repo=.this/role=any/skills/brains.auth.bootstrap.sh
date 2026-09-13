@@ -27,16 +27,20 @@
 # .note = ${BASH_SOURCE[0]} is THIS file, so the path holds no matter which
 #   proxy sourced it, and no matter the caller's cwd.
 #
-# ⚠️ the root is found by LANDMARK, never by a hop count. it used to be
-#   `$dir/../../../..` — four `..` steps chosen because this file sits at
-#   `.agent/repo=.this/role=any/skills/`, which is four levels down. that count
-#   was correct (`role=any` is ONE directory, not two — a reviewer read it as
-#   two and filed a blocker, which is the tell), but "correct" is the wrong
-#   property to lean on: it holds only for THIS layout, it re-derives from a
-#   directory convention nobody promised to keep, and a rename or one more
-#   level breaks every entry point at once with a message that names a path
-#   rather than a cause.
-#   so we walk up and stop at the directory that actually holds what we want.
+# ⚠️ the root is found by LANDMARK, never by a hop count.
+#
+#   a hop count — `$dir/../../../..`, four `..` for the four levels under
+#   `.agent/repo=.this/role=any/skills/` — can be CORRECT and is still the wrong
+#   property to lean on. it holds only for THIS layout, it re-derives from a
+#   directory convention nobody promised to keep, and a rename or one more level
+#   breaks every entry point at once with a message that names a path rather
+#   than a cause.
+#
+#   ⚠️ and its correctness is not even legible: `role=any` is ONE directory and
+#   reads as two, so a reviewer filed a blocker against a count that was right.
+#   a reader who cannot check a claim by eye will guess at it.
+#
+#   ⇒ so we walk up and stop at the directory that actually holds what we want.
 #   the search states the intent, cannot be off by one, and survives any
 #   reshuffle of the levels between here and the root.
 #

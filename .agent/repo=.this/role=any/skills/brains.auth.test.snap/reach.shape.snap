@@ -1,4 +1,4 @@
-ok   'kai@ehmpath.com'
+ok   'kai@example.com'
 ok   'a.b+c@sub.domain.co'
 no   '@all'
 no   'kai'

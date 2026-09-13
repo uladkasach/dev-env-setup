@@ -49,10 +49,20 @@ grove_provision_5_13_reach_configure_verify() {
   local gitroot
   gitroot="$(grove_provision_5_12_rack_gitroot)"
 
-  local failed=0 pair env dkey account named seen
+  # 🛑 declare THIS org before the reads — `5.12.rack` runs first and its loop
+  #    leaves the LAST org it wired declared in that scratch yml. a named-org read
+  #    resolves against the yml in scope, so without this every row below reads
+  #    empty and reports a false ✋ on entries that are present
+  grove_provision_5_12_rack_declare_org "$gitroot" "$org" || return 1
+
+  # ⚠️ parse the row the SAME way the upsert does — one table, two readers, free
+  #    to drift. a `${pair##*:}` here reads the ROLE key as the account key, so
+  #    every env falls to the weaker 🌙 "no clone declares the account"
+  local failed=0 pair rest env dkey account named seen
   for pair in $(grove_provision_5_13_reach_envs); do
     env="${pair%%:*}"
-    dkey="${pair##*:}"
+    rest="${pair#*:}"
+    dkey="${rest%%:*}"
 
     # 1. does the rack NAME a profile for this env?
     named="$(env -C "$gitroot" rhx keyrack get --owner "$owner" --key AWS_PROFILE \

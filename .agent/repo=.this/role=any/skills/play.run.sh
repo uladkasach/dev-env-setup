@@ -36,9 +36,8 @@
 #
 #     🛑 and the word is PATH, never BYTES. this asks whether git tracks the
 #        path; it does not ask whether the disk matches the index, so a MODIFIED
-#        tracked play still runs. the sentence used to read "must be TRACKED"
-#        with no line that asked git anything at all — see the block at the
-#        `--error-unmatch` check for the measurement
+#        tracked play still runs — the block at the `--error-unmatch` check
+#        carries the measurement, and the residue that word leaves open
 #   - every run is BOUNDED. a play that hangs fails; it never waits forever
 #   - it runs the play in a subshell, so a `set -e`/`exit` inside it cannot
 #     take this runner's own report with it

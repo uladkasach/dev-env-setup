@@ -74,14 +74,31 @@
 #         that tty. keyrack writes it age-encrypted. the secret crosses one
 #         encrypted hop and is never seen by this skill, this shell, or any log.
 #
-#         the tty is a REQUIREMENT, not a courtesy: set's secret prompt masks its
-#         echo, so it reads the terminal rather than stdin. driven by a pipe it
-#         takes the mechanism answer, SKIPS the secret, stores an empty value, and
-#         prints `✔ set` all the same — a blank that only surfaces later, as a
-#         token github rejects (measured on grove-1, 2026-08-02).
-#
 #         this is the same reason `plan.grove-credentials.md` says a credential
 #         goes over the TUNNEL and never through the duct.
+#
+# 🛑 .why a TTY here, when `git.grove.auth.keys.set` pipes instead
+#         the two skills part on their SOURCE, never on what keyrack accepts:
+#
+#           this one     a pat is MINTED at github. no box holds it, so there is
+#                        none to read and none to pipe — a human types it, once,
+#                        and the tty is where they type
+#           keys.set     the value already sits on THIS box's rack, so it is read
+#                        and piped straight into the far side with no human
+#
+#   🛑 .the tty is about the SOURCE, and NOT about what a pipe can do
+#      a piped `keyrack set` stores correctly — `promptHiddenInput.js:61` at
+#      rhachet 1.47.3 reads ALL of stdin when stdin is not a tty:
+#        // non-TTY mode: read ALL stdin content for multiline secrets (e.g., PEM files)
+#      probed end to end against a throwaway key: 18 bytes in, 18 bytes back.
+#
+#      ⚠️ what DOES store a blank is a pipe with no `--mech`: the mechanism
+#        prompt fires first and eats it, the secret's prompt then reads an
+#        exhausted stdin, and keyrack prints `✔ set` either way. so a pipe that
+#        stores a blank is a CALL SHAPE, never a property of keyrack.
+#
+#      ⇒ so a pipe is legal wherever there is a source to read from. this skill
+#        has none, which is the whole reason it asks for a tty.
 #
 # .why `--vault aws.params` — a CENTRAL store, and this skill only ever targets a grove
 #         a grove is exclusively ec2, so IMDS is always there — and IMDS is the one

@@ -70,6 +70,34 @@ ambient, and what was absent was a NAME for it.
 - `src/grove.provision/5.devtools/5.6.aws/configure.verify.sh` — proves the ambient profile
   yields credentials, not merely that its text is present
 
+## .the misread the term did not prevent — 2026-09-06
+
+on a grove, eight `AWS_PROFILE` rows were live and proven. four held `ambient`; four held
+a `<org>.<env>.<owner>` profile that assumes an env-account role.
+
+read as an asymmetry to correct: *"that doesnt look like mirror treatment"*, and
+*"all should be ambient for each"*.
+
+both readings were right, on axes the term did not part:
+
+| axis | the answer |
+|---|---|
+| PROVENANCE | all eight are ambient — no stored secret, no rotation of ours, every one traced to IMDS |
+| the rack VALUE | four are `ambient`, because only four answer with no hop |
+
+⇒ `.what` and the `rack`/`ambient` table are about provenance, and both were correct. what
+neither said is that the VALUE is a narrower claim — so a reader who checks the value to
+judge the provenance gets the wrong answer on every hopped profile.
+
+⇒ the repair is `.the WORD is a provenance` in the say file: one concept, stated at both
+levels. no second term was coined, because there is no second concept — a hopped profile
+is the same badge, one assume further.
+
+⚠️ the cost of the gap is asymmetric, which is why it earned a section. to read a hopped
+profile as non-ambient is a harmless confusion; to act on it and write `ambient` into a
+hopped env is silent — the profile assumes CLEANLY as the badge, into the wrong account,
+and every call fails far from the cause.
+
 ## .disputes
 
 none open.

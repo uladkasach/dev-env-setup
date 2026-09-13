@@ -45,11 +45,12 @@ four answer the reader with the identical `absent 🫧`:
 | the read path rejects the org sigil (`@all` vs the manifest's org) | value ✔, grant ✔, manifest entry ✔ | fix the read path; **no new secret** |
 | the value is genuinely gone | value ✋ | mint a fresh secret |
 | the box lacks the iam grant to reach the vault | value ✔, grant ✋ | fix the role, not the rack |
+| the box reads a DIFFERENT ACCOUNT's vault than the one written to | value ✔ *elsewhere*, grant ✔, manifest entry ✔ | align the org's `AWS_PROFILE` across both boxes — see below |
 
 ⚠️ read row 1 with the `keyrack set` section below before you act on it: "wire the manifest entry"
 has **no unattended command** today, and the obvious reach for one destroys the value.
 
-⇒ **four causes, one word, and only ONE of them wants a fresh secret.**
+⇒ **five causes, one word, and only ONE of them wants a fresh secret.**
 
 the 2026-08-10 chain, link by link, on `grove-ahbode-v20260810`:
 
@@ -67,6 +68,79 @@ facts four separate times.
 ⚠️ the hazard this makes concrete: a reader who takes `absent` at face value reaches for
 `keyrack set` — and a `set` fed a closed stdin stores an EMPTY value while it prints `✔ set`.
 that replaces a live central pat with a blank, to cure a defect that was never in the value.
+
+### 🛑 the FIFTH cause — a central vault is not ONE store, it is one PER ACCOUNT
+
+the first four causes all ask *"is the value there, and may this box read it?"* and take for
+granted that both boxes look in the same place. for `aws.params` they may not:
+
+| the org on the slug | the identity the read authenticates as |
+|---|---|
+| `@all` | imds — this box's own ambient badge |
+| a NAMED org | the profile that org's `AWS_PROFILE` names |
+
+⇒ so an `aws.params` value is addressed by **the parameter name AND the account**, and only the
+first half is in the slug. the account is a property of the BOX.
+
+📜 measured 2026-09-06, `ehmpathy.test.FIREWORKS_API_KEY`, written from the laptop into
+ehmpathy's own account, then read from grove-ahbode-v20260901:
+
+```
+ehmpathy: profile 'ambient'             -> = this box's ambient account   (camp)
+ahbode:   profile 'ahbode.test.ehmpath' -> != this box's ambient account
+
+✋ ehmpathy.test.FIREWORKS_API_KEY — EMPTY
+```
+
+the value was placed correctly, the box holds a manifest entry, the session was live, and the
+grove's iam grant is fine. it read **camp's** parameter store, where no such parameter exists.
+
+⚠️ **this cause is invisible to every remedy the four rows above teach.** it wants no fresh
+secret, no manifest entry, no iam change — it wants the org's `AWS_PROFILE` to name the same
+account on both boxes. that is why `5.16.keys` prints `= ambient` / `!= ambient` beside every
+empty read: it is the one state a human cannot infer from the word `absent`.
+
+#### 🛑 the WRITE half — the ORG picks the account, and the SHELL YOU OCCUPY does not
+
+the read half above is the cheap half to see. the write half is the one that bites, because a
+human can occupy the very account they mean and still write elsewhere.
+
+⇒ from `asKeyrackAwsParamIdentity`'s own header, verbatim:
+
+> `@all` → grove-wide → the grove's own ambient identity (**IMDS only, never a profile, never
+> ambient SSO**). a specific org → tree-wide → **that org's AWS_PROFILE (looked up from the
+> keyrack itself)**
+
+so the org on the slug is the ONLY input. an ambient SSO session is named and refused, by
+design — `getOneKeyrackAwsParamIdentity` reads `profileForOrg` out of the host manifest and
+consults no environment at all.
+
+📜 measured 2026-09-06, and this is the sharp form of the same day's earlier measurement:
+
+```
+# typed from a shell whose prompt read `☁️ ahbode.camp`
+rhx keyrack set --key FIREWORKS_API_KEY --owner ehmpath --env test --vault aws.params
+  → ✔ set    name: /keyrack/infra/vault/aws.params/v1/ehmpath/ehmpathy/test/FIREWORKS_API_KEY
+
+# then, keyrack out of the path entirely
+aws ssm get-parameter --name <that exact name> --profile <camp>
+  → ParameterNotFound
+```
+
+⇒ **the intent was camp, the shell was camp, and the write landed in ehmpathy** — because
+`--org` defaulted to the tree's `ehmpathy`, and `--org` is what picks the account.
+
+⚠️ and it is silent in BOTH directions: the set prints `✔` with the parameter name it wrote,
+and the name is correct — the name never carries the account. the read prints empty. neither
+end says a word about which store was touched.
+
+⇒ so the direct `aws ssm get-parameter` is the read that settles it, and the keyrack read is
+not. one asks the store you name; the other asks the store your slug implies.
+
+⇒ **`@all` is the only scope that pins the account to the BOX** (imds), which is why
+`@all.camp.GITHUB_TOKEN` works on a grove and cannot work on a laptop. that tradeoff is
+`rule.require.github-token-at-all-camp`'s to hold, and it is a choice about REACH, never a
+workaround for this defect.
 
 ### `KeyrackKeyHost` is CITED here, never itemized — and `pointer` is DRIFT
 
@@ -95,9 +169,9 @@ the canonical phrasings, all of which already work:
 VALUE survive a box's death and makes a rotation one write. it makes no claim at all about the
 MANIFEST ENTRY, which every fresh `$HOME` still needs placed.
 
-## 🛑 .a FIFTH state, and it is not a cause of `absent` — measured 2026-08-25
+## 🛑 .a state that is NO cause of `absent` at all — measured 2026-08-25
 
-the four rows above are four causes behind ONE word. this state answers with the opposite word,
+the rows above are causes behind ONE word. this state answers with the opposite word,
 and is worse for it: the entry is healthy on **every axis the table measures**, and the
 credential still does not work.
 
@@ -126,7 +200,7 @@ that is `declared` and `live` (`term=live`) in a place neither term had reached:
 the DECLARED credential; the ISSUER alone knows whether it is still honoured. the rack cannot
 ask, so a perfect read is compatible with a dead secret.
 
-⚠️ it also inverts the four-way table's own advice. every row there teaches *"do not reach for a
+⚠️ it also inverts the cause table's own advice. every row there teaches *"do not reach for a
 fresh secret — the value is probably fine"*: right four times out of five, and the exact wrong
 move here. only the ISSUER can tell the two apart.
 
@@ -143,13 +217,13 @@ read the **headers**, not the body — the body is `Bad credentials` in every ca
 
 this measurement hit the third row — the one row a body-only read cannot see.
 
-⇒ so the fix here is a **fresh mint into the same slug**: the one remedy the four-way table
+⇒ so the fix here is a **fresh mint into the same slug**: the one remedy the cause table
 spends all its prose to steer a reader away from. the table is not wrong; its scope is the rack,
 and this state lives past its edge.
 
 ## ⚠️ .and `keyrack set` cannot place a manifest entry ALONE — read from source 2026-08-10
 
-the four-way split says cause 1 needs "no new secret". a reader may then reach for `keyrack set`
+the cause table says cause 1 needs "no new secret". a reader may then reach for `keyrack set`
 to wire the entry without a fresh value. **no such mode exists.**
 
 - `setKeyrackKeyHost.js:47` calls `adapter.set(...)` **before** it ever touches `hostManifest.hosts`
@@ -187,8 +261,42 @@ and because `keyrack set` has no entry-only mode (above), re-creation of the ent
 re-paste of the pat — NOT because the value is bad, but because keyrack offers no way to point
 at a value it did not just write. **that is the gap, stated exactly.**
 
-⚠️ still unmeasured, and not to be guessed: whether `keyrack recipient set` + a shared `.age`
-file is a sanctioned cross-seat path. it writes no secret, so it is the candidate to test.
+### ✔ .the candidate was MEASURED — 2026-09-07, and it is CLOSED
+
+this section named `keyrack recipient set` + a shared `.age` file as the untested cross-seat
+path. it was read from source, and **it closes none of this gap**:
+
+```js
+// setKeyrackRecipient.js:74
+// re-encrypt to all recipients
+await daoKeyrackHostManifest.set({ upsert: manifestUpdated });
+```
+
+a host manifest holds **two** lists, and the verb touches one:
+
+| the list | what it holds | `recipient set` |
+|---|---|---|
+| `recipients` | the pubkeys that may DECRYPT the manifest | ✔ appends, then re-encrypts |
+| `hosts` | the ENTRY per slug — what this gap is about | ✋ untouched |
+
+⚠️ and the same read kills the shared-file half. `vaultAdapterOsSecure` seals each value into
+its own `.age`, encrypted to the recipient set **at write time** — so a recipient added later
+cannot open a file sealed before it, and a copy of that file to a fresh box is ciphertext no
+one there can read.
+
+⇒ **the FILE cannot travel; the VALUE can.** the one verb that re-encrypts a value is `set`,
+and `set` accepts a pipe — measured the same day at rhachet 1.47.3, 18 bytes in, 18 bytes back
+(`promptHiddenInput.js:61` reads ALL stdin in non-TTY mode). so a box that CAN read a value
+hands it to a box that cannot, over one encrypted hop, with no human.
+
+⚠️ **the pipe needs `--mech`.** with it absent the MECHANISM prompt fires first and eats the
+pipe, and the value stored is a blank behind a `✔ set` — which is what the 2026-08-02
+"never pipe a secret" measurement actually caught. that was a CALL SHAPE, never a property of
+keyrack.
+
+⇒ so cause 1's cost is now split by SOURCE: a value some box holds costs no re-paste
+(`git.grove.auth.keys.set` places the replica). a value **no** box holds — a pat, which is
+minted at github — still costs a human at a tty.
 
 ## 🛑 .the entry that OUTLIVES its subject — measured 2026-09-02, the grove registry
 
@@ -238,6 +346,7 @@ signal. `aws.ec2.get` is the read that settles it, and no reader of the registry
 - `.agent/repo=.this/role=any/briefs/evidence/gotcha.a-partial-write-discards-what-it-never-read.md`  # a registry entry, partly blanked
 - `src/git-credential-keyrack.sh`                                                # reads the entry a slug names
 - `src/grove.provision/5.devtools/5.4.gh/configure.upsert.sh`
+- `src/grove.provision/5.devtools/5.16.keys/configure.verify.sh`                 # asserts the READ half, per box, and names the account
 - `.agent/repo=.this/role=any/briefs/creds/rule.require.github-token-at-all-camp.md`   # the slug every consumer reads
 
 ## .reason

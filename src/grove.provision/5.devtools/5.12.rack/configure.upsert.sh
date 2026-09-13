@@ -151,7 +151,17 @@ grove_provision_5_12_rack_configure_upsert() {
 }
 
 ######################################################################
-# .what = wire `ahbode.{test,prep}.AWS_PROFILE` to the literal `ambient`
+# .what = wire `ahbode.camp.AWS_PROFILE` to the literal `ambient`, and DECLARE
+#         every env `5.13.reach` will later set
+#
+# 🛑 .why only camp gets `ambient`, though every env runs on the ambient badge
+#   - the rack value is a profile NAME, never the credential source. every env's
+#     source is the badge — each per-env profile body carries `credential_source
+#     = Ec2InstanceMetadata`, plus the `role_arn` it hops into
+#   - camp IS the badge, so it has no hop and names it directly
+#   - ⇒ `ambient` in a REACH env names a profile with no `role_arn`, so the hop
+#     never happens and every call answers as camp
+#     (measured; `aws.reach.set`'s header carries it)
 #
 # .why  = see `_.sh`
 #   - a consumer had no way to learn WHICH profile to reach for
@@ -165,9 +175,8 @@ grove_provision_5_12_rack_configure_upsert() {
 ######################################################################
 grove_provision_5_12_rack_upsert_awsprofile() {
   local gitroot="$1"
-  local key org vault value owner
+  local key vault value owner
   key="$(grove_provision_5_12_rack_awsprofile_key)"
-  org="$(grove_provision_5_12_rack_awsprofile_org)"
   vault="$(grove_provision_5_12_rack_awsprofile_vault)"
   value="$(grove_provision_5_12_rack_awsprofile_value)"
   owner="$(grove_provision_5_12_rack_slug_owner)"
@@ -193,52 +202,48 @@ grove_provision_5_12_rack_upsert_awsprofile() {
   #   writers, and `5.10.repos` clones it AFTER this bundle
   #   (rule.forbid.two-writers-on-one-artifact)
   # .refs = gotcha.5-12-rack.demo=entry-vs-value
-  local rackyml="$gitroot/.agent/keyrack.yml"
-  mkdir -p "$gitroot/.agent" || return 1
-  {
-    printf '# .written by 5.12.rack\n'
-    printf '#   - this dir is a scratch git root owned by that bundle\n'
-    printf '#   - it is NOT a checkout of any repo\n'
-    printf '#   - the rhachet cli refuses a `keyrack set` for a NAMED org\n'
-    printf '#     unless a keyrack.yml is in scope\n'
-    printf '#   - the operation needs no repo, so this declares the minimum\n'
-    printf '#   - it declares MORE envs than this bundle sets, since a\n'
-    printf '#     declaration is a legal name and not a value\n'
-    printf '#   - see `_.sh`, `_envs_declared`\n'
-    printf 'org: %s\n' "$org"
-    local e
-    for e in $(grove_provision_5_12_rack_awsprofile_envs_declared); do
-      printf 'env.%s:\n' "$e"
-      printf '  - %s\n' "$key"
-    done
-  } > "$rackyml" || return 1
-  local env
-  for env in $(grove_provision_5_12_rack_awsprofile_envs); do
-    # .`-q` is absent for the same reason as the gh read above
-    # .why `env -C "$gitroot"` matters MORE here — a named-org lookup reads the
-    #   `keyrack.yml` written just above; read from elsewhere the cli throws, an
-    #   empty list reads as "no entry", and the loop re-drives a live set on every
-    #   apply (define.provision-defect-shapes, "the NINTH shape")
-    if env -C "$gitroot" rhx keyrack list --owner "$owner" 2>/dev/null \
-       | grep "${org}\.${env}\.${key}" >/dev/null; then
-      echo "   • the manifest already names ${org}.${env}.${key} — no work"
-      continue
-    fi
-    # .why captured and replayed on failure, as the github set above is — this
-    #   value is the word `ambient`, so its log discloses no secret
-    local setlog rc
-    setlog="$(printf '%s' "$value" | env -C "$gitroot" rhx keyrack set \
-                --owner "$owner" --key "$key" --org "$org" --env "$env" \
-                --vault "$vault" 2>&1)"
-    rc=$?
-    if [[ $rc -ne 0 ]]; then
-      echo "   ✋ could not name ${org}.${env}.${key} in the rack (exit $rc)" >&2
-      echo "      ⇒ without it, every ahbode suite on this box throws" >&2
-      echo "        'AWS_PROFILE not set. keyrack.source() should have set it.'" >&2
-      echo "      ⇒ what it said:" >&2
-      printf '%s\n' "$setlog" | sed 's/^/        /' >&2
+  local row org envs env
+  for row in $(grove_provision_5_12_rack_awsprofile_rows); do
+    org="${row%%:*}"
+    envs="${row#*:}"
+
+    # ⚠️ halt a row with no envs here — `${row#*:}` hands back the ORG, whose
+    #   set would then aim at an env named `ahbode`
+    if [[ "$row" != *:* ]]; then
+      echo "   ✋ the row for '${org}' names no envs" >&2
+      echo "      ⇒ a row is '<org>:<env>,<env>' — see 5.12.rack/_.sh" >&2
       return 1
     fi
-    echo "   • the manifest now names ${org}.${env}.${key} = ${value} (a name, not a secret)"
+
+    grove_provision_5_12_rack_declare_org "$gitroot" "$org" || return 1
+
+    for env in ${envs//,/ }; do
+      # .`-q` is absent for the same reason as the gh read above
+      # .why `env -C "$gitroot"` matters MORE here — a named-org lookup reads the
+      #   `keyrack.yml` written just above; read from elsewhere the cli throws, an
+      #   empty list reads as "no entry", and the loop re-drives a live set on every
+      #   apply (define.provision-defect-shapes, "the NINTH shape")
+      if env -C "$gitroot" rhx keyrack list --owner "$owner" 2>/dev/null \
+         | grep "${org}\.${env}\.${key}" >/dev/null; then
+        echo "   • the manifest already names ${org}.${env}.${key} — no work"
+        continue
+      fi
+      # .why captured and replayed on failure, as the github set above is — this
+      #   value is the word `ambient`, so its log discloses no secret
+      local setlog rc
+      setlog="$(printf '%s' "$value" | env -C "$gitroot" rhx keyrack set \
+                  --owner "$owner" --key "$key" --org "$org" --env "$env" \
+                  --vault "$vault" 2>&1)"
+      rc=$?
+      if [[ $rc -ne 0 ]]; then
+        echo "   ✋ could not name ${org}.${env}.${key} in the rack (exit $rc)" >&2
+        echo "      ⇒ without it, every ${org} suite on this box throws" >&2
+        echo "        'AWS_PROFILE not set. keyrack.source() should have set it.'" >&2
+        echo "      ⇒ what it said:" >&2
+        printf '%s\n' "$setlog" | sed 's/^/        /' >&2
+        return 1
+      fi
+      echo "   • the manifest now names ${org}.${env}.${key} = ${value} (a name, not a secret)"
+    done
   done
 }

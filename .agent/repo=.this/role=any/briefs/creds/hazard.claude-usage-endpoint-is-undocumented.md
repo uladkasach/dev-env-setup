@@ -38,7 +38,7 @@ the exit code says whose fault it is:
 
 ```
 🧠 claude budget
-   ├─ kai@ehmpathy.com: 💥 the usage endpoint refused (http 404)
+   ├─ kai@example.com: 💥 the usage endpoint refused (http 404)
    └─
 ```
 

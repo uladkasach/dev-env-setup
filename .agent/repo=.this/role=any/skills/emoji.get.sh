@@ -7,12 +7,13 @@
 #         sourced and never pays this fork or rhx's node boot.
 #
 # .note = the 5-rank logic is NOT restated here. it is sourced from
-#         2.9.emoji's emoji.zsh, the file that actually ships. an earlier draft
-#         copied the ranks into this file and the contract brief
-#         documented "they must stay in sync" — which is a duplicate
-#         with a note attached rather than a fix. if TAB and this
-#         command could disagree, the disagreement would surface as the
-#         worst kind of surprise: the same query, two answers.
+#         2.9.emoji's emoji.zsh, the file that actually ships.
+#
+#         🛑 a copy of the ranks here would be a SECOND holder of one set, and
+#         a brief that asks two holders to "stay in sync" is a duplicate with a
+#         note attached rather than a fix. if TAB and this command could
+#         disagree, the disagreement surfaces as the worst kind of surprise:
+#         the same query, two answers.
 #
 # usage:
 #   rhx emoji.get --query rocket        # 🚀 to stdout

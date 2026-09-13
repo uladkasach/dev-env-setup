@@ -39,6 +39,29 @@ independent declarations that must all agree, and two of the three fail QUIETLY.
 `@this` points at the **root** manifest's org, no matter which nested manifest declared the
 key — so a key declared under `repo=ehmpathy` still lives at `ahbode.*`.
 
+## 🛑 .the `org` axis is not merely a NAMESPACE — for `aws.params` it ROUTES
+
+the table above reads the three axes as segments of an address, and for every vault but one
+that is all they are. for `aws.params` the `org` axis also decides **which aws account's
+parameter store** the read and the write touch:
+
+| the `org` axis | the identity |
+|---|---|
+| `@all` | imds — the BOX's own ambient badge |
+| a NAMED org | the profile that org's `AWS_PROFILE` names, read from the rack itself |
+
+⇒ so **two boxes can agree on all three axes and still touch different stores.** the slug is
+the whole address for every other vault, and only half of it for this one — the account is a
+property of the box, and it appears in no segment.
+
+⚠️ this makes the `org` axis fail QUIETLY in a way the table's own row denies. that row says
+`org` is the loud axis, and it is — for a MISMATCH against the manifest. a correctly-matched
+org that routes to an account you did not intend prints `✔ set` on the write and `absent` on
+the read, and the parameter NAME is correct in both.
+
+⇒ the measurement, both halves, lives in `term=entry` under `.the FIFTH cause`. do not restate
+it here.
+
 ## .a slug is DECLARED before it is filled
 the slug's `key` axis must appear in a `keyrack.yml` before any value can be read back at it.
 that is the `declared` / `live` pair applied to a credential (`term=declared`), and it is what

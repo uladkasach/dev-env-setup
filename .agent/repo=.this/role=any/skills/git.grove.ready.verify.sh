@@ -416,9 +416,9 @@ GROUND_ENTRY="${GIT_FOREST_DIR:-$HOME/.git.forest}/groves/$GROUND.json"
 #       git.grove.trust.gen`. so the message EXISTED and this rung dropped it
 #       (`rule.require.errors-name-the-fix`).
 #
-# ⇒ all three shared one cause and took one repair: a probe that needs no duct.
-#   `_ask_bare` cannot reach `_shell_at`, so the halts below are now reachable,
-#   `duct.log` is now read, and a rebuilt box gets `trust.gen` by name.
+# ⇒ all three share one cause and take one repair: a probe that needs no duct.
+#   `_ask_bare` cannot reach `_shell_at`, so the halts below stay reachable,
+#   `duct.log` is read, and a rebuilt box gets `trust.gen` by name.
 #
 # ⚠️ the ✔ arm is proven live; the no-tmux ✋ arm is not, because the infra image
 #    ships tmux and no such box is at hand. a check proven in one direction is

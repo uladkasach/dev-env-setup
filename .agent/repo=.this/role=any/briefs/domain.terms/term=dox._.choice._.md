@@ -39,6 +39,35 @@ prescribe the wrong first move half the time.
 - a **concept** with no identifier: "the camp account", "the grove role". the concept is fine;
   its identifier is not
 - a conventional dummy: `123456789012`, `i-0123456789abcdef0`, `0.0.0.0`, `jane.doe@…`
+  - 🛑 **the dummy set is CLOSED, and `dox.verify.sh`'s exempt pattern is its ONE holder.** an
+    author may not coin their own — an UNDECLARED dummy is indistinguishable from a real
+    address to any reader, human or clamp, which is the whole reason one set is named
+- 🛑 **an address at `example.com` is not dox, and it takes NO exempt entry** — RFC 2606 §3
+  reserves the domain for documentation forever, so it can never route to a person. that is a
+  declaration, and an external one: the property the exempt set has to assert per-string,
+  `example.com` carries by standard
+  - ⇒ so it is **outside the rule's subject**, never an exemption to it. the personal-email rule
+    INCLUDES a list of consumer-mail and org domains (`dox.verify.sh`, `.why the email rule
+    matches a DOMAIN LIST`), and a reserved domain is on neither — the exempt pattern stays the
+    one holder of the exempt set, because this adds no member to it
+  - ⇒ **a fixture that needs several distinct personas uses it**: `kai@example.com`,
+    `moana@example.com`. the closed dummy set holds ONE address, so a suite that keys two rows
+    on two identities cannot be written from it at all
+  - ⚠️ 📜 so a persona this repo invented is **correctly flagged**, and the repair is to move
+    the fixture onto the declared dummy — never to widen the set. measured 2026-09-07: a wider
+    set was attempted HERE, in this list, and it contradicted a dream caught the same day
+  - 🛑 **and the exemption was to be by PREFIX, which cannot work at all.** a walk of every hit
+    the next day found a real personal address under one of the four prefixes the exemption
+    named. ⇒ **inventedness is not a property of the string**, so no pattern can read it and
+    only a declaration can carry it. `rule.forbid.exemption-as-habit` names the shape;
+    `term=dox._.choice.reason.md` carries both measurements
+- 📜 **the repo owner's own username**, where the owner has said so — settled 2026-09-07:
+  *"vlad is fine"*. dox protects a person from a stranger; the person may waive it for
+  themselves, in their own public repo, and `/home/vlad/` appears in every captured path
+  here regardless
+  - ⚠️ the waiver is on the USERNAME axis and does NOT extend to an **email address**. an
+    address is a contact primitive — a spam and phish target a bare username is not — so it
+    stays redacted until the owner says otherwise, per axis, never by inference
 
 ## .refs
 where the term is used:

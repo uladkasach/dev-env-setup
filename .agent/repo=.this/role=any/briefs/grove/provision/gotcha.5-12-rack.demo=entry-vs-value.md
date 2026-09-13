@@ -12,7 +12,7 @@ each row below is a measurement that shaped one clause of its header.
 - 📜 every keyrack consumer still answered `absent 🫧`
 - the value survived its old box's death, as `aws.params` promises
 - the ENTRY did not — it lived in a `$HOME` that went with the disk
-- see `term=entry` for the four-way split this proves
+- see `term=entry` for the cause split this proves
 
 ## the AWS_PROFILE pointer — traced twice
 

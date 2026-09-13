@@ -110,8 +110,8 @@ done
 #    exited 2 and been obvious.
 #
 #    ⇒ this skill lives INSIDE the checkout it reads, so its own path is the one
-#      anchor that cannot drift with the cwd. `--root` stays the explicit
-#      override, and is now the only way to point elsewhere.
+#      anchor that cannot drift with the cwd. `--root` is the explicit override,
+#      and the only way to point this at another tree.
 ######################################################################
 if [[ -z "$ROOT" ]]; then
   SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -226,7 +226,7 @@ RULES=(
   "instance/vpc/subnet/ami id§\\b(i|vpc|subnet|ami|sg|eni|vol)-[0-9a-f]{8,17}\\b§<instance-id>§"
   "private ipv4§\\b(10\\.[0-9]{1,3}|192\\.168|172\\.(1[6-9]|2[0-9]|3[01]))\\.[0-9]{1,3}\\.[0-9]{1,3}\\b§<host>§"
   "private ipv4, dash form§\\bip-(10|192-168|172-(1[6-9]|2[0-9]|3[01]))-[0-9]{1,3}-[0-9]{1,3}(-[0-9]{1,3})?\\b§<private-ip>§"
-  "personal email§[a-zA-Z0-9._%+-]+@([a-zA-Z0-9-]+\\.)*(gmail|googlemail|outlook|hotmail|live|yahoo|ymail|protonmail|proton|icloud|aol|fastmail|zoho|gmx|ehmpath|ehmpathy|ahbode)\\.[a-z]{2,}§<user>§seaturtle@ehmpath\\.com|noreply@anthropic\\.com|jane\\.doe@|<user>@|user@example|you@example"
+  "personal email§[a-zA-Z0-9._%+-]+@([a-zA-Z0-9-]+\\.)*(gmail|googlemail|outlook|hotmail|live|yahoo|ymail|protonmail|proton|icloud|aol|fastmail|zoho|gmx|ehmpath|ehmpathy|ahbode)\\.[a-z]{2,}§<user>§seaturtle@ehmpath\\.com|jane\\.doe@"
 )
 
 ######################################################################
@@ -260,8 +260,9 @@ RULES=(
 #    a bot identity that already appears in every commit this repo carries is
 #    public by construction, so to flag it is a false ✋.
 #
-#    each email entry is a full address, never a domain: a bare `@ehmpath.com`
-#    would exempt every future address there, including a human's.
+#    an email entry is a full address, or the declared dummy's local part, and
+#    never a bare domain: a `@ehmpath.com` would exempt every future address
+#    there, a human's included.
 #
 #    ⚠️ every entry is a VALUE, and the loop asks it against the matched value.
 #      an entry that names a CONTEXT — `e\.g\.`, a comment marker, a filename —
@@ -269,6 +270,34 @@ RULES=(
 #      context appears. one such entry blinded 102 lines to buy 1; a doc that
 #      wants an example uses the dummy convention (`term=dox._.choice._.md`)
 #      and needs no exemption at all.
+#
+# 🛑 .the test for an entry: can the RULE PRODUCE a value that HOLDS it?
+#    the ask above is a `grep -qE`, so an entry is reached whenever it occurs
+#    ANYWHERE INSIDE a matched value. that makes the question not "is this
+#    address public?" but whether the rule can emit a value that holds the
+#    string at all.
+#
+#    the email rule terminates its domain in a listed provider, so an address at
+#    an omitted domain never matches and never reaches the exempt — such an
+#    entry buys 0, and every character it spans is a hole.
+#
+#    📜 measured 2026-09-09: four of six entries bought 0.
+#
+#      `noreply@anthropic\.com`   anthropic is not on the provider list
+#      `<user>@`                  `<` is not in the local-part class
+#      `user@example`             example is not on the provider list
+#      `you@example`              ditto
+#
+#    ⚠️ the last two were not merely idle. a probe planted
+#      `user@example.<provider>.<tld>` beside a plain `<local>@<provider>.<tld>`
+#      control: the control was flagged and the first was NOT, because the entry
+#      occurs inside it. a provider-hosted address went exempt under a string
+#      written for a reserved documentation domain.
+#
+#    ⇒ all four retired — the repair `<instance-id>` and `<private-ip>` already
+#      got, for the reason they got it (`rule.forbid.exemption-as-habit`). both
+#      canaries then flagged and no other line moved, so none of the four was
+#      load-bear anywhere in the 1064 files this reader opens.
 ######################################################################
 
 HITS=0
@@ -537,9 +566,9 @@ if [[ "$PROVE" -eq 1 ]]; then
   #        class could not reach an id at END OF LINE
   #      · then both of those, while the head class could not reach COLUMN 0
   #
-  #    ⇒ the canary set is now derived from the POSITIONS a line affords —
-  #      start, middle, end — rather than from the shapes already in mind.
-  #      that is the m.12 / q11 repair: enumerate from the SUBJECT's side.
+  #    ⇒ so the canary set is derived from the POSITIONS a line affords — start,
+  #      middle, end — rather than from the shapes already in mind. that is the
+  #      m.12 / q11 repair: enumerate from the SUBJECT's side.
   printf '\n<!-- canary %s -->\n' "$CANARY" >> "$TARGET"   # mid-line
   printf '\n    account: %s\n' "$CANARY" >> "$TARGET"      # end of line
   printf '\n%s\n' "$CANARY" >> "$TARGET"                   # column 0, and alone
