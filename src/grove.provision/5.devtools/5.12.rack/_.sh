@@ -44,9 +44,13 @@ grove_provision_5_12_rack_awsprofile_value() { printf 'ambient'; }
 # 🛑 the env sets DIFFER on purpose, and neither may hold the other's
 #   - `5.13.reach` overwrites ahbode's test/prep/prod with per-account profile
 #     names, so to list them here is two writers on one slug
-#   - ehmpathy's envs hold `ambient` because no hop is DECLARED for them yet:
-#     no ehmpathy repo declares an `awsAccountId`, and `GROVE_ROLE_NAME` holds
-#     two keys, both `ahbode-*`
+#   - ehmpathy's test/prep/prod hold `ambient` because no hop is DECLARED for
+#     them: no ehmpathy repo declares an `awsAccountId` (all 92 of its clones
+#     that carry a `declapract.use.yml` are libraries, measured 2026-09-13)
+#   - ⚠️ ehmpathy's `demo` is the EXCEPTION and is NOT in this row on purpose:
+#     `5.13.reach` wires it to a real hop, so to list it here is two writers on
+#     one slug. its declaration lives under ahbode, which is why that bundle
+#     parts its SOURCE org from its TARGET org
 #   - ⚠️ that is a fact about what is READABLE, never about what EXISTS in aws.
 #     ehmpathy holds its own accounts; the grant and the declaration are owed
 #     (uladkasach/dev-env-setup#123). do NOT restate the absence as "no account
@@ -65,7 +69,11 @@ grove_provision_5_12_rack_awsprofile_rows() {
 grove_provision_5_12_rack_declared() {
   case "$1" in
     ahbode)   printf 'camp test prep prod' ;;
-    ehmpathy) printf 'test prep prod' ;;
+    # ⚠️ `demo` is declared for `5.13.reach`'s ehmpathy row, and for no row of
+    #   THIS bundle — it is deliberately absent from `_awsprofile_rows` above,
+    #   since that would be two writers on one slug. a declaration is a legal
+    #   NAME and never a value, so a declared-but-unset env costs one line
+    ehmpathy) printf 'test prep prod demo' ;;
     *)        return 1 ;;
   esac
 }

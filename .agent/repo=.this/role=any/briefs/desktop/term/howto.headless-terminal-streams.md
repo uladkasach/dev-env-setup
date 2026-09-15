@@ -9,7 +9,6 @@ run terminal sessions headless (no display), attach later from any terminal — 
 - start long jobs without a window
 - detach when you close laptop, reattach later
 - survive terminal crashes
-- sessions persist across reboots (via continuum)
 
 ## .the address — a duct uri, and only that
 
@@ -79,13 +78,20 @@ scrollback, with no attach.
 
 ## .persistence
 
-sessions survive reboots via tmux-continuum:
-- auto-saves every 15 minutes
-- auto-restores on tmux start
+a session survives a detach, a terminal crash, and a network drop. it does **not**
+survive a reboot on its own — save it by hand with tmux-resurrect:
 
-manual save/restore:
 - `ctrl+x ctrl+s` — save
 - `ctrl+x ctrl+r` — restore
+
+🛑 there is no autosave, and the absence is deliberate. tmux-continuum fires its save from
+a `status-right` interpolation, which tmux evaluates on every status refresh — so the cost
+scales **per status line**, and a duct is a session with a status line. measured at 74 duct
+sessions: 188 concurrent saves, load 40.41 on 12 cores. the full measurement sits where a
+re-add would start: `2.8.tmux/tmux.conf`.
+
+⇒ a duct loses no state to this. `rhx git.crew.boot` rebuilds it from the crew ledger,
+and it was never restored from a snapshot even when continuum was loaded.
 
 ## .install
 

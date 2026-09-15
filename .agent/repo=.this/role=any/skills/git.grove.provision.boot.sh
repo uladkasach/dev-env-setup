@@ -175,7 +175,7 @@ UPGRADE='bash $HOME/git/more/dev-env-setup/src/grove.provision._.sh --mode apply
 
 echo "🐢 heres the wave..."
 echo ""
-echo "🌱 git.grove.provision $GROVE --mode $MODE"
+echo "🌱 git.grove.provision boot $GROVE --mode $MODE"
 echo "   ├─ steps: $FROM..4"
 echo "   ├─ trust: $TRUST"
 echo "   ├─ within: ${WITHIN}s per apply"
@@ -207,7 +207,16 @@ halt() {
   for line in "$@"; do echo "    $line" | __duct_strip_escapes; done
   echo ""
   echo "  then run again from here —"
-  echo "    $RHX git.grove.provision $GROVE --mode apply --from $step --trust keep"
+  # 🛑 the VERB is not optional, and its absence is silent until a human types it
+  #   - `git.grove.provision` dispatches on a verb and refuses without one, so
+  #     a resume line that omits `boot` exits 2 with "needs a verb"
+  #   - ⇒ a halt hands a human the one command that repairs the box; a command
+  #     that cannot run leaves them to guess the shape of the resume
+  #   - 📜 measured 2026-09-13: this line printed
+  #     `git.grove.provision <grove> --mode apply --from 2 --trust keep`,
+  #     which refuses — the halt's own fix-text was unrunnable
+  #   - (`rule.require.prove-the-path-the-human-runs`)
+  echo "    $RHX git.grove.provision boot $GROVE --mode apply --from $step --trust keep"
   exit 3
 }
 
@@ -328,6 +337,74 @@ drive_seat() {
   fi
   say "│  ├─ push ✔"
 
+  ####################################################################
+  # 🛑 a RUN MARKER, written before the apply — every read below slices from it
+  #
+  # `git.grove.send --detach` writes `>> "$LOG"`, so ONE path accumulates every
+  # apply that box ever ran. that is correct for the send — a detached job must
+  # not clobber a log another reader holds — and it makes every UNBOUNDED read
+  # here a claim about the wrong run.
+  #
+  # 📜 measured 2026-09-14 on a grove whose ground seat had applied twice.
+  #    `git.grove.auth.keys.set` placed 8 keys and the grove read each one back;
+  #    this boot then reported all 8 as `the rack hands over an EMPTY value`.
+  #    one claim, two readers, and the boot read an OLDER apply
+  #    (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.9).
+  #
+  #    ⚠️ two lines it printed could not have come from that run at all: `the
+  #       rack names no profile for ehmpathy.demo.AWS_PROFILE` is unreachable
+  #       under the current `5.13.reach` verify, and the tmux TERM claim had
+  #       been proven green on that box hours earlier. that pair is what
+  #       exposed it — a false ✋ is the half that gets a check SILENCED.
+  #
+  # 🛑 the FALSE ✔ is the worse half, and it had not fired yet. the poll below
+  #    reads four lines twenty seconds after the send; before the new apply has
+  #    written four, that tail carries the PRIOR run's terminal line — so a box
+  #    whose last apply ended `🌲 grove.provision done` reports `✔ converged in
+  #    ~0m` for a run that had just begun.
+  #
+  # ⇒ the repair is at cause and it KEEPS the history: mark the log, then read
+  #   only what follows the mark. an unwritten mark makes every slice empty,
+  #   which the empty-payload arm below already halts on — so this degrades to
+  #   a loud halt and never to a verdict (`rule.forbid.failhide`).
+  #
+  # ⚠️ the marker carries NO glob metacharacter and NO dash at its head: the
+  #    duct runs an interactive zsh (see the claim read below), and a `printf`
+  #    whose first argument opens with `-` is parsed as an option. `%s` is why
+  #    the format holds whatever the marker becomes
+  #    (`rule.forbid.bare-globs-in-dual-shell-files`).
+  ####################################################################
+  local mark="~~~ boot run $(date +%s).$$ ~~~"
+
+  # 🛑 the sed expression is wrapped in DOUBLE quotes, and that is load-bear
+  #
+  # 📜 measured 2026-09-14, on this file's own first run. a single-quoted
+  #    expression reads fine programmatically — the transport escapes the whole
+  #    `--what` verbatim — and it COLLIDES the moment a halt quotes it for a
+  #    human, since every fix-text here wraps `--what` in single quotes:
+  #
+  #      --what 'sed -n '/~~~ boot run N ~~~/,$p' $HOME/…'
+  #             └ opens ┘                        └ closes ┘
+  #
+  #    ⇒ the pasted command loses its quoting: `$p` expands to empty, `~~~`
+  #      reaches zsh bare, and the one command whose job is to SHOW this run's
+  #      log shows none of it (`rule.require.errors-name-the-fix`).
+  #
+  # ⇒ double inside, single outside. `\$p` survives the far shell's double
+  #   quotes as a literal, and `$HOME` still expands THERE rather than on the
+  #   human's box — which is the whole point, since the seats do not share one.
+  local slice="sed -n \"/$mark/,\\\$p\" $log"
+
+  if ! "$RHX" git.grove.send "$seat" --reply \
+         --what "printf '%s\n' '$mark' >> $log" >/dev/null; then
+    halt "$step" "$label" \
+      "the run marker did not land, so no read here can be bounded to THIS run" \
+      "⚠️ do NOT apply without it. an unbounded read reports a PRIOR run's" \
+      "   verdict as this one's — a false ✔ as readily as a false ✋" \
+      "$RHX git.grove.send $seat --reply --what 'stat -c %y $log'"
+  fi
+  say "│  ├─ run marked ✔"
+
   # ── ONE apply, detached, so it outlives this connection
   local sent rc=0
   sent="$("$RHX" git.grove.send "$seat" --detach --log "$log" --what "$UPGRADE" 2>&1)" || rc=$?
@@ -335,7 +412,7 @@ drive_seat() {
     halt "$step" "$label" \
       "the text landed and NO JOB STARTED — an unproven delivery, not a failure" \
       "look before you re-send; a blind re-send starts a second copy —" \
-      "$RHX git.grove.send $seat --reply --what 'tail -20 $log'"
+      "$RHX git.grove.send $seat --reply --what '$slice'"
   fi
   if [[ "$rc" -ne 0 ]]; then
     halt "$step" "$label" "the apply could not be sent (rc=$rc)" "$sent"
@@ -352,14 +429,19 @@ drive_seat() {
     sleep "$tick"; waited=$(( waited + tick ))
 
     ask_rc=0
-    tail="$(_ask_at "$seat" "tail -4 $log")" || ask_rc=$?
+    tail="$(_ask_at "$seat" "$slice | tail -4")" || ask_rc=$?
 
     ####################################################################
     # 🛑 a fault is 97 OR AN EMPTY PAYLOAD — measured 2026-08-31
     #
-    # this read is `tail -4` of a log the apply appends to, so a NON-EMPTY
-    # answer is the only correct one. an empty string is not "the marker has
-    # not landed yet"; it is "this probe learned no fact".
+    # this read slices the log from a marker THIS run already wrote, so a
+    # NON-EMPTY answer is the only correct one — the marker line alone
+    # guarantees one. an empty string is not "the apply has not spoken yet";
+    # it is "this probe learned no fact".
+    #
+    # ⚠️ and the slice WIDENS what this arm covers, at no cost: a marker that
+    #    never landed also renders empty here, so a boot that could not bound
+    #    its reads halts loudly instead of reporting a prior run's verdict.
     #
     # ⚠️ a loop that tests `ask_rc` ALONE misses it. 📜 on a fresh grove every
     #    `--reply` came back with the send's banner and NO payload, so `tail`
@@ -397,7 +479,9 @@ drive_seat() {
         "the probe gave no verdict 10 times over — the apply may still be at work" \
         "⚠️ an EMPTY reply is a fault, not a 'not yet'. read the box directly," \
         "   and do NOT re-send; a blind re-send starts a second copy —" \
-        "$RHX git.grove.send $seat --what 'tail -20 $log'"
+        "$RHX git.grove.send $seat --what 'tail -20 $log'" \
+        "⚠️ that read is UNBOUNDED on purpose: a marker that never landed is one" \
+        "   cause of this halt, so a slice from it would render empty too"
       continue
     fi
     faults=0
@@ -417,13 +501,13 @@ drive_seat() {
       #    named above" over an empty space
       #    (`rule.forbid.bare-globs-in-dual-shell-files`).
       "$RHX" git.grove.send "$seat" --reply \
-        --what "grep ✋ $log | grep -v 'grove.provision finished'" || true
+        --what "$slice | grep ✋ | grep -v 'grove.provision finished'" || true
       echo ""
       halt "$step" "$label" \
         "the apply COMPLETED and left claims — each is named above, with its fix" \
         "a claim is a defect in a BUNDLE, fixed now and never filed" \
-        "(rule.forbid.deferred-provision-defects). read the full log —" \
-        "$RHX git.grove.send $seat --reply --what 'tail -60 $log'"
+        "(rule.forbid.deferred-provision-defects). read THIS run's log —" \
+        "$RHX git.grove.send $seat --reply --what '$slice'"
     fi
 
     [[ $(( waited % 120 )) -eq 0 ]] && say "│  │  · ${waited}s — at work"
@@ -434,7 +518,7 @@ drive_seat() {
     "read whether the log still grows; if it does, wait —" \
     "$RHX git.grove.send $seat --reply --what 'stat -c %y $log'" \
     "then resume the GATE alone, once it reports done —" \
-    "$RHX git.grove.provision $GROVE --mode apply --from 4 --trust keep"
+    "$RHX git.grove.provision boot $GROVE --mode apply --from 4 --trust keep"
 }
 
 ######################################################################
@@ -476,7 +560,7 @@ if [[ "$FROM" -le 1 ]]; then
           "the key offered on the tunnel was NOT attested by the box's own boot" \
           "record — read trust.gen's own rows above; they name each fingerprint" \
           "a REBUILT box presents a NEW key, and that is the benign cause —" \
-          "$RHX git.grove.provision $GROVE --mode apply --trust replace" \
+          "$RHX git.grove.provision boot $GROVE --mode apply --trust replace" \
           "🛑 if the boot record cannot be read AT ALL, there is no flag for it." \
           "--trust tofu is refused on a CHANGED key: a prior key is on record" \
           "and disagrees, so there is no 'first use' for tofu to be about, and" \

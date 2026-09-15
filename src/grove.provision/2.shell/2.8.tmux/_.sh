@@ -41,6 +41,45 @@ grove_provision_2_8_tmux_plugin_root() {
   printf '%s' "${root%/}"
 }
 
+# .what = every LIVE tmux server on this box, by socket name, one per line
+#   `..._live_sockets` → `default`, `duct_worktree_mechanic`, …
+#
+# 🛑 .why a box holds MORE THAN ONE server, and why that is the whole point
+#   - a conf is read at SERVER start, so each server holds its own copy IN MEMORY
+#   - ⇒ a write to `~/.tmux.conf` reaches exactly zero live servers
+#   - and a source into the DEFAULT socket reaches exactly one of however many
+#   - 📜 2026-09-13, this laptop: 16 sockets — the duct server, a `copygate`, and
+#     14 probe corpses left by `prove.*` plays. so the count is small and it is
+#     not one, and a phase that converges only `default` leaves the rest adrift
+#
+# ⚠️ .the ducts are SESSIONS on one server, not a server each
+#   - ductwork addresses `-t "$DUCT_SESSION"`, so 74 ducts share one socket
+#   - a prior draft here claimed one `-L` server per duct and was wrong
+#   - ⇒ it changes the MAGNITUDE and not the claim: a live server still holds an
+#     in-memory conf, and a removed plugin's option still outlives its `@plugin`
+#     line, so every live server must be sourced whatever the count
+#
+# .why the SOCKET DIR is asked rather than a session list
+#   - tmux keeps one unix socket per server under `${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/`
+#   - ⇒ the dir IS the inventory, so no second list can drift from it
+#   - a stale file is left for the caller's own bounded probe to answer
+#   - ⚠️ never `tmux ls`: it speaks to ONE server and reports its SESSIONS
+#
+# guarantee:
+#   - READ-ONLY. it lists sockets; it starts no server and it kills none
+#
+# stdout: one socket name per line, `default` among them when it is up
+grove_provision_2_8_tmux_live_sockets() {
+  local dir="${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)"
+  [[ -d "$dir" ]] || return 0
+
+  local sock
+  for sock in "$dir"/*; do
+    [[ -S "$sock" ]] || continue
+    printf '%s\n' "${sock##*/}"
+  done
+}
+
 # .what = the tpm commit this repo installs, declared ONCE
 # .why here, not inside `provision.upsert` — the state reader below compares
 #   against the same value, so a second `local tpm_at=` would drift
@@ -49,15 +88,19 @@ grove_provision_2_8_tmux_plugin_root() {
 #   gh api -X GET repos/tmux-plugins/tpm/commits/master --jq .sha
 GROVE_UPGRADE_2_8_TMUX_TPM_AT="e261deb1b47614eed3400089ce7197dc68acc4eb"  # master, 2026-05-17
 
-# .why the PLUGINS need the same pin — tpm's tip is shell code `.tmux.conf`
-#   RUNS every session, and `@continuum-restore 'on'` runs it UNATTENDED on
-#   every server start, so push access to either repo is code execution on
-#   every box; this bundle clones them itself via `git_clone --at`, and tpm
-#   skips them (`@plugin` carries no ref, so the pin cannot live in the conf)
+# .why the PLUGIN needs the same pin — tpm sources each `@plugin`'s own `.tmux`
+#   file at conf load, so resurrect's tip is shell code that runs UNATTENDED on
+#   every server start; push access to that repo is code execution on every box.
+#   this bundle clones it itself via `git_clone --at`, and tpm skips it
+#   (`@plugin` carries no ref, so the pin cannot live in the conf)
 # to bump: read the sha you mean, then change BOTH the value and its date
 #   gh api -X GET repos/tmux-plugins/tmux-resurrect/commits/master --jq .sha
+#
+# 🛑 there is no continuum pin, and its absence is DELIBERATE — the plugin is
+#   removed, since its per-server autosave timer storms a box that runs one tmux
+#   server per duct. the measurement, and why resurrect is unaffected, sit at the
+#   site that would re-introduce it: `tmux.conf`, where the `@plugin` line was
 GROVE_UPGRADE_2_8_TMUX_RESURRECT_AT="cff343cf9e81983d3da0c8562b01616f12e8d548"  # master, 2023-03-06
-GROVE_UPGRADE_2_8_TMUX_CONTINUUM_AT="0698e8f4b17d6454c71bf5212895ec055c578da0"  # master, 2024-01-20
 
 # .what = which of FOUR states is a PINNED plugin dir in?
 #   `..._plugin_state "$HOME/.tmux/plugins/x" "$pin"` → absent|half|adrift|whole

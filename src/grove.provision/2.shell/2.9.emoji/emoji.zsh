@@ -86,10 +86,37 @@ _emoji_clip() {
 ######################################################################
 # the command
 ######################################################################
+######################################################################
+# 🛑 the banner is ON DEMAND, never on boot — measured 2026-09-14
+#
+# 📜 five `print` lines ran unconditionally at the bottom of this file, so
+#    every interactive shell opened with a wall of text nobody asked for:
+#
+#      🐢 emoji loaded
+#         ├─ index : …/emoji.tsv (1580 emoji)
+#         ├─ tab   : falls through to 'expand-or-complete'
+#         …
+#
+#    an rc that ANNOUNCES itself is a debug print shipped as production.
+#
+# ⇒ the lines are not deleted — they were this file's ONLY discoverability
+#   surface, and a delete would trade one defect for another
+#   (`rule.require.discoverability`). they move HERE, behind `--help`, which
+#   is where a human looks (`rule.require.help-on-demand`).
+######################################################################
+_emoji_help() {
+  print "🐢 emoji"
+  print "   ├─ index : $EMOJI_INDEX ($(wc -l < $EMOJI_INDEX) emoji)"
+  print "   ├─ tab   : falls through to '${_EMOJI_PRIOR_TAB:-unbound}'"
+  print "   ├─ enter : falls through to '${_EMOJI_PRIOR_ACCEPT:-unbound}'"
+  print "   └─ try   : ':turt<TAB>'  ':zap:'  ':zap<Enter>'  'emoji rocket'"
+}
+
 emoji() {
   local pick_forced=0 query="" a
   for a in "$@"; do
     case $a in
+      --help|-h) _emoji_help; return 0 ;;
       --pick) pick_forced=1 ;;
       *) query="$a" ;;
     esac
@@ -248,10 +275,8 @@ _emoji_accept() {
 zle -N _emoji_accept
 bindkey '^M' _emoji_accept
 
-print "🐢 emoji loaded"
-print "   ├─ index : $EMOJI_INDEX ($(wc -l < $EMOJI_INDEX) emoji)"
-print "   ├─ tab   : falls through to '$_EMOJI_PRIOR_TAB'"
-print "   ├─ enter : falls through to '$_EMOJI_PRIOR_ACCEPT'"
-print "   └─ try   : ':turt<TAB>'  ':zap:'  ':zap<Enter>'  'emoji rocket'"
+# 🛑 NO banner here. an rc prints on boot only where a human must ACT on the
+#    line — and this one asks for no act at all. it lives at `emoji --help`
+#    instead. `prove.rc-is-quiet-on-boot` is the clamp; do not re-add one.
 
 fi  # end interactive-only bindings

@@ -118,8 +118,12 @@ term.open --via kitty --on vlad@cloud:agent-2
 # read output (no window needed)
 duct.read --on vlad@cloud:agent-3
 
-# hibernate cloud machine... sessions persist via tmux-continuum
+# hibernate cloud machine... the tmux server keeps every session while it lives
 # resume later, reattach to any session
+#
+# 🛑 a REBOOT is a different matter — there is no autosave (tmux-continuum
+#   fires its save per status line, and a duct is a session with one). rebuild
+#   with `rhx git.crew.boot`, or save by hand first with prefix+ctrl-s
 term.open --via kitty --on vlad@cloud:agent-1
 ```
 
