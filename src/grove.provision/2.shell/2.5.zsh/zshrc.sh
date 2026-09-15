@@ -32,6 +32,44 @@ zle -N edit-command-line
 bindkey '^E' edit-command-line
 bindkey '^X^E' edit-command-line
 
+####################################################################
+# 🛑 the OSC SINK is settled HERE — OUTSIDE the `[[ -t 1 ]]` block below
+#
+# ⚠️ .this line looks like it belongs beside the emitters, and it does NOT
+#    every writer that reaches for `$_osc_sink` is a `chpwd` hook, and a
+#    `chpwd` hook fires on every `cd` — a `cd` inside a `$( )` among them,
+#    where fd 1 is a PIPE and `[[ -t 1 ]]` is FALSE.
+#
+#    ⇒ so a sink declared inside that block is UNSET at the one moment it is
+#      most needed, and `>$_osc_sink` then redirects to an EMPTY filename.
+#
+# 📜 measured 2026-09-14, after the sink was first placed inside the block:
+#
+#      $ zsh -ic true | wc -c
+#      _grove_fnm_use_on_cd:2: no such file or directory:
+#      0
+#
+#    the byte count went green and the shell still spoke — on stderr, where
+#    the count could not see it. a clamp that reads one stream is half a
+#    clamp (`gotcha.a-check-that-cries-wolf-gets-silenced`).
+#
+# ⚠️ `_grove_fnm_use_on_cd` is the reader that proved it: it sits in the
+#    `command -v fnm` block far below, which has NO tty gate of its own, so
+#    it runs under a pipe while the sink's own block does not.
+#
+# ⚠️ `; }`, never `{ … }` — zsh accepts the bare form and bash does NOT: it
+#    reads the `}` as an argument to `:`, leaves the group unterminated, and
+#    reports the error a hundred lines later at an innocent `fi`. this file is
+#    read by `prove.dual-shell-files-hold-no-bash-only-syntax`, so it must
+#    parse under both (`rule.forbid.bare-globs-in-dual-shell-files`, same seam)
+#
+# ⚠️ `-w /dev/tty` is NOT the probe: `access(2)` reads the device node's mode
+#    bits, which say `crw-rw-rw-` on a box with no ctty as readily as on one
+#    with. only an OPEN answers, so this opens it.
+####################################################################
+_osc_sink=/dev/null
+{ : >/dev/tty; } 2>/dev/null && _osc_sink=/dev/tty
+
 # interactive session setup
 if [[ -t 1 ]]; then
   # disable ctrl+z job suspend (lets apps like nvim use ctrl+z for undo)
@@ -59,6 +97,51 @@ if [[ -t 1 ]]; then
   #      greps both rc files for it, so the declaration is still proven by the bundle
   #      whose concern it is. terminfo keeps ~/.bashrc, which no bundle byte-owns
   [[ -t 0 ]] && stty erase '^?' 2>/dev/null
+
+  ####################################################################
+  # 🛑 the OSC SINK — the TERMINAL, never stdout
+  #
+  # ⚠️ .this assignment is DUPLICATED at the top of the file, ON PURPOSE
+  #    the copy above is the one that binds; this one is dead on every run.
+  #    it is kept so a reader who lands on the emitters below finds the sink's
+  #    whole reason beside them rather than 60 lines up, and re-assignment is
+  #    idempotent, so the pair cannot disagree. ⇒ see the top copy for WHY it
+  #    must sit outside this `[[ -t 1 ]]` block.
+  #
+  # 📜 measured 2026-09-14. both emitters below `printf`ed to STDOUT, and
+  #    both are `chpwd` hooks. so ANY `cd` inside a command substitution
+  #    poured their escape bytes straight into the capture:
+  #
+  #      eval "$( cd "$HOME"; pnpm completion zsh )"
+  #        ✋ (eval):1: command not found: ^[]7
+  #        ✋ (eval):1: no such file or directory: file://pop-os/home/vlad^G^[]2
+  #        ✋ (eval):1: command not found: ~^G#compdef
+  #
+  #    read the payloads and the cause is on the page: the OSC 7 body is
+  #    `$HOME`, the OSC 2 title is `~`, and `#compdef` is the first line of
+  #    `pnpm completion zsh` — three unrelated producers, glued into one
+  #    string, and RUN in the human's interactive shell.
+  #
+  # ⇒ an OSC sequence addresses the TERMINAL. a capture is not one. so the
+  #   sink is `/dev/tty`, which stays the terminal where fd 1 is a pipe —
+  #   and that holds for every future `cd` inside a `$( )` rather than for
+  #   one call site at a time (`rule.require.solve-at-cause`).
+  #
+  # ⚠️ a process with no ctty opens no `/dev/tty`, so the sink is settled
+  #    ONCE here rather than probed per `cd` — these run on every directory
+  #    change, and `.perf` is why they are hooks at all.
+  #
+  # ⚠️ `-w /dev/tty` is NOT the probe: `access(2)` reads the device node's
+  #    mode bits, which say `crw-rw-rw-` on a box with no ctty as readily as
+  #    on one with. only an OPEN answers, so this opens it.
+  ####################################################################
+  # ⚠️ `; }`, never `{ … }` — zsh accepts the bare form and bash does NOT: it
+  #    reads the `}` as an argument to `:`, leaves the group unterminated, and
+  #    reports the error a hundred lines later at an innocent `fi`. this file is
+  #    read by `prove.dual-shell-files-hold-no-bash-only-syntax`, so it must
+  #    parse under both (`rule.forbid.bare-globs-in-dual-shell-files`, same seam)
+  _osc_sink=/dev/null
+  { : >/dev/tty; } 2>/dev/null && _osc_sink=/dev/tty
 
   # report cwd to the terminal, so a new tab or split inherits this pwd —
   # kitty reads OSC 7 for `launch --cwd=current`, as does every other emulator
@@ -109,7 +192,7 @@ if [[ -t 1 ]]; then
   _osc7_cwd() {
     local safe="${PWD//[[:cntrl:]]/}"
     local url_path="${safe// /%20}"  # encode spaces (common case)
-    printf '\e]7;file://%s%s\a' "${HOST:-localhost}" "$url_path"
+    printf '\e]7;file://%s%s\a' "${HOST:-localhost}" "$url_path" >$_osc_sink
   }
   chpwd_functions+=(_osc7_cwd)
   _osc7_cwd  # run once on shell start
@@ -134,7 +217,7 @@ if [[ -t 1 ]]; then
     #    branch, and a SUBPATH, and two of those three are directory names. a
     #    BEL in one ends this OSC 2 and the rest is fresh terminal input. the
     #    full reason sits on `_osc7_cwd` above
-    printf '\e]2;%s\a' "${title//[[:cntrl:]]/}"
+    printf '\e]2;%s\a' "${title//[[:cntrl:]]/}" >$_osc_sink
 
     # inside tmux, push repo + branch as pane options so the tmux status line can
     # read them directly (see status-left/right in tmux.conf) — no string parse,
@@ -292,9 +375,34 @@ if command -v fnm &>/dev/null; then
   #      plausible fix, which is the costliest kind
   #      (`gotcha.a-check-that-cries-wolf-gets-silenced`, q7). the residue above
   #      is about WHICH version is chosen, and no timeout reaches that.
+  # 🛑 `>$_osc_sink` — the THIRD stdout writer of the 2026-09-14 repair, and the
+  #    one the first two passes missed. measured, not recalled:
+  #
+  #      $ zsh -ic true | wc -c
+  #      20
+  #      $ zsh -ic true | cat -A
+  #      Using Node v22.21.0$
+  #
+  #    `fnm use` prints that line to STDOUT whenever the version changes, and
+  #    `--silent-if-unchanged` only quiets the no-op case. two harms, one cause:
+  #
+  #      1. it is a BOOT PRINT. a shell that opens inside a pinned repo leads
+  #         with it, and a human is asked to act on none of it
+  #      2. ⚠️ this function is a `chpwd` hook, so it is the SAME junction the
+  #         OSC emitters sat on — any `cd` inside a `$( )` that lands in a
+  #         pinned tree pours this line into the capture
+  #
+  #    ⇒ so the repair is the repair the OSC emitters already got: the line
+  #      addresses a HUMAN AT A TERMINAL, and a capture is not one. it goes to
+  #      the sink settled once at boot, which stays the terminal even where fd 1
+  #      is a pipe.
+  #
+  # ⚠️ STDOUT only — stderr is left alone on purpose. an absent version, a failed
+  #    fetch, and a refused install all report there, and to sink those would be
+  #    a failhide (`rule.forbid.failhide`).
   _grove_fnm_use_on_cd() {
     [[ -f .node-version || -f .nvmrc || -f package.json ]] || return 0
-    fnm use --install-if-missing --silent-if-unchanged
+    fnm use --install-if-missing --silent-if-unchanged >$_osc_sink
   }
   autoload -U add-zsh-hook
   add-zsh-hook -D chpwd _grove_fnm_use_on_cd
@@ -330,7 +438,20 @@ if command -v fnm &>/dev/null; then
     #
     #    the literals are the clamped copy of `WEB_REGISTRY_{GRACE,TOTAL}` —
     #    never a third number (`prove.registry-bounds-agree`).
-    ( cd "$HOME" && CI=1 timeout -k 30 900 pnpm --version ) &>/dev/null && return
+    #
+    # 🛑 `cd -q`, here and at the install below — this function IS a `chpwd`
+    #    hook, so a bare `cd` re-fires every hook in `chpwd_functions`, THIS
+    #    ONE INCLUDED. a subshell bounds the blast and does not stop the
+    #    re-entry, and each round forks again.
+    #    ⇒ `-q` suppresses `chpwd` and `chpwd_functions`, which is correct on
+    #      its own terms too: this cwd is CONTAINMENT, never a place a human
+    #      went, so no hook that reacts to a human's move belongs on it.
+    #
+    #    📜 measured 2026-09-14 rather than recalled — one counter, one hook:
+    #         bare cd  -> fired=1
+    #         cd -q    -> fired=1      ← the hook did not run
+    #      `prove.rc-hooks-never-reach-a-capture` re-proves it on every box.
+    ( cd -q "$HOME" && CI=1 timeout -k 30 900 pnpm --version ) &>/dev/null && return
 
     # install pnpm globally (works on node <25 and 25+)
     #
@@ -403,7 +524,7 @@ if command -v fnm &>/dev/null; then
     #    absence of a ✋ here as agreement.
     local _pnpm_floor="10.24.0"
     echo "• pnpm not found, install pnpm@$_pnpm_floor via npm..." > /dev/tty
-    ( cd "$HOME" && CI=1 timeout -k 30 900 \
+    ( cd -q "$HOME" && CI=1 timeout -k 30 900 \
         npm install -g "pnpm@$_pnpm_floor" --ignore-scripts --fetch-timeout 60000 ) > /dev/tty 2>&1
   }
 
@@ -445,9 +566,21 @@ if command -v fnm &>/dev/null; then
   #
   # ⚠️ the `eval` stays OUTSIDE the subshell on purpose — a completion defines
   #    functions, and functions defined inside `( … )` die with it.
+  #
+  # 🛑 `cd -q`, never a bare `cd` — the SECOND half of the 2026-09-14 repair
+  #    `-q` suppresses `chpwd` and `chpwd_functions`, and four hooks are
+  #    registered by the time this line runs: the two OSC emitters above,
+  #    `_grove_fnm_use_on_cd`, and `_ensure_pnpm_after_fnm`. not one of them
+  #    is wanted here — this cwd is CONTAINMENT, never a place the human went.
+  #
+  #    ⇒ the OSC sink above already keeps their bytes out of this capture, so
+  #      this is the belt to that brace. it earns its own line because it
+  #      closes a SECOND hazard the sink does not reach: `_grove_fnm_use_on_cd`
+  #      would switch this shell's node version mid-capture, from a `.nvmrc`
+  #      the cwd chose — and `pnpm` is a node program.
   ####################################################################
   [[ -t 1 ]] && command -v pnpm &>/dev/null && eval "$(
-    cd "$HOME" || exit
+    cd -q "$HOME" || exit
     export CI=1
     timeout -k 30 900 pnpm completion zsh 2>/dev/null \
       || timeout -k 30 900 pnpm completion bash 2>/dev/null

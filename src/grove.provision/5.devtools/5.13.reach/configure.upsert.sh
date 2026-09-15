@@ -20,8 +20,7 @@
 ######################################################################
 
 grove_provision_5_13_reach_configure_upsert() {
-  local org owner
-  org="$(grove_provision_5_13_reach_org)"
+  local owner
   owner="$(grove_provision_5_13_reach_owner)"
 
   ####################################################################
@@ -44,53 +43,86 @@ grove_provision_5_13_reach_configure_upsert() {
     return 0
   fi
 
-  ####################################################################
-  # 🛑 declare THIS org before any `aws.reach.set` runs
-  #   - that skill's own `keyrack set` resolves a NAMED org against the
-  #     `keyrack.yml` in scope, and the scratch root is `5.12.rack`'s
-  #   - `5.12.rack` runs FIRST and its loop leaves the LAST org it wired
-  #     declared there, so this phase must never inherit that leftover
-  #   - 📜 measured: with `ehmpathy` left declared, all three rows died on
-  #     `org "ahbode" does not match keyrack.yml org "ehmpathy"`, AFTER each
-  #     had already written its `~/.aws/config` body — a half-applied pair
-  #   - ⇒ one fact, two consumers: `5.12.rack` OWNS the scratch declaration,
-  #     and every borrower re-states the org it needs
-  #   - (`rule.forbid.two-writers-on-one-artifact`,
-  #      `gotcha.a-check-that-cries-wolf-gets-silenced`, m.9)
-  ####################################################################
   local gitroot
   gitroot="$(grove_provision_5_12_rack_gitroot)"
-  grove_provision_5_12_rack_declare_org "$gitroot" "$org" || return 1
 
-  # 1. one env at a time. ⚠️ the role is read INSIDE the loop — the rows no
-  #    longer share a role, so a hoisted read writes one name into every profile
-  local failed=0 pair rest env dkey rkey role account
+  # 1. one row at a time. ⚠️ the role AND the org are read INSIDE the loop — the
+  #    rows share neither, so a hoisted read writes one value into every profile
+  local failed=0 pair rest org env reader akey rkey role account
   for pair in $(grove_provision_5_13_reach_envs); do
-    env="${pair%%:*}"
+    org="${pair%%:*}"
     rest="${pair#*:}"
-    dkey="${rest%%:*}"
+    env="${rest%%:*}"
+    rest="${rest#*:}"
+    reader="${rest%%:*}"
+    rest="${rest#*:}"
+    akey="${rest%%:*}"
     rkey="${rest##*:}"
 
-    # ⚠️ halt a 2-field row here: `${rest##*:}` would hand back the declapract
-    #    key, whose empty role read looks like "infrastructure is not cloned"
-    if [[ "$rest" != *:* ]]; then
-      echo "   ✋ the row for '${env}' names no role key" >&2
-      echo "      ⇒ a row is '<env>:<declapractKey>:<roleKey>' — see 5.13.reach/_.sh" >&2
+    # ⚠️ halt a short row here: `${rest##*:}` would hand back some EARLIER
+    #    field, whose empty role read looks like "infrastructure is not cloned"
+    if [[ "$pair" != *:*:*:*:* ]]; then
+      echo "   ✋ the row '${pair}' is malformed" >&2
+      echo "      ⇒ a row is '<org>:<env>:<reader>:<accountKey>:<roleKey>' — see 5.13.reach/_.sh" >&2
       failed=1
       continue
     fi
 
     ##################################################################
-    # the ROLE — read from infrastructure's own declaration, never recalled
+    # 🛑 declare THIS ROW's org before its `aws.reach.set` runs
+    #   - that skill's own `keyrack set` resolves a NAMED org against the
+    #     `keyrack.yml` in scope, and the scratch root is `5.12.rack`'s
+    #   - `5.12.rack` runs FIRST and its loop leaves the LAST org it wired
+    #     declared there, so this phase must never inherit that leftover
+    #   - 📜 measured: with `ehmpathy` left declared, all three rows died on
+    #     `org "ahbode" does not match keyrack.yml org "ehmpathy"`, AFTER each
+    #     had already written its `~/.aws/config` body — a half-applied pair
+    #   - ⇒ one fact, two consumers: `5.12.rack` OWNS the scratch declaration,
+    #     and every borrower re-states the org it needs
+    #   - (`rule.forbid.two-writers-on-one-artifact`,
+    #      `gotcha.a-check-that-cries-wolf-gets-silenced`, m.9)
+    #
+    # 🛑 .why PER ROW and no longer once, above the loop
+    #   - the rows no longer share an org, so one declaration ahead of them
+    #     leaves every row but the first resolved against the wrong yml
+    #   - that file declares ONE org by contract (`5.12.rack`'s own comment),
+    #     so the rewrite per row is its intended use, never a workaround
     ##################################################################
-    role="$(grove_provision_5_13_reach_role "$rkey")"
+    grove_provision_5_12_rack_declare_org "$gitroot" "$org" || { failed=1; continue; }
+
+    ##################################################################
+    # the ROLE — read from infrastructure's own declaration, never recalled
+    #
+    # 🛑 the decline names the row's OWN reader's file, never one fixed path
+    #   - a row that reads `resources.reach-arns.ts` and declines with the
+    #     `GROVE_ROLE_NAME` sentence sends a human to repair a file whose
+    #     contract FORBIDS that key — a fix nobody can perform, forever
+    #   - ⇒ `_declsrc` holds that sentence once, for both halves (m.9)
+    ##################################################################
+    local declsrc; declsrc="$(grove_provision_5_13_reach_declsrc "$reader")" || declsrc="(unknown reader '${reader}')"
+
+    role="$(grove_provision_5_13_reach_role "$reader" "$rkey")"
 
     if [[ -z "$role" ]]; then
-      echo "   • ${org}.${env} declined — GROVE_ROLE_NAME.${rkey} is not readable here"
-      echo "     ⇒ it is DECLARED in ahbode/infrastructure:"
-      echo "       provision/aws.auth/resources.role-names.ts → GROVE_ROLE_NAME"
-      echo "     ⇒ that repo is a clone, so this declines until 5.10.repos has run:"
-      echo "       rhx grove.provision --what 5.10.repos --mode apply"
+      echo "   • ${org}.${env} declined — the role key '${rkey}' is not readable here"
+      echo "     ⇒ it is DECLARED in ahbode/infrastructure, by the '${reader}' reader:"
+      echo "       ${declsrc}"
+      ################################################################
+      # 🛑 name BOTH repairs — this reader cannot tell them apart
+      #   - an ABSENT clone and a clone PRESENT AND BEHIND read identically:
+      #     the key is unreadable here. the repairs are opposite
+      #   - ⇒ a decline that names only the clone-absent fix sends a human to
+      #     re-run `5.10.repos` on a box whose clone is already there. it
+      #     changes naught, and the decline repeats on every apply forever
+      #   - 📜 measured 2026-09-14 on grove-ahbode-v20260901: infra WAS cloned,
+      #     and the demo pair sits on a branch that has not merged
+      #   - (`rule.require.one-command-provision`, its unrepairable-fix-text
+      #      clause; `gotcha.a-check-that-cries-wolf-gets-silenced`)
+      ################################################################
+      echo "     fix — whichever holds. the two read the SAME way from here:"
+      echo "       • the clone is absent:  rhx grove.provision --what 5.10.repos --mode apply"
+      echo "       • the clone is behind:  the declaration has not merged to that"
+      echo "         repo's main yet, so no command on THIS box can close it"
       echo "     🛑 it is NOT guessed. a role name that does not exist refuses with"
       echo "        the same AccessDenied as a role that excludes this box, so a"
       echo "        guess turns a readable gap into a false 'no access' report"
@@ -100,11 +132,12 @@ grove_provision_5_13_reach_configure_upsert() {
 
     # ⚠️ the account is read and PASSED, never printed, since it is dox
     #   - (`rule.forbid.dox-in-public-repo`)
-    account="$(grove_provision_5_13_reach_account "$dkey")"
+    account="$(grove_provision_5_13_reach_account "$reader" "$akey")"
     if [[ -z "$account" ]]; then
-      echo "   • ${org}.${env} declined — no declapract.use.yml declares awsAccountId.${dkey}"
-      echo "     ⇒ every repo of one org declares the same accounts, so any clone"
-      echo "       answers. until 5.10.repos has run, none is present"
+      echo "   • ${org}.${env} declined — the account key '${akey}' is not readable here"
+      echo "     ⇒ it is DECLARED in ahbode/infrastructure, by the '${reader}' reader:"
+      echo "       ${declsrc}"
+      echo "     ⇒ those are clones, so this declines until 5.10.repos has run"
       continue
     fi
 

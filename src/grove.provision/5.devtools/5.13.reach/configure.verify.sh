@@ -24,8 +24,7 @@
 ######################################################################
 
 grove_provision_5_13_reach_configure_verify() {
-  local org owner
-  org="$(grove_provision_5_13_reach_org)"
+  local owner
   owner="$(grove_provision_5_13_reach_owner)"
 
   if ! aws configure export-credentials --profile ambient >/dev/null 2>&1; then
@@ -49,26 +48,65 @@ grove_provision_5_13_reach_configure_verify() {
   local gitroot
   gitroot="$(grove_provision_5_12_rack_gitroot)"
 
-  # 🛑 declare THIS org before the reads — `5.12.rack` runs first and its loop
-  #    leaves the LAST org it wired declared in that scratch yml. a named-org read
-  #    resolves against the yml in scope, so without this every row below reads
-  #    empty and reports a false ✋ on entries that are present
-  grove_provision_5_12_rack_declare_org "$gitroot" "$org" || return 1
-
   # ⚠️ parse the row the SAME way the upsert does — one table, two readers, free
   #    to drift. a `${pair##*:}` here reads the ROLE key as the account key, so
   #    every env falls to the weaker 🌙 "no clone declares the account"
-  local failed=0 pair rest env dkey account named seen
+  local failed=0 pair rest org env reader akey rkey account named seen declsrc
   for pair in $(grove_provision_5_13_reach_envs); do
-    env="${pair%%:*}"
+    org="${pair%%:*}"
     rest="${pair#*:}"
-    dkey="${rest%%:*}"
+    env="${rest%%:*}"
+    rest="${rest#*:}"
+    reader="${rest%%:*}"
+    rest="${rest#*:}"
+    akey="${rest%%:*}"
+    rkey="${rest##*:}"
+    declsrc="$(grove_provision_5_13_reach_declsrc "$reader")" || declsrc="(unknown reader '${reader}')"
+
+    # 🛑 declare THIS ROW's org before its reads — `5.12.rack` runs first and its
+    #    loop leaves the LAST org it wired declared in that scratch yml. a named-org
+    #    read resolves against the yml in scope, so without this a row reads empty
+    #    and reports a false ✋ on an entry that is present.
+    #    ⚠️ per ROW, since the rows no longer share an org
+    grove_provision_5_12_rack_declare_org "$gitroot" "$org" || { failed=1; continue; }
 
     # 1. does the rack NAME a profile for this env?
     named="$(env -C "$gitroot" rhx keyrack get --owner "$owner" --key AWS_PROFILE \
                --org "$org" --env "$env" --unlock --value 2>/dev/null | tail -1)"
 
     if [[ -z "$named" ]]; then
+      ################################################################
+      # 🛑 an UNWIRED row whose DECLARATION is unreadable is UNPROVEN,
+      #    never broken — decline exactly where the UPSERT declined
+      #   - the upsert cannot wire a role or an account it cannot read, so
+      #     it `continue`s with no claim. a ✋ here names a defect nobody
+      #     can repair: its fix-text asks for a re-apply of this bundle,
+      #     and that re-apply declines identically, forever
+      #   - ⇒ the owed work is a DECLARATION in another repo, so say that
+      #     instead — a box must be repairable by the command it is given
+      #   - ⇒ one table, two readers: the upsert's decline conditions and
+      #     these are the SAME two reads, in the same order
+      #   - (`rule.require.one-command-provision`, its unrepairable-fix-text
+      #      clause; `gotcha.a-check-that-cries-wolf-gets-silenced`)
+      ################################################################
+      if [[ -z "$(grove_provision_5_13_reach_role "$reader" "$rkey")" ]]; then
+        echo "   • ${org}.${env} declined — the role key '${rkey}' is not readable here"
+        echo "     ⇒ the upsert declined for the same reason, so no hop is owed yet"
+        echo "     ⇒ it is DECLARED in ahbode/infrastructure, by the '${reader}' reader:"
+        echo "       ${declsrc}"
+        continue
+      fi
+
+      # ⚠️ a DISAGREEMENT also reads empty, and `_account` has already printed
+      #   its own ✋ that names the files — so this decline hides none of it
+      if [[ -z "$(grove_provision_5_13_reach_account "$reader" "$akey")" ]]; then
+        echo "   • ${org}.${env} declined — the account key '${akey}' is not readable here"
+        echo "     ⇒ the upsert declined for the same reason, so no hop is owed yet"
+        echo "     ⇒ it is DECLARED in ahbode/infrastructure, by the '${reader}' reader:"
+        echo "       ${declsrc}"
+        continue
+      fi
+
       echo "   ✋ the rack names no profile for ${org}.${env}.AWS_PROFILE" >&2
       echo "      ⇒ every suite that targets ${env} dies at 'AWS_PROFILE not set.'" >&2
       echo "        with live credentials one metadata call away" >&2
@@ -92,7 +130,7 @@ grove_provision_5_13_reach_configure_verify() {
       continue
     fi
 
-    account="$(grove_provision_5_13_reach_account "$dkey")"
+    account="$(grove_provision_5_13_reach_account "$reader" "$akey")"
     if [[ -z "$account" ]]; then
       echo "   🌙 ${org}.${env} answers as '${named}', and no clone declares the"
       echo "      account to compare it against — so the ACCOUNT half is unproven"
@@ -110,7 +148,13 @@ grove_provision_5_13_reach_configure_verify() {
       echo "        on it will fail on permissions, far from this cause" >&2
       echo "      ⇒ compare them by hand:" >&2
       echo "        aws sts get-caller-identity --profile ${named} --query Account" >&2
-      echo "        grep -A4 awsAccountId ~/git/${org}/*/declapract.use.yml" >&2
+      # ⚠️ the SOURCE org, never the row's target org — a row may reach into an
+      #   account that no clone of its own org declares, which is why the two
+      #   axes parted in the first place (`5.13.reach/_.sh`, `_srcorg`)
+      # ⚠️ and the FILE is the row's own reader's, never one fixed path — an
+      #   `arnconst` row's id is nowhere in a declapract.use.yml
+      echo "        under ~/git/$(grove_provision_5_13_reach_srcorg)/, read:" >&2
+      echo "        ${declsrc}" >&2
       failed=1
       continue
     fi

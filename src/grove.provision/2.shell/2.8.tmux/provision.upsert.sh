@@ -26,10 +26,10 @@
 #   - self-repair: any other state is moved aside and re-cloned
 #   - ⇒ one apply converges it and no human owes an `rm -rf`
 #
-# .note = tpm AND both plugins are pinned to a sha, each declared in `_.sh`
+# .note = tpm AND the plugin are pinned to a sha, each declared in `_.sh`
 #   - tpm's tip is shell code `~/.tmux.conf` runs on every session
-#   - `@continuum-restore 'on'` runs the plugins' code unattended on every server start
-#   - ⇒ an unpinned clone of any of the three is code execution nobody vouched for
+#   - and tpm sources each `@plugin`'s own `.tmux` file at that same load
+#   - ⇒ an unpinned clone of either is code execution nobody vouched for
 ######################################################################
 
 grove_provision_2_8_tmux_provision_upsert() {
@@ -152,10 +152,17 @@ grove_provision_2_8_tmux_provision_upsert() {
   #   - tpm resolves `@plugin 'owner/name'` to `~/.tmux/plugins/<name>`
   #   - ⇒ these paths are not ours to choose
   ####################################################################
+  #
+  # ⚠️ this list and the conf's `@plugin` lines are ONE SET, TWO READERS
+  #   - the conf declares what tpm loads; this clones what the conf will name
+  #   - ⇒ a plugin in one and not the other is a drift no phase reports:
+  #     conf-only means tpm fetches it UNPINNED, and clone-only means a dir
+  #     nobody loads
+  #   - 🛑 so a change to either belongs in the SAME edit as the other
+  #   (`rule.require.one-command-provision`: one set, two readers)
   local plug plug_name plug_url plug_at plug_dir plug_state plug_aside
   for plug in \
-    "tmux-resurrect|https://github.com/tmux-plugins/tmux-resurrect|$GROVE_UPGRADE_2_8_TMUX_RESURRECT_AT" \
-    "tmux-continuum|https://github.com/tmux-plugins/tmux-continuum|$GROVE_UPGRADE_2_8_TMUX_CONTINUUM_AT"
+    "tmux-resurrect|https://github.com/tmux-plugins/tmux-resurrect|$GROVE_UPGRADE_2_8_TMUX_RESURRECT_AT"
   do
     plug_name="${plug%%|*}"
     plug_url="${plug#*|}";  plug_url="${plug_url%%|*}"

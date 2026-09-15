@@ -22,6 +22,21 @@
 # .permissions.defaultMode=acceptEdits starts every session with file edits
 #   applied without a prompt (shift+tab still cycles modes live)
 #
+# 🛑 .cleanupPeriodDays governs the TRANSCRIPTS, and its default DELETES them
+#   - claude keeps a session's transcript for N days past its last activity and
+#     then removes it. the default N is 30, and it applies whether or not the key
+#     appears in the file — so an ABSENT key is not "no prune", it IS the 30-day
+#     prune, chosen by default and never stated
+#   - ⇒ every `/resume`, every post-compaction re-read of a session `.jsonl`, and
+#     every archaeology run against a prior session dies on its 31st day
+#   - ⚠️ the loss is UNRECOVERABLE and UNREPORTED. no line says a transcript was
+#     pruned, so a human learns of it from a `/resume` that finds naught — which
+#     is a failhide in the tool, and the reason this key is declared rather than
+#     left to a default nobody sees (`rule.forbid.failhide`)
+#   - ⇒ 36500 days is a hundred years, which is `never` said in the one unit the
+#     option accepts. claude declares NO sentinel for never, so a reader who
+#     greps for that word finds none — and must not read its absence as a gap
+#
 # ⚠️ the prompt-suggestion flag belongs in `env`, and the installer nag does not
 #   - claude reads it mid-session, well after settings load
 #   - the installation checks run at BOOT, before settings are read at all
@@ -45,7 +60,7 @@
 ######################################################################
 
 grove_provision_5_3_brains_configure_upsert() {
-  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false"}, "disableClaudeAiConnectors": true, "permissions": {"defaultMode": "acceptEdits"}, "model": "claude-opus-4-8[1m]"}'
+  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false"}, "disableClaudeAiConnectors": true, "permissions": {"defaultMode": "acceptEdits"}, "model": "claude-opus-4-8[1m]", "cleanupPeriodDays": 36500}'
   local settings="$HOME/.claude/settings.json"
 
   if ! mkdir -p "$HOME/.claude"; then

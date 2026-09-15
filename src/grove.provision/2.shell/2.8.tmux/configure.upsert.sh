@@ -22,8 +22,11 @@
 #
 # .why the conf IS sourced into the live server
 #   - 📜 grove-ahbode-v20260901, 2026-09-03, against three prior reasons to decline:
-#   - 1. "a re-run of tpm re-inits continuum" — REFUTED
-#   - the conf ends in `run '~/.tmux/plugins/tpm/tpm'` and sets `@continuum-restore on`
+#   - 1. "a re-run of tpm re-inits a plugin's hooks" — REFUTED
+#   - ⚠️ measured while the conf still carried continuum, which it no longer does;
+#     the claim it settles is about TPM, so the plugin it used as a probe is
+#     incidental and the refutation stands
+#   - the conf ends in `run '~/.tmux/plugins/tpm/tpm'`, and then set `@continuum-restore on`
 #   - a source does re-run tpm, and it does NOT stack
 #   - after three sources, `status-right "#(…/continuum_save.sh) #{@branch} "` held ONE hook
 #   - 2. "a conf that does not parse breaks the duct" — STALE
@@ -196,8 +199,8 @@ grove_provision_2_8_tmux_configure_upsert() {
     echo "      ⇒ this is SILENT at runtime: tmux starts, the conf loads, and the" >&2
     echo "        plugin's keybinds and status segments are simply omitted with no" >&2
     echo "        error anywhere. the human finds it by a dead keypress" >&2
-    echo "      ⇒ tmux-resurrect and tmux-continuum are what restore a session" >&2
-    echo "        across a reboot, so their absence costs the duct its memory" >&2
+    echo "      ⇒ tmux-resurrect is what saves a session on prefix+ctrl-s and" >&2
+    echo "        restores it on prefix+ctrl-r, so its absence makes both keys dead" >&2
     echo "      ⇒ waited ${waited}s for the clones under $plugin_dir; a slow" >&2
     echo "        network or a github reach that needs auth are the usual causes" >&2
     echo "      read why, on an isolated server so the duct is untouched:" >&2
@@ -210,32 +213,67 @@ grove_provision_2_8_tmux_configure_upsert() {
   echo "   • tmux plugins installed (${wanted[*]})"
 
   ####################################################################
-  # load the conf into the LIVE server — see `.why the conf IS sourced`
+  # load the conf into EVERY live server — see `.why the conf IS sourced`
+  #
+  # 🛑 .why EVERY, and not the default socket alone
+  #   - a conf is read at SERVER start, so each server holds its own copy in memory
+  #   - a write to `~/.tmux.conf` reaches none of them
+  #   - ⇒ a source into `default` reaches one of however many are up
+  #   - 📜 2026-09-13, this laptop: 16 sockets — the duct server, a `copygate`,
+  #     and 14 probe corpses. the duct's own is not always `default`, so a
+  #     default-only source is a converge of whichever server happened to be it
+  #
+  # 🛑 .why that is a CORRECTNESS bug and not a tidiness one
+  #   - 📜 2026-09-13: tmux-continuum was removed from the conf, and the storm
+  #     did not stop — every live server still carried continuum's `status-right`,
+  #     which is the interpolation that FIRES the save on each status refresh
+  #   - the removal was real and reached only servers booted after it
+  #   - ⇒ an option a plugin set OUTLIVES the line that asked for it, so an
+  #     un-sourced server does not merely hold stale values: it still runs what
+  #     the conf no longer declares
+  #   - this conf sets `status-right` explicitly, so one source overwrites it
+  #
+  # ⚠️ a FAILED socket does not fail the phase
+  #   - a socket file can outlive its server, and a server can be wedged on a pane
+  #   - neither is a defect in the conf this phase just wrote
+  #   - ⇒ they are counted and named; the bundle's verify is what grades them
+  #   - (`rule.forbid.failhide`: the count is reported, never swallowed)
   #
   # ⚠️ BOUNDED, for the reason every other tmux call here is
   #   - a client waits on the server's socket, and a wedged server never replies
+  #   - at ~140 sockets an unbounded call is a hang, not a slow run
   #   - (`rule.require.bounded-probes-in-verifies`)
-  #
-  # ⚠️ the DEFAULT socket on purpose
-  #   - that is the duct's own server on a grove, the one a human wants converged
-  #   - the `-L $sock` server above is the throwaway, and it is dead by now
   #
   # ⚠️ an ABSENT server is a pass, not a claim
   #   - a box with no tmux up has no live conf to converge
   #   - ⇒ the next server reads the file fresh
-  #   - only a server that is UP and REFUSES the conf is worth a word
   ####################################################################
-  if timeout -k 2 5 tmux has-session 2>/dev/null; then
-    if timeout -k 2 5 tmux source-file "$HOME/.tmux.conf" 2>/dev/null; then
-      echo "   • conf sourced into the live tmux server"
+  local live=() sourced=0 refused=()
+  while read -r line; do
+    [[ -n "$line" ]] && live+=("$line")
+  done < <(grove_provision_2_8_tmux_live_sockets)
+
+  for name in "${live[@]}"; do
+    if timeout -k 2 5 tmux -L "$name" source-file "$HOME/.tmux.conf" 2>/dev/null; then
+      sourced=$(( sourced + 1 ))
     else
-      echo "   🌙 a tmux server is up and would not load the conf"
-      echo "      ⇒ its options keep their PRIOR values, so a reattach alone will"
-      echo "        not deliver this conf — read why:"
-      echo "        tmux source-file ~/.tmux.conf"
+      refused+=("$name")
     fi
-  else
+  done
+
+  if [[ ${#live[@]} -eq 0 ]]; then
     echo "   • no tmux server up — the next one reads the conf fresh"
+  else
+    echo "   • conf sourced into $sourced of ${#live[@]} live tmux server(s)"
+  fi
+
+  if [[ ${#refused[@]} -gt 0 ]]; then
+    echo "   🌙 ${#refused[@]} live server(s) would not load the conf: ${refused[*]}"
+    echo "      ⇒ each keeps its PRIOR options — a REMOVED plugin's among them,"
+    echo "        since an option outlives the line that asked for it"
+    echo "      ⇒ a socket that outlived its server reads the same way here; the"
+    echo "        bundle's verify is what tells the two apart"
+    echo "      read why: tmux -L ${refused[0]} source-file ~/.tmux.conf"
   fi
 
   echo "     ⚠️ a live CLIENT still needs a reattach: terminal-features (RGB,"
