@@ -61,6 +61,13 @@ fi
 export ANTHROPIC_MODEL='claude-opus-5[1m]'
 export CLAUDE_CODE_SKIP_UPDATE_CHECK=1
 
+# subagents default to sonnet, never the session's opus.
+#
+# .why a subagent reads a bounded slice and reports one message back, so the
+#      session's opus buys little there and costs per spawn. an agent whose
+#      own definition declares a `model:` still wins over this default.
+export CLAUDE_CODE_SUBAGENT_MODEL='claude-sonnet-5[1m]'
+
 # aws profiles via keyrack
 # usage: use.ahbode.prep [--owner <owner>]
 _use_aws_profile() {

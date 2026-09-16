@@ -37,6 +37,21 @@
 #     option accepts. claude declares NO sentinel for never, so a reader who
 #     greps for that word finds none — and must not read its absence as a gap
 #
+# .permissions.deny=["Agent"] bans SUBAGENTS outright
+#   - a BARE tool name (no parens, no args) removes the tool from claude's own
+#     context, so it never sees it — this is not a prompt-at-call-time gate
+#   - ⇒ it takes effect on the next tool call, mid-session, with no restart
+#   - the cost is real and chosen: research that a subagent would hold in its own
+#     context now lands in the main one, and `/batch` (which fans out across
+#     worktree agents) no longer runs
+#
+# 🛑 .`jq '. * $patch'` REPLACES an array; it merges only objects
+#   - ⇒ a `deny` list a human adds to this file by hand is DESTROYED by the next
+#     apply, silently, because this patch declares that same key
+#   - ⇒ a deny entry belongs HERE, in this list, never in the live file alone
+#   - (the live file held no `deny` array when this landed, so the first apply
+#     destroyed no entry — that is a fact about that day, never a guarantee)
+#
 # ⚠️ the prompt-suggestion flag belongs in `env`, and the installer nag does not
 #   - claude reads it mid-session, well after settings load
 #   - the installation checks run at BOOT, before settings are read at all
@@ -60,7 +75,7 @@
 ######################################################################
 
 grove_provision_5_3_brains_configure_upsert() {
-  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false"}, "disableClaudeAiConnectors": true, "permissions": {"defaultMode": "acceptEdits"}, "model": "claude-opus-4-8[1m]", "cleanupPeriodDays": 36500}'
+  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false"}, "disableClaudeAiConnectors": true, "permissions": {"defaultMode": "acceptEdits", "deny": ["Agent"]}, "model": "claude-opus-5[1m]", "cleanupPeriodDays": 36500}'
   local settings="$HOME/.claude/settings.json"
 
   if ! mkdir -p "$HOME/.claude"; then
