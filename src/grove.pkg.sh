@@ -263,9 +263,17 @@ pkg_assert_sudo() {
   echo "   │" >&2
 
   if [[ "${GROVE_ENV_SERVER:-}" == local@* ]]; then
-    echo "   └─ fix, whichever fits the box:" >&2
-    echo "      · run this from a terminal, so sudo can prompt you" >&2
-    echo "      · warm the credential first, then re-run:  sudo -v" >&2
+    # reached only when a password is owed AND this caller cannot answer it:
+    # on local@unix a human-at-keyboard tty already returned 0 in pkg_can_sudo,
+    # so what lands here is a robot, a background run, or a cron — a caller with
+    # no tty to prompt on. sudo caches its credential PER-TTY, so a `sudo -v`
+    # warmed in a DIFFERENT terminal does not reach this caller; the warm and the
+    # run must share one tty. that is why the fix is a single chained command,
+    # not a warm-then-rerun in two steps (rule.require.errors-name-the-fix)
+    echo "   └─ this caller cannot answer a sudo prompt — hand it to a human at a" >&2
+    echo "      terminal, who warms and runs in ONE tty (a credential warmed in a" >&2
+    echo "      separate terminal will NOT carry — sudo caches per-tty):" >&2
+    echo "         sudo -v && rhx grove.provision --mode apply" >&2
     return 1
   fi
 
