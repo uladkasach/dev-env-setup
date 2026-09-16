@@ -733,15 +733,31 @@ end
 --   2. ctrl+( (d,j) -> emit, (d,j) -> emit, ... )                ctrl held, d+j re-tapped
 --   3. ctrl+d+( j -> emit, j -> emit, ... )                      ctrl held, j alone repeats
 --
--- forms 1 and 2 are ONE keystream — <C-d><C-j> either way, because a ctrl lift
--- between two chords leaves no trace in the keycodes. both always worked.
+-- forms 1 and 2 are ONE keystream — a ctrl lift between two chords leaves no
+-- trace in the keycodes. form 3 needs the arm below: the ctrl-held chord
+-- re-points the second key at another boundary jump instead of its usual half
+-- page scroll, until a key outside the set ends it.
 --
--- form 3 needs this arm: the ctrl-held chord re-points ctrl+j at another boundary
--- jump instead of its usual half page scroll, until a key outside the set ends it.
+-- 🛑 ctrl+j reaches nvim as a BARE <CR> (0d), and never as <C-j> or <S-CR>.
+--    measured 2026-09-16, live kitty -> tmux -> nvim, via a key logger:
+--      form 1 (ctrl lifted):  04  0d  04  0d
+--      form 2 (ctrl held):    04  0d  04  0d      — byte-identical to form 1
+--      form 3 (j repeats):    04  0d  0d  0d  0d
+--    kitty rewrites ctrl+j to shift+enter, but tmux never negotiated the
+--    enhanced keyboard protocol, so shift+enter has no distinct legacy byte and
+--    degrades to \r. ⇒ every <S-CR> bind here is UNREACHABLE under tmux.
 --
--- the disarm on ctrl lift costs no code: ctrl-held j arrives as <C-j> (kitty
--- rewrites it to <S-CR>), while a ctrl-lifted j arrives as plain `j`, which is
--- never rebound. so the moment ctrl comes up, `j` is a normal motion again.
+-- ⇒ so the vocabulary carries ALL the spellings ctrl+j can wear, rather than a
+--   bet on which one arrives: <C-j> (a bare terminal), <S-CR> (kitty direct),
+--   <CR> (kitty through tmux — the daily path). a chain change moves which one
+--   fires and breaks no bind.
+--
+-- ⚠️ a prior draft of this claim was "confirmed headless". headless nvim has no
+--    kitty and no tmux, so it measured the MAP TABLE and no part of the chain.
+--    see howto.probe-the-key-chain-with-a-live-logger.
+--
+-- the disarm on ctrl lift costs no code: a ctrl-lifted j arrives as plain `j`,
+-- which is never rebound. so the moment ctrl comes up, `j` is a normal motion.
 --
 -- 🛑 a ctrl RELEASE is UNREACHABLE here, and it is nvim that drops it, not tmux.
 --    measured 2026-09-06 -- see howdoes.a-key-event-reaches-nvim.md:
@@ -750,7 +766,7 @@ end
 --      · nvim yields NO key at all for any `:3u` release
 --    so the arm cannot end on the lift. it ends on the VOCABULARY instead.
 local BOUNDARY_REPEAT_KEEP = {}
-for _, k in ipairs({ '<C-d>', '<C-j>', '<C-k>', '<S-CR>' }) do
+for _, k in ipairs({ '<C-d>', '<C-j>', '<C-k>', '<S-CR>', '<CR>' }) do
   BOUNDARY_REPEAT_KEEP[#BOUNDARY_REPEAT_KEEP + 1] =
     vim.api.nvim_replace_termcodes(k, true, false, true)
 end
@@ -758,8 +774,9 @@ end
 -- ⚠️ on_key hands the WHOLE resolved chord as one string, never one key per call:
 --    `<C-d><C-j>` arrives as `04 0a`, not as `04` then `0a`. so the test is whether
 --    the string DECOMPOSES into vocabulary members, not whether it IS one.
---    no member is a prefix of another (04 / 0a / 0b / 80 fc 02 0d), so a greedy
---    walk is exact.
+--    no member is a prefix of another (04 / 0a / 0b / 0d / 80 fc 02 0d), so a
+--    greedy walk is exact. ⚠️ `0d` and `80 fc 02 0d` SHARE A TAIL, never a head,
+--    so the walk stays unambiguous — check that again before you add a member.
 local function boundary_repeat_keeps(s)
   local i = 1
   while i <= #s do
@@ -1246,10 +1263,13 @@ local PLUGIN_SPEC = {
       vim.keymap.set('n', '<C-d><C-k>', boundary_up_arm, { desc = 'Prev diff boundary' })
       -- kitty remaps ctrl+j -> shift+enter (the `map ctrl+j send_key shift+enter`
       -- line in grove.provision/4.terminal/4.3.kitty/4.3.2.emulator/kitty.conf),
-      -- so ctrl-held <C-d><C-j> never delivers <C-j> to
-      -- nvim — it arrives as <S-CR>. map that too so "ctrl held down" next-diff
-      -- works. ctrl+k is untouched by kitty, so prev needs no equivalent.
+      -- so ctrl-held <C-d><C-j> never delivers <C-j> to nvim. it arrives as
+      -- <S-CR> on a direct kitty, and as a BARE <CR> through tmux — which is the
+      -- daily path, and the one measured 2026-09-16. bind BOTH, so the chord
+      -- holds whichever form the chain delivers.
+      -- ctrl+k is untouched by kitty, so prev needs no equivalent.
       vim.keymap.set('n', '<C-d><S-CR>', boundary_down_arm, { desc = 'Next diff boundary' })
+      vim.keymap.set('n', '<C-d><CR>', boundary_down_arm, { desc = 'Next diff boundary' })
       -- ctrl+d s = stage, u = unstage, x = discard
       local function stage_buffer()
         gs.stage_buffer()
@@ -2149,9 +2169,11 @@ local PLUGIN_SPEC = {
           vim.keymap.set('n', '<C-d><C-j>', boundary_down_arm, { buffer = true, desc = 'Next diff boundary' })
           vim.keymap.set('n', '<C-d><C-k>', boundary_up_arm, { buffer = true, desc = 'Prev diff boundary' })
           -- kitty remaps ctrl+j -> shift+enter, so ctrl-held <C-d><C-j> reaches
-          -- nvim as <S-CR>; map it so next-diff works with ctrl held (see the
+          -- nvim as <S-CR> on a direct kitty and as a bare <CR> through tmux;
+          -- map both so next-diff works with ctrl held (see the
           -- gitsigns block above for the full rationale). ctrl+k is untouched.
           vim.keymap.set('n', '<C-d><S-CR>', boundary_down_arm, { buffer = true, desc = 'Next diff boundary' })
+          vim.keymap.set('n', '<C-d><CR>', boundary_down_arm, { buffer = true, desc = 'Next diff boundary' })
           -- 'o' to open file in new tab
           vim.keymap.set('n', 'o', function()
             local bufname = vim.api.nvim_buf_get_name(0)
@@ -2647,6 +2669,39 @@ end
 vim.keymap.set('n', '<C-j>', half_page('down'), { noremap = true, desc = 'Half page down' })
 vim.keymap.set('n', '<S-CR>', half_page('down'), { noremap = true, desc = 'Half page down' })
 vim.keymap.set('n', '<C-k>', half_page('up'), { noremap = true, desc = 'Half page up' })
+
+-- 🛑 <CR> is the byte ctrl+j ACTUALLY delivers through tmux (measured 2026-09-16),
+--    so form 3's repeats land here rather than on <C-j> or <S-CR>.
+--
+--    but a bare <CR> is also ORDINARY ENTER, and Enter must keep every extant
+--    sense it has: the next-line motion, a quickfix jump, a prompt-buffer submit.
+--    ⇒ so this diverts ONLY while a boundary repeat is armed, and otherwise hands
+--      the key straight back for its DEFAULT behavior.
+--
+-- .why feedkeys and not a `normal! <CR>` call
+--    a `normal!` call executes the next-line MOTION, which is what Enter does in a
+--    plain buffer and wrong in every special one — it would eat the quickfix jump.
+--    a fed key with mode 'n' runs as the DEFAULT instead, with no remap, so each
+--    buftype keeps its own sense of Enter.
+--
+-- 🛑 .why this is NOT an `expr` map
+--    an expr map evaluates under a TEXTLOCK: it may not move the cursor, change a
+--    buffer, or jump a window. so the armed branch — which is a cursor jump —
+--    cannot run from one. measured 2026-09-16: an expr draft jumped once (from the
+--    <C-d><CR> map, an ordinary one) and then died SILENTLY on every repeat, which
+--    reads exactly like a disarm and is not one.
+--    ⇒ a map whose job is to MOVE may never be `expr`, however tidy the fallthrough.
+--
+-- ⚠️ this spends NO key. an unarmed Enter is untouched, which is what lets ctrl+j
+--    drive the repeat without a tradeoff (contrast <S-CR>, spent on the scroll).
+vim.keymap.set('n', '<CR>', function()
+  if boundary_repeat_armed() and boundary_repeat.down then
+    boundary_repeat.down()
+    boundary_repeat_arm(boundary_repeat.down, boundary_repeat.up)
+    return
+  end
+  vim.api.nvim_feedkeys(vim.keycode('<CR>'), 'n', false)
+end, { noremap = true, desc = 'Next diff boundary (armed), else Enter' })
 
 -- ctrl+z = undo, ctrl+shift+z = redo (standard keybinds)
 vim.keymap.set('n', '<C-z>', 'u', { noremap = true })

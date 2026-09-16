@@ -10,15 +10,35 @@ the human may hold ctrl, lift it, or hold `d`, and the jump lands either way.
 the same jump is reachable three ways. they differ only in what the fingers do
 between emits.
 
-| form | fingers | keystream nvim receives |
-|------|---------|-------------------------|
-| **1. full chord, ctrl released** | `(ctrl+d, ctrl+j)` → emit, `(ctrl+d, ctrl+j)` → emit, … | `<C-d><C-j>` `<C-d><C-j>` … |
-| **2. ctrl held, d+j re-tapped** | `ctrl+( (d,j)→emit, (d,j)→emit, … )` | `<C-d><C-j>` `<C-d><C-j>` … |
-| **3. ctrl+d armed, j repeats** | `ctrl+d+( j→emit, j→emit, … )` | `<C-d><C-j>` then `<C-j>` `<C-j>` … |
+| form | fingers | bytes nvim receives |
+|------|---------|---------------------|
+| **1. full chord, ctrl released** | `(ctrl+d, ctrl+j)` → emit, `(ctrl+d, ctrl+j)` → emit, … | `04 0d` `04 0d` … |
+| **2. ctrl held, d+j re-tapped** | `ctrl+( (d,j)→emit, (d,j)→emit, … )` | `04 0d` `04 0d` … |
+| **3. ctrl+d armed, j repeats** | `ctrl+d+( j→emit, j→emit, … )` | `04 0d` then `0d` `0d` … |
 
 **forms 1 and 2 are one behavior.** nvim reads keycodes, not finger state — a
-ctrl lift between two chords leaves no trace. both arrive as `<C-d><C-j>`, so
-both worked from the start.
+ctrl lift between two chords leaves no trace. both arrive identically.
+
+## 🛑 .the keystream is `<C-d><CR>`, and this brief asserted `<C-d><C-j>`
+
+📜 measured 2026-09-16, live kitty → tmux → nvim, via a key logger
+(`howto.probe-the-key-chain-with-a-live-logger`). the bytes above are that measurement.
+
+a prior draft of the table read `<C-d><C-j>`, and closed with *"so both worked from the
+start."* **both claims were false, and all three forms were dead:**
+
+- kitty rewrites ctrl+j to shift+enter; tmux never negotiated the enhanced keyboard protocol,
+  so shift+enter degrades to a bare `\r`. ⇒ ctrl+j arrives as `0d`
+- `<C-d><CR>` was mapped nowhere, and `<CR>` was absent from the repeat vocabulary
+- bare `<C-d>` only prints a hint, so every form printed the hint and moved the cursor a line
+
+⚠️ **the clamp below was green throughout.** it fed nvim the keystream the table asserted, so
+it measured the map table and no part of the chain — a false ✔ about the one link that broke.
+
+⇒ `rule.require.clamp-edge-cases` asks that a clamp bite. this is the case that rule does not
+reach: **a clamp can bite perfectly on an input the world never delivers.** a fed keystream is
+a claim about the chain, and it is the claim least likely to be checked, because it sits in the
+fixture rather than in an assertion.
 
 **form 3 is the added one.** the first `<C-d><C-j>` **arms** a transient state;
 each further ctrl-held `j` emits another jump instead of its usual half-page
@@ -29,11 +49,12 @@ scroll.
 | given | when | then |
 |-------|------|------|
 | a buffer with git chunks | `<C-d>j` / `<C-d>k` | jump to next / prev boundary |
-| ctrl held throughout | `<C-d><C-j>` (kitty: `<C-d><S-CR>`) | jump to next boundary; **arm** repeat |
-| repeat armed, ctrl still held | `<C-j>` (kitty: `<S-CR>`) | jump to next boundary; stay armed |
+| ctrl held throughout | `<C-d><C-j>` (kitty: `<C-d><S-CR>`; **tmux: `<C-d><CR>`**) | jump to next boundary; **arm** repeat |
+| repeat armed, ctrl still held | `<C-j>` (kitty: `<S-CR>`; **tmux: `<CR>`**) | jump to next boundary; stay armed |
 | repeat armed, ctrl still held | `<C-k>` | jump to prev boundary; stay armed |
 | repeat armed | ctrl lifted, plain `j` | `j` moves down one line as always; **disarm** |
-| repeat armed | any key outside `{<C-d> <C-j> <C-k> <S-CR>}` | **disarm**, and that key acts as always |
+| repeat armed | any key outside `{<C-d> <C-j> <C-k> <S-CR> <CR>}` | **disarm**, and that key acts as always |
+| repeat **dis**armed | `<CR>` | ordinary Enter — the motion, a quickfix jump, a prompt submit |
 | repeat armed | no key at all, for any duration | **stays armed** — there is no clock |
 | repeat armed | `<C-j>` in ANOTHER buffer | half page down — the arm is INERT there |
 | repeat disarmed | `<C-j>` / `<S-CR>` / `<C-k>` | half page down / up (the extant bind) |
@@ -165,12 +186,22 @@ ask nvim what it resolved — never trust a read of the config:
 nvim --headless -u src/grove.provision/4.terminal/4.5.nvim/init.lua -c 'lua for _,k in ipairs({"<C-D><C-J>","<C-D><S-CR>","<C-D>j","<C-D><C-K>","<S-CR>","<C-J>"}) do local m=vim.fn.maparg(k,"n",false,true); print(k.." -> "..((m and (m.desc or m.rhs)) or "UNMAPPED")) end' -c 'qa'
 ```
 
-⚠️ that reads the MAP TABLE, so it proves each key resolves and says none of what the arm
+⚠️ that reads the MAP TABLE, so it proves each key is bound and says none of what the arm
 does. the behavior needs the hermetic probe above — a fixture with known chunks, keys fed,
 cursor read.
+
+🛑 **and the hermetic probe reads no part of the CHAIN.** it feeds a keystream, so it can only
+ever confirm that the keystream its author believed in is wired. the byte a finger actually
+delivers is settled by one instrument alone — a live key logger, with a human's hand on the
+key (`howto.probe-the-key-chain-with-a-live-logger`).
+
+⇒ the two are complements, and **the fed-keystream half is the one that lies quietly.** run the
+live probe whenever kitty, tmux, or nvim moves, and whenever a human says a bind is dead while
+every check is green.
 
 ## .see also
 
 - `diff-boundary-nav.md` — why boundary nav beats chunk-to-chunk
-- `gotcha.kitty-rewrites-ctrl-j.md` — why every ctrl+j bind needs an `<S-CR>` twin
+- `gotcha.kitty-rewrites-ctrl-j.md` — why every ctrl+j bind needs `<S-CR>` AND `<CR>` twins
+- `howto.probe-the-key-chain-with-a-live-logger.md` — the instrument that reads the chain
 - `rule.require.crystallize-behaviors.md` — the rule this file demonstrates
