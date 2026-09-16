@@ -77,20 +77,29 @@ grove_provision_2_5_zsh_provision_upsert() {
     seat_home="$(getent passwd "$seat" 2>/dev/null | cut -d: -f6)"
     [[ -n "$seat_home" && -d "$seat_home" ]] || continue
 
-    # ANY one of zsh's four startup files suppresses the first-run wizard
-    if [[ -f "$seat_home/.zshenv" || -f "$seat_home/.zprofile" \
-       || -f "$seat_home/.zshrc"  || -f "$seat_home/.zlogin" ]]; then
+    # ANY one of zsh's four startup files suppresses the first-run wizard.
+    # 🛑 the reader is `_..._seat_has_startup_file`, which reads at the SAME
+    #    privilege the writes below use — a bare `[[ -f ]]` here is BLIND on
+    #    another seat's 0750 home, and answers "absent" to mean "forbidden"
+    if _grove_provision_2_5_zsh_seat_has_startup_file "$seat_home"; then
       continue
     fi
 
     # this seat's own home needs no privilege
     if [[ "$seat_home" == "$HOME" ]]; then
+      [[ -e "$seat_home/.zshrc" ]] && continue
       : > "$seat_home/.zshrc" 2>/dev/null && seeded="${seeded}${seat} "
       continue
     fi
 
-    # another seat's home needs root, and `-n` so it can never prompt
+    # .what = another seat's home needs root, and `-n` so it can never prompt
+    # 🛑 the `test -e` is NOT redundant with the guard above, and it is load-bear:
+    #    the guard asks "does ANY of four files exist" (the wizard's question);
+    #    this asks "am i about to overwrite THIS file" (the write's own question).
+    #    `install /dev/null` truncates, so the write owns a precondition no
+    #    caller-side guard can be trusted to keep across a later edit
     seat_group="$(id -gn "$seat" 2>/dev/null || echo "$seat")"
+    sudo -n test -e "$seat_home/.zshrc" 2>/dev/null && continue
     sudo -n install -m 644 -o "$seat" -g "$seat_group" /dev/null \
       "$seat_home/.zshrc" >/dev/null 2>&1 && seeded="${seeded}${seat} "
   done <<< "$seats"

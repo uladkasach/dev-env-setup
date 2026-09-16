@@ -38,7 +38,8 @@ grove_provision_5_3_brains_configure_verify() {
     '.env.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION:"false":the prompt suggestion' \
     '.disableClaudeAiConnectors:true:the claude.ai connector fetch' \
     '.permissions.defaultMode:"acceptEdits":the accept-edits default mode' \
-    '.model:"claude-opus-4-8[1m]":the default model' \
+    '.permissions.deny:["Agent"]:the subagent ban' \
+    '.model:"claude-opus-5[1m]":the default model' \
     '.cleanupPeriodDays:36500:the never-prune transcript retention'; do
     path="${pair%%:*}"
     want="${pair#*:}"; want="${want%%:*}"
