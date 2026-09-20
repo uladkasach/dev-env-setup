@@ -162,5 +162,49 @@ grove_provision_5_13_reach_configure_verify() {
     echo "   ✔ ${org}.${env} answers as '${named}', in the declared account"
   done
 
+  ####################################################################
+  # every reach this box carries that no row declares
+  #
+  # 🛑 .why the VERIFY asks too, and not the upsert alone
+  #   - `--mode plan` short-circuits every upsert and always runs every verify,
+  #     so a plan is the one read that tells a human a box is converged
+  #   - ⇒ a drift the upsert alone could see is a drift no plan ever reports,
+  #     and this bundle's whole subject is a pointer nobody re-reads
+  #   - (`rule.require.one-command-provision`, its plan-proves-the-verifies half)
+  #
+  # ⚠️ it is a ✋ and not a 🌙 — a profile that names a real role in a real
+  #   account, under a name this repo does not declare, is live reach nobody
+  #   decided to grant. the fix is one command and the box repairs itself
+  ####################################################################
+  local declared carried seen
+  declared="$(grove_provision_5_13_reach_declared_profiles)"
+
+  # ⚠️ an unreadable fence list is a 🌙, never a ✔ — see the same block in the
+  #   upsert. a checkout pushed as `src/` alone carries no grammar to read
+  if ! carried="$(grove_provision_5_13_reach_carried)"; then
+    echo "   🌙 the reach fences could not be listed, so drift is unproven here"
+    echo "      ⇒ this checkout carries no .agent/, so an undeclared profile"
+    echo "        would be invisible to this check rather than absent"
+    return $failed
+  fi
+
+  while IFS= read -r seen; do
+    [[ -n "$seen" ]] || continue
+
+    # ⚠️ a whole-line match in pure bash — see the same block in the upsert for
+    #   why it is neither a partial match nor a `grep -q` in a pipe
+    case $'\n'"$declared"$'\n' in
+      *$'\n'"$seen"$'\n'*) continue ;;
+    esac
+
+    echo "   ✋ this box carries reach '${seen}', and no row declares it" >&2
+    echo "      ⇒ it is a live profile: a real role in a real account, under a" >&2
+    echo "        name this repo no longer owns. a suite or a human can select" >&2
+    echo "        it, and no declaration says what it is for" >&2
+    echo "      fix: rhx grove.provision --what 5.13.reach --mode apply" >&2
+    echo "        (its upsert reaps every fence this table does not declare)" >&2
+    failed=1
+  done < <(printf '%s\n' "$carried")
+
   return $failed
 }

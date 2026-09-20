@@ -327,7 +327,7 @@ fi
 # 🛑 the `*)` arm is what makes the reader field load-bear
 #   - with no `*)`, a future reader name falls through to whichever arm sits
 #     first, and answers one row's key out of the other row's FILE
-#   - ⇒ it would hunt `ACCOUNT_ID_DEMO` in a declapract.use.yml, find none,
+#   - ⇒ it would hunt `ACCOUNT_ID_EHMPATHY_DEMO` in a declapract.use.yml, find none,
 #     and decline with a reason that names the wrong repo
 #   - (`rule.forbid.failhide`)
 ####################################################################

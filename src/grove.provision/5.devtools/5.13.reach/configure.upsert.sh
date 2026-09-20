@@ -43,8 +43,51 @@ grove_provision_5_13_reach_configure_upsert() {
     return 0
   fi
 
+  ####################################################################
+  # 0.5 make the DECLARATION CLONE current, before any row reads it
+  #
+  # 🛑 a presence guard is not convergence — see `_sync` in this bundle's `_.sh`
+  #   `5.10.repos` skips a clone that opens, so a declaration merged upstream
+  #   reaches no box that already holds the repo. every row below reads a file
+  #   in that clone, so a stale tree makes every one of them decline — with a
+  #   reason that names an upstream gap that does not exist
+  ####################################################################
+  local srcstate; srcstate="$(grove_provision_5_13_reach_sync)"
+  case "$srcstate" in
+    current) echo "   • ahbode/infrastructure is current — its declarations are fresh" ;;
+    absent)  echo "   🌙 ahbode/infrastructure is not cloned — every row below declines"
+             echo "      fix: rhx grove.provision --what 5.10.repos --mode apply" ;;
+    dirty)   echo "   🌙 ahbode/infrastructure has edits in flight — left as it stands"
+             echo "      ⇒ the rows read THAT tree, which may differ from its main" ;;
+    ahead)   echo "   🌙 ahbode/infrastructure has diverged from its upstream — left alone"
+             echo "      ⇒ a fast-forward would drop work, so the rows read what it holds" ;;
+    detached) echo "   🌙 ahbode/infrastructure is on no branch with an upstream — left alone" ;;
+    *)       echo "   🌙 ahbode/infrastructure could not be fetched — the rows read what it holds"
+             echo "      ⇒ a declaration merged since the last fetch is invisible here" ;;
+  esac
+
   local gitroot
   gitroot="$(grove_provision_5_12_rack_gitroot)"
+
+  ####################################################################
+  # the cwd every `rhx` call below runs from
+  #
+  # ⚠️ run each from the CHECKOUT ROOT, never from the inherited cwd
+  #   - rhachet links a `repo=.this` role relative to the GIT ROOT it runs from
+  #   - a phase inherits its caller's cwd, and a grove apply starts at `$HOME`
+  #   - 📜 2026-08-12, one box, one minute apart:
+  #
+  #       cwd = $HOME               ✋ no skill "aws.reach.set" found in any
+  #                                   linked role
+  #       cwd = the checkout root   ✔ the skill itself answered
+  #
+  # 🛑 hoisted ABOVE the loop, and it used to sit inside it
+  #   - a `local` inside a loop is still function-scoped, so it read fine —
+  #     right up until a box where EVERY row declined before reaching that
+  #     line. then the reap below ran with it unset, and `set -u` killed the
+  #     phase on the one box class that most needed the reap to run
+  ####################################################################
+  local checkout; checkout="$(dirname "$GROVE_SRC")"
 
   # 1. one row at a time. ⚠️ the role AND the org are read INSIDE the loop — the
   #    rows share neither, so a hoisted read writes one value into every profile
@@ -108,21 +151,25 @@ grove_provision_5_13_reach_configure_upsert() {
       echo "     ⇒ it is DECLARED in ahbode/infrastructure, by the '${reader}' reader:"
       echo "       ${declsrc}"
       ################################################################
-      # 🛑 name BOTH repairs — this reader cannot tell them apart
-      #   - an ABSENT clone and a clone PRESENT AND BEHIND read identically:
-      #     the key is unreadable here. the repairs are opposite
-      #   - ⇒ a decline that names only the clone-absent fix sends a human to
-      #     re-run `5.10.repos` on a box whose clone is already there. it
-      #     changes naught, and the decline repeats on every apply forever
-      #   - 📜 measured 2026-09-14 on grove-ahbode-v20260901: infra WAS cloned,
-      #     and the demo pair sits on a branch that has not merged
-      #   - (`rule.require.one-command-provision`, its unrepairable-fix-text
-      #      clause; `gotcha.a-check-that-cries-wolf-gets-silenced`)
+      # 🛑 the clone's STATE is measured above, so the decline names it
+      #   - an ABSENT clone and a clone PRESENT AND BEHIND read identically to
+      #     THIS reader: the key is unreadable. the repairs are opposite
+      #   - ⇒ phase 0.5 settles which, so the fix-text below is a fact rather
+      #     than a menu a human must sort for themselves
+      #   - 📜 the menu cost a real apply. its "the clone is behind" arm read
+      #     "the declaration has not merged … so no command on THIS box can
+      #     close it" — and on 2026-09-18 the declaration HAD merged, the clone
+      #     was simply stale, and a fetch closed it. a correct verdict with the
+      #     wrong reason (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4)
       ################################################################
-      echo "     fix — whichever holds. the two read the SAME way from here:"
-      echo "       • the clone is absent:  rhx grove.provision --what 5.10.repos --mode apply"
-      echo "       • the clone is behind:  the declaration has not merged to that"
-      echo "         repo's main yet, so no command on THIS box can close it"
+      echo "     ⇒ that clone reads '${srcstate}' this run"
+      case "$srcstate" in
+        absent)  echo "     fix: rhx grove.provision --what 5.10.repos --mode apply" ;;
+        current) echo "     ⇒ it is at its upstream's tip, so the key is genuinely"
+                 echo "       undeclared — no command on THIS box can close it" ;;
+        *)       echo "     ⇒ so the tree read was not its upstream's tip. settle it"
+                 echo "       there, then re-apply this bundle" ;;
+      esac
       echo "     🛑 it is NOT guessed. a role name that does not exist refuses with"
       echo "        the same AccessDenied as a role that excludes this box, so a"
       echo "        guess turns a readable gap into a false 'no access' report"
@@ -147,17 +194,9 @@ grove_provision_5_13_reach_configure_upsert() {
     #   - ⇒ a muted run says "did not complete" and drops its own reason
     #   - (`rule.forbid.failhide`)
     #
-    # ⚠️ run it from the CHECKOUT ROOT, never from the inherited cwd
-    #   - rhachet links a `repo=.this` role relative to the GIT ROOT it runs from
-    #   - a phase inherits its caller's cwd, and a grove apply starts at `$HOME`
-    #   - 📜 2026-08-12, one box, one minute apart:
-    #
-    #       cwd = $HOME               ✋ no skill "aws.reach.set" found in any
-    #                                   linked role
-    #       cwd = the checkout root   ✔ the skill itself answered
-    ##################################################################
-    local checkout; checkout="$(dirname "$GROVE_SRC")"
-
+    # ⚠️ `$checkout` is the cwd — hoisted above this loop, and the block there
+    #   carries why (a `local` inside a loop outlives it, until the run where
+    #   no iteration reaches the line that sets it)
     ##################################################################
     # 🛑 `--assume`, NEVER `--role`, and the wrong one is DROPPED in silence
     #   - 📜 2026-09-01, on a grove built from scratch, `--role "$role"` gave:
@@ -225,6 +264,89 @@ grove_provision_5_13_reach_configure_upsert() {
 
     echo "   • ${org}.${env} reaches its account, proven with a live sts call ✔"
   done
+
+  ####################################################################
+  # 2. reap every reach this table no longer declares
+  #
+  # 🛑 .why a bundle that only ADDS is not a bundle that CONVERGES
+  #   - the loop above wires each declared row and touches no other fence, so
+  #     a row that LEAVES the table leaves both its halves on every box that
+  #     ever applied it
+  #   - ⇒ reach became a function of every row this repo EVER held, so two
+  #     boxes with identical trees carried different reach, by apply order
+  #   - (`rule.require.one-command-provision`, its deterministic clause)
+  #
+  # ⚠️ it reaps by DECLARATION, never by a hand-written list of dead names
+  #   - a list of what to remove goes stale the moment a row is renamed, and
+  #     its staleness is silent — no run says a name was omitted
+  #   - ⇒ the question asked is "what does this box carry that the table does
+  #     not declare", which needs no second list and cannot rot
+  #
+  # ⚠️ a reap is bounded to the fences THIS FAMILY wrote
+  #   - `aws.reach.get --names` lists only `# grove: reach` fences, so the
+  #     `ambient` profile `5.6.aws` owns and a human's own `[profile …]` are
+  #     invisible here and cannot be reaped
+  #   - (`rule.forbid.two-writers-on-one-artifact`)
+  ####################################################################
+  local declared carried seen
+  declared="$(grove_provision_5_13_reach_declared_profiles)"
+
+  # ⚠️ a checkout with no `.agent/` cannot be read, and that is NOT "no reach"
+  #   - a `git.grove.push --from src` carries `src/` and leaves the skills dir
+  #     behind, so the fence grammar has no holder to source
+  #   - ⇒ say the reap was SKIPPED rather than report a converged box
+  #   - (`rule.forbid.failhide` — an unread subject is never a clean one)
+  if ! carried="$(grove_provision_5_13_reach_carried)"; then
+    echo "   🌙 the reach fences could not be listed, so none were reaped"
+    echo "      ⇒ this checkout carries no .agent/, so the fence grammar has"
+    echo "        no holder here — an undeclared profile would stay live"
+    echo "      fix: push the whole checkout, not src/ alone"
+    return $failed
+  fi
+
+  while IFS= read -r seen; do
+    [[ -n "$seen" ]] || continue
+
+    ##################################################################
+    # ⚠️ a WHOLE-LINE match, in pure bash, and no `grep -q` in a pipe
+    #   - an exact line, because `ehmpathy.test.ehmpath` matches part of
+    #     `ehmpathy.test.ehmpath2` and a partial match would spare a fence
+    #     that is genuinely undeclared
+    #   - and no `grep -q`: under `set -uo pipefail` a MATCHED `grep -q`
+    #     SIGPIPEs its producer, so the `if` takes its else branch on a hit
+    #     (`gotcha.pipefail-grep-q`)
+    ##################################################################
+    case $'\n'"$declared"$'\n' in
+      *$'\n'"$seen"$'\n'*) continue ;;
+    esac
+
+    echo "   • ${seen} is carried by this box and declared by no row — reaped"
+
+    ##################################################################
+    # ⚠️ the org+env are split back OUT of the profile name, since that is
+    #   what `aws.reach.del` takes. the name is `<org>.<env>.<owner>` and an
+    #   org may hold a dot, so each tail is cut from the RIGHT
+    ##################################################################
+    local dead_env dead_org
+    dead_org="${seen%.*}"        # drop .<owner>
+    dead_env="${dead_org##*.}"   # the env is now the tail
+    dead_org="${dead_org%.*}"    # and the org is what remains
+
+    local deadlog drc
+    deadlog="$(env -C "$checkout" rhx aws.reach.del \
+                 --org "$dead_org" --env "$dead_env" --owner "$owner" \
+                 --mode apply 2>&1)"
+    drc=$?
+
+    if [[ $drc -ne 0 ]]; then
+      echo "   ✋ could not reap the undeclared reach '${seen}'" >&2
+      echo "      ⇒ it stays live on this box: a profile that names a real role" >&2
+      echo "        in a real account, under a name this repo no longer declares" >&2
+      echo "      ⇒ what it said:" >&2
+      printf '%s\n' "$deadlog" | sed 's/^/        /' >&2
+      failed=1
+    fi
+  done < <(printf '%s\n' "$carried")
 
   return $failed
 }

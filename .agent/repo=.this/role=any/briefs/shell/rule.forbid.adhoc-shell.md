@@ -76,6 +76,28 @@ silent with its mute flag clear.
 ⇒ so the cost of ad-hoc is not merely *"the next traveler re-derives it"*. it is that a raw command
 run for a diagnosis leaves the diagnosed component exactly as broken as it found it.
 
+## 🛑 .measured a third time — 2026-09-16, and the cue was a DIAGNOSTIC, not a capability
+
+the first two instances were about a capability i wanted (a window, a take). this one was a
+**read of machine state**, mid-investigation, and it slipped past the rule because it felt like
+a look rather than an act:
+
+```sh
+cat /etc/timezone; tty        # "just a peek at the tz, and whether i have a tty"
+```
+
+the human's read, in four words: **"rhx. no adhoc"**.
+
+⇒ 🔴 **a diagnostic probe is the easiest ad-hoc to excuse and the most valuable to entool**, for
+the reason the 2026-09-06 measurement already proves: the probe is where a defect hides beside
+the question. and a state read is the shape most likely to recur — a timezone, a tty, a
+login-shell record, a unit's state are asked once per investigation, forever.
+
+⚠️ **the near-miss to name: a READ of a repo FILE is not ad-hoc shell.** `Read`, `Grep`, `Glob`
+are the dedicated tools for that, and they are the correct reach (`rule.require.wrap-cli-in-skills`
+governs the CLI, never the file read). what this rule catches is a raw command that interrogates
+**a machine or a tool** — `tty`, `timedatectl`, `pactl`, `getent`, `systemctl show`.
+
 ## 🛑 .the escape hatch this retires
 
 `rule.require.reach-for-the-skill-before-adhoc-shell` used to close with:

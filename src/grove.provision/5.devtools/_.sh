@@ -55,4 +55,11 @@ grove_provision_5_devtools() {
   #   any earlier it measures a box mid-provision and blames a human for a key
   #   that was fine
   bundle.upgrade 5.16.keys
+
+  # .why AFTER 5.3.brains: its reconciler drives `rhx git.commit.uses` and
+  #   `rhx radio.uses`, and `rhx` arrives with rhachet at `5.3.brains`. its
+  #   verify PROBES that reach rather than assume it, so a box that cannot
+  #   reach the two skills says so — instead of a timer that ticks forever
+  #   over a gate that never closes
+  bundle.upgrade 5.18.openhours
 }

@@ -7,6 +7,15 @@
 #   - a dir with a `.git` and no readable HEAD is moved aside and re-cloned
 #   - ⇒ so one apply converges the box
 #   - one repo's failure does not end the org's loop
+#
+# ⚠️ .this bundle converges PRESENCE, and never CURRENCY
+#   a clone that opens is skipped outright, so a declaration merged upstream
+#   does NOT reach a box that already holds the repo. that is deliberate: a
+#   grove is where work happens, and a blanket pull across ~140 clones would
+#   touch trees this bundle does not own.
+#   ⇒ a bundle that READS another repo as a source of truth owns the currency
+#     of that ONE clone (`rule.require.bundles-own-their-dependencies`).
+#     `5.13.reach` is the worked example.
 ######################################################################
 
 GROVE_GIT_ORGS_DEFAULT="ehmpathy ahbode whodisio"

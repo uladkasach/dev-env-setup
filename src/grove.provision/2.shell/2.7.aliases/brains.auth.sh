@@ -22,7 +22,7 @@
 #   the file, the source line, and the cp in the sync alias.
 #
 # vision: .behavior/v2026_07_28.brain-budget-utilization/1.vision.yield.md
-# tests:  rhx brains.auth.test   (317 cases, hermetic, no network, no real ~/.claude)
+# tests:  rhx brains.auth.test   (323 cases, hermetic, no network, no real ~/.claude)
 #         ⚠️ this number is ASSERTED, not maintained by hand — `header.count-matches-the-suite`
 #           reads it back out of this very line and compares it to the suite's own total. it
 #           drifted ~100 cases wrong once, when it was only a promise. now a case added
@@ -2689,6 +2689,68 @@ _brains_auth_render_identity_blocked() {
   return 0
 }
 
+# .what = where every usage sweep is appended, one JSONL line per call
+# .why  = this alias runs from WHATEVER directory a human happens to stand in, so a
+#   repo-relative `.log/` would scatter one history across every checkout and record the
+#   spend of a subscription under the accident of a cwd. a budget read is a fact about an
+#   ACCOUNT, never about a repo, so its log gets one home per machine.
+# .why HERE and not `.log/` in this repo — that dir is gitignored, which keeps it out of
+#   git, and a log keyed by EMAIL ADDRESS inside a public checkout is one `git add -A` away
+#   from a dox commit (`rule.forbid.dox-in-public-repo`). outside the tree, no add can reach it.
+# .note = the env override exists for TESTS. a test that writes to the real home is not a
+#   test of a sandbox (`gotcha.a-test-that-names-a-real-home-has-no-sandbox`), and it would
+#   also poison the very history this log exists to keep.
+_BRAINS_AUTH_USAGE_LOG_DIR="${HOME}/.rhachet/storage/repo=dev-env-setup/role=any/.log/brains.auth.usage"
+
+# .what = append one sweep to the durable log ($1=combined json, $2=verdict, $3=reach asked)
+# .why  = a single read tells you today's number; the series tells you the burn rate, which
+#   window you actually live in, and whether a cap was approached before it was hit. the
+#   endpoint keeps no history for us, so a number not written down at read time is gone.
+#
+# 🛑 .this may never fail the read. the budget read is the product; the log is a side effect,
+#   so every step below swallows its own failure and returns 0. a full disk, a read-only home,
+#   or an absent `jq` must cost a human their log line and NEVER their answer
+#   (`rule.forbid.failhide` does not apply: no error is HIDDEN here, because no error is this
+#   function's to report — it has no claim of its own to make).
+#
+# ⚠️ it logs `$combined` RAW, not a projection of the fields the render happens to read.
+#   a projection would be a SECOND reader of the endpoint's shape, free to drift from the
+#   render's — one set, two readers, which is the defect this repo keeps to pay for. the raw
+#   body is the OBSERVATION; a projection is an interpretation, and a log records the former.
+#
+# ⚠️ .security = `$combined` carries no token by construction — a 200 node is the usage body
+#   (gated on a numeric `.five_hour.utilization`), and an error node carries the api's own
+#   message. it DOES carry email addresses, so the dir is 0700 and each file 0600.
+_brains_auth_usage_log() {
+  local combined="$1" verdict="$2" reach="$3" dir day line
+  dir="${BRAINS_AUTH_USAGE_LOG_DIR:-$_BRAINS_AUTH_USAGE_LOG_DIR}"
+  [[ -n "$dir" ]] || return 0
+
+  # one file per UTC day: it bounds any single file, makes a date range a plain glob, and
+  # makes a prune a `rm` of whole days rather than a rewrite of one file that only grows.
+  day="$(date -u +%Y-%m-%d 2>/dev/null)" || return 0
+  [[ -n "$day" ]] || return 0
+
+  mkdir -p "$dir" 2>/dev/null || return 0
+  chmod 0700 "$dir" 2>/dev/null
+
+  # .note = `--argjson a` parses `$combined`, so a malformed gather writes NO line rather than
+  #   a corrupt one. a JSONL file with one unparseable line is worse than one line short: it
+  #   breaks every `jq` that reads the series, which is the only way this log is ever read.
+  line="$(jq -cn \
+    --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)" \
+    --arg r "$reach" \
+    --argjson v "$verdict" \
+    --argjson a "$combined" \
+    '{ts:$t, reach:$r, verdict:$v, accounts:$a}' 2>/dev/null)" || return 0
+  [[ -n "$line" ]] || return 0
+
+  # the umask rides a subshell so the caller's own umask is untouched — this file is sourced
+  # into a human's interactive shell, where a leaked umask would follow every later command.
+  ( umask 077; printf '%s\n' "$line" >> "${dir}/usage.${day}.jsonl" ) 2>/dev/null
+  return 0
+}
+
 # ══ §13. command: brains.auth.usage — read the budget ════════════════════════
 # .what = show claude subscription budget usage; the command a human runs
 # .why  = orchestrate the leaf operations (slugs -> gather -> render/json)
@@ -2726,6 +2788,22 @@ _brains_auth_usage() {
         echo ""
         echo "     each account also costs one 'keyrack unlock' subprocess per call — one,"
         echo "     not one per retry — so an @all sweep scales with your account count."
+        echo ""
+        # ⚠️ the DEFAULT path is printed, never `$BRAINS_AUTH_USAGE_LOG_DIR`. that override is a
+        #   test fixture pointed at a fresh `mktemp -d`, so an interpolation of it would make
+        #   this help text differ on every run — unsnapshotable, and of no use to a human, who
+        #   wants the path their own machine writes. `$HOME` is rendered as `~` for the same
+        #   reason: the line must read the same on every box.
+        local _logdir="${_BRAINS_AUTH_USAGE_LOG_DIR/#$HOME/\~}"
+        echo "  every call appends one json line to a durable log, so the series is"
+        echo "  reviewable over time:"
+        echo "    ${_logdir}/usage.<YYYY-MM-DD>.jsonl"
+        echo ""
+        echo "  read the series with jq, e.g. every five-hour number for one account:"
+        # ⚠️ unquoted, deliberately. a `~` inside double quotes does NOT expand, so a quoted
+        #   form would be a paste that greets the human with 'No such file or directory'.
+        echo "    cat ${_logdir}/usage.*.jsonl \\"
+        echo "      | jq -r '[.ts, (.accounts[\"you@example.com\"].five_hour.utilization)] | @tsv'"
         echo ""
         echo "  exit codes, for a cron or statusline that reads only \$?:"
         echo "    0  at least one account was read"
@@ -2849,6 +2927,15 @@ _brains_auth_usage() {
   local verdict
   _brains_auth_exit_for "$combined"; verdict=$?
   _brains_auth_debug "stage=verdict rc=${verdict}"
+
+  # ⚠️ the log sits HERE, above the `--json` branch, so BOTH surfaces record the same sweep.
+  #   below it there are two exits, and a log on each would be one claim with two writers —
+  #   free to drift the day a third surface lands, and silently short a whole surface's
+  #   history meanwhile. one call, one place, before the fork.
+  # ⚠️ it records a FAILED sweep too. an account that errored is exactly the row a later
+  #   review needs: "the numbers stop on the 8th" and "the reads kept failing from the 8th"
+  #   are different stories, and a log of successes alone cannot part them.
+  _brains_auth_usage_log "$combined" "$verdict" "$sub"
 
   if [[ "$as_json" == 1 ]]; then
     jq . <<< "$combined"

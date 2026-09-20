@@ -44,21 +44,22 @@ grove_provision_5_12_rack_awsprofile_value() { printf 'ambient'; }
 # 🛑 the env sets DIFFER on purpose, and neither may hold the other's
 #   - `5.13.reach` overwrites ahbode's test/prep/prod with per-account profile
 #     names, so to list them here is two writers on one slug
-#   - ehmpathy's test/prep/prod hold `ambient` because no hop is DECLARED for
-#     them: no ehmpathy repo declares an `awsAccountId` (all 92 of its clones
-#     that carry a `declapract.use.yml` are libraries, measured 2026-09-13)
-#   - ⚠️ ehmpathy's `demo` is the EXCEPTION and is NOT in this row on purpose:
-#     `5.13.reach` wires it to a real hop, so to list it here is two writers on
-#     one slug. its declaration lives under ahbode, which is why that bundle
-#     parts its SOURCE org from its TARGET org
-#   - ⚠️ that is a fact about what is READABLE, never about what EXISTS in aws.
-#     ehmpathy holds its own accounts; the grant and the declaration are owed
-#     (uladkasach/dev-env-setup#123). do NOT restate the absence as "no account
-#     exists" — that claim stood here until 2026-09-06 and was wrong
-#   - ⇒ the rows STAY until the hop replaces them: `ambient` is what lets
+#   - ehmpathy's `prod` holds `ambient` because no hop is DECLARED for it: no
+#     ehmpathy repo declares an `awsAccountId` (all 92 of its clones that carry
+#     a `declapract.use.yml` are libraries, measured 2026-09-13)
+#   - ⚠️ ehmpathy's `test` and `prep` LEFT this row on 2026-09-18: `5.13.reach`
+#     now wires both to a real hop into the demo account, so to list them here
+#     is two writers on one slug. their declaration lives under ahbode, which is
+#     why that bundle parts its SOURCE org from its TARGET org
+#   - ⚠️ `ambient` was a fact about what is READABLE, never about what EXISTS in
+#     aws. ehmpathy holds its own accounts; the grant and the declaration were
+#     owed (uladkasach/dev-env-setup#123) and landed for the non-prod tiers. do
+#     NOT restate the absence as "no account exists" — that claim stood here
+#     until 2026-09-06 and was wrong
+#   - ⇒ a row STAYS until the hop replaces it: `ambient` is what lets
 #     `keyrack.source()` read the ssm params those suites need
 grove_provision_5_12_rack_awsprofile_rows() {
-  printf 'ahbode:camp ehmpathy:test,prep,prod'
+  printf 'ahbode:camp ehmpathy:prod'
 }
 
 # .what = per org, the envs the scratch keyrack.yml DECLARES — a superset of its row
@@ -69,11 +70,15 @@ grove_provision_5_12_rack_awsprofile_rows() {
 grove_provision_5_12_rack_declared() {
   case "$1" in
     ahbode)   printf 'camp test prep prod' ;;
-    # ⚠️ `demo` is declared for `5.13.reach`'s ehmpathy row, and for no row of
-    #   THIS bundle — it is deliberately absent from `_awsprofile_rows` above,
-    #   since that would be two writers on one slug. a declaration is a legal
-    #   NAME and never a value, so a declared-but-unset env costs one line
-    ehmpathy) printf 'test prep prod demo' ;;
+    # ⚠️ `test` and `prep` are declared for `5.13.reach`'s two ehmpathy rows, and
+    #   for no row of THIS bundle — both are deliberately absent from
+    #   `_awsprofile_rows` above, since that would be two writers on one slug. a
+    #   declaration is a legal NAME and never a value, so a declared-but-unset
+    #   env costs one line
+    # 🛑 `demo` is NOT declared: it names the ACCOUNT, never a tier, and keyrack's
+    #   own `KEYRACK_VALID_ENVS` holds no such value — so a row wired that way
+    #   writes the profile body and then refuses the rack name
+    ehmpathy) printf 'test prep prod' ;;
     *)        return 1 ;;
   esac
 }

@@ -1,0 +1,27 @@
+# .why no OnCalendar: the payload does the clock math, in a PINNED timezone.
+#   an OnCalendar here would read the BOX's timezone, so a grove on UTC and a
+#   laptop on local would enforce two different windows from one declaration.
+#
+# .why OnUnitActiveSec and not two triggers at 08:00 / 20:00: a box asleep at
+#   08:00 misses a trigger and sits allowed all day. a periodic converge
+#   self-heals, and costs at most one interval of drift.
+#
+# ⚠️ .the CADENCE is 2/hr, so a boundary can be up to 30 minutes late
+#   that is the declared trade: the gate is a courtesy fence around a human's
+#   hours, not a security control, and a re-ask every 5 minutes bought 6x the
+#   wakeups to sharpen an edge nobody measures.
+#   ⇒ a box that must close ON the minute needs a different mechanism, never a
+#     smaller interval here — the drift is bounded by design, not by accident.
+#
+# .why 1min after boot: a box woken inside the window must close the gate
+#   promptly, not up to half an hour later.
+
+[Unit]
+Description=Re-ask the open-hours policy twice an hour
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=30min
+
+[Install]
+WantedBy=timers.target
