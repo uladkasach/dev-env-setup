@@ -2588,6 +2588,43 @@ local PLUGIN_SPEC = {
           markdown = {
             enabled = true,
             only_render_image_at_cursor = false,
+            -- 🛑 do NOT fetch remote urls — measured 2026-09-20, `nvim readme.md`
+            --    threw a Lua error and a "Press ENTER" on any readme with badges
+            --
+            --    a shields.io badge is an SVG. image.nvim downloads every remote
+            --    url it finds and runs `identify` on it, with NO format filter —
+            --    `hijack_file_patterns` bounds which FILES open as images and says
+            --    not one word about what this integration fetches.
+            --
+            --    imagemagick has no reach to decode a badge. measured 2026-09-20:
+            --    a trivial `<rect>` svg reads via im6's internal msvg renderer,
+            --    and a badge (styles, fonts, gradients) falls through to the
+            --    `svg:decode` delegate in `/etc/ImageMagick-6/delegates.xml`,
+            --    which names `inkscape`. that binary is ABSENT on this box, as is
+            --    the `rsvg-convert` of the plain `svg` delegate, and im6 reports
+            --    the dead reach as `not allowed by the security policy 'inkscape'`.
+            --
+            -- ⚠️ do NOT read that sentence as this repo's policy at work. measured
+            --    the same day, `identify -list policy` names only
+            --    `/etc/ImageMagick-6/policy.xml` and `[built-in]`, with and without
+            --    `XDG_CONFIG_HOME` set — so `imagemagick.policy.xml` is UNREAD here
+            --    and its rule 4 holds no delegate at all. the /etc file closes
+            --    three (URL, HTTPS, HTTP) and declares no `inkscape` rule.
+            --
+            -- ⇒ so the bound belongs HERE either way: do not fetch what we never
+            --   declared renderable. IMAGE_DIFF_EXTS is the declaration, and it
+            --   holds six raster formats — SVG is not one of them. the repair that
+            --   installs inkscape buys a badge and hands a grove's bytes to an
+            --   interpreter, which is the trade this bundle exists to refuse.
+            --
+            -- ⚠️ document.lua:214 DOES wrap the fetch in a pcall. it does not
+            --    help: `get_dimensions` raises inside a scheduled callback, after
+            --    that pcall has already returned, so the error reaches the user.
+            --
+            -- .cost = a remote RASTER in a markdown file no longer renders inline.
+            --         local images are unaffected (document.lua's else-branch),
+            --         and `hijack_file_patterns` still opens image files directly.
+            download_remote_images = false,
           },
         },
         -- open image files directly as rendered images

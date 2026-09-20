@@ -27,6 +27,19 @@
        `$HOME/.config` fallback. `identify -list policy` reports it as a second
        `Path:` beside `/etc/ImageMagick-6/policy.xml`.
 
+  🛑 ⚠️ THAT CLAIM DOES NOT HOLD ON THE LAPTOP — re-measured 2026-09-20
+       the file is installed at `/home/vlad/.config/ImageMagick/policy.xml` and
+       `identify -list policy` names only `/etc/ImageMagick-6/policy.xml` and
+       `[built-in]` — with `XDG_CONFIG_HOME` unset AND with it set explicitly.
+       so every rule below is INERT here: the ghostscript reach rule 1 exists to
+       close is open, which `4.5.nvim`'s own configure.verify reports as a ✋.
+
+       ⇒ read this file as a DECLARATION, never as a measured posture. ask the
+         box which paths it consults before you claim a coder or delegate is
+         shut (`gotcha.a-check-that-cries-wolf-gets-silenced`, q13 — one claim,
+         two stores). the repair is owed and is not this file's to make; it is
+         caught as a dream against `4.5.nvim`.
+
        so the holder needs NO root — which matters because the CAMPER seat is
        the seat that runs the editor and holds no sudo. a box-wide write would
        have to be owned by `ground`, and every camper would then depend on a
@@ -79,6 +92,20 @@
           a delegate, `configure.verify`'s cost claim goes ✋ and names this
           line — the verify asks BOTH halves, so a too-wide policy is caught
           rather than discovered later as a broken image render.
+
+       🛑 .on the laptop this line costs zero because NO READER CONSULTS IT
+          see the ⚠️ under `.why the SEAT path` above. where the seat policy is
+          unread, rule 4 closes no delegate, and the "cost zero" claim above is
+          true for a reason it never intended.
+
+          ⚠️ so do NOT cite rule 4 as the holder of a delegate refusal. measured
+             2026-09-20: `nvim readme.md` raised
+             `not allowed by the security policy 'inkscape'` on a shields.io
+             badge, and rule 4 was not why — `inkscape` and `rsvg-convert` are
+             both ABSENT from that box, and im6 reports the dead reach in the
+             vocabulary of a policy error. `4.5.nvim` was repaired at its own
+             cause instead (`download_remote_images = false`), which holds
+             wherever this file is read and wherever it is not.
   -->
   <policy domain="delegate" rights="none" pattern="*" />
 
