@@ -1,0 +1,17 @@
+# ⚠️ .why the two streams are split
+#   stdout  = the decision, every run. it answers a human who runs the payload
+#             by hand; in the journal it would land twice an hour and bury the
+#             transitions under a heartbeat. so: null.
+#   stderr  = transitions and failures. rare, and the only lines worth a read.
+#
+#   read them with:
+#     journalctl --user -u machine_openhours_reconcile.service
+
+[Unit]
+Description=Converge the global commit and radio gates to the open-hours policy
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/machine_openhours_reconcile
+StandardOutput=null
+StandardError=journal

@@ -1,0 +1,234 @@
+#!/usr/bin/env bash
+######################################################################
+# .what = converge the GLOBAL commit + radio gates to the open-hours policy
+#
+#   window  = whatever `~/.local/state/machine_openhours/schedule.env` declares
+#   inside  -> block both.  outside -> allow both.
+#
+# .why a RECONCILER, not two OnCalendar triggers
+#   a box asleep at 08:00 misses its trigger and sits ALLOWED all day.
+#   `Persistent=` is worse: a 20:00 allow replayed at 09:00 unblocks
+#   inside open hours. a converge re-asks "what should be true now?" on
+#   every tick, so a missed tick costs one interval and self-heals.
+#   ⇒ the timer carries no `OnCalendar`; the clock math lives here.
+#
+# .why the timezone is DECLARED and never inherited
+#   a user unit inherits the box's zone, and a grove runs UTC — one rule,
+#   two windows, no signal they diverged. the policy is a fact about the
+#   human's day, so the schedule names the human's zone and this obeys it.
+#
+# .why it converges ON DRIFT
+#   a write every tick is ~288/day into the store that holds every role's
+#   durable state, and it turns the log into a heartbeat. a read first
+#   makes it a TRANSITION log.
+#
+# ⚠️ .why __I_AM_HUMAN=true
+#   both skills refuse a mutation from a caller with no tty, because a
+#   human is meant to be the only party that moves the gate. this enacts
+#   that human's declared schedule, so the flag asserts their prior
+#   authorization rather than lies about who calls.
+#   the trigger, narrowly: a non-tty caller that enacts a declared schedule.
+#   ⇒ a sanctioned non-human-caller flag upstream would retire it.
+#
+# 🛑 .why it cd's into a dir the BUNDLE BUILT
+#   the cd is owed TWICE, and the two demands differ:
+#     1. both skills ask `git rev-parse --show-toplevel`; a user unit
+#        starts in `%h`, which is no repo
+#     2. `rhx` reads `$cwd/.agent/repo=*/role=*/skills/*` and runs what it
+#        finds there (`discoverSkillExecutables.ts:26`)
+#   no checkout on a grove holds both — `grove.push` is rsync and skips
+#   `.git` and `node_modules`, so the pushed tree is not a repo and its
+#   role symlinks dangle:
+#     ✋ ConstraintError: no skill "git.commit.uses" found in any linked role
+#   ⇒ `5.18.openhours` builds this dir instead: `git init`, the two role
+#     packages installed, `rhachet roles link` run.
+#
+# ⚠️ .the dir is never written to
+#   for `--global` both skills write only under `~/.rhachet/storage`
+#   (`git.commit.uses.global.sh:31`, `radio.uses.global.sh:14`). this
+#   enters the dir to be SEEN by `rhx`, and leaves no mark.
+#
+# ⚠️ .why the window is [from, till) and not [from, till-1s]
+#   this converges twice an hour, so one second sits far below the instrument.
+#   the bound says what it can deliver (`rule.forbid.failhide`).
+#
+# .security
+#   reads two json files and the clock. it holds no credential and can
+#   reach none: `~/.rhachet/keyrack/` is a peer of the store it reads, and
+#   is never named here.
+######################################################################
+
+# ⚠️ NOT `set -e`. if one leg fails the other must still converge — commits
+#    blocked with radio open beats a first failure that skips the second call.
+set -uo pipefail
+
+COMMIT_METER="$HOME/.rhachet/storage/repo=ehmpathy/role=mechanic/.meter/git.commit.uses.jsonc"
+RADIO_METER="$HOME/.rhachet/storage/repo=bhuild/role=dispatcher/.meter/radio.uses.global.jsonc"
+CWD="$HOME/.local/state/machine_openhours/cwd"
+SCHEDULE="$HOME/.local/state/machine_openhours/schedule.env"
+
+# ── the two streams
+#
+# a transition is rare and worth a record; the decision line lands every tick
+# and would bury it. so each rides its own stream and the unit routes them:
+#   stderr -> journal   (transitions, failures)
+#   stdout -> null      (the decision — it answers a human who runs this by hand)
+#
+# ⚠️ .why not `logger`: a second path to the same journal, a binary this file
+#    does not otherwise need, and a failure nobody sees.
+say() { echo "$*" >&2; }
+die() { echo "✋ $*" >&2; exit 1; }
+
+# ── PATH, because a systemd unit is not a login shell
+#
+# systemd sources no rc at all, and `~/.zshrc` reaches an INTERACTIVE zsh alone
+# — so a dependency named there answers a human and is absent for this caller
+# (`gotcha.a-tool-found-by-path-answers-only-a-human`). it APPENDS: a caller
+# that already carries a pnpm dir has chosen one.
+if ! command -v rhx >/dev/null 2>&1; then
+  PNPM_DIR="${PNPM_HOME:-$HOME/.local/share/pnpm}"
+  [[ -d "$PNPM_DIR" ]]     && PATH="$PATH:$PNPM_DIR"
+  [[ -d "$PNPM_DIR/bin" ]] && PATH="$PATH:$PNPM_DIR/bin"
+  export PATH
+fi
+
+# ⚠️ node is a SECOND rung. `rhx` opens `#!/usr/bin/env node`, so a shim FOUND
+#    and unable to run fails differently from one absent — and fnm's ALIAS dir
+#    is the only fnm path that outlives a shell.
+if ! command -v node >/dev/null 2>&1; then
+  FNM_DEFAULT="${FNM_DIR:-$HOME/.local/share/fnm}/aliases/default/bin"
+  [[ -d "$FNM_DEFAULT" ]] && export PATH="$PATH:$FNM_DEFAULT"
+fi
+
+command -v git >/dev/null 2>&1 || die "git is absent — both gate skills require a repo"
+command -v jq  >/dev/null 2>&1 || die "jq is absent — cannot read the gate state"
+command -v rhx >/dev/null 2>&1 || die "rhx is absent from PATH — the gate cannot be driven"
+
+# ── the dir the bundle built
+#
+# ⚠️ each rung is asked SEPARATELY, because each has its own repair. one "the
+#    cwd is bad" would send a human to the wrong fix three times in four
+#    (`gotcha.a-check-that-cries-wolf-gets-silenced`).
+#
+# ⚠️ the SKILL rungs name a FILE, never the `.agent` dir. a dir can exist with
+#    every symlink under it dead — which is what a pushed checkout on a grove
+#    looks like — so `-d .agent` reads ✔ on the box that cannot converge.
+#    `-r <the skill file>` follows the link and answers for real.
+APPLY="re-apply: rhx grove.provision --what 5.18.openhours --mode apply"
+[[ -d "$CWD" ]] \
+  || die "no reconciler cwd at $CWD — $APPLY"
+[[ -d "$CWD/.git" ]] \
+  || die "'$CWD' is no git repo — both gate skills ask git rev-parse and exit 2; $APPLY"
+[[ -r "$CWD/.agent/repo=ehmpathy/role=mechanic/skills/git.commit/git.commit.uses.sh" ]] \
+  || die "repo=ehmpathy/role=mechanic is not linked into '$CWD' — $APPLY"
+[[ -r "$CWD/.agent/repo=bhuild/role=dispatcher/skills/radio.uses.sh" ]] \
+  || die "repo=bhuild/role=dispatcher is not linked into '$CWD' — $APPLY"
+cd "$CWD" || die "could not enter the reconciler cwd at $CWD"
+
+# ── the schedule the bundle rendered
+#
+# ⚠️ .why a RENDERED file and not constants baked here
+#   the window is a fact about a HUMAN's day, so it is declared once in the
+#   bundle's `_.sh` and this reads what that declaration produced. a constant
+#   here would be a second declaration, free to drift with no reader to catch it.
+#
+# ⚠️ .why this re-checks SHAPE, and not the semantics the upsert checked
+#   this file runs from `~/.local/bin`, outside any checkout, so it cannot
+#   source the bundle's own reader — a second reader is unavoidable. so the two
+#   ask DIFFERENT questions rather than cut one set twice: the upsert asks
+#   whether the declaration is SOUND (zone resolves, from precedes till), this
+#   asks only whether what it got PARSES. a partial write or a hand-edit is what
+#   that catches, and it must never be read as a window.
+[[ -r "$SCHEDULE" ]] \
+  || die "no schedule at $SCHEDULE — $APPLY"
+# shellcheck source=/dev/null
+. "$SCHEDULE" || die "could not read the schedule at $SCHEDULE — $APPLY"
+
+[[ "${OPENHOURS_DAYS:-}" =~ ^([1-7])-([1-7])$ ]] \
+  || die "schedule days '${OPENHOURS_DAYS:-}' is no contiguous range — $APPLY"
+DAYS_LO="${BASH_REMATCH[1]}"
+DAYS_HI="${BASH_REMATCH[2]}"
+
+[[ "${OPENHOURS_FROM:-}" =~ ^[0-9]{2}:[0-9]{2}$ ]] \
+  || die "schedule from '${OPENHOURS_FROM:-}' is no HH:MM — $APPLY"
+[[ "${OPENHOURS_TILL:-}" =~ ^[0-9]{2}:[0-9]{2}$ ]] \
+  || die "schedule till '${OPENHOURS_TILL:-}' is no HH:MM — $APPLY"
+[[ -n "${OPENHOURS_ZONE:-}" ]] \
+  || die "the schedule names no timezone — $APPLY"
+
+# ⚠️ `10#` is load-bear here too — see the note at `now` below
+HOUR_LO=$((10#${OPENHOURS_FROM//:/}))   # inclusive
+HOUR_HI=$((10#${OPENHOURS_TILL//:/}))   # exclusive
+TZ_POLICY="$OPENHOURS_ZONE"
+
+# ── what should be true right now
+dow="$(TZ="$TZ_POLICY" date +%u 2>/dev/null)"
+hhmm="$(TZ="$TZ_POLICY" date +%H%M 2>/dev/null)"
+[[ "$dow" =~ ^[1-7]$ && "$hhmm" =~ ^[0-9]{4}$ ]] \
+  || die "could not read the clock in $TZ_POLICY (dow='$dow' hhmm='$hhmm')"
+
+# ⚠️ `10#` is load-bear. bash reads a zero-led literal as OCTAL, so a bare
+#    `$hhmm` at 08:00 is `0800` — an invalid octal digit — and the arithmetic
+#    errors for the whole 0800..0959 band, exactly where the window opens.
+now=$((10#$hhmm))
+
+want="allow"
+if [[ "$dow" -ge "$DAYS_LO" && "$dow" -le "$DAYS_HI" \
+   && "$now" -ge "$HOUR_LO" && "$now" -lt "$HOUR_HI" ]]; then
+  want="block"
+fi
+
+# ── what IS true right now
+#
+# ⚠️ it reads the STATE FILE, not `<skill> get --global`. to parse another
+#    component's prose is to depend on its output FORMAT — an invisible
+#    dependency that breaks the day that sentence moves. the file is what both
+#    skills write, and its contract is two-valued: present-and-true, or absent.
+#
+# ⚠️ a CORRUPT file reads as `block`, as the skills themselves do. the safe
+#    direction on an unreadable gate is closed, never open.
+state_of() {
+  local f="$1" v
+  if [[ ! -f "$f" ]]; then echo "allow"; return 0; fi
+  if ! v="$(jq -r '.blocked // false' "$f" 2>/dev/null)"; then
+    echo "block"; return 0
+  fi
+  if [[ "$v" == "true" ]]; then echo "block"; else echo "allow"; fi
+}
+
+rc=0
+
+# ── converge each gate, and only where it has drifted
+#
+# each gate is named with the form ITS OWN skill documents. both parsers accept
+# either order today; the documented form keeps this inside the contract each
+# publishes rather than inside what each happens to tolerate.
+converge() {
+  local label="$1" meter="$2" have
+  shift 2                       # $@ is now the full command
+  have="$(state_of "$meter")"
+
+  [[ "$have" == "$want" ]] && return 0
+
+  # ⚠️ __I_AM_HUMAN carries the human's declared instruction past the tty guard.
+  #    scoped to this one call, never exported. trigger named in the header.
+  if __I_AM_HUMAN=true "$@" >/dev/null 2>&1; then
+    say "$label: $have -> $want  (dow=$dow ${hhmm} ${TZ_POLICY})"
+  else
+    say "✋ $label: could not converge $have -> $want"
+    rc=1
+  fi
+}
+
+converge "commit" "$COMMIT_METER" rhx git.commit.uses "$want" --global
+converge "radio"  "$RADIO_METER"  rhx radio.uses --global "$want"
+
+# ── the decision, on STDOUT, every run
+#
+# a converge that moved no gate must still ANSWER a human who ran it by hand —
+# silence reads the same as a crash (`rule.require.status-feedback`). the unit
+# nulls stdout, so this line reaches a terminal alone and never the journal.
+echo "🕰️ openhours: want=$want  commit=$(state_of "$COMMIT_METER")  radio=$(state_of "$RADIO_METER")"
+echo "   dow=$dow  ${hhmm}  ${TZ_POLICY}  ·  window: days ${OPENHOURS_DAYS}, ${OPENHOURS_FROM}–${OPENHOURS_TILL}"
+
+exit "$rc"

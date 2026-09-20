@@ -2,7 +2,7 @@
 
 ## .what
 
-the ten shapes that break `rule.require.one-command-provision` — each in full, with the
+the eleven shapes that break `rule.require.one-command-provision` — each in full, with the
 measurement that found it and the repair that closed it.
 
 that rule is booted at say level and states the bar, the four properties, the test, and a
@@ -10,7 +10,7 @@ one-line catalogue of every shape below. **this file is that catalogue's long fo
 shape here when you have hit it, or when you are about to write the kind of phase it names.
 
 ⚠️ the shapes are numbered in the order they were FOUND, and that order carries no rank
-beyond the first: shape 1 is the most common cause of a second apply, and the nine after it
+beyond the first: shape 1 is the most common cause of a second apply, and the ten after it
 are unordered.
 
 ⚠️ **"this rule", anywhere below, names `rule.require.one-command-provision`.** every shape
@@ -1037,6 +1037,90 @@ of `gotcha.a-check-that-cries-wolf-gets-silenced`.
 - every box, every apply → the tree itself is the evidence
 - one class, on a fresh machine only → **it has no evidence.** owe it a play that reaches
   its source, or it will rot silently and be found by a human on a new laptop
+
+---
+
+## 🛑 .the ELEVENTH shape — a bundle that only ADDS, so HISTORY outranks the tree
+
+> a bundle that writes one artifact per declared row, and reaps none, converges a box to
+> **every row the repo has ever held** — never to the rows it declares today.
+
+that breaks the DETERMINISTIC clause of `rule.require.one-command-provision` in the one
+direction a green page cannot show: the box holds MORE than the tree declares, and every
+verify that reads a declared row still passes.
+
+⚠️ and it is the shape most apt to be written on purpose. an upsert is naturally additive —
+*write the row, move on* — so the reap is a step nobody omits deliberately. it is simply
+never reached for.
+
+### .measured 2026-09-18
+
+`5.13.reach` wrote one `~/.aws/config` fence per declared row. a row was renamed, the bundle
+re-applied, and the box then carried the old fence and the new one:
+
+```
+# grove: reach ehmpathy.demo.ehmpath — begin     ← no row declares this
+[profile ehmpathy.demo.ehmpath]
+...
+# grove: reach ehmpathy.demo.ehmpath — end
+```
+
+⇒ live reach — a real role in a real account — under a name the repo no longer owns. a
+suite or a human can select it, and no declaration says what it is for. the plan was
+**green on every declared row** the whole time, because a plan grades what the tree names
+and cannot grade what the tree has forgotten.
+
+### .why it hid — the grammar had a WRITER and no READER
+
+the fence grammar (`# grove: reach <profile> — begin`) lived in ONE place: the writer. so a
+reap had no verb to call:
+
+| the move | what it needs |
+|---|---|
+| write a fence | the grammar — the writer holds it |
+| LIST what was written | 🛑 the same grammar, read backward — **no verb held it** |
+
+⇒ so a reap could only be written as a **second copy** of the grammar — an m.9 drift primed
+to fire the first time an em dash or a spacing choice moved. the cheap road was to skip the
+reap, and the cheap road is the one that got taken.
+
+**the repair is at cause**: one `aws.reach.operations.sh` holds the grammar, a
+`aws.reach.get` READS it, a `aws.reach.del` removes both halves of a pair, and the upsert
+calls them. the reap became a dozen lines once a verb existed to call.
+
+### .the reap is by DECLARATION, never by a list of dead names
+
+a skip-list of retired profiles is the same defect one step out — it goes stale the day the
+next row is renamed, and its staleness is silent.
+
+⇒ so the upsert derives the declared set from its own row table, lists what the box
+carries, and reaps the difference. a row that LEAVES the table reaches the box on the very
+next apply, with no edit anywhere else.
+
+⚠️ the carried set is read by a **direct source** of the operations file, never through
+`rhx` — the transport writes a banner to stdout, so a caller that diffs those lines reads
+the banner as a profile name and acts on it (`project_rhx-not-pipe-safe`). every WRITE
+still goes through `rhx`.
+
+### 🛑 .the VERIFY asks it too, and not the upsert alone
+
+`--mode plan` short-circuits every upsert and always runs every verify, so a plan is the one
+read that tells a human a box is converged.
+
+⇒ a drift the upsert alone could see is a drift **no plan ever reports** — and it would be
+repaired silently on the next apply, so no human learns the box ever held it.
+
+### .the test, for any bundle that writes a per-row artifact
+
+> **1. if a row LEAVES this table, what removes what it wrote?**
+
+a verb you can name → the bundle converges · no answer → it only ADDS, and history outranks
+the tree.
+
+> **2. does any verb in this family LIST what it has written?**
+
+yes → the reap is a dozen lines · no → 🛑 **that absence IS the defect.** write the reader
+first; a reap written without one is a second copy of the grammar, and it will drift.
 
 ---
 

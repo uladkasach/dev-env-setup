@@ -290,11 +290,20 @@ trap 'rm -rf "$_SWAPDIR"' EXIT
 _BRAINS_AUTH_LIVE_CREDS="$_SWAPDIR/.credentials.json"
 _BRAINS_AUTH_LIVE_PROFILE="$_SWAPDIR/.claude.json"
 
+# ⚠️ the usage log is the THIRD live path, and it joined this list only after a run of this
+#   file appended fixture sweeps into the human's real usage history. it is redirected here,
+#   beside its twins, for the reason the block above states: a redirect parted from its twins
+#   is a redirect the next section can be added above.
+# ⚠️ and it is EXPORTED, unlike the two above. three cases near the end of this file re-source
+#   the aliases inside `bash -c`, which inherits only the environment — a plain shell variable
+#   does not reach them, so those sweeps would log to the real path.
+export BRAINS_AUTH_USAGE_LOG_DIR="$_SWAPDIR/.log/brains.auth.usage"
+
 # ⚠️ and the redirect is VERIFIED, not merely written. every case below writes fixtures — some
 #   deliberately corrupt — through these two variables, so a path that still points into $HOME
 #   destroys the human's live claude config. the comment above is not a guard — a comment
 #   cannot fail a run. this can.
-for _p in "$_BRAINS_AUTH_LIVE_CREDS" "$_BRAINS_AUTH_LIVE_PROFILE"; do
+for _p in "$_BRAINS_AUTH_LIVE_CREDS" "$_BRAINS_AUTH_LIVE_PROFILE" "$BRAINS_AUTH_USAGE_LOG_DIR"; do
   case "$_p" in
     "$_SWAPDIR"/*) ;;
     *) echo "💥 halt: '$_p' is not inside the temp dir — a case would clobber a real file" >&2
@@ -493,6 +502,51 @@ _is 'union.narrowed-read-stays-narrow' 'kai@x.com' \
 _is 'union.unverified-stays-out' 'kai@x.com' \
   "$(rm -f "$_BRAINS_AUTH_LIVE_CREDS"; _usage_union 'kai@x.com' 'moana@x.com' 2 --json \
      | jq -r 'keys | join(" ")' 2>/dev/null)"
+
+# ---- the usage log: every sweep appends one json line, so history outlives the one tree
+# .why = a budget tree answers "where am i now". the log answers "where was i over the week",
+#        which is the question a human asks when they want to pace a session.
+#
+# ⚠️ the clamp that earns its keep here is APPEND, not write. a log that TRUNCATES looks
+#   identical on the run that wrote it and holds exactly one line forever after — and nobody
+#   reads a log on the run that produced it, so the defect would surface only once the
+#   history it was built to keep was already gone.
+_usage_log_dir() { mktemp -d "$_SWAPDIR/log.XXXXXX"; }
+_usage_log_run() {   # $1 = dir to log into; $2... = args to _brains_auth_usage
+  local dir="$1"; shift
+  ( export BRAINS_AUTH_USAGE_LOG_DIR="$dir"
+    _usage_union 'kai@x.com' 'moana@x.com' 0 "$@" ) >/dev/null 2>&1
+}
+_usage_log_lines() { cat "$1"/*.jsonl 2>/dev/null | wc -l | tr -d ' '; }
+
+# one sweep, one line
+_L="$(_usage_log_dir)"; _usage_log_run "$_L"
+_is 'log.sweep-writes-one-line' '1' "$(_usage_log_lines "$_L")"
+
+# 🔴 the append clamp. a truncate passes the case above and fails this one
+_usage_log_run "$_L"; _usage_log_run "$_L"
+_is 'log.sweeps-append-never-truncate' '3' "$(_usage_log_lines "$_L")"
+
+# the `--json` surface logs too, exactly once. the log sits ABOVE that fork on purpose — a
+# call site below it would record the tree reads and leave every scripted read invisible
+_L="$(_usage_log_dir)"; _usage_log_run "$_L" --json
+_is 'log.json-surface-logs-once' '1' "$(_usage_log_lines "$_L")"
+
+# the line carries the accounts the sweep read, keyed by reach — a log of bare timestamps
+# would prove a sweep ran and say none of what it found
+_is 'log.line-carries-the-accounts' 'kai@x.com moana@x.com' \
+  "$(cat "$_L"/*.jsonl | jq -r '.accounts | keys | join(" ")' 2>/dev/null)"
+
+# and the fields a reader needs to chart a series: a utc stamp, the reach asked for, and the
+# verdict — so a sweep whose reads all failed stays distinct from a week with no sweep at all
+_is 'log.line-carries-ts-reach-verdict' 'yes @all 0' \
+  "$(cat "$_L"/*.jsonl | jq -r '[(.ts | if test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T.*Z$") then "yes" else "no" end), .reach, (.verdict|tostring)] | join(" ")' 2>/dev/null)"
+
+# ⚠️ `--help` returns before any gather, so it has none of the data a line would carry. a line
+#   here would be a fabricated observation — a row in the series for a sweep that read no
+#   account at all
+_L="$(_usage_log_dir)"; _usage_log_run "$_L" --help
+_is 'log.help-logs-no-line' '0' "$(_usage_log_lines "$_L")"
 
 # ---- the sweep-count invariant: N reaches in -> N rows out, none silently dropped
 # ⚠️ every mechanism below this promise is unit-covered — the fold keeps prior accounts, a bad

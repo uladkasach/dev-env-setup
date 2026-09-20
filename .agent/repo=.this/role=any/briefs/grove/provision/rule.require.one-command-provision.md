@@ -214,7 +214,7 @@ camp` before the gate can reach the box at all. that repairs this machine's reac
 grove — the box's state is untouched, and `git.grove.wake` reports `[KEEP]` on every rung when
 it was never asleep. what the gap forbids is a command that CHANGES THE GROVE.
 
-## 🛑 .the TEN shapes that break this rule — the catalogue
+## 🛑 .the ELEVEN shapes that break this rule — the catalogue
 
 each costs a second apply, a hand step, or a prompt. **the full account of every shape — its
 measurement, its repair, and the clamp that holds it — lives in
@@ -233,6 +233,11 @@ run the whole set at the keyboard.
 | 8 | a test that keys on how the repo ARRIVED, not what it HOLDS | what FACT does this test need, and is `.git` a proxy for it? |
 | 9 | a git that can ASK, on a box with nobody to answer | can this call reach `/dev/tty`, on a box with no human? |
 | 10 | the DARKEST corner — a path that runs on ONE box class, rarely | which box class runs this line, and how often? |
+| 11 | a bundle that only ADDS, so HISTORY outranks the tree | if a row LEAVES this table, what removes what it wrote — and does any verb in this family LIST what it has written? |
+
+⚠️ **shape 11 is invisible to a green page by construction.** the box holds MORE than the tree
+declares, so every verify that reads a declared row still passes. only a read of what the box
+CARRIES, diffed against what the tree DECLARES, can see it.
 
 ⚠️ **shapes 3 and 10 have no ambient evidence at all.** a phase nobody dispatches runs on no
 box, so no run says so — and a plan reports what RAN. a path that declines on one class and
@@ -358,6 +363,13 @@ for later.
   tool — the deterministic clause, defeated by the bundle's own guard
 - a pin declared in a phase file where the bundle's own reader compares against it = **blocker**
   (two declarations of one fact, and an apply that can never converge)
+- a bundle that writes one artifact per declared row and REAPS none = **blocker**; the box then
+  converges to every row the repo has ever held rather than the rows it declares today, and no
+  verify on a declared row can see it
+- a reap written as a **skip-list of retired names** = **blocker**; it goes stale the day the
+  next row is renamed, and its staleness is silent — derive the declared set from the row table
+- a grammar written by one verb that no verb can READ BACK = **blocker**; a reap is then only
+  expressible as a second copy of that grammar, so the cheap road is to skip it (m.9)
 - a `*_state` reader declared in a bundle's `_.sh` and asked by only one of its halves =
   **blocker**; a reader in `_.sh` is declared to be SHARED, so a lone asker means the other
   half cut the set its own way

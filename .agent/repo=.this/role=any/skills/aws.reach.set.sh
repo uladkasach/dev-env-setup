@@ -140,6 +140,9 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   exit 0
 fi
 
+# shellcheck source=./aws.reach.operations.sh
+source "$(dirname "${BASH_SOURCE[0]}")/aws.reach.operations.sh"
+
 ORG=""
 ENV=""
 ROLE=""
@@ -184,6 +187,22 @@ done
 
 [[ -n "$ORG" ]] || { echo "✋ --org is required (e.g. --org ahbode)" >&2; exit 2; }
 [[ -n "$ENV" ]] || { echo "✋ --env is required (test|prep|prod|camp)" >&2; exit 2; }
+####################################################################
+# 🛑 this list MIRRORS keyrack's `KEYRACK_VALID_ENVS` — it never extends it
+#   this skill writes BOTH halves, and the rack half is a `keyrack set`. so an
+#   env this list accepts and keyrack refuses writes the profile body and then
+#   fails — the half-applied pair, with a decline that names the callee.
+#
+#   📜 measured 2026-09-18: a `demo` value was added here to let an
+#   `ehmpathy:demo` reach row through. it got one step further and died on
+#   `invalid --env 'demo': must be one of sudo, prod, prep, test, all, camp`,
+#   with `[profile ehmpathy.demo.ehmpath]` already on disk. ⇒ the enum was the
+#   SIGNAL, never the defect: `demo` names an ACCOUNT, and an env names a TIER.
+#   the row was rewired to `ehmpathy:test` + `ehmpathy:prep`, both into that one
+#   account, which is what `ehmpathy/sdk-aws-lambda` already selects by.
+#
+#   ⇒ so a new env here is owed a keyrack release FIRST, never the reverse
+####################################################################
 case "$ENV" in
   test|prep|prod|camp) ;;
   *) echo "✋ invalid --env '$ENV' (test|prep|prod|camp)" >&2; exit 2 ;;
@@ -236,8 +255,10 @@ reach_clamp --owner "$OWNER" 'A-Za-z0-9._-' '[A-Za-z0-9._-]'
 reach_clamp --assume "$ROLE" 'A-Za-z0-9+=,.@_/-' '[A-Za-z0-9+=,.@_/-] (an iam role name, path allowed)'
 reach_clamp --region "$REGION" 'a-z0-9-' '[a-z0-9-] (e.g. us-east-1)'
 
-PROFILE="${ORG}.${ENV}.${OWNER}"
-CFG="$HOME/.aws/config"
+# ⚠️ the profile NAME and the config PATH are sourced too — `aws.reach.del`
+#   must name the very same string to reap the very same fence
+PROFILE="$(aws_reach_profile "$ORG" "$ENV" "$OWNER")"
+CFG="$(aws_reach_config)"
 DECL_ENV="$ENV"; [[ "$ENV" == "test" ]] && DECL_ENV="dev"
 
 echo "🐢 heres the wave..."
@@ -386,8 +407,14 @@ else
   echo "   ├─ reach:   the grove's badge ⇒ $ROLE_ARN"
 fi
 
-FENCE_OPEN="# grove: reach ${PROFILE} — begin"
-FENCE_SHUT="# grove: reach ${PROFILE} — end"
+# ⚠️ the fence grammar is SOURCED, never spelled here
+#   - `aws.reach.del` reaps by this exact pair of lines, and `aws.reach.get`
+#     lists by it. three holders of one string is an m.9 drift that has not
+#     fired yet, and the em dash is a byte nobody re-types correctly
+#   - ⇒ `aws.reach.operations.sh` holds it once, and its LIST reader derives
+#     its own affixes from `_fence_open` so it cannot drift either
+FENCE_OPEN="$(aws_reach_fence_open "$PROFILE")"
+FENCE_SHUT="$(aws_reach_fence_shut "$PROFILE")"
 
 ####################################################################
 # 5. plan

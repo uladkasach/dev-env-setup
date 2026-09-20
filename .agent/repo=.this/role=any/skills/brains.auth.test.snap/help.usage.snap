@@ -23,6 +23,14 @@
      each account also costs one 'keyrack unlock' subprocess per call — one,
      not one per retry — so an @all sweep scales with your account count.
 
+  every call appends one json line to a durable log, so the series is
+  reviewable over time:
+    ~/.rhachet/storage/repo=dev-env-setup/role=any/.log/brains.auth.usage/usage.<YYYY-MM-DD>.jsonl
+
+  read the series with jq, e.g. every five-hour number for one account:
+    cat ~/.rhachet/storage/repo=dev-env-setup/role=any/.log/brains.auth.usage/usage.*.jsonl \
+      | jq -r '[.ts, (.accounts["you@example.com"].five_hour.utilization)] | @tsv'
+
   exit codes, for a cron or statusline that reads only $?:
     0  at least one account was read
     1  every account failed, and at least one failure is ours to fix
