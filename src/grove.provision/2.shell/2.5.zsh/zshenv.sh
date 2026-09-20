@@ -128,9 +128,26 @@ fi
 #      shell needs." a right rule above wrong code is what a reader never
 #      catches (`gotcha.a-tool-found-by-path-answers-only-a-human`).
 #
-# .what stays in ~/.zshrc, deliberately: `eval "$(fnm env)"`, the chpwd hook,
-#      pnpm completions, the starship prompt. those are a HUMAN's shell. this is
-#      the PATH every other caller reads.
+# .what stays in ~/.zshrc, deliberately: the chpwd hook, pnpm completions, the
+#      starship prompt. those are a HUMAN's shell. this is the PATH every other
+#      caller reads.
+#
+# 🛑 .`eval "$(fnm env)"` was on that list until 2026-09-19, and it was wrong
+#      — 📜 measured on a converged grove, issue #140
+#
+#      the argument was sound for the half it weighed: `fnm env` mints a
+#      PER-SHELL dir, so it looked like prompt-shaped work. what it missed is
+#      that `fnm use` — the command a repo's own build runs to honor its
+#      `.nvmrc` — CANNOT WORK without it, and an automated caller is exactly
+#      who this file exists to serve:
+#
+#        $ zsh -c 'fnm use'
+#        error: We can't find the necessary environment variables to replace
+#        the Node version. You should setup your shell profile to evaluate
+#        `fnm env`
+#
+#      ⇒ so it was a HUMAN's convenience AND a program's precondition at once,
+#        and the list sorted it by the first alone. the block below carries it.
 #
 # .why the guards: .zshenv runs on EVERY zsh, nested ones included, so an
 #      unguarded prepend grows PATH once per shell.
@@ -171,6 +188,67 @@ if [ -d "$FNM_DEFAULT_BIN" ]; then
   esac
 fi
 unset FNM_DEFAULT_BIN
+
+######################################################################
+# the fnm BINARY, and the env var `fnm use` cannot run without
+#
+# 🛑 .two halves, and the block above serves NEITHER — 📜 issue #140,
+#    measured on a converged grove 2026-09-19
+#
+#    `aliases/default/bin` holds node and pnpm. it does NOT hold `fnm`, and
+#    `fnm use` needs a second thing besides: `FNM_MULTISHELL_PATH`, which only
+#    `fnm env` sets. so a box converged by the block above reads:
+#
+#      $ which node fnm pnpm            # from a NON-interactive zsh
+#      …/aliases/default/bin/node       ← ✔ the block above
+#      fnm not found                    ← ✋ half 1
+#      …/aliases/default/bin/pnpm       ← ✔ the block above
+#
+#      $ PATH="$FNM_DIR:$PATH" fnm use  # half 1 forced on by hand
+#      error: We can't find the necessary environment variables …
+#                                       ← ✋ half 2, still
+#
+# ⚠️ .the harm is INVISIBLE from a keyboard, which is why it survived
+#    `~/.profile` already carries BOTH halves for a login bash, and `~/.zshrc`
+#    carries both for an interactive zsh. so a human finds a healthy box, and
+#    every agent, cron, jest child and `zsh -c` on that same box dies at
+#    `fnm: command not found` (`gotcha.a-tool-found-by-path-answers-only-a-human`).
+#    ⇒ found when a service repo ran `rhx declapract.upgrade exec`, whose
+#      `exec.sh:63` calls `fnm use` to honor `.nvmrc`. it died at step one.
+#
+# ⚠️ .the COST, against this file's own budget — measured 2026-09-19
+#    the header bars "no command that costs more than a test", and this is the
+#    first line here to FORK a binary. a scrubbed `zsh -c true` measured 17ms
+#    with it, against a 400ms bound.
+#    ⇒ and the bound is a CHECK rather than this sentence, because a budget
+#      stated in a header is one the next author reads past:
+#      `prove.node-toolchain-reaches-a-noninteractive-zsh`, arm 3.
+#
+# 🛑 .why the mint is GUARDED on the var, and not run unconditionally
+#    `fnm env` mints a FRESH per-shell dir every call, and .zshenv runs on
+#    every zsh INCLUDING nested ones — so an unguarded eval forks once per
+#    nesting level and litters `/run/user` with a dir per shell.
+#    ⇒ guarded, a fresh shell mints its own (isolation held, which is the whole
+#      point of a per-shell dir) and a nested one inherits its parent's.
+#
+# 🛑 .do NOT "simplify" this to a hardcoded FNM_MULTISHELL_PATH
+#    it is the workaround that first got past this defect, and it is wrong as a
+#    fix: a shared constant lets two concurrent shells fight over ONE node
+#    version. the fork is what buys the isolation, and that is what it is for.
+######################################################################
+FNM_BIN_DIR="${FNM_DIR:-$HOME/.local/share/fnm}"
+if [ -x "$FNM_BIN_DIR/fnm" ]; then
+  case ":$PATH:" in
+    *":$FNM_BIN_DIR:"*) ;;
+    *) export PATH="$FNM_BIN_DIR:$PATH" ;;
+  esac
+
+  # only when absent — see the nesting reason above
+  if [ -z "${FNM_MULTISHELL_PATH:-}" ]; then
+    eval "$(fnm env --shell zsh)"
+  fi
+fi
+unset FNM_BIN_DIR
 
 ######################################################################
 # ⚠️ BOTH $PNPM_HOME and $PNPM_HOME/bin, and the ORDER is a tiebreak
