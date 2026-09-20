@@ -297,14 +297,22 @@ if [ -d "$HOME/.local/bin" ] ; then
  PATH="$HOME/.local/bin:$PATH"
 fi
 
-# fnm (fast node manager) — its PATH dir is declared in ~/.zshenv, because a
-# PROGRAM-invoked shell needs node just as much as a human's does. what stays
-# here is the interactive half: fnm's env eval and the chpwd hook.
+# fnm (fast node manager) — its PATH dirs AND its env eval are declared in
+# ~/.zshenv, because a PROGRAM-invoked shell needs node just as much as a
+# human's does. what stays here is the interactive half: the chpwd hook.
+#
+# 🛑 .`eval "$(fnm env)"` stood HERE until 2026-09-19 — 📜 issue #140
+#
+#    it moved because `fnm use` needs `FNM_MULTISHELL_PATH`, and an rc reaches
+#    a human's shell alone — so every agent, cron and jest child on the box
+#    died at `fnm: command not found` while a keyboard found it healthy.
+#
+# ⚠️ and it is NOT kept here as a belt to that brace. zsh sources `.zshenv`
+#    BEFORE this file, always — so a copy here would fork a second time and
+#    mint a SECOND per-shell dir on every interactive shell, over a var that
+#    already holds one (`rule.forbid.two-writers-on-one-artifact`). the guard
+#    in `.zshenv` is keyed on that var, and this is what keeps it honest.
 if command -v fnm &>/dev/null; then
-  ####################################################################
-  # fnm's env, but OUR cd hook — see the ⚠️ below for why not --use-on-cd
-  ####################################################################
-  eval "$(fnm env)"
 
   # ⚠️ .why this hook is written here rather than taken from `fnm env --use-on-cd`
   #      the generated hook calls `fnm use --silent-if-unchanged`, and NOT
