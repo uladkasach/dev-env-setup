@@ -939,6 +939,76 @@ local function set_image_diff_pane(win, present, image_mod, img_path, label, win
   return buf
 end
 
+-- the pane pair an image diff owns when codediff has NO session to hand it one
+-- (an explorer whose session was cleaned up). keyed by tabpage so a second
+-- image select REUSES the pair instead of a fresh split.
+local image_diff_wins_by_tab = {}
+
+-- what the LAST image render actually painted on a tab: the selection it was
+-- for, plus the windows and buffers it produced. read by the already-shown
+-- guard in open_image_diff_for_selection, which re-checks every field against
+-- the live tab — so this is a cache to validate, never a truth to trust.
+local image_diff_shown_by_tab = {}
+
+-- hand back codediff's OWN two diff windows for this tab, so an image diff and
+-- a text diff compete for one piece of real estate.
+--
+-- 🛑 the pair must come from the SESSION, and an absent side must be recreated
+--    INTO the session — never split as an unowned window. measured 2026-09-20:
+--    after an untracked/added/deleted selection codediff is `single_pane`, so
+--    one of original_win/modified_win is nil. a reuse test that demands BOTH
+--    valid then falls through to a split that no one owns and no one closes —
+--    3 wins → 5 after one image select → 7 after a second, and a later text
+--    diff rebuilt its own pair beside the 4 orphans.
+--
+-- returns old_win, new_win (or nil when there is no session to own them)
+local function get_codediff_diff_wins(tabpage)
+  local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
+  if not lc_ok then return nil end
+  local sess = lifecycle.get_session(tabpage)
+  if not sess then return nil end
+
+  local function live(w) return w ~= nil and vim.api.nvim_win_is_valid(w) end
+  local ow, mw = sess.original_win, sess.modified_win
+  if live(ow) and live(mw) then return ow, mw end
+  if not live(ow) and not live(mw) then return nil end
+
+  -- single-pane: recreate the closed side beside the one that remains, the same
+  -- way codediff itself restores it (ui/view/side_by_side.lua, its single_pane
+  -- branch), so the sides keep the human's configured original_position — then
+  -- hand the new window back to the session.
+  local cfg_ok, cfg = pcall(require, 'codediff.config')
+  local orig_right = cfg_ok and cfg.options.diff.original_position == 'right'
+  local prev_win = vim.api.nvim_get_current_win()
+
+  if live(mw) then
+    vim.api.nvim_set_current_win(mw)
+    vim.cmd(orig_right and 'rightbelow vsplit' or 'leftabove vsplit')
+    ow = vim.api.nvim_get_current_win()
+    sess.original_win = ow
+  else
+    vim.api.nvim_set_current_win(ow)
+    vim.cmd(orig_right and 'leftabove vsplit' or 'rightbelow vsplit')
+    mw = vim.api.nvim_get_current_win()
+    sess.modified_win = mw
+  end
+
+  -- the restore marker is what codediff's cleanup counts (ui/lifecycle/
+  -- cleanup.lua count_diff_windows). an unmarked pane reads as "not a diff
+  -- window" and the session gets torn down under us on the next BufEnter.
+  vim.w[ow].codediff_restore = 1
+  vim.w[mw].codediff_restore = 1
+  sess.single_pane = nil
+
+  local lay_ok, layout = pcall(require, 'codediff.ui.layout')
+  if lay_ok then pcall(layout.arrange, tabpage) end
+
+  if vim.api.nvim_win_is_valid(prev_win) then
+    vim.api.nvim_set_current_win(prev_win)
+  end
+  return ow, mw
+end
+
 -- open a side-by-side image diff: old (git base) vs new (worktree), rendered
 -- INTO codediff's own diff windows so the explorer tree stays on the left —
 -- exactly where a text diff shows. opts = { git_root, path, old_path, status,
@@ -1006,26 +1076,47 @@ local function open_codediff_image_diff(opts)
     end
   end
 
-  -- reuse codediff's diff windows: original=old (base), modified=new (worktree)
-  local old_win, new_win = nil, nil
-  local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
-  if lc_ok then
-    local orig_win, mod_win = lifecycle.get_windows(tabpage)
-    if orig_win and vim.api.nvim_win_is_valid(orig_win)
-      and mod_win and vim.api.nvim_win_is_valid(mod_win) then
-      old_win, new_win = orig_win, mod_win
+  -- reuse codediff's diff windows: original=old (base), modified=new (worktree).
+  -- a single-pane session gets its closed side restored INTO the session here,
+  -- so the pair we render into is the same pair the next text diff claims.
+  local old_win, new_win = get_codediff_diff_wins(tabpage)
+
+  -- a session reclaims the real estate, so any pair WE own for this tab is now
+  -- an orphan. reap it here — no other reader ever will: the owned pair carries
+  -- no codediff_restore marker, so codediff's own cleanup does not count it.
+  if old_win and new_win then
+    local stale = image_diff_wins_by_tab[tabpage]
+    if stale then
+      for _, w in ipairs({ stale.old, stale.new }) do
+        if w and w ~= old_win and w ~= new_win and vim.api.nvim_win_is_valid(w) then
+          pcall(vim.api.nvim_win_close, w, true)
+        end
+      end
+      image_diff_wins_by_tab[tabpage] = nil
     end
   end
 
-  -- fallbacks: split beside the explorer, or (no explorer) a dedicated tab
+  -- no session to own the panes. keep OUR OWN pair per tab and reuse it, so a
+  -- second image select lands in the same real estate rather than a new split.
   local used_dedicated_tab = false
   if not old_win or not new_win then
-    if explorer_win and vim.api.nvim_win_is_valid(explorer_win) then
+    local owned = image_diff_wins_by_tab[tabpage]
+    if owned and vim.api.nvim_win_is_valid(owned.old) and vim.api.nvim_win_is_valid(owned.new) then
+      old_win, new_win = owned.old, owned.new
+    elseif explorer_win and vim.api.nvim_win_is_valid(explorer_win) then
+      -- close a half-dead owned pair before a fresh one, else the survivor
+      -- lingers as an orphan pane nobody ever reclaims
+      if owned then
+        for _, w in ipairs({ owned.old, owned.new }) do
+          if w and vim.api.nvim_win_is_valid(w) then pcall(vim.api.nvim_win_close, w, true) end
+        end
+      end
       vim.api.nvim_set_current_win(explorer_win)
       vim.cmd('rightbelow vsplit')
       old_win = vim.api.nvim_get_current_win()
       vim.cmd('rightbelow vsplit')
       new_win = vim.api.nvim_get_current_win()
+      image_diff_wins_by_tab[tabpage] = { old = old_win, new = new_win }
     else
       used_dedicated_tab = true
       vim.cmd('tabnew')
@@ -1091,19 +1182,105 @@ local function open_codediff_image_diff(opts)
   elseif vim.api.nvim_win_is_valid(new_win) then
     vim.api.nvim_set_current_win(new_win)
   end
+
+  -- hand back WHAT WAS PAINTED, so the caller's already-shown guard can key on
+  -- the live panes rather than on a second record of its own (m.9).
+  return old_win, new_win, old_buf, new_buf
 end
 
--- open the image diff for an explorer file node — single source of the
--- node.data → opts shape, shared by the <CR> and <2-LeftMouse> handlers so a
--- field change (e.g. a new_path field for renames) is a one-place edit
-local function open_image_diff_for_node(node, explorer)
-  open_codediff_image_diff({
-    git_root = explorer.git_root or node.data.git_root,
-    path = node.data.path,
-    old_path = node.data.old_path,
-    status = node.data.status,
+-- open the image diff for an explorer selection — the ONE funnel every image
+-- entry point takes (<CR>, <2-LeftMouse>, and the on_file_select wrapper that
+-- covers file-nav + programmatic selects). one holder, so the file_data → opts
+-- shape and the record adoption below cannot drift between entry points.
+--
+-- 🛑 it ADOPTS codediff's selection record before it diverts.
+--    measured 2026-09-20: without that, a text diff followed by an image select
+--    showed the TEXT DIFF AGAIN ~500ms later.
+--
+--    the chain: every image path short-circuits codediff's own on_file_select
+--    (ui/explorer/render.lua:492), which is what writes current_file_path. so
+--    that field still named the last TEXT file. we then focus the tree,
+--    BufEnter fires on the explorer buffer, and its debounced refresh
+--    (ui/explorer/refresh.lua:299) RE-SELECTS current_file_path — so the
+--    wrapper is handed a text path, which it dutifully delegates. text paints
+--    over the image.
+--
+--    ⇒ so the image must BE the current file. then the refresh re-selects the
+--      image, and the same divert re-renders it.
+--
+--    ⚠️ image→image hid this: a session whose FIRST select is an image leaves
+--      current_file_path nil, and the refresh's re-select block is gated on it.
+--      only a text diff first arms the defect — exactly how it was reported.
+local function open_image_diff_for_selection(explorer, file_data, opts)
+  local tabpage = vim.api.nvim_get_current_tabpage()
+
+  explorer.current_file_path = file_data.path
+  explorer.current_file_group = file_data.group
+  explorer.current_selection = vim.deepcopy(file_data)
+
+  -- 🛑 the ALREADY-SHOWN guard, and it is what stops a 2/sec flash.
+  --
+  --    measured 2026-09-20: with the adoption above in place, the image flashed
+  --    twice a second. the loop feeds itself and the debounce is its clock:
+  --
+  --      render → focus the tree → BufEnter on the explorer buffer
+  --             → 500ms debounce → the refresh re-selects current_file_path
+  --             → this funnel re-renders → image.nvim clears and re-places the
+  --               kitty placement, which IS the visible flash
+  --             → focus the tree again → BufEnter → …
+  --
+  --    codediff's own select does not loop, because render.lua:323-341 returns
+  --    early on `is_same_file and not opts.force` — and a refresh re-select
+  --    passes `{ no_jump = true }`, so it carries no force. this mirrors it.
+  --
+  --    ⚠️ the record holds the WINDOWS AND BUFFERS the last render produced, so
+  --      the guard VALIDATES ITSELF against the live tab rather than trust a
+  --      second record of its own (m.9 — one set, two readers). a text diff that
+  --      reclaimed the panes, a welcome page, a closed tab: each makes the
+  --      window invalid or swaps the buffer, so the guard falls through and the
+  --      image is re-rendered. no invalidation list is owed, so none can rot.
+  local shown = image_diff_shown_by_tab[tabpage]
+  if shown
+    and not (opts and opts.force)
+    and shown.path == file_data.path
+    and shown.status == file_data.status
+    and shown.group == file_data.group
+    and shown.old_win and vim.api.nvim_win_is_valid(shown.old_win)
+    and shown.new_win and vim.api.nvim_win_is_valid(shown.new_win)
+    and vim.api.nvim_win_get_buf(shown.old_win) == shown.old_buf
+    and vim.api.nvim_win_get_buf(shown.new_win) == shown.new_buf
+  then
+    return
+  end
+
+  -- the tree's own highlight keys on a LOCAL upvalue in render.lua that no
+  -- caller can write, so the row cannot be marked from out here. clear it
+  -- rather than leave it on a file the panes no longer show.
+  if explorer.clear_selection then pcall(explorer.clear_selection) end
+
+  local old_win, new_win, old_buf, new_buf = open_codediff_image_diff({
+    git_root = explorer.git_root or file_data.git_root,
+    path = file_data.path,
+    old_path = file_data.old_path,
+    status = file_data.status,
     base_revision = explorer.base_revision,
   })
+
+  -- a render that produced no panes leaves NO record, so the next select is a
+  -- real render rather than a skip against panes that were never painted.
+  if old_win and new_win then
+    image_diff_shown_by_tab[tabpage] = {
+      path = file_data.path,
+      status = file_data.status,
+      group = file_data.group,
+      old_win = old_win,
+      new_win = new_win,
+      old_buf = old_buf,
+      new_buf = new_buf,
+    }
+  else
+    image_diff_shown_by_tab[tabpage] = nil
+  end
 end
 
 -- check if line has diff highlight (works for both vimdiff and codediff)
@@ -2038,13 +2215,9 @@ local PLUGIN_SPEC = {
           local original_on_file_select = explorer.on_file_select
           explorer.on_file_select = function(file_data, opts)
             if file_data and is_image_diff_path(file_data.path) then
-              open_codediff_image_diff({
-                git_root = explorer.git_root or file_data.git_root,
-                path = file_data.path,
-                old_path = file_data.old_path,
-                status = file_data.status,
-                base_revision = explorer.base_revision,
-              })
+              -- opts rides through, so codediff's own `force` reaches our
+              -- already-shown guard exactly as it reaches codediff's
+              open_image_diff_for_selection(explorer, file_data, opts)
               return
             end
             return original_on_file_select(file_data, opts)
@@ -2096,7 +2269,7 @@ local PLUGIN_SPEC = {
               if is_image_diff_path(node.data.path) then
                 -- image node — divert to our side-by-side image diff, so the
                 -- binary never reaches codediff's text/diff path (which errors)
-                open_image_diff_for_node(node, explorer)
+                open_image_diff_for_selection(explorer, node.data)
               elseif explorer.on_file_select then
                 -- non-image file — codediff default
                 explorer.on_file_select(node.data)
@@ -2113,7 +2286,7 @@ local PLUGIN_SPEC = {
             local node_type = node.data.type
             if node_type == 'group' or node_type == 'directory' then return end
             if is_image_diff_path(node.data.path) then
-              open_image_diff_for_node(node, explorer)
+              open_image_diff_for_selection(explorer, node.data)
             elseif explorer.on_file_select then
               explorer.on_file_select(node.data)
             end
