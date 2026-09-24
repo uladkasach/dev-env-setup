@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = prove all three brains are reachable — claude, rhachet (rhx), codex
+# .what = prove all three brains are reachable — claude, rhachet (rhx), codex —
+#         and that the CANDIDATE claude (`claude.latest`) matches what the tree
+#         declares, without any part of it reaching the pinned default
 #
 # ⚠️ each brain is asked SEPARATELY
 #   - one status for three installs names no partial part
@@ -195,6 +197,146 @@ grove_provision_5_3_brains_provision_verify() {
       echo "         to a human like github broke overnight" >&2
       echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
       failed=1
+    fi
+  fi
+
+  ####################################################################
+  # 🔴 the shadow that would make a candidate the DEFAULT, silently
+  #
+  # `~/.zshrc` prepends `~/.local/bin` AFTER `.zshenv` laid down $PNPM_HOME/bin,
+  # so that dir outranks the pnpm shims in a human's shell. a file named
+  # `claude` there therefore BECOMES the default, and every check above still
+  # reads the pnpm copy the tree declares — so the swap is invisible to all of
+  # them, which is what makes this its own claim.
+  #
+  # ⚠️ asked on EVERY run, opted in or out. it grades a hazard about the
+  #   DEFAULT, so the candidate's flag has no bearing on whether it applies
+  ####################################################################
+  if [[ -e "$HOME/.local/bin/claude" ]]; then
+    echo "   ✋ a file named 'claude' sits in ~/.local/bin" >&2
+    echo "      ⇒ that dir outranks \$PNPM_HOME/bin in a human's shell, so this" >&2
+    echo "        file — not the declared pin — is what 'claude' now runs" >&2
+    echo "      ⇒ every pin check above still reads the pnpm copy, so it is" >&2
+    echo "        green on a box whose claude was swapped out from under it" >&2
+    echo "      ⇒ the candidate is reached as 'claude.latest' for exactly this" >&2
+    echo "        reason; no bundle here writes a 'claude' to this dir" >&2
+    echo "      fix: rm $HOME/.local/bin/claude" >&2
+    failed=1
+  fi
+
+  ####################################################################
+  # the CANDIDATE claude — `claude.latest`
+  #
+  # ⚠️ the claim INVERTS with the pin. an opted-out box that still carries a
+  #   shim offers a command no line in the tree declares, pointed at a version
+  #   nobody reviewed — so a torn-down box is CONVERGED, and residue is the
+  #   defect this reads for
+  ####################################################################
+  local latest_prefix="$GROVE_BRAIN_CLAUDE_LATEST_PREFIX"
+  local latest_shim="$GROVE_BRAIN_CLAUDE_LATEST_SHIM"
+  local latest_pin="$GROVE_BRAIN_CLAUDE_LATEST_PIN"
+
+  if [[ -z "$latest_pin" ]]; then
+    if [[ -e "$latest_shim" || -d "$latest_prefix" ]]; then
+      echo "   ✋ claude.latest is opted out and the box still carries it" >&2
+      echo "      ⇒ shim: ${latest_shim} $([[ -e "$latest_shim" ]] && echo present || echo absent)" >&2
+      echo "      ⇒ prefix: ${latest_prefix} $([[ -d "$latest_prefix" ]] && echo present || echo absent)" >&2
+      echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+      failed=1
+    else
+      echo "   • claude.latest is opted out, and no candidate is installed ✔"
+      echo "     opt in: set GROVE_BRAIN_CLAUDE_LATEST_PIN in this bundle's _.sh"
+    fi
+    return $failed
+  fi
+
+  ####################################################################
+  # 1. the install — the SAME three-valued reader the upsert guarded on, so
+  #    the two halves cannot cut this set two ways
+  ####################################################################
+  local latest_state
+  latest_state="$(grove_provision_5_3_brains_claude_latest_state)"
+
+  if [[ "$latest_state" != "whole" ]]; then
+    echo "   ✋ the claude.latest candidate reads '$latest_state', not 'whole'" >&2
+    echo "      ⇒ expected a runnable bin at $latest_prefix/v$latest_pin, with" >&2
+    echo "        '$latest_prefix/latest' naming it" >&2
+    echo "      ⇒ found: latest → $(readlink "$latest_prefix/latest" 2>/dev/null || echo '(no symlink)')" >&2
+    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+    failed=1
+  else
+    echo "   • claude.latest candidate is built at $latest_pin ✔ (latest → v$latest_pin)"
+  fi
+
+  ####################################################################
+  # 2. the shim is CURRENT, not merely present
+  #
+  # ⚠️ a presence test would pass on a shim that still names the prior cap, or
+  #   the prior target — so it is DIFFED against a fresh render of the one
+  #   declaration it was written from
+  ####################################################################
+  if [[ ! -x "$latest_shim" ]]; then
+    echo "   ✋ the claude.latest shim is absent or not executable" >&2
+    echo "      ⇒ looked for: $latest_shim" >&2
+    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+    failed=1
+  elif ! grove_provision_5_3_brains_claude_latest_shim_render | diff -q - "$latest_shim" >/dev/null 2>&1; then
+    echo "   ✋ the claude.latest shim has drifted from this checkout" >&2
+    echo "      ⇒ it may still name a prior target or a prior memory cap" >&2
+    echo "      read the diff: diff <(…render…) $latest_shim" >&2
+    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+    failed=1
+  else
+    echo "   • the claude.latest shim matches this checkout ✔"
+  fi
+
+  ####################################################################
+  # 3. it RUNS, and answers the declared candidate
+  #
+  # ⚠️ the SHIM is what runs, never the binary behind it — the shim is the path
+  #   a human takes, and it carries two branches of its own
+  #   (`rule.require.prove-the-path-the-human-runs`)
+  #
+  # ⚠️ the version is asked of the BINARY for the same reason the pin above is:
+  #   claude's in-place updater rewrites `cli.js` and leaves package.json
+  #   behind, so a check on the package answers ✔ on a drifted box
+  ####################################################################
+  if [[ -x "$latest_shim" ]]; then
+    local latest_live
+    latest_live="$(timeout -k 5 "$GROVE_BRAIN_PROBE_SECONDS" "$latest_shim" --version 2>/dev/null \
+      | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+
+    if [[ -z "$latest_live" ]]; then
+      echo "   🌙 claude.latest ran, but did not answer a version this run"
+      echo "      ⇒ the candidate ($latest_pin) is unproven here, not disproven"
+    elif [[ "$latest_live" == "$latest_pin" ]]; then
+      echo "   • claude.latest is $latest_live, the declared candidate ✔"
+    else
+      echo "   ✋ claude.latest is $latest_live, but the declared candidate is $latest_pin" >&2
+      echo "      ⇒ the candidate drifted, so a trial reports on a version the" >&2
+      echo "        tree does not name — and a comparison against the pin is then" >&2
+      echo "        one nobody else can reproduce" >&2
+      echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+      echo "      or, if the drift is wanted: bump GROVE_BRAIN_CLAUDE_LATEST_PIN first" >&2
+      failed=1
+    fi
+
+    ##################################################################
+    # 4. REACH — a shim no lookup finds is a command the human does not have
+    #
+    # ⚠️ a 🌙, never a ✋: this reads THIS shell's PATH, and a verify driven
+    #   over a duct runs in a shell whose PATH is not the human's
+    #   (`gotcha.a-tool-found-by-path-answers-only-a-human`)
+    ##################################################################
+    local latest_which
+    latest_which="$(command -v claude.latest 2>/dev/null || true)"
+    if [[ "$latest_which" == "$latest_shim" ]]; then
+      echo "   • claude.latest is on PATH ✔"
+    else
+      echo "   🌙 claude.latest is installed and this shell's PATH does not name it"
+      echo "      ⇒ found: ${latest_which:-(no match)}"
+      echo "      ⇒ ~/.local/bin reaches PATH from ~/.zshenv (owned by 2.5.zsh), so"
+      echo "        a shell that read neither rc will not see it — unproven here"
     fi
   fi
 
