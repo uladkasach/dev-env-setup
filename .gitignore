@@ -41,3 +41,4 @@ node_modules
 # a RUNTIME lock — it names one machine's live process, so a commit of it
 # either lies to the next machine or blocks it
 .claude/scheduled_tasks.lock
+!.agent/.actors/actor.via.slug=.default/

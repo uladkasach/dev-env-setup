@@ -44,6 +44,7 @@ grove_provision_5_3_brains_configure_verify() {
     '.env.DISABLE_INSTALLATION_CHECKS:"1":the native-installer migration nag' \
     '.env.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION:"false":the prompt suggestion' \
     '.env.CLAUDE_CODE_DISABLE_COMMAND_INJECTION_CHECK:"1":the command injection check' \
+    '.env.CLAUDE_CODE_ENABLE_TODO_TOOLS:"1":the todo and task tools' \
     '.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE:"50":the auto-compact threshold' \
     '.disableClaudeAiConnectors:true:the claude.ai connector fetch' \
     '.permissions.defaultMode:"auto":the auto default mode' \
@@ -54,6 +55,7 @@ grove_provision_5_3_brains_configure_verify() {
     '.effortLevel:"medium":the default effort level' \
     '.skipAutoPermissionPrompt:true:the auto-permission prompt skip' \
     '.tui:"fullscreen":the fullscreen tui' \
+    '.verbose:true:the verbose output default' \
     '.cleanupPeriodDays:36500:the never-prune transcript retention'; do
     path="${pair%%:*}"
     want="${pair#*:}"; want="${want%%:*}"
@@ -73,9 +75,9 @@ grove_provision_5_3_brains_configure_verify() {
   ####################################################################
   # .the GLOBAL CONFIG half — `~/.claude.json`, the `/config` panel's toggles
   #
-  # ⚠️ this is a SECOND FILE, not a second key in the one above. a `verbose`
-  #   in `settings.json` is accepted, stored, and read by no caller — so a
-  #   check aimed at the wrong file would go green on an inert declaration
+  # ⚠️ this is a SECOND FILE, not a second key in the one above. claude reads
+  #   `diffSidebarOpen` straight off the global config, never through settings —
+  #   so a check aimed at `settings.json` would go green on an inert declaration
   ####################################################################
   local config
   if declare -F _grove_provision_5_3_brains_config_path >/dev/null 2>&1; then
@@ -87,26 +89,26 @@ grove_provision_5_3_brains_configure_verify() {
     #   - ⇒ it says so rather than guess a path, because a guessed path that
     #     misses reads `absent` and reports a ✋ against a box that is fine
     ####################################################################
-    echo "   🌙 the global config path reader is absent, so verbose is unproven"
+    echo "   🌙 the global config path reader is absent, so the diff panel default is unproven"
     return $failed
   fi
 
   if [[ ! -r "$config" ]]; then
     echo "   ✋ no claude global config at $config" >&2
-    echo "      ⇒ verbose output is off, so every command's output is truncated" >&2
+    echo "      ⇒ so the diff panel will auto-open on any wide terminal" >&2
     echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
     return 1
   fi
 
-  live="$(jq -c '.verbose' "$config" 2>/dev/null)"
-  if [[ "$live" == "true" ]]; then
-    echo "   • the verbose output default holds the declared value ✔"
+  live="$(jq -c '.diffSidebarOpen' "$config" 2>/dev/null)"
+  if [[ "$live" == "false" ]]; then
+    echo "   • the diff panel shut-at-start holds the declared value ✔"
   else
-    echo "   ✋ the verbose output default is NOT declared — .verbose reads ${live:-absent}, want true" >&2
-    echo "      ⇒ an ABSENT key is not neutral here: claude's own default is" >&2
-    echo "        false, so an unset key IS verbose-off, chosen by no one" >&2
-    echo "      ⇒ and this is a different FILE from settings.json — a verbose" >&2
-    echo "        key placed there is inert, so check which file you edited" >&2
+    echo "   ✋ the diff panel is NOT held shut — .diffSidebarOpen reads ${live:-absent}, want false" >&2
+    echo "      ⇒ absent or true, the fullscreen tui opens the diff panel on its own" >&2
+    echo "        whenever the terminal is wide enough" >&2
+    echo "      ⇒ a /diff toggle writes this key, so one open flips it to true;" >&2
+    echo "        the next apply shuts it again" >&2
     echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
     failed=1
   fi
