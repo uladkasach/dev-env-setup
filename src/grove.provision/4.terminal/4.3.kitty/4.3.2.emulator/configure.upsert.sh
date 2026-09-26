@@ -27,9 +27,11 @@ grove_provision_4_3_2_emulator_configure_upsert() {
   cp "$bundle_dir/kitty.conf" "$HOME/.config/kitty/kitty.conf"
   echo "   • kitty.conf declared (~/.config/kitty/kitty.conf)"
 
-  cp "$bundle_dir/copy_notify.py" "$HOME/.config/kitty/copy_notify.py"
-  cp "$bundle_dir/reboot_window.py" "$HOME/.config/kitty/reboot_window.py"
-  echo "   • kittens declared (copy_notify.py, reboot_window.py)"
+  local kitten
+  for kitten in copy_notify.py reboot_window.py scroll_window.py; do
+    cp "$bundle_dir/$kitten" "$HOME/.config/kitty/$kitten"
+  done
+  echo "   • kittens declared (copy_notify.py, reboot_window.py, scroll_window.py)"
 
   cp "$bundle_dir/desert.conf" "$HOME/.config/kitty/themes/desert.conf"
   echo "   • desert theme declared (~/.config/kitty/themes/desert.conf)"

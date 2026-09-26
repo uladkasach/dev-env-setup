@@ -34,18 +34,19 @@ grove_provision_2_1_toolkit_provision_verify() {
   #   - 📜 `gnupg` was added there and not here for one apply
   #   - ⇒ the box declared a fact no phase would ever re-check
   #   - (rule.require.upgrade-entries-verify-themselves)
-  for tool in jq tree unzip rg curl gpg pv; do
+  for tool in jq tree unzip rg curl gpg pv age; do
     command -v "$tool" >/dev/null 2>&1 || absent+=("$tool")
   done
 
   if [[ "${#absent[@]}" -eq 0 ]]; then
-    echo "   • toolkit essentials resolve — jq, tree, unzip, rg, curl, gpg, pv ✔"
+    echo "   • toolkit essentials resolve — jq, tree, unzip, rg, curl, gpg, pv, age ✔"
   else
     echo "   ✋ an essential toolkit command does NOT resolve: ${absent[*]}" >&2
     echo "      ⇒ each of these is depended on by NAME, so the failure surfaces" >&2
     echo "        wherever the caller lives — never here. an absent unzip reads" >&2
     echo "        as 'pnpm is broken'; an absent rg reads as 'nvim search is dead';" >&2
-    echo "        an absent pv breaks git backup" >&2
+    echo "        an absent pv breaks git backup; age is reached by a human," >&2
+    echo "        so its absence surfaces at a keyboard rather than in a run" >&2
     echo "      note: two names differ from their package — ripgrep ships 'rg'," >&2
     echo "        and gnupg ships 'gpg'" >&2
     echo "      fix: rhx grove.provision --what 2.1.toolkit --mode apply" >&2
