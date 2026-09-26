@@ -62,10 +62,15 @@ grove_provision_4_3_2_emulator_configure_verify() {
   # .why the deployed artifact is a plain `cp`, so a byte-diff is decisive —
   #   claims 2-5 check five PROPERTIES, and every one holds on a stale copy
   ####################################################################
-  local pair dest mismatched=() named_absent=()
+  local pair dest mismatched=() named_absent=() kittens=()
   for pair in kitty.conf:kitty.conf copy_notify.py:copy_notify.py \
-    reboot_window.py:reboot_window.py desert.conf:themes/desert.conf; do
+    reboot_window.py:reboot_window.py scroll_window.py:scroll_window.py \
+    desert.conf:themes/desert.conf; do
     dest="$conf_dir/${pair#*:}"
+    # ⚠️ the kitten set is DERIVED here, never re-typed for claim 1d below
+    #   - a second list of one set is free to drift from this one, and the
+    #     kitten it forgets is the one whose key silently dies
+    [[ "${pair%%:*}" == *.py ]] && kittens+=("${pair#*:}")
     if [[ ! -f "$dest" ]]; then named_absent+=("${pair#*:}")
     elif ! cmp -s "$bundle_dir/${pair%%:*}" "$dest"; then mismatched+=("${pair#*:}")
     fi
@@ -92,7 +97,7 @@ grove_provision_4_3_2_emulator_configure_verify() {
   #   this bundle has already put kitty's on disk
   ####################################################################
   local kitten unparsed=()
-  for kitten in copy_notify.py reboot_window.py; do
+  for kitten in "${kittens[@]}"; do
     [[ -f "$conf_dir/$kitten" ]] || continue
     kitty +runpy "
 import sys
@@ -110,7 +115,7 @@ except SyntaxError as e:
       "  so the break waits for a human mid-task and looks like a wrong gate" \
       "read why: kitty +runpy \"compile(open('$conf_dir/${unparsed[0]}').read(), 'k', 'exec')\""
   else
-    echo "   • both kittens parse ✔"
+    echo "   • all ${#kittens[@]} kittens parse ✔"
   fi
 
   ####################################################################
@@ -252,7 +257,7 @@ print(load_config('$conf').remember_window_size)
   #   (rule.require.seam-claims-have-an-owner)
   ####################################################################
   if [[ ${#named_absent[@]} -eq 0 ]]; then
-    echo "   • the theme and both kittens are on disk ✔"
+    echo "   • the theme and all ${#kittens[@]} kittens are on disk ✔"
   else
     _kitty_verify_fail "kitty.conf names ${#named_absent[@]} file(s) that are not readable" \
       "${named_absent[@]/#/• $conf_dir/}" \

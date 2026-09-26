@@ -21,6 +21,7 @@
 #   - `5.17.yq` runs FIRST despite the highest digit — it depends on no bundle
 #     in this section at all. its only need is `curl`, which `2.1.toolkit`
 #     already put down a whole section earlier
+#   - `5.19.op` runs SECOND: `5.12.rack` and `6.apps` both read what it places
 #   - .refs = howdoes.5-devtools-dispatch-order.md — the full trace, per swap
 #
 # .why every install here is a BUNDLE, never a function on a roll
@@ -34,6 +35,7 @@
 
 grove_provision_5_devtools() {
   bundle.upgrade 5.17.yq
+  bundle.upgrade 5.19.op
   bundle.upgrade 5.1.node
   bundle.upgrade 5.2.rust
   bundle.upgrade 5.14.treesitter

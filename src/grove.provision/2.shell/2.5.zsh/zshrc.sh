@@ -701,20 +701,20 @@ export EDITOR="nvim"
 # skipped for: Claude Code, scripts, pipes — they don't need a prompt
 [[ -t 1 ]] && eval "$(starship init zsh)"
 
-# claude code: lower auto-compact threshold from default ~83% to 50%
-# keeps the conversation context smaller so large payloads don't accumulate,
-# which reduces per-minute input-token (ITPM) spikes that trip "rate limit reached"
-# note: must be exported in shell — a value in settings.json env block is ignored
-export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=50
-
-# claude code: block all self-update paths (we manage claude via pnpm global)
-# silences the "auto-update failed" nag
-# note: must be exported in shell — the settings.json env block is read too late
-export DISABLE_AUTOUPDATER=1
-export DISABLE_UPDATES=1
-
-# claude code: suppress the "switched from npm to native installer" migration nag
-# undocumented flag found in the minified source (gates the installer check):
-#   if (K.current || v9() || w1(process.env.DISABLE_INSTALLATION_CHECKS)) return;
-# ref: https://github.com/anthropics/claude-code/issues/23683
-export DISABLE_INSTALLATION_CHECKS=1
+# 🛑 .NO CLAUDE FLAG IS EXPORTED HERE — `5.3.brains` declares every one of them
+#    in `~/.claude/settings.json`, and is the SOLE writer
+#    (`rule.require.brain-config-has-one-home`)
+#
+# .what stood here until 2026-09-25, and why each left
+#   | export | why it left |
+#   |---|---|
+#   | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | read at `et6()`, per turn — long after settings load |
+#   | `DISABLE_AUTOUPDATER` | read at `j96()` off `process.env`; claude's own `RtK()` writes it INTO settings |
+#   | `DISABLE_UPDATES` | 🔴 DEAD — 0 refs in cli 2.1.87 |
+#   | `DISABLE_INSTALLATION_CHECKS` | read at `$w6()`/`kFz()`, behind a react effect |
+#
+# ⚠️ two of these carried `note: must be exported in shell — the settings.json env
+#    block is read too late`. neither cited a READ SITE, and both were false: `zd()`
+#    assigns the settings `env` block into `process.env` at startup, unfiltered.
+#    ⇒ a shelf claim with no read site beside it is a guess, and these two guesses
+#      bought a two-writers split across three bundles

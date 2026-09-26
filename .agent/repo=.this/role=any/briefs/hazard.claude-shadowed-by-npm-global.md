@@ -10,13 +10,15 @@ chose — with no error raised.
 
 three things combine, and each one alone looks harmless:
 
-1. **no binding exists.** `src/bash_aliases.sh` sets `ANTHROPIC_MODEL` and
-   `CLAUDE_CODE_SKIP_UPDATE_CHECK`, but declares no `alias claude=`. the "pin" was
-   only ever "the pnpm copy happens to be first on PATH".
+1. **no binding pins the PATH.** `2.7.aliases/bash_aliases.sh` declares a `claude()`
+   function, but that function looks the binary up by BARE NAME — `command -v claude`,
+   and `rhx enroll claude`, which hands the bare name to rhachet. so the function
+   decides WHAT to run and never WHICH COPY. the "pin" is still only "the pnpm copy
+   happens to be first on PATH".
 2. **fnm always wins the PATH race.** `eval "$(fnm env --use-on-cd)"`
-   (`src/zshrc.sh`) puts `/run/user/$UID/fnm_multishells/*/bin` near the front on
+   (`2.5.zsh/zshrc.sh`) puts `/run/user/$UID/fnm_multishells/*/bin` near the front on
    every shell.
-3. **the PNPM_HOME prepend is skipped.** `src/zshrc.sh` guards it:
+3. **the PNPM_HOME prepend is skipped.** `2.5.zsh/zshrc.sh` guards it:
 
    ```sh
    case ":$PATH:" in
@@ -84,6 +86,6 @@ claude --version  # must match CLAUDE_CODE_VERSION_PINNED
 
 ## .see also
 
-- `rule.require.brain-configs-via-repo` — brain config belongs in the repo, applied via sync
+- `rule.require.brain-config-has-one-home` — `5.3.brains` declares every brain knob, and no peer bundle may
 - `rule.require.repo-as-source-of-truth`
 - `rule.require.install-via-procedures`

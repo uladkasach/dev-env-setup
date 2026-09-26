@@ -57,16 +57,20 @@ if [[ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/yubikey-agent/yubikey-agent.soc
   export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/yubikey-agent/yubikey-agent.sock"
 fi
 
-# claude code config (expected: v2.1.87, beyond which hooks are truncated)
-export ANTHROPIC_MODEL='claude-opus-5[1m]'
-export CLAUDE_CODE_SKIP_UPDATE_CHECK=1
-
-# subagents default to sonnet, never the session's opus.
+# 🛑 .NO CLAUDE CONFIG VALUE IS SET HERE — `5.3.brains` declares every knob in
+#    `~/.claude/settings.json`, and is the SOLE writer
+#    (`rule.require.brain-config-has-one-home`)
 #
-# .why a subagent reads a bounded slice and reports one message back, so the
-#      session's opus buys little there and costs per spawn. an agent whose
-#      own definition declares a `model:` still wins over this default.
-export CLAUDE_CODE_SUBAGENT_MODEL='claude-sonnet-5[1m]'
+# .what stood here until 2026-09-25, and why each left
+#   | export | why it left |
+#   |---|---|
+#   | `ANTHROPIC_MODEL` | two writers, and this copy had DRIFTED — `claude-opus-5[1m]` against the settings' `claude-opus-5-5[1m]`. the settings `env` block is applied at startup and OVERRODE it, so the stale value was a silent loser |
+#   | `CLAUDE_CODE_SUBAGENT_MODEL` | read at `Ik6()` off `process.env`, so settings reaches it |
+#   | `CLAUDE_CODE_SKIP_UPDATE_CHECK` | 🔴 DEAD — 0 refs in cli 2.1.87 |
+#
+# ⚠️ the `claude()` FUNCTION below stays, and is not an exception to that rule: a
+#    function is a shell surface, and no settings key can express one. the line is
+#    "a VALUE the brain reads is config; a FUNCTION a human types is shell"
 
 # aws profiles via keyrack
 # usage: use.ahbode.prep [--owner <owner>]
@@ -609,18 +613,48 @@ nvim() {
 #         must clear the peak or the cgroup oom killer reaps the session
 #         mid-turn. 8G leaves headroom above the worst observed peak.
 #         set the aggregate cap via: claude.memory.cap.set
+# 🛑 .`claude` RESOLVES TO `rhx enroll claude` — every session is an enrolled,
+#    addressable clone, never a bare cli
+#    .why = an unenrolled session holds no clone address and no managed reach
+#           socket, so no caller can name it or speak to it later. enrollment
+#           is the default because the bare cli is the exception
+#    .how = every suffix passes through VERBATIM, since `enroll` takes the
+#           brain as its positional and owns no flag namespace of its own:
+#             claude --roles +driver,-learner
+#               → rhx enroll claude --roles +driver,-learner
+#    .note = `command claude` still reaches the bare binary, in bash and zsh —
+#            that is the escape hatch, and it needs no flag
 claude() {
   # find the real claude binary, bypass this function (works in bash + zsh)
   local bin
   bin=$( unset -f claude 2>/dev/null; command -v claude )
-  # cap only in a real user session with systemd; else run bare
-  if [[ -n "$bin" ]] && command -v systemd-run >/dev/null 2>&1 && [[ -n "$XDG_RUNTIME_DIR" ]]; then
+
+  # build the call: enrolled when rhx is reachable, bare when it is not.
+  # ⚠️ a fallback rather than a failure — an unenrolled session beats no
+  #    session at all, and rhx is absent on a box mid-provision
+  local -a cmd=()
+  local rhx_bin
+  rhx_bin=$(command -v rhx 2>/dev/null)
+  if [[ -n "$rhx_bin" ]]; then
+    cmd=( "$rhx_bin" enroll claude "$@" )
+  elif [[ -n "$bin" ]]; then
+    cmd=( "$bin" "$@" )
+  else
+    echo "✋ neither rhx nor claude is on PATH" >&2
+    echo "   fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 127
+  fi
+
+  # cap only in a real user session with systemd; else run bare.
+  # the scope wraps the OUTER call, and claude inherits the cgroup — so the
+  # slice still bounds the session however it was launched
+  if command -v systemd-run >/dev/null 2>&1 && [[ -n "$XDG_RUNTIME_DIR" ]]; then
     systemd-run --user --scope --quiet --collect \
       --slice=claude.slice \
       -p MemoryMax=8G \
-      "$bin" "$@"
+      "${cmd[@]}"
   else
-    command claude "$@"
+    "${cmd[@]}"
   fi
 }
 
