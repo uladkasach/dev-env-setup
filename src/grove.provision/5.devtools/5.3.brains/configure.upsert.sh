@@ -18,14 +18,23 @@
 #   would find it and report ✔ forever.
 #   ⇒ before you add a key, settle WHICH file claude reads it from
 #
-# .why the global config half exists at all — `verbose`
-#   - `verbose` is the `/config` panel's "show full command outputs" toggle
-#   - it is ABSENT from the settings zod schema (measured, 2.1.87), so a
-#     `"verbose": true` in `settings.json` is inert
-#   - and `claude config set` is GONE from the cli — the only `config`
-#     subcommand left in 2.1.87 sits under `auto-mode`
-#   - ⇒ a human's only lever is the TUI toggle, which this repo cannot declare
-#     (`rule.require.repo-as-source-of-truth`)
+# .why `verbose` lives in `settings.json`, and never in `~/.claude.json`
+#   - measured, 2.1.280: `yo(key, default)` reads every settings source first,
+#     and falls back to the global config only for keys in its `nSe` list
+#   - and a global-config value that EQUALS claude's default is dropped when
+#     claude saves the file — every save filters through
+#     `Ls(config, (v, k) => S(v) !== S(Rx[k]))`, and `Rx.verbose` is `false`.
+#     measured: `verbose: false` was written, verified ✔, and read absent
+#     seconds later. a settings key is never rewritten that way
+#   - ⇒ the declared `verbose: true` holds however the global config drifts,
+#     since `yo` reads the settings value before the global config is asked
+#
+# .why the global config half exists at all — `diffSidebarOpen`
+#   - the fullscreen tui's diff panel auto-opens on a wide terminal while this
+#     key is ABSENT (`SWn()`); only an explicit `false` keeps it shut
+#   - it is read straight off the global config (`ie()`), never through `yo`,
+#     so no settings file can reach it
+#   - it has no claude default, so a declared `false` survives claude's saves
 #
 # 🛑 .THIS PATCH IS THE SOLE HOME OF EVERY BRAIN KNOB
 #   - `rule.require.brain-config-has-one-home`. no peer bundle may declare one
@@ -172,7 +181,7 @@
 # .what = the SETTINGS half — `~/.claude/settings.json`
 ####################################################################
 _grove_provision_5_3_brains_settings_upsert() {
-  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_INSTALLATION_CHECKS": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false", "CLAUDE_CODE_DISABLE_COMMAND_INJECTION_CHECK": "1", "ANTHROPIC_MODEL": "claude-opus-5-5[1m]", "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-5[1m]", "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50"}, "disableClaudeAiConnectors": true, "permissions": {"defaultMode": "auto", "deny": ["Agent"]}, "model": "claude-opus-5-5[1m]", "effortLevel": "medium", "cleanupPeriodDays": 36500, "skipAutoPermissionPrompt": true, "tui": "fullscreen"}'
+  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_INSTALLATION_CHECKS": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false", "CLAUDE_CODE_DISABLE_COMMAND_INJECTION_CHECK": "1", "CLAUDE_CODE_ENABLE_TODO_TOOLS": "1", "ANTHROPIC_MODEL": "claude-opus-5-5[1m]", "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-5[1m]", "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50"}, "disableClaudeAiConnectors": true, "permissions": {"defaultMode": "auto", "deny": ["Agent"]}, "model": "claude-opus-5-5[1m]", "effortLevel": "medium", "cleanupPeriodDays": 36500, "skipAutoPermissionPrompt": true, "tui": "fullscreen", "verbose": true}'
   local settings="$HOME/.claude/settings.json"
 
   if ! mkdir -p "$HOME/.claude"; then
@@ -277,7 +286,12 @@ _grove_provision_5_3_brains_config_path() {
 ####################################################################
 # .what = the GLOBAL CONFIG half — the `/config` panel's own toggles
 #
-# .verbose=true shows full command outputs rather than a truncated head
+# .diffSidebarOpen=false keeps the fullscreen tui's diff panel shut at start;
+#   `/diff` still opens it on demand for the one session that asks
+#
+# ⚠️ a key here must have NO claude default — a value equal to the default is
+#   dropped on claude's next save (see the header). that is why `verbose` moved
+#   to the settings half
 #
 # 🛑 .this file also holds the OAUTH SESSION, so the write is guarded twice
 #
@@ -307,7 +321,7 @@ _grove_provision_5_3_brains_config_path() {
 #   inside it and leaves every other key exactly as it found it
 ####################################################################
 _grove_provision_5_3_brains_config_upsert() {
-  local patch='{"verbose": true}'
+  local patch='{"diffSidebarOpen": false}'
   local config
   config="$(_grove_provision_5_3_brains_config_path)"
 
@@ -338,8 +352,8 @@ _grove_provision_5_3_brains_config_upsert() {
   ####################################################################
   # 🛑 guard 1 — a file that already holds the value is never opened for write
   ####################################################################
-  if [[ "$(jq -c '.verbose' "$config" 2>/dev/null)" == "true" ]]; then
-    echo "   • claude global config already verbose → $config [KEEP]"
+  if [[ "$(jq -c '.diffSidebarOpen' "$config" 2>/dev/null)" == "false" ]]; then
+    echo "   • claude global config already holds the diff panel shut → $config [KEEP]"
     return 0
   fi
 
@@ -362,14 +376,15 @@ _grove_provision_5_3_brains_config_upsert() {
   ####################################################################
   # ⚠️ a merge that yields a smaller file than it read is a jq that dropped
   #   state, and this is the one file where that costs a human their session.
-  #   the patch ADDS one key, so the output can never be shorter than the input
+  #   the patch adds `diffSidebarOpen`, or turns `true` into the longer `false`, so
+  #   the output can never be shorter than the input
   ####################################################################
   local was now
   was="$(wc -c < "$config")"
   now="$(wc -c < "$tmp")"
   if [[ "$now" -lt "$was" ]]; then
     echo "   ✋ the merged global config SHRANK — $was bytes in, $now bytes out" >&2
-    echo "      ⇒ this patch only adds a key, so a smaller result means state" >&2
+    echo "      ⇒ this patch never shortens a value, so a smaller result means state" >&2
     echo "        was dropped. the write is refused and $config is untouched" >&2
     echo "      read the candidate before you discard it: jq . $tmp" >&2
     return 1
@@ -381,7 +396,7 @@ _grove_provision_5_3_brains_config_upsert() {
     return 1
   fi
 
-  echo "   • claude global config merged → $config (verbose output on)"
+  echo "   • claude global config merged → $config (diff panel shut at start)"
 }
 
 ####################################################################

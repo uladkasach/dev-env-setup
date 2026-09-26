@@ -28,9 +28,12 @@
 #     by every box that floats it — the first-party float is accepted
 #   - a top-level pin bounds only this package, never its dependency tree
 #
-# .why claude is `2.1.87`, not latest, and the verify asks the BINARY
-#   - hooks are TRUNCATED beyond it (`define.claude-code-config.md`)
-#   - claude's in-place updater rewrites `cli.js` and leaves the
+# .why a PIN at all, and not a float — no surprise updates
+#   - a float changes the box under a human who asked for no change
+#   - so the version moves when a human MOVES it, and on no other event
+#
+# .why the verify asks the BINARY, never the package metadata
+#   - claude's in-place updater rewrites the shipped cli and leaves the
 #     package metadata behind, so a package-only check misses drift
 #
 # .refs = gotcha.5-3-brains-pins.demo=publish-path-and-drift.md
@@ -39,7 +42,7 @@
 #   npm view @openai/codex version
 #   codex --version
 ####################################################################
-GROVE_BRAIN_CLAUDE_PIN="2.1.87"
+GROVE_BRAIN_CLAUDE_PIN="2.1.280"
 GROVE_BRAIN_CODEX_PIN="0.128.0"
 
 ####################################################################
@@ -72,7 +75,10 @@ GROVE_BRAIN_CODEX_PIN="0.128.0"
 # .how to opt OUT = set the pin to "". the next apply removes the shim, the
 #   symlink, and every versioned prefix — and touches the default not at all
 ####################################################################
-GROVE_BRAIN_CLAUDE_LATEST_PIN="2.1.280"        # "" = opted out; torn down next apply
+# ⚠️ set this ONLY while a trial is live, and empty it once the trial settles —
+#   a candidate equal to the default above is a second copy of one version, and
+#   makes `claude.latest` a synonym for `claude`
+GROVE_BRAIN_CLAUDE_LATEST_PIN=""               # "" = opted out; torn down next apply
 GROVE_BRAIN_CLAUDE_LATEST_PREFIX="$HOME/.local/opt/claude"
 GROVE_BRAIN_CLAUDE_LATEST_SHIM="$HOME/.local/bin/claude.latest"
 
