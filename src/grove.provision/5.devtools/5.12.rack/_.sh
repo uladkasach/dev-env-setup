@@ -27,9 +27,20 @@ grove_provision_5_12_rack_slug_org()   { printf '@all'; }
 grove_provision_5_12_rack_slug_env()   { printf 'camp'; }
 grove_provision_5_12_rack_slug_vault() { printf 'aws.params'; }
 
+# .what = is this box on the ec2 PLATFORM — the only place `aws.params` may be written
+# 🛑 `rule.forbid.aws-params-off-ec2`. a local or house grove has no ec2 identity,
+#   so an `aws.params` write there reads ssm as whatever credential the human's
+#   shell holds, rewires the entry, and PUTs the value back into that account
+# .why the PLATFORM half of the tag, never the tier — `cloud` names who reaches the
+#   box, `aws.ec2` names the fact this depends on, and any tag this repo does not
+#   know yet (a house grove) fails CLOSED
+grove_provision_5_12_rack_platform_is_ec2() { [[ "${GROVE_ENV_SERVER:-}" == *@aws.ec2 ]]; }
+
 # .what = the aws-profile slug, and the ONE value it ever holds
 # .why
-#   - every grove is ec2, so IMDS always answers `5.6.aws`'s `ambient` role
+#   - every CLOUD grove is ec2 for now, so IMDS answers `5.6.aws`'s `ambient`
+#     role there. a local or house grove has no ec2 identity, so this slug
+#     declines on it (`rule.forbid.aws-params-off-ec2`)
 #   - no secret is stored: `ambient` names an identity, and an instance
 #     role's keys rotate on aws's clock, so a stored copy would go stale
 #   - ONLY `camp`. every other env is a REACH — a hop out of camp into another

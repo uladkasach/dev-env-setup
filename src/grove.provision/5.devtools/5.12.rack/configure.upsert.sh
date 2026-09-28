@@ -90,6 +90,20 @@ grove_provision_5_12_rack_configure_upsert() {
     printf '%s\n' "$initlog" | sed 's/^/        /' >&2
     return 1
   fi
+  # .what = 2c. an `aws.params` entry is written on the ec2 PLATFORM only
+  # 🛑 `rule.forbid.aws-params-off-ec2` — steps 3 and 4 read ssm and PUT the value
+  #   back. on a local or house grove there is no ec2 identity, so the read runs as
+  #   whatever credential the human's shell holds: it either fails the provision, or
+  #   rewires this seat's entry to `aws.params` and writes into THAT account
+  # .why the aws gate above never caught it — a laptop HAS the aws cli; the absent
+  #   fact is the identity, never the binary
+  if ! grove_provision_5_12_rack_platform_is_ec2; then
+    echo "   🌙 declined — ${org}.${env}.${key} lives in aws.params, which only an ec2 box may reach"
+    echo "      ⇒ this box is '${GROVE_ENV_SERVER:-unset}': no instance role, so no aws.params read or write"
+    echo "      ⇒ a local grove reaches github through 'gh auth login', by its human (5.4.gh)"
+    grove_provision_5_12_rack_upsert_awsprofile "$gitroot"
+    return $?
+  fi
   # .what = 3. read the CURRENT value out of ssm, as the box's own role
   # .why the value a prompt would ask for is already on the box's side, which is
   #   what makes the whole bundle human-free — skipped where the entry holds, since
