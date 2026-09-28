@@ -30,6 +30,15 @@ grove_provision_5_12_rack_configure_verify() {
     return 0
   fi
 
+  # .off the ec2 platform the upsert DECLINED the github entry, so there is no
+  #   aws.params value this seat may read — a ✋ here would condemn a seat that
+  #   did right (`rule.forbid.aws-params-off-ec2`, `gotcha.a-check-that-cries-wolf-gets-silenced`)
+  if ! grove_provision_5_12_rack_platform_is_ec2; then
+    echo "   • declined — ${org}.${env}.${key} is an aws.params slug, and '${GROVE_ENV_SERVER:-unset}' has no ec2 identity"
+    grove_provision_5_12_rack_verify_awsprofile
+    return $?
+  fi
+
   ####################################################################
   # .the read, exactly as `5.4.gh` and `git-credential-keyrack` make it
   #

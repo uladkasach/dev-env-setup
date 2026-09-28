@@ -48,7 +48,7 @@ grove_provision_5_3_brains_configure_verify() {
     '.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE:"50":the auto-compact threshold' \
     '.disableClaudeAiConnectors:true:the claude.ai connector fetch' \
     '.permissions.defaultMode:"auto":the auto default mode' \
-    '.permissions.deny:["Agent"]:the subagent ban' \
+    '(.permissions.deny // []) | index("Agent"):null:the subagent tool, never denied' \
     '.model:"claude-opus-5-5[1m]":the default model' \
     '.env.ANTHROPIC_MODEL:"claude-opus-5-5[1m]":the default model env override' \
     '.env.CLAUDE_CODE_SUBAGENT_MODEL:"claude-sonnet-5[1m]":the subagent model' \
@@ -56,6 +56,7 @@ grove_provision_5_3_brains_configure_verify() {
     '.skipAutoPermissionPrompt:true:the auto-permission prompt skip' \
     '.tui:"fullscreen":the fullscreen tui' \
     '.verbose:true:the verbose output default' \
+    '.feedbackDrafts:"off":the claude-drafted feedback queue' \
     '.cleanupPeriodDays:36500:the never-prune transcript retention'; do
     path="${pair%%:*}"
     want="${pair#*:}"; want="${want%%:*}"

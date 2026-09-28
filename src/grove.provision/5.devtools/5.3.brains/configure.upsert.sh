@@ -50,8 +50,7 @@
 #   | `DISABLE_INSTALLATION_CHECKS` | the npm→native migration nag (#23683) | `$w6()`, `kFz()` |
 #   | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | auto-compact at 50%, not ~83% — cuts ITPM spikes | `et6()` |
 #   | `CLAUDE_CODE_SUBAGENT_MODEL` | subagents on sonnet, never the session's opus | `Ik6()` |
-#   - ⚠️ the subagent model is inert while `permissions.deny` holds `Agent`; it is
-#     declared so the value is right on the day that ban lifts
+#   - the subagent tool is ALLOWED (see `.subagents` below), so this value is live
 #
 # .refs = gotcha.5-3-brains.demo=one-home-consolidation.md — the three-bundle split,
 #   the silent model drift, what `gk6` gates, the reap, and why `DISABLE_UPDATES` is no knob (m7)
@@ -145,20 +144,27 @@
 #     option accepts. claude declares NO sentinel for never, so a reader who
 #     greps for that word finds none — and must not read its absence as a gap
 #
-# .permissions.deny=["Agent"] bans SUBAGENTS outright
-#   - a BARE tool name (no parens, no args) removes the tool from claude's own
-#     context, so it never sees it — this is not a prompt-at-call-time gate
-#   - ⇒ it takes effect on the next tool call, mid-session, with no restart
-#   - the cost is real and chosen: research that a subagent would hold in its own
-#     context now lands in the main one, and `/batch` (which fans out across
-#     worktree agents) no longer runs
+# .feedbackDrafts="off" stops claude queue its own bug-report drafts (2.1.247+)
+#   - on, claude writes a draft to `~/.claude/feedback/drafts/` whenever it judges
+#     it erred, and shows a "Bug report drafted" card above the prompt
+#   - `off` stops the queue; `quiet` keeps it and hides the card
+#   - ⚠️ USER or MANAGED scope only — a project or local file's value is ignored
+#   - ⚠️ `CLAUDE_CODE_SEND_FEEDBACK=0` is the env twin, and it is NOT declared: the
+#     settings shelf is where `rule.require.brain-config-has-one-home` puts a knob
+#   - .ref = https://code.claude.com/docs/en/tools-reference (SendFeedback)
+#
+# 🛑 .subagents are ALLOWED — `Agent` is never denied
+#   - a subagent holds research in its OWN context, so the main one stays lean,
+#     and `/batch` (which fans out across worktree agents) can run
+#   - a bare `Agent` in `permissions.deny` removes the tool from claude's context
+#     outright, so a leftover one silently re-bans every session
+#   - ⇒ this patch declares NO `deny`, and the reap below strips a leftover
+#     `"Agent"` entry while it keeps every other deny a human placed
 #
 # 🛑 .`jq '. * $patch'` REPLACES an array; it merges only objects
-#   - ⇒ a `deny` list a human adds to this file by hand is DESTROYED by the next
-#     apply, silently, because this patch declares that same key
-#   - ⇒ a deny entry belongs HERE, in this list, never in the live file alone
-#   - (the live file held no `deny` array when this landed, so the first apply
-#     destroyed no entry — that is a fact about that day, never a guarantee)
+#   - ⇒ a key this patch declares as an array overwrites the live one whole
+#   - ⇒ so `deny` is left UNdeclared: a human's own deny list survives every apply,
+#     and a retired entry is removed by name in the reap, never by overwrite
 #
 # 🛑 .the rule is "match the shelf to WHEN the flag is read" — so FIND THE READ SITE
 #   - this file named the wrong shelf TWICE, both times for the installer nag, and
@@ -179,9 +185,18 @@
 
 ####################################################################
 # .what = the SETTINGS half — `~/.claude/settings.json`
+#
+# ⚠️ .an ENROLLED claude does not read this file
+#   - `rhx enroll claude` spawns the cli with `CLAUDE_CONFIG_DIR` pointed at
+#     `<repo>/.agent/.actors/…/brain/.claude`, so its "user" layer is rhachet's
+#     generated role file (rhachet `asBrainCliSpawnEnv`, `asBrainCliSpawnArgs`)
+#   - measured 2026-09-26: every key below held its declared value here, and an
+#     enrolled clone still opened outside auto mode
+#   - ⇒ this reaches a bare `command claude` only, until rhachet's enroll layers
+#     this file under the role config (as it already symlinks `.credentials.json`)
 ####################################################################
 _grove_provision_5_3_brains_settings_upsert() {
-  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_INSTALLATION_CHECKS": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false", "CLAUDE_CODE_DISABLE_COMMAND_INJECTION_CHECK": "1", "CLAUDE_CODE_ENABLE_TODO_TOOLS": "1", "ANTHROPIC_MODEL": "claude-opus-5-5[1m]", "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-5[1m]", "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50"}, "disableClaudeAiConnectors": true, "permissions": {"defaultMode": "auto", "deny": ["Agent"]}, "model": "claude-opus-5-5[1m]", "effortLevel": "medium", "cleanupPeriodDays": 36500, "skipAutoPermissionPrompt": true, "tui": "fullscreen", "verbose": true}'
+  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_INSTALLATION_CHECKS": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false", "CLAUDE_CODE_DISABLE_COMMAND_INJECTION_CHECK": "1", "CLAUDE_CODE_ENABLE_TODO_TOOLS": "1", "ANTHROPIC_MODEL": "claude-opus-5-5[1m]", "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-5[1m]", "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50"}, "disableClaudeAiConnectors": true, "permissions": {"defaultMode": "auto"}, "model": "claude-opus-5-5[1m]", "effortLevel": "medium", "cleanupPeriodDays": 36500, "skipAutoPermissionPrompt": true, "tui": "fullscreen", "verbose": true, "feedbackDrafts": "off"}'
   local settings="$HOME/.claude/settings.json"
 
   if ! mkdir -p "$HOME/.claude"; then
@@ -244,7 +259,13 @@ _grove_provision_5_3_brains_settings_upsert() {
   ####################################################################
   # ⚠️ ONE `del`, never a loop that builds the filter — an empty list would render
   #    `del() | …`, which is a jq syntax error, so the shape must not depend on count
-  local reap='del(.env.DISABLE_UPDATES, .env.CLAUDE_CODE_SKIP_UPDATE_CHECK)'
+  # ⚠️ the `Agent` strip removes ONE entry by name, never the list — a human's other
+  #    denies survive; a list emptied by the strip is dropped rather than left `[]`
+  local reap='del(.env.DISABLE_UPDATES, .env.CLAUDE_CODE_SKIP_UPDATE_CHECK)
+    | if (.permissions.deny | type) == "array"
+      then .permissions.deny -= ["Agent"]
+        | if .permissions.deny == [] then del(.permissions.deny) else . end
+      else . end'
 
   local tmp
   tmp="$(mktemp)" || return 1
@@ -277,10 +298,19 @@ _grove_provision_5_3_brains_settings_upsert() {
 #                                                 : join($CLAUDE_CONFIG_DIR || homedir(), ".claude.json")
 #   c1 = () => $CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude")
 ####################################################################
+#
+# 🛑 .why `CLAUDE_CONFIG_DIR` is IGNORED here, where the cli honors it
+#   - an apply launched from inside an enrolled claude INHERITS that session's
+#     `CLAUDE_CONFIG_DIR` — rhachet points it at `<repo>/.agent/.actors/…/brain/.claude`
+#   - measured 2026-09-26: such an apply wrote `diffSidebarOpen` into one
+#     actor's `.claude.json` and reported [KEEP], while `~/.claude.json` went
+#     unexamined — the result depended on WHO ran the apply, not on the box
+#   - ⇒ a seat converges its OWN `$HOME`, so the caller's env is never the subject
+####################################################################
 _grove_provision_5_3_brains_config_path() {
-  local dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  local dir="$HOME/.claude"
   [[ -f "$dir/.config.json" ]] && { echo "$dir/.config.json"; return 0; }
-  echo "${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
+  echo "$HOME/.claude.json"
 }
 
 ####################################################################

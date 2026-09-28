@@ -21,6 +21,11 @@ always:
       # today and `@all` does not. a requirement that is not loaded is a
       # requirement that gets optimized away by whoever meets the blocker next
       - briefs/creds/rule.require.github-token-at-all-camp.md
+      # ⚠️ say-level beside it — the rule above says WHICH vault a cloud grove's
+      # token lives in; this one says where that vault may never be touched. a
+      # comment read "every grove is ec2", so `5.12.rack` wrote aws.params on a
+      # local grove with no ec2 identity, and broke it
+      - briefs/creds/rule.forbid.aws-params-off-ec2.md
       # ⚠️ say-level for the THIRD instance of the same failure. this rule was
       # written, was correct, named its own four slip-vectors — and was booted as
       # NEITHER say nor ref, so it was never in context. a blind red-team sweep on

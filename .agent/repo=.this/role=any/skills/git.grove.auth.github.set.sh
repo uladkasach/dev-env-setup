@@ -172,9 +172,10 @@ KR_ENV="camp"
 KR_OWNER="ehmpath"
 KR_ORG="@all"
 KR_KEY="GITHUB_TOKEN"
-# central, not a replica — and safe here because this skill only targets a grove,
-# which is always ec2 and so always has the IMDS identity aws.params wants.
-# see the `.why --vault aws.params` block in the header
+# central, not a replica — safe only on an ec2 box, which holds the IMDS identity
+# aws.params wants. rung 0b PROBES that before any write; a local or house grove is
+# refused there (`rule.forbid.aws-params-off-ec2`). see the `.why --vault aws.params`
+# block in the header
 KR_VAULT="aws.params"
 # the checkout every remote `rhx` must run from — see the ⚠️ in the header
 KR_REPO="git/more/dev-env-setup"
@@ -331,6 +332,26 @@ if ! _ask true; then
   exit 1
 fi
 echo "      ├─ box  reachable at '$SSH_ALIAS'"
+
+# 0b. does the box hold an ec2 identity? only then is aws.params readable
+#
+# 🛑 `rule.forbid.aws-params-off-ec2`. this rung used to be a comment — "a grove is
+#    always ec2" — and that is true of a CLOUD grove only. a local or house grove
+#    has no instance role, so a set there writes into whatever account its shell
+#    holds, and no read on that box ever gets the value back
+# ⇒ PROBED, never claimed: the same IMDS token ask `5.6.aws` makes. `-f` so an http
+#    refusal fails too, `-m 3` so a box with no route to IMDS answers in seconds
+if ! _ask 'curl -fsS -m 3 -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60"'; then
+  echo "      └─ ✋ grove '$GROVE' has no ec2 identity — IMDS does not answer there" >&2
+  echo "" >&2
+  echo "  why: this skill stores the token in aws.params, and only an ec2 box can" >&2
+  echo "       read that vault. a local or house grove would get a value it can" >&2
+  echo "       never read back, written into whatever account its shell holds" >&2
+  echo "  fix: on a box with a human, reach github by hand —" >&2
+  echo "    gh auth login" >&2
+  exit 2
+fi
+echo "      ├─ ec2  the box holds an instance identity, so aws.params is readable"
 
 # 1. is keyrack even ON the box? it ships inside rhachet, which 5.3.brains installs
 if ! _ask 'command -v rhx'; then
