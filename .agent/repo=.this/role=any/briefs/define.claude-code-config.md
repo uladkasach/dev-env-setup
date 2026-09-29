@@ -39,9 +39,21 @@ measured 2026-09-25: a shell that exported `ANTHROPIC_MODEL=claude-opus-5[1m]` p
 session on `claude-opus-5-5[1m]`, because the settings `env` block is applied at startup
 (`zd()`) **before** the model is picked.
 
-⇒ so a shell export is not a second lever; it is a **silent loser**. `bash_aliases.sh` used to
-carry one, and it had drifted a full version behind with no signal
-(`rule.forbid.two-writers-on-one-artifact`).
+⇒ so a shell export is not a second lever; it is a **silent loser** — for a claude that
+READS `~/.claude/settings.json`. `bash_aliases.sh` used to carry one, and it had drifted a full
+version behind with no signal (`rule.forbid.two-writers-on-one-artifact`).
+
+### 🛑 under `rhx enroll claude`, the shell export WINS
+
+an enrolled clone runs with `CLAUDE_CONFIG_DIR` relocated to the actor's brain dir, so it never
+reads `~/.claude/settings.json` — and no settings `env` block is there to override what the shell
+exported. measured 2026-09-28 on the september grove's camper seat: its installed
+`~/.bash_aliases` still exported `ANTHROPIC_MODEL='claude-opus-5[1m]'` (a copy from before the
+2026-09-25 removal), while its `settings.json` declared `claude-opus-5-5[1m]`. an enrolled claude
+opened from that shell defaults to the stale model.
+
+⇒ **a stale installed rc copy is a live model pin, not a harmless leftover.** the repair is a
+re-apply of `2.7.aliases` on each seat, which replaces the whole copy.
 
 ## 🛑 .`gk6` is a TRUST list, NOT a permission list — the `env` block is applied UNFILTERED
 

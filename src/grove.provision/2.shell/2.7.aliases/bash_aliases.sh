@@ -64,7 +64,7 @@ fi
 # .what stood here until 2026-09-25, and why each left
 #   | export | why it left |
 #   |---|---|
-#   | `ANTHROPIC_MODEL` | two writers, and this copy had DRIFTED — `claude-opus-5[1m]` against the settings' `claude-opus-5-5[1m]`. the settings `env` block is applied at startup and OVERRODE it, so the stale value was a silent loser |
+#   | `ANTHROPIC_MODEL` | two writers, and this copy had DRIFTED — `claude-opus-5[1m]` against the settings' `claude-opus-5-5[1m]`. a bare claude applies the settings `env` block over it; an ENROLLED claude reads no `~/.claude/settings.json`, so there the stale export WON (`define.claude-code-config`) |
 #   | `CLAUDE_CODE_SUBAGENT_MODEL` | read at `Ik6()` off `process.env`, so settings reaches it |
 #   | `CLAUDE_CODE_SKIP_UPDATE_CHECK` | 🔴 DEAD — 0 refs in cli 2.1.87 |
 #
