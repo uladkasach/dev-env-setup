@@ -20,6 +20,7 @@
 #     1.7.usage      the two machine-usage report commands
 #     1.8.tmpfiles   the daily /tmp prune, so boot stays fast
 #     1.9.audio      the mic capture chain (pw-record, pactl, notify-send)
+#     1.10.hosts     the ssm-proxy db tunnel aliases (/etc/hosts)
 #
 # .why nearly all apply to EVERY box
 #   - a screen-gate reads "no EFFECT here" as "cannot be HELD here"; a
@@ -44,4 +45,5 @@ grove_provision_1_system() {
   bundle.upgrade 1.7.usage
   bundle.upgrade 1.8.tmpfiles
   bundle.upgrade 1.9.audio
+  bundle.upgrade 1.10.hosts
 }

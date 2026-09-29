@@ -2077,7 +2077,18 @@ local PLUGIN_SPEC = {
 
         -- replace create_tree_file_nodes with sorted flatten version
         nodes_mod.create_tree_file_nodes = function(files, git_root, group_name)
-          -- build directory structure (same as original)
+          -- build directory structure
+          --
+          -- 🛑 one name can be BOTH a file and a folder in one change set — a dir
+          --   turned into a symlink lists `A .claude` beside `D .claude/x`. the
+          --   upstream walk kept one node per name, so whichever came first won:
+          --   file first, the folder walk read `._children` off a file node, got
+          --   nil, and crashed on the next index; folder first, the file silently
+          --   overwrote the folder and its children vanished from the explorer
+          --   ⇒ the file moves to `<name> (file)`, the folder keeps `<name>`.
+          --     only the DISPLAYED key changes — a file node's `data.path` is its
+          --     real path, so open and diff act on the right file
+          local function as_file_key(name) return name .. ' (file)' end
           local dir_tree = {}
           for _, file in ipairs(files) do
             local parts = {}
@@ -2087,13 +2098,28 @@ local PLUGIN_SPEC = {
             local current = dir_tree
             for i = 1, #parts - 1 do
               local dir_name = parts[i]
-              if not current[dir_name] then
-                current[dir_name] = { _is_dir = true, _children = {} }
+              local found = current[dir_name]
+              if found and not found._is_dir then
+                -- a file holds this name: move it aside, so the folder can live here
+                current[as_file_key(dir_name)] = found
+                found = nil
               end
-              current = current[dir_name]._children
+              if not found then
+                found = { _is_dir = true, _children = {} }
+                current[dir_name] = found
+              end
+              current = found._children
             end
             local filename = parts[#parts]
-            current[filename] = { _is_dir = false, _file = file }
+            -- a path with no segments names no file; `current[nil] = …` would throw
+            if filename ~= nil then
+              local key = filename
+              if current[filename] and current[filename]._is_dir then
+                -- a folder already holds this name: the file takes the suffixed key
+                key = as_file_key(filename)
+              end
+              current[key] = { _is_dir = false, _file = file }
+            end
           end
 
           -- flatten with SORTED iteration (fix for pairs() order issue)

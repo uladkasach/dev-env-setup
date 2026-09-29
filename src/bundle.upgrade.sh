@@ -362,6 +362,18 @@ bundle.root.declines() {
 
   echo "   🌙 $subject is a BOX-WIDE fact, and this seat has no root"
   [[ -n "$observed" ]] && echo "      ⇒ $observed"
+
+  # ⚠️ on a laptop the seat with root IS its human — there is no ground seat whose
+  #    apply sets it. so "no step is owed" was FALSE there: measured 2026-09-28, it
+  #    printed over an /etc/hosts that blocked every db read, and the fix went
+  #    unasked. an agent shell has no terminal for sudo, so the human owes one run
+  if [[ "${GROVE_ENV_SERVER:-}" == local@unix ]]; then
+    echo "      ⇒ on a laptop the seat with root is its human, and this shell has no"
+    echo "        terminal for sudo to ask on — so ONE run from a terminal is owed:"
+    echo "        rhx grove.provision --what <this bundle> --mode apply"
+    return 0
+  fi
+
   echo "      ⇒ a seat converges its own \$HOME; this lives outside it, and the"
   echo "        seat with sudo runs this same bundle and sets it there"
   echo "      ⇒ no step is owed by this seat, and none by a human"
