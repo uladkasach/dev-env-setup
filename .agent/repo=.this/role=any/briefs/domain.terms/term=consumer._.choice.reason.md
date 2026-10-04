@@ -5,7 +5,7 @@
 latin *consumere* — to take up entirely. software already carries the word in the
 producer/consumer pair: one party writes, another reads and acts on what it read. that pair is
 exactly the relation this repo has with the machine — the repo **produces**
-`src/bash_aliases.sh`, and a shell **consumes** it.
+`src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`, and a shell **consumes** it.
 
 the pair is what earns the word. `reader` names only half of it (a process opened the bytes) and
 carries no obligation. a consumer *acts on* what it read, so it can refuse — and the refusal is
@@ -17,13 +17,13 @@ the whole reason the term exists here.
 `DEV_ENV_SETUP_DIR`. before a `sync.devenv.bashaliases` could put that file on the live machine,
 one check was owed: does it parse?
 
-the obvious check is `bash -n src/bash_aliases.sh`. the filename says bash. the extension says
+the obvious check is `bash -n src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`. the filename says bash. the extension says
 bash. the alias that syncs it is named `bashaliases`.
 
 but the file's actual consumers are declared elsewhere:
 
 ```sh
-# src/zshrc.sh
+# src/grove.provision/2.shell/2.5.zsh/zshrc.sh
 source ~/.bash_aliases            # line 119 — zsh reads it
 export BASH_ENV=~/.bash_aliases   # line 124 — bash reads it
 ```
@@ -44,8 +44,8 @@ this is the durable lesson:
 > file than the one under test.** the name cannot carry it, because the name was chosen before
 > the second consumer arrived.
 
-which makes the set *discoverable but not local*. `src/bash_aliases.sh` holds no evidence that
-zsh reads it; the evidence is two lines in `src/zshrc.sh`. a check that reads only the file under
+which makes the set *discoverable but not local*. `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` holds no evidence that
+zsh reads it; the evidence is two lines in `src/grove.provision/2.shell/2.5.zsh/zshrc.sh`. a check that reads only the file under
 test can never derive its own scope.
 
 this is a `proxy` in the exact sense the repo already names: a value measured (bash parses)
@@ -58,11 +58,16 @@ so `shell.test.syntax` prints the consumer set beside every result:
 ├─ ✔ src/zshrc.sh           zsh
 ```
 
+⚠️ **verbatim capture** — both files later moved into `2.shell/2.7.aliases/` and
+`2.shell/2.5.zsh/`. the paths stand as they were read, because a transcript is the
+evidence; the move is exactly what taught `shell.test.syntax` to key its consumer set on
+the BASENAME rather than the path.
+
 the claim is now exactly as wide as the measurement.
 
 ## .why the set is declared, not derived
 
-`consumers_of()` reads a hardcoded `DUAL_CONSUMED` list rather than a parse of `src/zshrc.sh`.
+`consumers_of()` reads a hardcoded `DUAL_CONSUMED` list rather than a parse of `src/grove.provision/2.shell/2.5.zsh/zshrc.sh`.
 that is a **second copy**, and it can drift from the truth it mirrors — the same hazard `sync`
 records.
 

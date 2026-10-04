@@ -184,5 +184,40 @@ grove_provision_5_1_node_provision_verify() {
     fi
   fi
 
+  # 7. every DECLARED pnpm is CACHED — so no repo's own pin reaches the wire
+  # mid-run, and corepack's `pnpm` shim never asks to fetch one.
+  #
+  # ⚠️ claim 6 above cannot see this, and that is the whole reason this claim
+  # exists: 6 asks which version ANSWERS, which is the default plus the cwd's
+  # declaration. a version this box will be asked for by some OTHER repo is
+  # absent from that question entirely, so 6 reads ✔ on a box that stalls the
+  # moment such a repo is entered.
+  #
+  # 🛑 it reads the CACHE DIR, never `pnpm --version` under that repo. to ask
+  # the shim is to TRIGGER the very fetch this claim is about — a probe that
+  # causes the state it measures, and on a duct it would hang the verify
+  # (rule.require.bounded-probes-in-verifies takes the same view of a probe
+  # that writes). the dir is the declared state; the shim is the live one
+  # (rule.require.judge-declared-state-not-live-state)
+  local pnpm_ver pnpm_uncached=()
+  while read -r pnpm_ver; do
+    [[ -n "$pnpm_ver" ]] || continue
+    grove_pnpm_cached "$pnpm_ver" || pnpm_uncached+=("$pnpm_ver")
+  done < <(grove_pnpm_versions_wanted)
+
+  if [[ "${#pnpm_uncached[@]}" -eq 0 ]]; then
+    echo "   • pnpm cache ✔ (every declared version held)"
+  else
+    echo "   ✋ pnpm NOT cached: ${pnpm_uncached[*]}" >&2
+    echo "      ⇒ a repo whose 'packageManager' names one of those makes" >&2
+    echo "        corepack fetch it on 'pnpm install' — and its pnpm shim ASKS" >&2
+    echo "        first, on stdin. a duct is tmux, so that question holds the" >&2
+    echo "        pane and eats every command sent after it" >&2
+    echo "      ⇒ this is invisible to the 'one pnpm' claim above, which asks" >&2
+    echo "        only what answers HERE — never what another repo will want" >&2
+    echo "      fix: rhx grove.provision --what 5.1.node --mode apply" >&2
+    failed=1
+  fi
+
   return $failed
 }

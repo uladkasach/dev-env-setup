@@ -48,9 +48,9 @@ word at the vendor's door, ours everywhere inside.
 
 **the contract:**
 
-- `src/init.lua` → `navigate_diff_boundary` — consumes `get_chunks()`, which yields `{ start, fin }[]`
-- `src/init.lua` → `get_gitsigns_chunks()` — the gitsigns cast
-- `src/init.lua` → `get_diff_hl_chunks()` — the diff-highlight derivation
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` → `navigate_diff_boundary` — consumes `get_chunks()`, which yields `{ start, fin }[]`
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` → `get_gitsigns_chunks()` — the gitsigns cast
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` → `get_diff_hl_chunks()` — the diff-highlight derivation
 - runtime echo: `print('chunk ' .. i .. ' bot')` — the word the human reads
 
 **the briefs:**

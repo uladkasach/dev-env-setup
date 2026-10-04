@@ -91,12 +91,11 @@ caught by a sweep rather than by an argument, so no dispute exists to record —
 own fixtures. one reader read the COUNT as a cry-wolf and widened the say file's `.what is NOT
 dox` list to exempt four `@`-prefixes wholesale.
 
-**that was wrong on the merits, and a dream caught the SAME DAY said so:**
+**that was wrong on the merits**, and the reason is one line:
 
-> *"an UNDECLARED dummy is indistinguishable from a real address to any reader — human or
-> clamp. that is the whole reason `term=dox` names one dummy rather than a convention where
-> each author coins their own."*
-> — `.dream/2026_09_07.brains-auth-fixtures-use-an-undeclared-dummy.dream.md`
+> an **undeclared** dummy is indistinguishable from a real address to any reader — human or
+> clamp. that is the whole reason `term=dox` names ONE dummy rather than a convention where
+> each author coins their own.
 
 ⇒ the check was **correct**. one dummy is declared; the rest are fixtures that drifted off the
 convention, and the repair is to move them ONTO the declared dummy — never to admit them to it.

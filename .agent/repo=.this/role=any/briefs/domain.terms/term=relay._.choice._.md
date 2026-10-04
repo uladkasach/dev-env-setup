@@ -32,8 +32,8 @@ three facts a relay-writer owes:
 
 - `.agent/repo=.this/role=any/skills/git.grove.operations.sh` — `_grove_relay_sunk`, the
   one relay both `_grove_err_sunk` and `_grove_ssh_sunk` share
-- `src/ductwork.sh` — `duct.send`'s BUSY block, which relays `$held` with `printf`
-- `src/ductwork.sh` — `__duct_pane_command`, a relay that sinks at the source
+- `src/grove.provision/2.shell/2.7.aliases/ductwork.sh` — `duct.send`'s BUSY block, which relays `$held` with `printf`
+- `src/grove.provision/2.shell/2.7.aliases/ductwork.sh` — `__duct_pane_command`, a relay that sinks at the source
 
 ## .reason
 

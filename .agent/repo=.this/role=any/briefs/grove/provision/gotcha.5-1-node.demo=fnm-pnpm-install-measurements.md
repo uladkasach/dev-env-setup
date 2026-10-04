@@ -101,9 +101,54 @@ measurements behind each choice.
 - ⇒ the prune reads pnpm's own live dir (`grove_pnpm_shim_dir_live`), removes
   only a shadowed duplicate — never a stray pnpm at a path pnpm does not own
 
+## m11 — the two shims DISAGREE on the prompt default, so no `corepack` call can see it
+
+m1 above names the hang. this names why a `corepack` call cannot reproduce it, measured
+2026-09-26 off corepack's own source:
+
+| the shim | its default | so it |
+|---|---|---|
+| `corepack` | `COREPACK_ENABLE_DOWNLOAD_PROMPT ??= '0'` | never asks |
+| `pnpm` | `COREPACK_ENABLE_DOWNLOAD_PROMPT ??= '1'` | **asks, on stdin** |
+
+- a duct is tmux, so the question held the pane and ate the rest of the run
+  (`rule.forbid.tty-as-a-proxy-for-a-human`). the aether gate's step 2:
+  ```
+  ! Corepack is about to download …/pnpm-10.11.0.tgz
+  ? Do you want to continue? [Y/n]
+  ```
+- 📜 the gate then reported a DUCT fault — true of the duct, and the cause was this
+  bundle's: a correct verdict over the wrong subject
+  (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4)
+- ⚠️ the env var is NOT the fix. to silence the prompt leaves the FETCH in place, so the
+  box still needs the wire mid-run and still stalls on a slow registry — and this repo
+  approves of corepack, so the answer is to hold what it will be asked for
+  (`rule.require.solve-at-cause`)
+- ⇒ hence `GROVE_PNPM_BASELINE`, a CACHE beside the pin. the two answer different
+  questions and no amount of the second buys the first: a DEFAULT is what `pnpm` means
+  outside any repo, exactly one by nature; a CACHE is which pins run with no wire call,
+  as many as you like. a repo's own `packageManager` outranks the default, so two repos
+  that declare two pnpms are served by no single default however it is chosen
+
+## m12 — the cache loop's flags, each read off corepack's source
+
+- `-g` is REQUIRED by corepack's own parser: `InstallGlobalCommand` declares it `{ required:
+  true }`. `--cache-only` is what keeps the install off the global default — so the pair is no
+  redundancy
+- 🛑 `--cache-only` alone does NOT protect the default: corepack repoints it inside the DOWNLOAD
+  path for any same-major, strictly-greater version, and `--cache-only` is read one level out,
+  after that has fired. the guard is `COREPACK_DEFAULT_TO_LATEST=0`, exported once at the driver
+  — absent it, the loop would move the pin `grove_pnpm_version_wanted` holds, and the verify
+  would halt on its own "TWO pnpms"
+- NOT per node: the cache is one dir per `$HOME` (`grove_pnpm_cached`), so a per-node loop would
+  re-ask for a held version once per node
+- the cache is re-ASKED after each install: corepack can exit 0 on a fetch it then declines to
+  land, so its code is no evidence — and an unheld version is exactly the prompt this closes
+
 ## .see also
 
 - `5.1.node/provision.upsert.sh` — the header these measurements back
+- `5.1.node/_.sh` — m11's header, the cache this bundle declares
 - `gotcha.5-1-node.demo=pnpm-shim-dir-split` — the neighbor demo, `_.sh`'s
   own two measurements on the shim-dir split
 - `rule.require.solve-at-cause`, `rule.forbid.failhide`, `rule.forbid.tty-as-a-proxy-for-a-human`

@@ -3,8 +3,8 @@
 ## .what
 
 `define.emoji-cli-contract.md` states the contract. this brief holds the four
-hazards found during the build of `src/emoji.index.build.sh` and
-`src/emoji.zsh` — kept here so the contract stays a contract.
+hazards found during the build of `src/grove.provision/2.shell/2.9.emoji/emoji.index.build.sh` and
+`src/grove.provision/2.shell/2.9.emoji/emoji.zsh` — kept here so the contract stays a contract.
 
 ## m1 — the FE0F trap, cost ~40% of the set — ❤️ and ⚠️ among them
 
@@ -43,4 +43,4 @@ hazards found during the build of `src/emoji.index.build.sh` and
 ## .see also
 
 - `define.emoji-cli-contract.md` — the contract these hazards back
-- `src/emoji.index.build.sh` — the transform that carries the FE0F fix
+- `src/grove.provision/2.shell/2.9.emoji/emoji.index.build.sh` — the transform that carries the FE0F fix

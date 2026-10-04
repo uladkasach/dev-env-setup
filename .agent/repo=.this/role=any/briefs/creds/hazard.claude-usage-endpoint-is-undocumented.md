@@ -62,7 +62,7 @@ in preference order:
 1. **look for an official API first.** the whole reason this endpoint is undocumented is that
    anthropic had no supported one. if they ship one, take it — `rule.require.solve-at-cause`.
 2. **build the TUI snapshot the vision named.** drive `claude /usage` headless through
-   `src/ductwork.sh`, capture the rendered widget, parse the two windows out of it. this is a
+   `src/grove.provision/2.shell/2.7.aliases/ductwork.sh`, capture the rendered widget, parse the two windows out of it. this is a
    screen-scrape: it breaks on a cosmetic re-render, it is slower, and it needs a live claude
    session per account — which fights the one-holder-per-token invariant
    (`hazard.claude-oauth-one-holder-per-token.md`), since a session must be signed in as the

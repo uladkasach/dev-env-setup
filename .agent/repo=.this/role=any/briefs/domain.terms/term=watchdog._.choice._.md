@@ -31,7 +31,7 @@ schedulable at all.
 
 **the contracts:**
 
-- `src/init.lua` — the nvim self-watchdog: a 30s `vim.uv` timer that reads `/proc/self/status`,
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` — the nvim self-watchdog: a 30s `vim.uv` timer that reads `/proc/self/status`,
   logs a trend past 800M, and trips at 1200M via `trip_breaker`
 - `.agent/repo=.this/role=any/skills/nvim.diagnose.watchdog.sh` — reads the watchdog's trend log
   and attributes the growth to the dimension that moved with it

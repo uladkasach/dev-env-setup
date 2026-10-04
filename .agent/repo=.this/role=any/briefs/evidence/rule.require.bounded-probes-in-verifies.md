@@ -165,8 +165,8 @@ zero.
 
 ### two copies cannot route through the boundary
 
-`src/zshrc.sh` (an `npm install -g pnpm` fallback, run on shell start and after every `cd`) and
-`src/bash_aliases.sh` (a backgrounded `pnpm install`) reach a registry from outside the bundle
+`src/grove.provision/2.shell/2.5.zsh/zshrc.sh` (an `npm install -g pnpm` fallback, run on shell start and after every `cd`) and
+`src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` (a backgrounded `pnpm install`) reach a registry from outside the bundle
 tree, where `src/devenv.web.sh` cannot be sourced — an installed shell artifact must work on a
 box with no checkout. both carry the two-layer pair as literals, and
 `prove.registry-bounds-agree` clamps every literal against the boundary's own numbers: a third

@@ -15,7 +15,7 @@ alias written. idempotent — a wake of a reachable grove is a no-op.
 ## .refs
 where the term is declared / used:
 - .agent/repo=.this/role=any/skills/git.grove.wake.sh   # the portable wake
-- src/bash_aliases.sh                                   # `git grove wake` dispatch
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                                   # `git grove wake` dispatch
 
 ## .reason
 see the ref-level cluster beside this choice:

@@ -4,26 +4,15 @@
 #         → 127.0.0.1, one line per env a repo tunnels a database through
 #
 # .why it exists
-#   - a repo's `config/<env>.json` names its db tunnel's LOCAL end as
-#     `.database.tunnel.local.host`; `rhx use.vpc.tunnel` opens the ssm port-forward
-#     with no root, then ensures that alias via `sudo tee -a /etc/hosts`
-#   - in a shell with no terminal that sudo cannot ask, so every db read and every
-#     provision that looks the alias up dies with `ENOTFOUND`
-#   - ⇒ pre-seed the alias here, as the seat that CAN write /etc; the tunnel skill's
-#     findsert (`setUnixHostAlias`, keyed on the hostname) then finds it and never
-#     reaches for sudo
+#   - `rhx use.vpc.tunnel` adds its `.database.tunnel.local.host` alias via `sudo tee`
+#   - with no terminal that sudo cannot ask, so every db read dies `ENOTFOUND`
+#   - ⇒ the seat that CAN write /etc pre-seeds it, and the skill's findsert never sudos
 #
-# .why a DECLARED table, and never a scan of the cloned repos
-#   - /etc is written by the seat with root (ground), and the repos are cloned into
-#     each seat's own $HOME — on a grove, into the camper's
-#   - ⇒ a scan on ground reads no configs, and the camper that holds them cannot
-#     write (`define.provision-defect-shapes`, a VERIFY that reads state a LATER
-#     component writes). a table converges on a fresh box with no repo cloned
-#   - the VERIFY closes the drift a table invites: it reads every cloned repo's
-#     `config/*.json` and reddens on an alias a repo declares that this table lacks
+# .why a DECLARED table, never a scan of the cloned repos
+#   - ground writes /etc, but the repos sit in the camper's $HOME, out of its reach
+#   - the VERIFY reads every cloned `config/*.json` and reddens on an alias this lacks
 #
-# 🛑 .no account id, no endpoint — this repo is PUBLIC (`rule.forbid.dox-in-public-repo`)
-#   - an alias maps a NAME to 127.0.0.1; it points no tool at a real resource
+# 🛑 no account id, no endpoint: this repo is PUBLIC (`rule.forbid.dox-in-public-repo`)
 #
 # usage:
 #   rhx grove.provision --what 1.10.hosts --mode apply

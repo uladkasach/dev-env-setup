@@ -344,7 +344,7 @@ signal. `aws.ec2.get` is the read that settles it, and no reader of the registry
 - `.agent/repo=.this/role=any/briefs/domain.terms/term=slug._.choice.reason.md`  # the dispute that split them
 - `.agent/repo=.this/role=any/skills/git.grove.list.sh`                          # reads the registry's entries
 - `.agent/repo=.this/role=any/briefs/evidence/gotcha.a-partial-write-discards-what-it-never-read.md`  # a registry entry, partly blanked
-- `src/git-credential-keyrack.sh`                                                # reads the entry a slug names
+- `src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh`                                                # reads the entry a slug names
 - `src/grove.provision/5.devtools/5.4.gh/configure.upsert.sh`
 - `src/grove.provision/5.devtools/5.16.keys/configure.verify.sh`                 # asserts the READ half, per box, and names the account
 - `.agent/repo=.this/role=any/briefs/creds/rule.require.github-token-at-all-camp.md`   # the slug every consumer reads

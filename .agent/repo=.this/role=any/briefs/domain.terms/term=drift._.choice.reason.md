@@ -83,7 +83,7 @@ the STALE copy names. a wrong slug reads as an empty rack, never as an out-of-da
 the observable symptom of that drift is `absent 🫧` from keyrack — a credential problem, on a
 box whose credentials are perfect.
 
-### measurement 2 — declaration drift, `src/bash_aliases.sh:315`
+### measurement 2 — declaration drift, `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh:315`
 
 two lists of the same bundle set diverged; one had silently dropped `brains`. groves therefore
 ran the robot brains with **no config at all**, and the file's own comment names the property

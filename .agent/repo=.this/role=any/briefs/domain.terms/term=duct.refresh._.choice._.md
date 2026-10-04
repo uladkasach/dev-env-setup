@@ -42,7 +42,7 @@ exactly the machines this repo drives most — so it reports and exits 0:
 ```
 
 ## .refs
-- src/ductwork.sh                                      # duct.refresh()
+- src/grove.provision/2.shell/2.7.aliases/ductwork.sh                                      # duct.refresh()
 - .agent/repo=.this/role=any/skills/duct.refresh.sh
 - lifted from ehmpathy/nheuron's `duct.refresh`, with the remote branch added
 

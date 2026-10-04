@@ -19,7 +19,7 @@ visible output, returned to the caller without a change to the grove.
 ## .refs
 where the term is declared / used:
 - .agent/repo=.this/role=any/skills/git.grove.read.sh    # the rhx dispatch surface
-- src/bash_aliases.sh                                    # `git_alias_grove read` + ductwork
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                                    # `git_alias_grove read` + ductwork
 
 ## .the pair it completes
 `grove.send` writes into the duct; `grove.read` takes out of it. one verb per direction, so a

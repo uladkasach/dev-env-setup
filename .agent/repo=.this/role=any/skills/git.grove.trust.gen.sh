@@ -38,6 +38,9 @@
 # options:
 #   --grove  the grove name from the registry; default grove-1
 #   --env    aws env whose credentials read the console output; default camp
+#   --org    whose credential to read; default the manifest's `org:` line. a
+#            wrong one finds no boot record, and this read is TOLERANT — so the
+#            attestation is SKIPPED rather than failed
 #   --mode   plan (default, preview) or apply (write known_hosts)
 #   --trust  verified (default) — write only when the boot record confirms it
 #            tofu     — write on scan alone, for an ABSENT key only. 🛑 it is
@@ -81,6 +84,7 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "options:"
   echo "  --grove  grove name from the registry; default grove-1"
   echo "  --env    aws env for the console-output read; default camp"
+  echo "  --org    whose credential to read; default the manifest's org: line"
   echo "  --mode   plan (default) or apply"
   echo "  --trust  verified (default) or tofu (scan alone, ABSENT key only)"
   echo "  --timeout      seconds to await the key scan; default 30"
@@ -100,6 +104,7 @@ fi
 
 GROVE="grove-1"
 ENV="camp"
+ORG=""
 MODE="plan"
 TRUST="verified"
 TIMEOUT="30"
@@ -109,6 +114,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --grove)      GROVE="$2"; shift 2 ;;
     --env)        ENV="$2"; shift 2 ;;
+    --org)        ORG="$2"; shift 2 ;;
     --mode)       MODE="$2"; shift 2 ;;
     --trust)      TRUST="$2"; shift 2 ;;
     --timeout)    TIMEOUT="$2"; shift 2 ;;
@@ -122,6 +128,41 @@ done
 [[ "$MODE" == "plan" || "$MODE" == "apply" ]] || { echo "invalid --mode: $MODE (plan|apply)" >&2; exit 2; }
 [[ "$TRUST" == "verified" || "$TRUST" == "tofu" ]] || { echo "invalid --trust: $TRUST (verified|tofu)" >&2; exit 2; }
 [[ "$ON_CHANGED" == "refuse" || "$ON_CHANGED" == "replace" ]] || { echo "invalid --on-changed: $ON_CHANGED (refuse|replace)" >&2; exit 2; }
+
+####################################################################
+# 🛑 the ORG — an INPUT, and the axis the boot-record read lacked
+#
+# 📜 .measured 2026-09-24 — `src/grove.org.sh` gave the BUNDLES an org axis and
+#    left the REACH skills asked with no org at all, so they read whatever
+#    `.agent/keyrack.yml` names. this was the LAST of the five such readers
+#    (wake and stop 2026-09-27/28, auth.keys.set 2026-09-28)
+#
+# ⚠️ .the ladder here is TWO rungs, not three — flag > manifest
+#    wake and stop each hold a registry entry open already, so they read a
+#    `.org` field from it. this skill reads no registry at all (it scans a live
+#    port and an ec2 boot record), so there is no entry rung to offer, and a
+#    registry read invented here would be a second reader of a file this skill
+#    does not otherwise touch. so: name it, or the manifest answers
+#
+# 🛑 .what an absent org costs HERE, and it is the subtlest of the three
+#    the credential feeds the BOOT-RECORD read — the attestation that binds a
+#    scanned host key to a real machine. a wrong org finds no boot record, and
+#    this branch is TOLERANT by design, so the run continues with NO attestation
+#    and grades the key on a weaker basis than the caller asked for. ⇒ the
+#    degradation is silent, which is why the 🌙 below must stay loud
+####################################################################
+if [[ -z "$ORG" ]]; then
+  ORG=$(jq -Rr 'select(startswith("org:")) | sub("^org:[[:space:]]*";"")' \
+        < "$HOME/git/more/dev-env-setup/.agent/keyrack.yml" 2>/dev/null | head -1)
+  ORG="${ORG//[[:space:]]/}"
+fi
+
+# 🛑 a LIVE control, not defense in depth: `$ORG` reaches a keyrack command line
+if [[ -n "$ORG" && "$ORG" == *[!A-Za-z0-9._@-]* ]]; then
+  echo "✋ the org holds a character a keyrack read cannot carry: '$ORG'" >&2
+  echo "   want: [A-Za-z0-9._@-] (e.g. ahbode, aether, @all)" >&2
+  exit 2
+fi
 
 ####################################################################
 # 🛑 `--on-changed replace --trust tofu` is REFUSED — the two contradict
@@ -177,6 +218,11 @@ fi
 
 # look up the grove's ssh alias from the registry (infra may own the alias)
 source ~/.bash_aliases 2>/dev/null || true
+
+# 🛑 the rack read for a FOREIGN org needs a scratch gitroot, and that holder is
+#    where it lives (`term=keyrack.gitroot`)
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.rack.operations.sh"
 ####################################################################
 # 🛑 the gate reads EVERY function this skill borrows, never one of them
 #
@@ -496,14 +542,22 @@ if [[ "$TRUST" == "verified" ]]; then
     #    `2>/dev/null` a locked rack produced no word at all here, and the
     #    failure surfaced later as an opaque ec2 api error whose text names
     #    no credential (`term=swallow`, `rule.forbid.failhide`).
-    AWS_PROFILE=$(rhx keyrack get --owner ehmpath --env "$ENV" --key AWS_PROFILE --value) || AWS_PROFILE=""
+    # 🛑 the read goes through ONE holder. do NOT inline a plain named-org
+    #    `keyrack get` here: keyrack scopes such a read to the CHECKOUT, so every
+    #    grove outside this checkout's org is refused — and this branch's
+    #    tolerance turns that refusal into a SILENT skip of the attestation
+    #    (`term=keyrack.gitroot`, and `_rack_profile` for the four-copy defect)
+    AWS_PROFILE="$(_rack_profile "$ENV" "$ORG")" || AWS_PROFILE=""
     if [[ -n "$AWS_PROFILE" ]]; then
       eval "$(aws configure export-credentials --profile "$AWS_PROFILE" --format env 2>/dev/null)" || true
       unset AWS_PROFILE AWS_DEFAULT_PROFILE
     else
-      echo "   ├─ 🌙 no AWS_PROFILE from the rack — the reason is above." >&2
+      echo "   ├─ 🌙 no AWS_PROFILE from the rack for env=$ENV${ORG:+ org=$ORG} — the reason is above." >&2
       echo "   │     the boot-record read below falls back to ambient creds," >&2
       echo "   │     so an ec2 error there is likely THIS, one step later." >&2
+      echo "   │     ⚠️ a WRONG org reads another account and finds no boot" >&2
+      echo "   │        record, so the attestation is skipped rather than failed:" >&2
+      echo "   │          rhx git.grove.trust.gen --grove $GROVE --org <org>" >&2
     fi
   fi
   # the aws api's own state enum is its word, not ours

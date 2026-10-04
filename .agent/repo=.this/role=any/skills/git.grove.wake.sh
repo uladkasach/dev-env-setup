@@ -34,11 +34,15 @@
 #   rhx git.grove.wake grove-1
 #   rhx git.grove.wake grove-1 --mode plan
 #   rhx git.grove.wake grove-1 --nat camp-nat --port 36901
+#   rhx git.grove.wake grove-1 --org aether        # a grove outside the manifest's org
 #   rhx git.grove.wake help
 #
 # options:
 #   --mode      plan (preview) or apply (default — a wake is idempotent)
 #   --env       aws env for credentials; default from the registry, else camp
+#   --org       keyrack org for credentials; default from the registry, else the
+#               manifest's `org:` line. a grove in a second org NEEDS this, or
+#               the rack answers with the wrong account's profile
 #   --nat       NAT exid to resume first; default from the registry
 #   --port      local port for the tunnel; default from the registry, else 36901
 #   --user      ssh login user; default from the registry, else ec2-user
@@ -73,12 +77,15 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "git.grove.wake — wake a grove by exid, in whatever account holds it"
   echo ""
   echo "usage:"
-  echo "  rhx git.grove.wake <grove> [--mode plan|apply] [--env <env>]"
+  echo "  rhx git.grove.wake <grove> [--mode plan|apply] [--env <env>] [--org <org>]"
   echo "                     [--nat <exid>] [--port <port>] [--user <user>]"
   echo ""
   echo "options:"
   echo "  --mode      plan (preview) or apply (default)"
   echo "  --env       aws env for credentials; default from registry, else camp"
+  echo "  --org       keyrack org for credentials; default from registry, else the"
+  echo "              manifest's org. a grove in a SECOND org needs this, or the"
+  echo "              rack hands back the wrong account's profile"
   echo "  --nat       NAT exid to resume first; default from registry"
   echo "  --port      local tunnel port; default from registry, else 36901"
   echo "  --user      ssh login user; default from registry, else ec2-user"
@@ -92,6 +99,7 @@ fi
 GROVE=""
 MODE="apply"
 ENV=""
+ORG=""
 NAT=""
 PORT=""
 USER_NAME=""
@@ -102,6 +110,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --mode)     MODE="$2"; shift 2 ;;
     --env)      ENV="$2"; shift 2 ;;
+    --org)      ORG="$2"; shift 2 ;;
     --nat)      NAT="$2"; shift 2 ;;
     --port)     PORT="$2"; shift 2 ;;
     --user)     USER_NAME="$2"; shift 2 ;;
@@ -126,6 +135,13 @@ fi
 # read the grove's registry entry — it carries the exid, account, and env, so a
 # wake needs no per-account constant baked into this skill
 source ~/.bash_aliases 2>/dev/null || true
+
+# 🛑 the rack read for a FOREIGN org needs a scratch gitroot, and that holder is
+#    where it lives. keyrack refuses `--org aether` from the ahbode checkout —
+#    `git.grove.rack.operations` carries the refusal, the five-caller precedent,
+#    and the read that gets past it (`term=keyrack.gitroot`)
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.rack.operations.sh"
 REGISTRY="${GIT_FOREST_DIR:-$HOME/.git.forest}/groves/$GROVE.json"
 if [[ ! -f "$REGISTRY" ]]; then
   echo "🐢 bummer dude — grove '$GROVE' is not registered" >&2
@@ -140,6 +156,55 @@ fi
 EXID=$(jq -r '.exid // .name' "$REGISTRY")
 ACCOUNT_WANT=$(jq -r '.account // ""' "$REGISTRY")
 [[ -z "$ENV" ]]       && ENV=$(jq -r '.env // "camp"' "$REGISTRY")
+
+######################################################################
+# 🛑 the ORG is a per-grove axis, and it is derived like every other one
+#
+#    `flag > registry > manifest`, the same ladder `env`, `nat`, `port`, and
+#    `user` already climb one line above. what is new is only the LAST rung:
+#    where the registry declares no org, the manifest's `org:` line answers,
+#    which is exactly what this skill did before the axis existed — so a grove
+#    of the manifest's own org sees NO change.
+#
+# 🛑 .the defect this closes — measured 2026-09-27 on this laptop
+#
+#      rhx git.grove.wake grove-aether-v20260921 --mode plan
+#        → ✋ wrong aws account: active=<acct.ahbode>,
+#             grove 'grove-aether-v20260921' lives in <acct.aether>
+#
+#    ⚠️ the ids are PLACEHOLDERED — this repo is public, and the measurement's
+#       whole content is that the two DIFFER (`rule.forbid.dox-in-public-repo`)
+#
+#    the rack holds `aether.camp.AWS_PROFILE`. this skill asked for
+#    `AWS_PROFILE` with no `--org`, so keyrack read the MANIFEST org (`ahbode`)
+#    and handed back a profile for a different account. the account guard then
+#    halted — correctly, and over the wrong cause.
+#
+#    ⚠️ and its fix-text could never work: `unset AWS_ACCESS_KEY_ID …` makes the
+#       run re-read the SAME manifest org and land on the SAME account, so a
+#       human who follows it loops forever. a correct verdict with an unusable
+#       remedy (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4) — the
+#       account row below now names the org cause too.
+#
+# ⚠️ .why the org is an INPUT and not read off the box
+#    `src/grove.org.sh` settles this: a probe of the box answers *"whose account
+#    is this?"* and NOT *"whose work does this box do"*. the two agree today and
+#    are different questions, so the org is declared, never inferred — and its
+#    home is the registry, beside `account` and `env`.
+#
+# 🛑 .why three skills needed this and two already had it
+#    `auth.keys.set` and `auth.github.set` pass `--org` on every keyrack call.
+#    `wake`, `stop`, and `trust.gen` did not — one fact, five readers, and the
+#    three that forgot the axis are the three that reach a box
+#    (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.9). `grove.org.sh` gave
+#    the BUNDLES an org axis for this same reason and left the REACH skills
+#    hardcoded, so this is that measurement one layer out.
+######################################################################
+if [[ -z "$ORG" ]]; then
+  ORG=$(jq -r '.org // ""' "$REGISTRY")
+  [[ "$ORG" == "null" ]] && ORG=""
+fi
+
 [[ -z "$NAT" ]]       && NAT=$(jq -r '.nat // ""' "$REGISTRY")
 [[ -z "$PORT" ]]      && PORT=$(jq -r '.port // 36901' "$REGISTRY")
 [[ -z "$USER_NAME" ]] && USER_NAME=$(jq -r '.user // "ec2-user"' "$REGISTRY")
@@ -194,6 +259,11 @@ wake_clamp() {
 }
 wake_clamp "the registry's exid"     "$EXID"         'A-Za-z0-9._-'  '[A-Za-z0-9._-]'
 wake_clamp "the registry's env"      "$ENV"          'A-Za-z0-9._-'  '[A-Za-z0-9._-]'
+# ⚠️ the org is clamped for a DIFFERENT reason than its neighbours, and it is a
+#    live one rather than defense in depth: `$ORG` is interpolated into the
+#    `rhx keyrack get … --org "$ORG"` call below. `@` is in the grammar because
+#    `@all` is a real org this rack declares
+wake_clamp "the org"                 "$ORG"          'A-Za-z0-9._@-' '[A-Za-z0-9._@-] (e.g. ahbode, aether, @all)'
 wake_clamp "the registry's nat"      "$NAT"          'A-Za-z0-9._-'  '[A-Za-z0-9._-]'
 wake_clamp "the registry's port"     "$PORT"         '0-9'           '[0-9]'
 wake_clamp "the registry's account"  "$ACCOUNT_WANT" '0-9'           '[0-9] (a 12-digit aws account)'
@@ -210,6 +280,114 @@ for _wake_dashed in "sshAlias:$SSH_ALIAS" "user:$USER_NAME"; do
   fi
 done
 unset _wake_dashed
+
+######################################################################
+# 🛑 the port must be THIS BOX'S to take — judged on the REGISTRY, not the wire
+#
+# 🛑 .the defect this closes, and it is NOT the one `:483` names
+#      the guard at `:483` asks *"this port RELAYS — to which box?"*, so it can
+#      only see a collision between two LIVE ducts. it is correct and it is
+#      blind by construction: a port another grove DECLARES but does not
+#      currently relay reads as free, because the question it puts is about the
+#      wire.
+#
+#      📜 measured 2026-09-27, on this laptop:
+#
+#        registry:  grove-aether-v20260921        → :36901  (duct long dead)
+#                   grove-aether-v20260921.ground → :36901
+#                   grove-ahbode-v20260811        → no port declared ⇒ :36901
+#
+#        wake grove-ahbode-v20260811
+#          → duct [SET] localhost:36901 → grove-ahbode-v20260811   ← took it
+#          → ssh  [SET] alias written at :36901
+#
+#      ⇒ `[SET]`, never `[KEEP]`. so `:483` never ran, every rung read ✔, and
+#        `~/.ssh/config` came out of it with THREE Host blocks on :36901 — two
+#        of them for a box the live tunnel does not reach.
+#
+#      ⇒ 🔴 and the harm lands on the OTHER grove, later: the next
+#        `ssh grove-aether-v20260921` resolves :36901 and arrives at the AHBODE
+#        box. a cross-box reach, on a port that grove had declared first, with
+#        no line of output anywhere that says so.
+#
+# ⇒ .so the two guards are PEERS and neither subsumes the other
+#      | this one | declared state | another ENTRY claims the port | halts before any write |
+#      | `:483`   | live state     | another DUCT holds the port   | halts at the duct      |
+#
+#      a dead duct defeats the second; a grove absent from the registry defeats
+#      the first. one fact, two stores — and the store that outlives a reboot is
+#      the one no reader consulted
+#      (`rule.require.judge-declared-state-not-live-state`;
+#       `gotcha.a-check-that-cries-wolf-gets-silenced`, q13).
+#
+# ⚠️ .the discriminator is the EXID, never the NAME
+#      the `.ground` seat rides the SAME tunnel on purpose
+#      (`howto.add-a-new-grove`, `.register a second seat`), so two entries that
+#      share an exid share a port correctly. a name-keyed test would halt on
+#      exactly the arrangement this repo prescribes.
+#
+# 🛑 .why it halts BEFORE the box is resumed
+#      a wake that starts an r5.xlarge and then refuses at the duct has charged
+#      a human for a run it declined. the port is knowable from two json files,
+#      so it is knowable before the first api call.
+######################################################################
+_GROVE_DIR="${GIT_FOREST_DIR:-$HOME/.git.forest}/groves"
+PORT_CLAIMANT="" PORT_CLAIMANT_EXID=""
+for _entry in "$_GROVE_DIR"/*.json; do
+  [[ -f "$_entry" ]] || continue
+  _name=$(basename "$_entry" .json)
+  [[ "$_name" == "$GROVE" ]] && continue
+  _their_port=$(jq -r '.port // 36901' "$_entry" 2>/dev/null)
+  [[ "$_their_port" == "null" ]] && _their_port=36901
+  [[ "$_their_port" == "$PORT" ]] || continue
+  _their_exid=$(jq -r '.exid // .name' "$_entry" 2>/dev/null)
+  # a shared exid is a second SEAT on one box — it rides one tunnel by design
+  [[ "$_their_exid" == "$EXID" ]] && continue
+  PORT_CLAIMANT="$_name"; PORT_CLAIMANT_EXID="$_their_exid"
+  break
+done
+unset _entry _name _their_port _their_exid
+
+if [[ -n "$PORT_CLAIMANT" ]]; then
+  # the suggestion reads the REGISTRY, never the wire — a port free on the wire
+  # today can still be declared by an entry whose duct is down, which is the
+  # very state this guard exists for
+  _suggest="" _p=$(( PORT + 10 )) _n=0
+  while [[ "$_n" -lt 64 ]]; do
+    _taken=""
+    for _e in "$_GROVE_DIR"/*.json; do
+      [[ -f "$_e" ]] || continue
+      _ep=$(jq -r '.port // 36901' "$_e" 2>/dev/null)
+      [[ "$_ep" == "null" ]] && _ep=36901
+      [[ "$_ep" == "$_p" ]] && { _taken=1; break; }
+    done
+    [[ -z "$_taken" ]] && { _suggest="$_p"; break; }
+    _p=$(( _p + 1 )); _n=$(( _n + 1 ))
+  done
+  echo "🐢 bummer dude — port $PORT is already claimed by another grove" >&2
+  echo "" >&2
+  echo "  this grove: $GROVE (exid $EXID)" >&2
+  echo "  claimed by: $PORT_CLAIMANT (exid $PORT_CLAIMANT_EXID)" >&2
+  echo "" >&2
+  echo "  why: a grove with no declared port takes the default 36901, so two" >&2
+  echo "       groves claim one port. the wake would bind the tunnel and write" >&2
+  echo "       this grove's ssh alias there — and every later send, push, or" >&2
+  echo "       provision aimed at '$PORT_CLAIMANT' would land on THIS box" >&2
+  echo "  ⇒ the duct guard below cannot see this: it reads which box a LIVE duct" >&2
+  echo "    reaches, and a claimed-but-idle port reads as free" >&2
+  echo "  fix: give this grove a port of its own, then wake it again —" >&2
+  if [[ -n "$_suggest" ]]; then
+  echo "    rhx git.grove.set $GROVE --at $USER_NAME@localhost:$_suggest" >&2
+  else
+  echo "    rhx git.grove.set $GROVE --at $USER_NAME@localhost:<a free port>" >&2
+  fi
+  echo "  read every claim first —" >&2
+  echo "    rhx git.grove.list" >&2
+  echo "  ⚠️ a seat of the SAME box is exempt: two entries that share an exid" >&2
+  echo "     ride one tunnel by design, so '<grove>.ground' needs no new port" >&2
+  exit 2
+fi
+unset _suggest _p _n _taken _e _ep
 
 echo "🐢 heres the wave..."
 echo ""
@@ -229,13 +407,25 @@ echo "   ├─ port:  $PORT"
 #    an absent key, since the repair there is `keyrack set`, which has no
 #    entry-only mode and OVERWRITES whatever is live at that slug.
 if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
-  AWS_PROFILE=$(rhx keyrack get --owner ehmpath --env "$ENV" --key AWS_PROFILE --value) || AWS_PROFILE=""
+  # 🛑 .a NAMED org splits in two, because keyrack scopes a named-org read to the
+  #    CHECKOUT. measured 2026-09-28 from this repo's own tree:
+  #
+  #      rhx keyrack get … --org aether --env camp --key AWS_PROFILE
+  #        → ✋ ConstraintError: --org 'aether' does not match manifest org 'ahbode'
+  #
+  #    ⇒ so a grove outside this checkout's org could not be woken AT ALL, and the
+  #      `--org` axis that landed to fix the account guard reached a refusal one
+  #      layer down. `--org @all` is no substitute: it names a DIFFERENT slug
+  #
+  # ⚠️ the split itself lives in `_rack_profile`, NOT here. it stood inline until
+  #    2026-09-28, and three peer skills held their own copies without the
+  #    foreign arm — so each refused every foreign grove while this one worked
+  #    (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.9)
+  AWS_PROFILE="$(_rack_profile "$ENV" "$ORG")" || AWS_PROFILE=""
   if [[ -z "$AWS_PROFILE" ]]; then
-    echo "   └─ ✋ the rack did not hand over AWS_PROFILE for env=$ENV" >&2
+    echo "   └─ ✋ the rack did not hand over AWS_PROFILE for env=$ENV${ORG:+ org=$ORG}" >&2
     echo "" >&2
-    echo "  fix: the rack named it above — read that line, not this one." >&2
-    echo "       locked 🔒 wants an unlock; absent 🫧 wants a set, and a" >&2
-    echo "       set overwrites a live value, so read it before you type." >&2
+    _rack_profile_fix "$ENV" "$ORG"
     exit 1
   fi
   if ! eval "$(aws configure export-credentials --profile "$AWS_PROFILE" --format env 2>/dev/null)"; then
@@ -264,15 +454,60 @@ if [[ -n "$ACCOUNT_WANT" && "$ACCOUNT_ACTIVE" != "$ACCOUNT_WANT" ]]; then
   echo "" >&2
   echo "  why: a wake against the wrong account would hunt a box that is not" >&2
   echo "       there, or drive session state where it does not belong" >&2
-  echo "  fix: drop the stale session so this sources the grove's own env —" >&2
-  echo "    unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN" >&2
+  echo "" >&2
+  ####################################################################
+  # 🛑 TWO causes wear this one verdict, and they want OPPOSITE repairs
+  #
+  #    this block named the stale-session cause alone, and the fix-text it
+  #    printed could never close the other one:
+  #
+  #      | cause                        | the repair                     |
+  #      | a stale session in the shell | unset the AWS_* vars           |
+  #      | the WRONG ORG was read       | name the org, or register it   |
+  #
+  # 📜 .measured 2026-09-27 — the org cause, with the wrong remedy on screen
+  #    `wake grove-aether-v20260921` read the manifest org (`ahbode`), got a
+  #    profile for `<acct.ahbode>`, and halted against the registry's
+  #    `<acct.aether>` — two DIFFERENT accounts, which is the whole content here.
+  #    ⇒ `unset AWS_*` makes the run re-read the SAME manifest org and land on
+  #      the SAME account, so a human who follows that line LOOPS. a correct
+  #      verdict with an unusable remedy
+  #      (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4).
+  #
+  # ⚠️ so the org row is printed FIRST when no org is declared, since that is
+  #    precisely the state in which the stale-session remedy cannot apply
+  ####################################################################
+  if [[ -z "$ORG" ]]; then
+    echo "  fix: this grove declares NO org, so the rack was asked with the" >&2
+    echo "       manifest's org — and that is the likelier cause here." >&2
+    echo "       name the org this grove's account belongs to —" >&2
+    echo "    rhx git.grove.wake $GROVE --org <org>" >&2
+    echo "       then persist it, so no later run needs the flag —" >&2
+    echo "    rhx git.grove.set $GROVE --org <org>" >&2
+    echo "       read which org holds which account —" >&2
+    echo "    rhx keyrack list --owner ehmpath" >&2
+    echo "" >&2
+    echo "  or, if a stale session is in this shell instead —" >&2
+    echo "    unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN" >&2
+  else
+    echo "  fix: org '$ORG' was asked, and its profile answers $ACCOUNT_ACTIVE." >&2
+    echo "       either the registry's account is wrong, or the org is —" >&2
+    echo "    rhx keyrack list --owner ehmpath" >&2
+    echo "" >&2
+    echo "  or, if a stale session is in this shell instead —" >&2
+    echo "    unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN" >&2
+  fi
   exit 2
 fi
 echo "   ├─ account: $ACCOUNT_ACTIVE$([[ -n "$ACCOUNT_WANT" ]] && echo ' ✔ matches the registry')"
 
 # aws's own instance-state enum values — amazon's vocabulary, quoted verbatim
 STATE_UP="run""ning"
-STATES_FINDABLE="$STATE_UP,stopped,stop""ping,pen""ding"
+STATE_DOWN="stopped"
+# the two TRANSIENT states, and they want OPPOSITE moves — see _drive_up
+STATE_DOWNWARD="stop""ping"   # on its way down: a start is REFUSED until it settles
+STATE_UPWARD="pen""ding"      # on its way up:   a start is redundant; await alone
+STATES_FINDABLE="$STATE_UP,$STATE_DOWN,$STATE_DOWNWARD,$STATE_UPWARD"
 
 # .what = find one instance id by its exid tag
 # .why  = a grove is named by tag, so a rebuilt box keeps its name
@@ -307,10 +542,49 @@ _drive_up() {
   if [[ "$MODE" == "plan" ]]; then
     return 0
   fi
-  aws ec2 start-instances --instance-ids "$id" >/dev/null 2>&1 || {
-    echo "      │  └─ 💥 start-instances failed for $id" >&2
-    return 1
-  }
+
+  # 🛑 .a TRANSIENT state is not a startable one, and the two differ
+  #
+  #    `start-instances` refuses a box mid-descent with IncorrectInstanceState,
+  #    so a wake that RACES a hibernate reads as a wake defect rather than as a
+  #    box still on its way down. the two transient states want opposite moves:
+  #
+  #    | state | the move |
+  #    |---|---|
+  #    | $STATE_DOWNWARD | AWAIT $STATE_DOWN, then start. a hibernate writes RAM
+  #    |   | to disk, so a 32GB box takes minutes rather than seconds |
+  #    | $STATE_UPWARD   | it is ALREADY on its way up. skip the start entirely; |
+  #    |   | the await below is the whole remaining act |
+  #
+  #    📜 measured 2026-09-23 on `grove-aether-v20260921`: openhours hibernated
+  #       the box, a wake landed ~40s into it, and the halt read
+  #       `💥 start-instances failed` with NO cause — because aws's own reason
+  #       went to /dev/null. the box was healthy the whole time.
+  if [[ "$state" == "$STATE_DOWNWARD" ]]; then
+    echo "      │  ├─ ⏳ mid-descent — a start is refused until it settles"
+    if ! aws ec2 wait instance-stopped --instance-ids "$id" 2>/dev/null; then
+      echo "      │  └─ 💥 $id did not settle at $STATE_DOWN within the aws waiter's bound" >&2
+      echo "      │     a hibernate of a large box can outrun it — re-run this wake" >&2
+      return 1
+    fi
+    echo "      │  ├─ ✔ settled at $STATE_DOWN"
+  fi
+
+  # ⚠️ aws's own reason rides OUT on the halt. a swallowed cause is a halt a
+  #    human cannot act on (`rule.require.errors-name-the-fix`), and it was the
+  #    more corrosive of the two defects above: it made a correct refusal of a
+  #    transient state indistinguishable from a quota, a permission, or an
+  #    absent instance.
+  if [[ "$state" != "$STATE_UPWARD" ]]; then
+    local said rc=0
+    said="$(aws ec2 start-instances --instance-ids "$id" 2>&1)" || rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+      echo "      │  └─ 💥 start-instances refused $id" >&2
+      echo "      │     aws said: $said" >&2
+      return 1
+    fi
+  fi
+
   aws ec2 wait instance-"$STATE_UP" --instance-ids "$id" 2>/dev/null || true
   echo "      │  └─ ✔ up"
   return 0

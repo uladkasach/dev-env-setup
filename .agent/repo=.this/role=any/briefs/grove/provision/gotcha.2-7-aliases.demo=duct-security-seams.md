@@ -63,7 +63,7 @@ OUTSIDE __duct_ssh_tmux`; green against the checkout, where the pattern returns 
 
 2026-08-31: the seam read `ssh "$host" "$remote_cmd" | __duct_strip_escapes`. a pipe carries
 stdout only; ssh relays the remote stderr byte-for-byte onto this process's fd 2 raw. with
-`set-clipboard on` in `src/tmux.conf`, an OSC 52 on that channel rewrites the clipboard.
+`set-clipboard on` in `src/grove.provision/2.shell/2.8.tmux/tmux.conf`, an OSC 52 on that channel rewrites the clipboard.
 the next paste is a command a grove chose.
 
 the two questions are separate claims with separate readers: does the caller SINK both

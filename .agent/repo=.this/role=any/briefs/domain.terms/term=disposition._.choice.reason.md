@@ -93,7 +93,7 @@ perturbed three ways in one run and each fired its own row, while the other nine
 ### ⚠️ the counter has a second place to be wrong
 
 this repo documents its own call shapes in prose beside the calls.
-`src/git-credential-keyrack.sh` names `rhx keyrack get` in a comment and inside an `echo`
+`src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh` names `rhx keyrack get` in a comment and inside an `echo`
 fix-text, one screen from its one live call. a naive counter reads 3 where the answer is 1.
 
 that is m.8 — a reader that re-authors its subject gains a second place to be wrong, one no

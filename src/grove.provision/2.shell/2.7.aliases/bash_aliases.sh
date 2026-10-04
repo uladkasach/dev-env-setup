@@ -92,7 +92,11 @@ function use.ahbode.prep { _use_aws_profile prep "$@"; }
 function use.ahbode.prod { _use_aws_profile prod "$@"; }
 function use.ahbode.camp { _use_aws_profile camp "$@"; }
 function use.ahbode.root { _use_aws_profile sudo "$@"; }
+function use.ahction.test { _use_aws_profile test "$@"; }
+function use.ahction.prep { _use_aws_profile prep "$@"; }
 function use.ahction.prod { _use_aws_profile prod "$@"; }
+function use.ahction.camp { _use_aws_profile camp "$@"; }
+function use.ahction.root { _use_aws_profile sudo "$@"; }
 function use.whodis.prod { _use_aws_profile prod "$@"; }
 function use.ehmpathy.test { _use_aws_profile test "$@"; }
 function use.ehmpathy.demo { _use_aws_profile test "$@"; }
@@ -101,6 +105,7 @@ function use.ehmpathy.root { _use_aws_profile sudo "$@"; }
 function use.aether.test { _use_aws_profile test "$@"; }
 function use.aether.prep { _use_aws_profile prep "$@"; }
 function use.aether.prod { _use_aws_profile prod "$@"; }
+function use.aether.camp { _use_aws_profile camp "$@"; }
 function use.aether.root { _use_aws_profile sudo "$@"; }
 
 # ahbode 3rd-party credentials
@@ -1235,7 +1240,7 @@ _git_tree_repo_name() {
 #      a subject is author-controlled bytes carried by `git fetch`, and every
 #      caller below prints it to a terminal with a bare `echo`. so a commit
 #      whose subject holds `\e]52;c;<b64>\a` WRITES THIS HUMAN'S CLIPBOARD when
-#      they run `git tree list` — with `set-clipboard on` in `src/tmux.conf`,
+#      they run `git tree list` — with `set-clipboard on` in `src/grove.provision/2.shell/2.8.tmux/tmux.conf`,
 #      the next paste is a command that commit chose.
 #
 #      ⇒ and the tree is REACHABLE with no extra step: `git.grove.pull` writes a
@@ -2746,13 +2751,49 @@ git_alias_grove() {
 #                           (use when infra/declastruct already wrote the ssh config —
 #                            keys, ProxyCommand, SSM tunnel, etc)
 #   both                    grove name stays semantic; the named alias carries the address
+# the usage, declared ONCE and reached two ways: `--help` asks for it, and an
+# absent name earns it. two copies would drift, and the drift is silent — the
+# flag list is a CLAIM about this function's contract, never a cue
+# (`rule.require.a-cue-is-not-a-claim`)
+#
+# 🛑 it prints to STDOUT, and the caller that is an ERROR redirects it
+#   `rhx` buffers a skill's stderr and relays it ONLY on a non-zero exit, so a
+#   `--help` that answered on stderr and returned 0 printed not one line
+#   through `rhx git.grove.set --help` — measured 2026-09-28, on the first roll
+#   of this very fix (`gotcha.the-duct-returns-the-send-not-the-answer`, its
+#   `rhx drops stderr on a zero exit` section)
+#
+#   ⇒ so the stream follows the EXIT, never the text: asked-for help is a
+#     verdict on stdout at 0, and an unasked-for usage is an error on stderr
+#     at 2 (`rule.forbid.stdout-on-errors`)
+_git_grove_set_usage() {
+  echo "usage: git grove set <name> [--at <user@host:port>] [--alias <ssh-alias>]"
+  echo "                            [--exid <tag>] [--env <env>] [--account <id>] [--nat <exid>]"
+  echo "                            [--org <keyrack-org>]"
+  echo ""
+  echo "  ⚠️ every flag is a FIELD-LEVEL upsert: a flag given overwrites its own"
+  echo "     field, a flag absent KEEPS what the entry holds, and \`--nat ''\` clears"
+  echo "     one (\`gotcha.a-partial-write-discards-what-it-never-read\`)"
+}
+
 _git_grove_set() {
-  local name="" at="" alias="" exid="" env="" account="" nat=""
+  # 🛑 `--help` earns an arm of its own, ahead of the parse
+  #   until 2026-09-28 the only route to the usage was to OMIT the name, so
+  #   `--help` fell to the `-*` arm and answered `✋ unknown flag '--help'`,
+  #   exit 2. a surface that refuses the one flag every reader tries is a
+  #   blocker (`rule.require.help-on-demand`), and the text it withheld was
+  #   already written six lines below
+  if [[ " $* " == *" --help "* || " $* " == *" -h "* ]]; then
+    _git_grove_set_usage
+    return 0
+  fi
+
+  local name="" at="" alias="" exid="" env="" account="" nat="" org=""
   # ⚠️ a `*_given` marker per flag, because "absent" and "empty" must differ:
   #    an absent flag INHERITS the extant entry's field, and `--nat ''` CLEARS
   #    it. a test on the value alone cannot tell those two apart — see the
   #    ⚠️ block below the parse for the entry this distinction protects
-  local at_given=0 alias_given=0 exid_given=0 env_given=0 account_given=0 nat_given=0
+  local at_given=0 alias_given=0 exid_given=0 env_given=0 account_given=0 nat_given=0 org_given=0
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --at) at="$2"; at_given=1; shift 2 ;;
@@ -2761,6 +2802,18 @@ _git_grove_set() {
       --env) env="$2"; env_given=1; shift 2 ;;
       --account) account="$2"; account_given=1; shift 2 ;;
       --nat) nat="$2"; nat_given=1; shift 2 ;;
+      # 🛑 .the org is the KEYRACK org, and it is a field of the ENTRY
+      #    `wake`, `stop`, and `trust.gen` each read `.org` off this record to
+      #    address their credential read. until 2026-09-28 this setter carried no
+      #    such flag, so that read fell to the CHECKOUT's manifest org — which
+      #    hands back a profile for a different account, and the account guard
+      #    then halts over the wrong cause
+      #
+      #    ⚠️ and `wake`'s own halt already printed `git grove set <g> --org <org>`
+      #      as its repair. a fix-text that names a flag nobody implemented is a
+      #      correct verdict with a phantom remedy
+      #      (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4)
+      --org) org="$2"; org_given=1; shift 2 ;;
       --) shift ;;
       -*) echo "✋ unknown flag '$1'" >&2; return 2 ;;
       *) [[ -z "$name" ]] && name="$1"; shift ;;
@@ -2768,8 +2821,8 @@ _git_grove_set() {
   done
 
   if [[ -z "$name" ]]; then
-    echo "✋ usage: git grove set <name> [--at <user@host:port>] [--alias <ssh-alias>]" >&2
-    echo "                             [--exid <tag>] [--env <env>] [--account <id>] [--nat <exid>]" >&2
+    echo "✋ a grove name is required" >&2
+    _git_grove_set_usage >&2
     return 2
   fi
   # a cloud grove is addressable by its exid alone — the wake derives its address
@@ -2850,6 +2903,7 @@ _git_grove_set() {
     [[ "$env_given"     != 1 ]] && { keep="$(jq -r '.env // empty'     "$prior")"; [[ "$keep" != "null" ]] && env="${env:-$keep}"; }
     [[ "$account_given" != 1 ]] && { keep="$(jq -r '.account // empty' "$prior")"; [[ "$keep" != "null" ]] && account="${account:-$keep}"; }
     [[ "$nat_given"     != 1 ]] && { keep="$(jq -r '.nat // empty'     "$prior")"; [[ "$keep" != "null" ]] && nat="${nat:-$keep}"; }
+    [[ "$org_given"     != 1 ]] && { keep="$(jq -r '.org // empty'     "$prior")"; [[ "$keep" != "null" ]] && org="${org:-$keep}"; }
     [[ "$alias_given"   != 1 ]] && { keep="$(jq -r '.sshAlias // empty' "$prior")"; [[ -n "$keep" && "$keep" != "null" ]] && ssh_alias="$keep"; }
   fi
   # 🛑 this is the ONE point where every field is final — argv has been read and
@@ -2866,6 +2920,10 @@ _git_grove_set() {
   _git_grove_clamp "--env"          "$env"       'A-Za-z0-9._-' '[A-Za-z0-9._-]' || return 2
   _git_grove_clamp "--account"      "$account"   '0-9'          '[0-9] (a 12-digit aws account)' || return 2
   _git_grove_clamp "--nat"          "$nat"       'A-Za-z0-9._-' '[A-Za-z0-9._-]' || return 2
+  # ⚠️ `@` is in the org's grammar and in no other field's: keyrack's own org
+  #    namespace holds `@all` and `@this`, so a clamp without it would refuse a
+  #    legitimate value (`rule.require.github-token-at-all-camp`)
+  _git_grove_clamp "--org"          "$org"       'A-Za-z0-9._@-' '[A-Za-z0-9._@-]' || return 2
 
   # the cloud fields (exid, env, account, nat) are what let `git grove wake` be
   # portable: it finds the box by exid TAG and pins the account per grove, so one
@@ -2902,6 +2960,7 @@ _git_grove_set() {
     --arg env "$env" \
     --arg account "$account" \
     --arg nat "$nat" \
+    --arg org "$org" \
     --argjson addedAt "$added_at" \
     '{
       name:     $name,
@@ -2913,6 +2972,7 @@ _git_grove_set() {
       env:      (if $env     == "" then null else $env     end),
       account:  (if $account == "" then null else $account end),
       nat:      (if $nat     == "" then null else $nat     end),
+      org:      (if $org     == "" then null else $org     end),
       type:     "ec2",
       status:   "active",
       addedAt:  $addedAt
@@ -2937,7 +2997,7 @@ _git_grove_set() {
   # tag and writes the Host block once the tunnel's port is known. to write one
   # here would emit an empty HostName/Port that ssh cannot use
   if [[ -z "$at" ]]; then
-    echo "🌲 grove '$name' registered → exid '${exid:-$name}'${env:+ in $env}${account:+ (account $account)}"
+    echo "🌲 grove '$name' registered → exid '${exid:-$name}'${env:+ in $env}${account:+ (account $account)}${org:+ [org $org]}"
     echo "   └─ wake it to open its duct: git grove wake $name"
     return 0
   fi

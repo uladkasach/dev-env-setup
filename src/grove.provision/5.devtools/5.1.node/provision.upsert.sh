@@ -2,40 +2,29 @@
 # .what = install fnm, the LTS node it manages, and pnpm
 # .ref  = https://github.com/Schniz/fnm
 # .why
-#   - the BINARY, never fnm's shell installer — that installer re-appends a
-#     PATH block to ~/.bashrc on every run, and ubuntu's ~/.bashrc returns
-#     early for a non-interactive shell; the binary install writes no rc
-#     line, so no second writer exists (rule.forbid.two-writers-on-one-artifact)
-#   - fnm is put on PATH by hand here, so it can install node in THIS shell;
-#     `configure` names that same dir for every later shell
-#   - a node version is read back rather than aliased — `--lts` is an install
-#     flag, never a version alias
+#   - the BINARY, never fnm's shell installer — that one appends a PATH block
+#     to ~/.bashrc, a second writer (rule.forbid.two-writers-on-one-artifact)
+#   - fnm goes on PATH by hand here, for THIS shell; `configure` serves the rest
 #   - every corepack call leans on `CI=1`, declared once at the driver
-#     .refs = gotcha.5-1-node.demo=fnm-pnpm-install-measurements, m1
+# .refs = gotcha.5-1-node.demo=fnm-pnpm-install-measurements — every (mN) below
 #
 # guarantee:
 #   - the same verified bytes land at the same path with the same mode
 #   - the fnm binary is NEVER placed unless its bytes matched their pinned digest
 
 grove_provision_5_1_node_provision_upsert() {
-  # the PINNED RELEASE ASSET, never `https://fnm.vercel.app/install` — that
-  # url serves a shell installer to fetch and EXECUTE, unversioned, so no
-  # hash is expressible (rule.require.verify-binary-downloads)
-  # .refs = gotcha.5-1-node.demo=fnm-pnpm-install-measurements, m2
+  # the PINNED RELEASE ASSET, never the unversioned installer url — no hash is
+  # expressible for that (rule.require.verify-binary-downloads, m2)
   local fnm_version="v1.39.0"
   local fnm_sha256="sha256:7807664f39d39fc518da1c35ba0181e4b3267603c4b1dedeb4b5fc6ae440a224"
   local fnm_url="https://github.com/Schniz/fnm/releases/download/${fnm_version}/fnm-linux.zip"
   local fnm_home="$HOME/.local/share/fnm"
 
-  # a PRIVATE temp dir — this path holds a file that becomes EXECUTABLE, and
-  # a fixed /tmp/fnm.zip in a 1777 dir is claimable by any seat on the box
-  # (src/grove.web.sh)
+  # a PRIVATE temp dir — a fixed /tmp path for a future executable is claimable
   local tmp_dir
   tmp_dir="$(web_tempdir fnm)" || return 1
 
-  # runs UNCONDITIONALLY, no `command -v fnm` short-circuit — a re-run
-  # converges by construction and self-heals a corrupt binary
-  # (rule.require.idempotent-install-procedures)
+  # UNCONDITIONAL, no `command -v fnm` short-circuit — a re-run self-heals
   if ! web_fetch "$fnm_url" --into "$tmp_dir/fnm.zip"; then
     echo "   ✋ could not download fnm ${fnm_version}" >&2
     echo "      ⇒ with no node, every rhachet/npm-driven tool on this box is" >&2
@@ -93,9 +82,7 @@ grove_provision_5_1_node_provision_upsert() {
 
   fnm install --lts || return 1
 
-  # the default is named by the `lts-latest` ALIAS, never by a `fnm list`
-  # scrape — a scrape of the last line can name a nightly instead of the LTS
-  # .refs = gotcha.5-1-node.demo=fnm-pnpm-install-measurements, m3
+  # the default is the `lts-latest` ALIAS, never a `fnm list` scrape (m3)
   if ! fnm default lts-latest; then
     echo "   ✋ fnm has no 'lts-latest' alias after 'fnm install --lts'" >&2
     echo "      ⇒ with no default, node is on PATH in no shell. read what it" >&2
@@ -105,19 +92,15 @@ grove_provision_5_1_node_provision_upsert() {
   fnm use lts-latest
   echo "   • node $(fnm current 2>/dev/null) set as the fnm default"
 
-  # the BASELINE versions land beside the lts, never instead of it — an
-  # absent .nvmrc pin opens an interactive fnm prompt a duct cannot answer.
-  # declared in `_.sh`, since provision.verify judges the same set
-  # (rule.require.identical-bundle-composition). the default stays the LTS
-  # .refs = gotcha.5-1-node.demo=fnm-pnpm-install-measurements, m4
+  # the BASELINE versions land BESIDE the lts — an absent pin opens a prompt a
+  # duct cannot answer. declared in `_.sh`, which the verify reads too (m4)
   local want roster
   roster="$(fnm list 2>/dev/null || true)"   # read ONCE; only this loop changes the set
 
   while read -r want; do
     [[ -n "$want" ]] || continue
 
-    # `fnm install` of a version already present exits NON-ZERO, so a bare
-    # call would fail every second run (rule.require.idempotent-install-procedures)
+    # `fnm install` of a present version exits NON-ZERO, so it is asked first
     if grove_node_version_present "$want" "$roster"; then
       echo "   • node v$want already present — skipped"
       continue
@@ -133,32 +116,23 @@ grove_provision_5_1_node_provision_upsert() {
       echo "      ⇒ check the version is real: fnm list-remote | grep v$want" >&2
       return 1
     fi
-    # process substitution, never a pipe — a piped `while read` runs in a
-    # SUBSHELL, so `roster` would reset each pass (gotcha.while-read-drops-the-last-line)
+    # process substitution, never a pipe — a piped loop is a subshell
   done < <(grove_node_versions_wanted)
 
   # pnpm's global bin dir goes on PATH BEFORE a global install, else corepack
-  # refuses. BOTH spellings are named — pnpm treats PNPM_HOME itself as the
-  # bin dir, corepack reports a /bin child — and the PRUNE at the end of this
-  # function, not PATH order, is what makes that safe
-  # (rule.forbid.two-writers-on-one-artifact, applied to a $PATH entry)
+  # refuses. BOTH spellings; the PRUNE below, not PATH order, makes that safe
   export PNPM_HOME="$HOME/.local/share/pnpm"
   mkdir -p "$PNPM_HOME/bin"
   export PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH"
 
-  # pnpm goes on EVERY node this box holds, never merely the default — a
-  # per-version failure is NOT fatal; provision.verify owns the verdict.
-  # install the DECLARED version, never `pnpm@latest`
-  # (rule.require.pinned-versions). an undeclared pin is a HARD stop, never
-  # a fall back to `@latest` (rule.forbid.failhide)
-  # .refs = gotcha.5-1-node.demo=fnm-pnpm-install-measurements, m5
+  # pnpm goes on EVERY node this box holds, at the DECLARED version — never
+  # `@latest`, and an undeclared pin is a HARD stop (m5). a per-version
+  # failure is not fatal; the verify owns that verdict
   local pnpm_want
   pnpm_want="$(grove_pnpm_version_wanted)"
 
-  # an empty answer means the manifest is absent (checkout partial) OR
-  # declares none (repo at fault) — an absent manifest cascades into claims
-  # on FOUR other bundles, each innocent
-  # .refs = gotcha.5-1-node.demo=fnm-pnpm-install-measurements, m6
+  # empty means the manifest is ABSENT (a partial checkout, the head of a
+  # cascade) or declares none (the repo at fault) — told apart below (m6)
   local pnpm_manifest; pnpm_manifest="$(dirname "$GROVE_SRC")/package.json"
   if [[ ! -f "$pnpm_manifest" ]]; then
     echo "   ✋ no package.json beside this checkout's src/ ($pnpm_manifest)" >&2
@@ -185,10 +159,8 @@ grove_provision_5_1_node_provision_upsert() {
     [[ -n "$ver" ]] || continue
     fnm use "$ver" --silent-if-unchanged >/dev/null 2>&1 || continue
 
-    # `web_corepack`/`web_npm`, never the bare tools — this loop runs PER
-    # NODE VERSION, so one silent-registry stall multiplies. `corepack
-    # enable` stays BARE, since it reaches no registry
-    # .refs = gotcha.5-1-node.demo=fnm-pnpm-install-measurements, m7
+    # `web_corepack`/`web_npm`, BOUNDED — a stall multiplies per node. `corepack
+    # enable` stays bare, since it reaches no registry (m7)
     corepack enable || true
     if ! web_corepack install -g "pnpm@$pnpm_want"; then
       echo "   • corepack declined pnpm for node v$ver — fall back to npm"
@@ -198,38 +170,56 @@ grove_provision_5_1_node_provision_upsert() {
 
   fnm use lts-latest --silent-if-unchanged >/dev/null 2>&1 || true   # back to the box's default
 
+  # CACHE every pnpm this box may be ASKED for, so corepack's shim never asks to
+  # fetch one — on a duct that question eats the run (m11)
+  # ⚠️ `-g --cache-only` is no redundancy, and 🛑 `--cache-only` alone does NOT
+  #    protect the default — `COREPACK_DEFAULT_TO_LATEST=0` at the driver does.
+  #    one cache per $HOME, so the loop is NOT per node (m12)
+  local cached=() cache_fresh=() cache_absent=()
+  while read -r ver; do
+    [[ -n "$ver" ]] || continue
+    if grove_pnpm_cached "$ver"; then cached+=("$ver"); continue; fi
+    # the cache is re-ASKED: corepack can exit 0 on a fetch it never lands (m12)
+    if web_corepack install -g --cache-only "pnpm@$ver" >/dev/null 2>&1 \
+       && grove_pnpm_cached "$ver"; then
+      cache_fresh+=("$ver")
+    else
+      cache_absent+=("$ver")
+    fi
+  done < <(grove_pnpm_versions_wanted)
+
+  echo "   • pnpm cached: ${#cached[@]} held, ${#cache_fresh[@]} fetched${cache_fresh:+ (${cache_fresh[*]})}"
+  if [[ "${#cache_absent[@]}" -gt 0 ]]; then
+    echo "   ✋ pnpm could not be cached: ${cache_absent[*]}" >&2
+    echo "      ⇒ a repo that pins one of those opens corepack's download" >&2
+    echo "        prompt on 'pnpm install', and a duct is tmux — the question" >&2
+    echo "        holds the pane and eats every command sent after it" >&2
+    echo "      ⇒ check the version is real: npm view pnpm@<x> version" >&2
+    return 1
+  fi
+
   if [[ "${#pnpm_absent[@]}" -gt 0 ]]; then
     echo "   🌙 pnpm could not be installed for: ${pnpm_absent[*]}"
     echo "      a 'cd' into a repo that pins one of those gets node without pnpm"
     echo "      read why: fnm use <version> && corepack install -g pnpm@$pnpm_want"
   fi
 
-  # report the pnpm that ANSWERS, never the one just installed. a PATH
-  # explanation for a mismatch is FALSE — corepack's shim dispatches on
-  # `packageManager`, so one binary answers two versions. reports rather
-  # than deletes — a mismatched pnpm may be the human's
-  # .refs = gotcha.5-1-node.demo=fnm-pnpm-install-measurements, m8, m9
+  # report the pnpm that ANSWERS, never the one just installed — corepack's shim
+  # dispatches on `packageManager`, a property of the DIRECTORY. it reports and
+  # never deletes, since a stray pnpm may be the human's (m8, m9)
   local pnpm_live
   pnpm_live="$(pnpm --version 2>/dev/null)"
   if [[ "$pnpm_live" == "$pnpm_want" ]]; then
     echo "   • pnpm $pnpm_live ✔"
   else
-    # `cd ~` is the diagnostic that discriminates — the answer is a property
-    # of the DIRECTORY, never of PATH; asked from `~`, where no repo
-    # declares one, it reports the global pin
     echo "   🌙 pnpm answers $pnpm_live here, and this phase installed $pnpm_want"
     echo "      corepack's shim dispatches on the nearest 'packageManager' field —"
     echo "      one binary, two versions, not two binaries"
     echo "      read why: cd ~ && pnpm --version   # away from any declaration"
   fi
 
-  # prune the SHADOWED shims — pnpm's own fossils, in pnpm's own dirs. pnpm
-  # moved its shim dir between 10.x and 11.x, so a box that ran both holds a
-  # stale copy that outranks the live one on PATH. this does NOT contradict
-  # the "report, do not delete" stance above — that guards a STRAY pnpm; this
-  # prune touches only pnpm's OWN dirs, and the live dir is pnpm's ANSWER,
-  # never a constant here
-  # .refs = gotcha.5-1-node.demo=fnm-pnpm-install-measurements, m10
+  # prune the SHADOWED shims — pnpm's own fossils from its 10.x→11.x dir move,
+  # in pnpm's OWN dirs only; the live dir is pnpm's ANSWER, never a constant (m10)
   local shadow shadows=() pruned=() live_dir fossil_dir
   live_dir="$(grove_pnpm_shim_dir_live)"
   while read -r shadow; do

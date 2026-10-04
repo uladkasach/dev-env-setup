@@ -155,7 +155,7 @@ published surface drift on under a resolved dispute.
 
 ## .evidence
 
-- `src/ductwork.sh` — `__duct_strip_escapes`, and the measured table above, inline
+- `src/grove.provision/2.shell/2.7.aliases/ductwork.sh` — `__duct_strip_escapes`, and the measured table above, inline
 - `.agent/repo=.this/role=any/skills/git.grove.operations.sh` — `_grove_relay_sunk`
 - `term=sink._.choice._.md` — the complement; a relay feeds it, at capture
 - `term=swallow._.choice._.md` — what a relay does when it drops a stream it owed

@@ -53,13 +53,13 @@ hold at a glance.
 
 **the contract:**
 
-- `src/init.lua` → the `error scribe` block — the subsystem, its two channels, the exit flush
-- `src/init.lua` → `_G.nvim_errorlog = { path, capture }` — the scribe's exposed handle
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` → the `error scribe` block — the subsystem, its two channels, the exit flush
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` → `_G.nvim_errorlog = { path, capture }` — the scribe's exposed handle
 - writes `stdpath('state')/errors.log`
 
 **the neighbor that holds the other sense:**
 
-- `src/init.lua` → the `self-watchdog` block — witnesses growth, and acts
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` → the `self-watchdog` block — witnesses growth, and acts
 
 **the briefs:**
 

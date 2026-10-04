@@ -32,7 +32,7 @@
 #
 # .why = every skill that sources this one relays GROVE-CHOSEN bytes to a
 #        terminal somewhere, and a terminal OBEYS them. the sink that strips
-#        them lives in `src/ductwork.sh`, and the skills that call it directly
+#        them lives in `src/grove.provision/2.shell/2.7.aliases/ductwork.sh`, and the skills that call it directly
 #        (`git.grove.send`, `git.grove.play.await`) each reach it their own way.
 #        the ones that source THIS file had no route to it at all.
 #
@@ -737,18 +737,61 @@ _shell_at() {
         echo "" >&2
         echo "  ✋ could not learn which shell serves '$seat' — the probe never ran" >&2
         echo "" >&2
-        echo "  why: a duct is tmux, and a pane another job holds refuses the" >&2
-        echo "       send outright. it waited ${GROVE_ASK_AWAIT:-900}s and the pane" >&2
-        echo "       did not free." >&2
+        ##############################################################
+        # 🛑 97 names ONE fact and SEVERAL causes, so this text must not pick one
+        #
+        # 📜 .MEASURED 2026-09-28, against a box deliberately hibernated
+        #
+        #   what stood here asserted a single cause, in two sentences that were
+        #   both false of that run:
+        #
+        #     why: a duct is tmux, and a pane another job holds refuses the
+        #          send outright. it waited 900s and the pane did not free.
+        #     fix: see what holds the pane, then run this again —
+        #       rhx git.grove.read <seat> --lines 40
+        #       rhx duct.list
+        #
+        #   the box was asleep, no pane was held, and the send was refused at
+        #   once rather than after 900s. so the verdict was right and its REASON
+        #   named another subject, and the repair it printed reads a pane that
+        #   does not exist (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4)
+        #
+        # ⚠️ and NO discriminator belongs here, because the transport collapses
+        #   these causes ON PURPOSE: `--reply` exits 97 for every fault of its
+        #   own — refused, quiet, elapsed, unreadable rc, malformed args — since
+        #   they "differ in CAUSE and agree on the only fact a caller acts on"
+        #   (`gotcha.the-duct-returns-the-send-not-the-answer`). to re-derive the
+        #   cause here would be a second reader of the transport's own knowledge,
+        #   free to drift from it
+        #
+        # ⇒ so the repair is a fix-text that is HONESTLY several-valued, ordered
+        #   by what is cheapest to rule out. `wake` leads because it is free and
+        #   idempotent — on a box that was never asleep it reports `[KEEP]` on
+        #   every rung and changes naught (`rule.require.errors-name-the-fix`)
+        ##############################################################
+        echo "  why: the duct gave no verdict, and 97 does not say which fault —" >&2
+        echo "       the box may be asleep, the send may have been refused by a" >&2
+        echo "       pane another job holds, or the await may have elapsed." >&2
+        echo "       the transport collapses these by design, so this names them" >&2
+        echo "       all rather than guess one." >&2
         echo "" >&2
         echo "  ⚠️ there is NO fallback to 'bash -lc': on a CONVERGED box it" >&2
         echo "     serves no rhx at all, so the suite rung would report" >&2
         echo "     'passed: 0' against a healthy grove, and the guess would be" >&2
         echo "     cached for the rest of the run." >&2
         echo "" >&2
-        echo "  fix: see what holds the pane, then run this again —" >&2
-        echo "    rhx git.grove.read $seat --lines 40" >&2
-        echo "    rhx duct.list" >&2
+        # ⚠️ one cause per line, its command INDENTED under it — never a comment
+        #    at the END of a command line. such a comment must be aligned past a
+        #    `$seat` interpolation, so it goes ragged for every name of a
+        #    different length, and this text carries two
+        #    (`rule.forbid.snapshot-visual-blemishes`)
+        echo "  fix: rule them out cheapest-first, then run this again —" >&2
+        echo "    · asleep? free and idempotent, so it is the one to try first" >&2
+        echo "        rhx git.grove.wake ${seat%%.*}" >&2
+        echo "    · a pane another job holds?" >&2
+        echo "        rhx git.grove.read $seat --lines 40" >&2
+        echo "    · a duct that will not relay?" >&2
+        echo "        rhx duct.list" >&2
         exit 3
     fi
 
@@ -816,11 +859,47 @@ _count() {
 #         a tally a reader can refute by eye is how a check loses its authority.
 #
 # .note = same `|| true` / `${n:-0}` care as `_count`, for the same reason.
+#
+# 🛑 .the DISCRIMINATOR lives in `_say_claims`, and this counts ITS output
+#         the two used to be written separately — one to count, one to list — and
+#         that is one set with two readers, free to drift on exactly the input the
+#         count exists to describe (`…cries-wolf`, m.9). the count is now a line
+#         count over the lister, so a claim the list omits is a claim the tally
+#         cannot count, and the two disagree by construction never.
 ######################################################################
 _count_claims() {
   local n
-  n=$(grep -E '^[[:space:]]*✋' "$1" 2>/dev/null | grep -vc 'grove.provision finished' || true)
+  n=$(_say_claims "$1" | grep -c . || true)
   echo "${n:-0}"
+}
+
+######################################################################
+# _say_claims — print the ✋ lines a bundle-tree plan raised as CLAIMS, one per line
+#
+# .why  = a caller that halts on a claim count owes the reader the claims. the
+#         ready ladder used to hand out a fix-text instead —
+#
+#           which bundles claimed —
+#           grep -B2 '✋' <log>
+#
+#         and that names no fix a driver can run: `grep` is not on a driver's
+#         permitted command set, so the one line that would have answered *which*
+#         bundles claimed is the one line the driver is refused
+#         (`rule.require.errors-name-the-fix` — a fix-text that cannot be run
+#         names no fix). ⇒ the check already holds the log and already reads it,
+#         so it prints the claims itself and asks the driver for no second command.
+#
+# ⚠️ it is the SAME discriminator `_count_claims` reports on, because that
+#         function now counts this one's output — see its `.why`.
+#
+# .note = the caller indents; this emits the log's own text, trimmed of leading
+#         space so one indent rules the whole list.
+######################################################################
+_say_claims() {
+  grep -E '^[[:space:]]*✋' "$1" 2>/dev/null \
+    | grep -v 'grove.provision finished' \
+    | sed -E 's/^[[:space:]]+//' \
+    || true
 }
 
 ######################################################################

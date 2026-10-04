@@ -45,9 +45,9 @@ exists to name.
 
 **the instances:**
 
-- `src/init.lua` — `neominimap` made minimaps of its own minimaps once `exclude_buftypes` was
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` — `neominimap` made minimaps of its own minimaps once `exclude_buftypes` was
   emptied. measured 2026-09-03: 2,709 of 2,714 buffers in one core, and 34,354 in a worse one
-- `src/init.lua` — the watchdog `stampede`: a starved core owes one timer fire per missed
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` — the watchdog `stampede`: a starved core owes one timer fire per missed
   interval, and each fire costs a /proc read, a buffer walk, and a log append. the guard becomes
   the load, and its rate rises with the starvation it worsens
 - the keyrack daemon leak — 641 leaked daemons filled zram, which forced disk swap, which

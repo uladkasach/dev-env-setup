@@ -3,7 +3,7 @@
 ## .etymology
 
 `term` is the short form the repo already used before any skill wrapped it:
-`src/termwork.sh` has carried that name since it was written, and its functions are
+`src/grove.provision/2.shell/2.7.aliases/termwork.sh` has carried that name since it was written, and its functions are
 `__term_as_ssh_host`, `__term_open`, `__term_list`. the word was in the code; the
 `term.*` skill family adopted it rather than coin a new one.
 
@@ -56,7 +56,7 @@ none raised.
 
 ## .evidence
 
-- the word predates the skills: `src/termwork.sh` uses `term` throughout, in a file the
+- the word predates the skills: `src/grove.provision/2.shell/2.7.aliases/termwork.sh` uses `term` throughout, in a file the
   repo has carried since before the family existed
 - five operations now anchor it: `term.open`, `term.list`, `term.read`, `term.send`,
   `term.stop`

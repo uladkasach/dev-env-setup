@@ -59,7 +59,7 @@ PATH: …/pnpm/bin  then  …/pnpm         ← so the STALE one answered
 pnpm treats `$PNPM_HOME` itself as the global bin dir in some versions and a `/bin`
 child in others, so an upgrade can write the new shim to the dir the old one is NOT
 in. both persist, both carry the name `rhx`, and an order three files in this repo
-pin decides which answers (`src/zshrc.sh`, `5.1.node`'s two phases).
+pin decides which answers (`src/grove.provision/2.shell/2.5.zsh/zshrc.sh`, `5.1.node`'s two phases).
 
 ### ✔ WHY the two dirs — it is the CWD, not the version (2026-08-06)
 

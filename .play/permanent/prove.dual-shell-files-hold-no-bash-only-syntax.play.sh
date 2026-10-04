@@ -20,7 +20,7 @@
 #   - zsh runs the line, exits 0, and yields an empty string
 #   - every test downstream then tests ""
 #
-# 📜 2026-09-02 — `src/bash_aliases.sh:3704`
+# 📜 2026-09-02 — `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh:3704`
 #   - `git backup`'s changed-file patch read `${BASH_REMATCH[1]}`
 #   - under zsh every changed member became a blank
 #   - `[[ -e "$HOME/$name" ]]` then tested `$HOME/`, a directory, and passed — each blank filed as FOUND
@@ -172,7 +172,7 @@ PAT_ARRKEYS='\$\{![A-Za-z_][A-Za-z0-9_]*\[@\]\}'
 #   - the `[[ -f "$f" ]] || continue` everyone writes reads as the defense and is never reached
 #   - `rule.forbid.bare-globs-in-dual-shell-files` grades this a blocker by name
 #
-# 📜 2026-09-02: fourteen instances stood in `src/bash_aliases.sh`
+# 📜 2026-09-02: fourteen instances stood in `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`
 #   - the rule's own `.where to look` had predicted them exactly: "worktree walks, `*.json`, `*.patch`"
 #   - the rule named them and no reader counted them
 #   - they sat while the rule read as enforced
@@ -301,7 +301,10 @@ else
 fi
 
 if command -v zsh >/dev/null 2>&1; then
-  got_zsh="$(zsh -c "$_PARSE" 2>/dev/null)"
+  # 🛑 `-f` — zsh reads `~/.zshenv` on EVERY invocation. the claim here is about
+  #    the DIALECT's parse of a snippet, so a live rc that failed to parse would
+  #    blame the snippet for a defect in the rc (`…cries-wolf`, m.19)
+  got_zsh="$(zsh -f -c "$_PARSE" 2>/dev/null)"
   if [[ "$got_zsh" != "$EXPECT" ]]; then
     echo "   ├─ ✋ zsh parses the tar line as $got_zsh, expected $EXPECT" >&2
     FAILED=$((FAILED+1))

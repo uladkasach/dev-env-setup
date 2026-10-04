@@ -61,7 +61,7 @@ the same thing — the repo copy on a box:
 
 - `src/grove.provision._.sh:256` — *"confirm the checkout is complete, or re-push the worktree"*
 - `src/grove.provision/1.system/1.8.tmpfiles/provision.verify.sh:36` — *"the installed $name DIFFERS from this checkout"*
-- `src/git-credential-keyrack.sh:240` — *"THIS repo's checkout — it owns `.agent/keyrack.yml`"*
+- `src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh:240` — *"THIS repo's checkout — it owns `.agent/keyrack.yml`"*
 - `src/grove.provision/3.cosmic/3.2.theme/configure.upsert.sh:9` — *"the same run applied this checkout's terminal config"*
 
 no competing word does that work. the concept was settled; only its record was absent.

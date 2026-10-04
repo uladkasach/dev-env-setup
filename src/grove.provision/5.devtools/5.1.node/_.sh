@@ -14,14 +14,12 @@
 # usage:
 #   rhx grove.provision --what 5.1.node --mode apply
 
-# the node versions this box carries BESIDE its lts default. lives here since
-# the upsert and the verify both read it (rule.require.identical-bundle-composition).
-# a `.nvmrc` pins a version per repo, and fnm's cd hook switches to it; when
-# that version is absent fnm ASKS on stdin rather than fall back, and a duct
-# is tmux so the question holds the pane and eats the next command sent down
-# it (rule.forbid.tty-as-a-proxy-for-a-human). exact patches, never a major —
-# `fnm install 22` moves each month (rule.require.pinned-versions). to add
-# one, append a line; the repo's own `.nvmrc` pin is read at runtime
+# the node versions this box carries BESIDE its lts default. lives here since the
+# upsert and the verify both read it (rule.require.identical-bundle-composition).
+# an absent `.nvmrc` version makes fnm's cd hook ASK on stdin rather than fall back
+# (rule.forbid.tty-as-a-proxy-for-a-human). exact patches, never a major
+# (rule.require.pinned-versions); to add one, append a line
+# .refs = gotcha.5-1-node.demo=fnm-pnpm-install-measurements, m4
 GROVE_NODE_BASELINE=(
   22.21.0   # the widest-used 22.x line; also what this repo's .nvmrc pins today
 )
@@ -67,6 +65,51 @@ grove_pnpm_version_wanted() {
   [[ -f "$manifest" ]] || return 0
   sed -n 's/.*"packageManager"[[:space:]]*:[[:space:]]*"pnpm@\([^"]*\)".*/\1/p' \
     "$manifest" | head -1
+}
+
+# the pnpm versions this box CACHES, BESIDE the one it defaults to. lives here
+# since the upsert and the verify both read it
+# (rule.require.identical-bundle-composition)
+#
+# 🛑 a CACHE, where the pin above is a DEFAULT — the two answer different questions
+#    and no amount of the second buys the first. corepack's `pnpm` shim FETCHES a
+#    version it does not hold and ASKS FIRST, on stdin, where a duct is tmux
+#    (rule.forbid.tty-as-a-proxy-for-a-human)
+#    .refs = gotcha.5-1-node.demo=fnm-pnpm-install-measurements, m11
+#
+# ⚠️ exact patches, never a range — `pnpm@10` moves weekly
+#    (rule.require.pinned-versions). to add one, append a line
+GROVE_PNPM_BASELINE=(
+  10.11.0   # measured: aether/svc-aether-auctions declares it (the gate's fetch above)
+  10.34.5   # named by the human 2026-09-26; which repo declares it is unmeasured here
+)
+
+# the baseline PLUS the declared default, deduped. the default belongs in the
+# cache too — `corepack install -g` caches it as a side effect, so a verify may
+# read this ONE set with no special case for the member that is also the default
+grove_pnpm_versions_wanted() {
+  local out=("${GROVE_PNPM_BASELINE[@]}") declared
+  declared="$(grove_pnpm_version_wanted)"
+  [[ -n "$declared" ]] && out+=("$declared")
+  printf '%s\n' "${out[@]}" | sort -u
+}
+
+# corepack's cache dir for ONE pnpm version
+#
+# ⚠️ ONE dir per $HOME, shared across every node version the box holds — read
+#    from corepack's own source (`getCorepackHomeFolder`, and
+#    `INSTALL_FOLDER_VERSION = 1` for the `v1` segment). so the cache pass runs
+#    ONCE, never per node, and the honest cost is one download per version
+#
+# 🛑 .why a PRESENCE test here is SOUND, where shape 6 forbids one
+#    corepack builds into a TMP dir, writes `.corepack` last, then RENAMES it into
+#    place — so a cut download never lands at this path and there is no partial
+#    state to mistake for a whole one. `.corepack` is asked for rather than the dir,
+#    since it is written last and so still discriminates if that rename ever goes
+grove_pnpm_cached() {
+  local ver="$1"
+  local home="${COREPACK_HOME:-${XDG_CACHE_HOME:-$HOME/.cache}/node/corepack}"
+  [[ -f "$home/v1/pnpm/$ver/.corepack" ]]
 }
 
 # the dir pnpm CURRENTLY writes its global shims into — pnpm ITSELF is asked,

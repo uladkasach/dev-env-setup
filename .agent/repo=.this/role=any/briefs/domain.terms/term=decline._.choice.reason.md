@@ -6,7 +6,7 @@ the word was already in the repo, in three independent places, before it was ite
 
 - `term=claim._.choice._.md:14` — a verify *"either proves, or **declines** to prove"*
 - `5.10.repos/configure.upsert.sh:38` — *"it DECLINES rather than fails where no key"*
-- `src/git-credential-keyrack.sh` — *"declines"* on its own decline path, to git
+- `src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh` — *"declines"* on its own decline path, to git
 
 so this cluster adopts a word the repo declares rather than coins one — the same habit
 `exid` followed (`rule.require.conform-to-sdk-environment`, applied inward).

@@ -141,7 +141,7 @@ export CI=1                             # corepack/pnpm: assume yes, never ask
 export DEBIAN_FRONTEND=noninteractive   # apt/dpkg: never open a config dialog
 ```
 
-a per-call guard is a second list, and a second list drifts — `src/zshrc.sh` had carried the
+a per-call guard is a second list, and a second list drifts — `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` had carried the
 `CI=1` lesson, with that same note, long before the installer inherited it. the knowledge lived
 in one file and never crossed into the other. that is this rule's own defect in miniature.
 

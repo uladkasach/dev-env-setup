@@ -38,27 +38,11 @@ grove_provision_1_3_1_firefox_configure_upsert() {
   local ff_root="$HOME/.var/app/org.mozilla.firefox/config/mozilla/firefox"
 
   ####################################################################
-  # 0. ctrl+N tab keys — via the flatpak systemconfig channel
-  #
-  # .why the rebind
-  #   - linux firefox binds tab 1..8 to alt+N, while kitty and tmux use ctrl+N
-  #   - ⇒ the browser is the one surface where the same intent needs a different hand
-  #
-  # 🛑 COPY the payload from this bundle's OWN `firefox/`, never reach into `.agent/`
-  #   - `src/` is the deployable unit, and `git.grove.push --from src` carries no dir beside it
-  #   - ⇒ a bundle that executes a file OUTSIDE `src/` cannot converge on a paved-path box
-  #   - 📜 grove 2026-07-31, against a phase that drove `.agent/…/firefox.systemconfig.sh install`:
-  #       ✋ firefox.systemconfig.sh is absent or unreadable
-  #          looked at: …/dev-env-setup.wip/.agent/…/firefox.systemconfig.sh
-  #   - so the two files are declared assets under this bundle's own `firefox/` and this phase copies them
-  #   - ⇒ `configure.verify` can `diff` the live files against the checkout and prove CURRENCY
-  #
-  # ⚠️ this phase is the ONE writer of the channel, and the skill writes none
-  #   - two writers on one artifact is forbidden (`rule.forbid.two-writers-on-one-artifact`)
-  #   - `firefox.systemconfig.sh` keeps its probe/status/doctor/uninstall verbs
-  #   - its `install` verb names this bundle instead
-  #
-  # see: .agent/repo=.this/role=any/briefs/desktop/system/howto.firefox-ctrl-tab-keys.md
+  # 0. ctrl+N tab keys — via the flatpak systemconfig channel, so the browser
+  #    matches kitty and tmux rather than linux firefox's alt+N
+  # 🛑 COPY this bundle's OWN `firefox/` assets — `src/` is the deployable unit,
+  #    and this phase is the channel's ONE writer
+  # .refs = howto.firefox-ctrl-tab-keys — the measurement and the two-writers case
   ####################################################################
   local ext_dir="$HOME/.local/share/flatpak/extension/org.mozilla.firefox.systemconfig/x86_64/stable"
   local ff_assets="$GROVE_SRC/grove.provision/1.system/1.3.browser/1.3.1.firefox/firefox"
@@ -93,21 +77,9 @@ grove_provision_1_3_1_firefox_configure_upsert() {
   local profile_dir
   profile_dir="$(grep -oP 'Path=\K.*default-release' "$ff_root/profiles.ini" 2>/dev/null)"
   if [[ -z "$profile_dir" ]]; then
-    ##################################################################
-    # 🛑 the SAME absent profile means two things, and only one is owed work
-    #   - a profile is created by a GUI LAUNCH
-    #   - on a box with a human, "open firefox once" is a step somebody can take
-    #   - on every other box there is no display to launch into and no hand
-    #   - ⇒ the precondition is not "unmet YET", it cannot be met at all
-    #   - to print it anyway is a HAND STEP on the provision path, on every grove
-    #   - and it names a SECOND APPLY as its fix, which finds the same absent profile forever
-    #   - and it reports owed work on a box that is fully converged
-    #   - (rule.require.one-command-provision)
-    #
-    # ⚠️ this does NOT reopen the "a grove would never USE it" objection
-    #   - the flatpak and the ctrl+N channel both converge above this line
-    #   - what declines is only the half whose precondition is a human-driven GUI launch
-    ##################################################################
+    # 🛑 an absent profile is owed work only where a human can launch the GUI —
+    #    elsewhere it can never be met, and a "fix" would loop forever
+    #    (rule.require.one-command-provision). the flatpak and ctrl+N above converge
     if [[ "$GROVE_ENV_SERVER" != "local@unix" ]]; then
       echo "   🌙 no firefox profile here, and none is owed"
       echo "      ⇒ a profile is born of a GUI launch, and the prefs and the three"
@@ -181,23 +153,9 @@ EOF
   local addons="$profile/extensions.json"
   local opened=0
 
-  ####################################################################
-  # 🛑 a tab is opened only where a HUMAN can accept what it asks
-  #   - this section's whole product is a permission prompt on a screen
-  #   - mozilla requires a hand on it
-  #   - ⇒ on a box with no human the opens below launch a browser into no display
-  #   - and they print 🌙 lines that say "accept it by hand" to nobody
-  #
-  # ⚠️ it is gated HERE, not left to the profile gate above
-  #   - today that gate returns first on every headless box, so this is unreachable
-  #   - a grove that acquires a profile by any route walks straight past it
-  #   - an ssh -X launch or a restored `$HOME` is such a route
-  #   - ⇒ a step's precondition belongs at the step (`rule.require.solve-at-cause`)
-  #
-  # ⚠️ `local@unix` and not `local@*`
-  #   - `local@cicd` is a local tier with no screen and no human
-  #   - this needs both (`repo.overview.md`)
-  ####################################################################
+  # 🛑 a tab opens only where a HUMAN can accept its prompt — gated HERE too, since
+  #    a grove can gain a profile (ssh -X, a restored $HOME) and walk past the gate
+  #    above. `local@unix`, never `local@*`: `local@cicd` has no screen
   if [[ "$GROVE_ENV_SERVER" != "local@unix" ]]; then
     echo "   🌙 the three extensions are not offered here, and none is owed"
     echo "      ⇒ each is accepted through a permission prompt mozilla shows on a"
@@ -220,19 +178,10 @@ EOF
     opened=$(( opened + 1 ))
   fi
 
-  ####################################################################
-  # the desert palette, to match this repo's kitty/nvim theme
-  #   - it is a firefox-color SHARE url, so it applies only once that extension is accepted
-  #
-  # ⚠️ the url is a variable, and is NAMED again when all three are accepted
-  #   - the theme tab must be gated on the EXTENSION's absence
-  #   - the share url is inert in a firefox with no firefox-color
-  #   - but the extension present does not mean the THEME is applied
-  #   - a human who skipped the theme tab or later reset their theme lands past that gate forever
-  #   - firefox-color keeps its theme in the extension's own storage, which no file exposes
-  #   - ⇒ the claim is unprovable, and this phase must not pretend otherwise (rule.forbid.failhide)
-  #   - what it can do is print the remedy, so the all-accepted branch prints the url
-  ####################################################################
+  # the desert palette — a firefox-color SHARE url, inert until that extension
+  # is accepted. ⚠️ whether the THEME is applied lives in extension storage no
+  # file exposes, so it is unprovable; the all-accepted branch prints the url
+  # rather than claim it (rule.forbid.failhide)
   local theme_url='https://color.firefox.com/?theme=XQAAAAIQAQAAAAAAAABBKYhm849SCia2CaaEGccwS-xMDPr_qlXDOMsy5fmNc7qTuOgZgZdB1JimDBY6_wyFhPNbQTHUNdhC5aOH-hbXzzZFdz54UfdCX_Q0U6BYOxbB4cKbN3-x8JbJB-nSYQTDMnJWVFqwFxW6UsMywRqsEjH6xrdahroi3D8vQwbLUkWN2HPFTCEwFJ-BNUTe2qbjSkITKQzctI3TSSXE5trErmv_7LBNAA'
 
   if __browser_addon_absent 'firefox color'; then

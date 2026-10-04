@@ -12,11 +12,11 @@
 #   - the widget calls `zle` and `bindkey`, which exist in zsh alone
 #   - `~/.bash_aliases` is reached by BASH_ENV, so bash sources it non-interactively
 #   - ⇒ those two builtins are absent there and every line would error
-#   - `src/zshrc.sh` sources this copy after compinit and after fzf
+#   - `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` sources this copy after compinit and after fzf
 #   - ⇒ our TAB bind lands last
 #
 # .the seam this bundle does NOT own
-#   - the SOURCE LINE lives in `src/zshrc.sh`, which `2.5.zsh` owns
+#   - the SOURCE LINE lives in `src/grove.provision/2.shell/2.5.zsh/zshrc.sh`, which `2.5.zsh` owns
 #   - one artifact, one writer (`rule.forbid.two-writers-on-one-artifact`)
 #   - the line is guarded by `[[ -f ~/.zshrc.emoji.sh ]]`
 #   - ⇒ a grove declines this bundle, sources no widget, and reports no fault

@@ -62,7 +62,7 @@ copy of the detection or the tag rule.
 
 two operations ask it, and neither holds a copy:
 - `src/grove.provision._.sh` — `--for cloud|local`, passed down the bundle tree
-- `src/bash_aliases.sh`     — `grove.provision --for cloud|local`
+- `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`     — `grove.provision --for cloud|local`
 
 ⚠️ the per-step `step any|local|cloud` tag this list once named is GONE, deleted with the
 step driver on 2026-07-30. a bundle declines inline, on the fact it actually depends on,
@@ -102,7 +102,7 @@ GROVE_ENV_SERVER=cloud@aws.ec2 rhx grove.provision --mode apply
 where the term is declared / used:
 - src/grove.for.sh                    # THE declaration
 - src/grove.provision._.sh              # `--for`, passed to the tree
-- src/bash_aliases.sh                  # `grove.provision --for`
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                  # `grove.provision --for`
 - .agent/repo=.this/role=any/briefs/grove/provision/howto.provision-a-grove.md
 - .agent/repo=.this/role=any/briefs/grove/provision/rule.require.every-function-has-a-driver.md
 

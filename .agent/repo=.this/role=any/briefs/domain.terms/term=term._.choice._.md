@@ -56,7 +56,7 @@ is not a uri. the two never coerce.
 
 ## .refs
 
-- `src/termwork.sh` — the implementation every `term.*` skill wraps
+- `src/grove.provision/2.shell/2.7.aliases/termwork.sh` — the implementation every `term.*` skill wraps
 - `.agent/repo=.this/role=any/skills/term.open.sh`
 - `.agent/repo=.this/role=any/skills/term.list.sh`
 - `.agent/repo=.this/role=any/skills/term.read.sh`

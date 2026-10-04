@@ -154,7 +154,7 @@ terminal metadata stored in `~/.termwork/{pid}.json`:
 ## .install
 
 ```bash
-source ~/git/more/dev-env-setup/src/termwork.sh
+rhx grove.provision --what 2.7.aliases --mode apply
 ```
 
 or add to shell config:
@@ -162,3 +162,7 @@ or add to shell config:
 ```bash
 source ~/.bash_aliases.termwork.sh
 ```
+
+⚠️ that `source` names the **installed** copy, never the repo's. a `source` of the checkout is a
+one-off command (`rule.require.install-via-procedures`) — it skips the bundle's verify, converges
+no state, and breaks the day the file moves inside its bundle.

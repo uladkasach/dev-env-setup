@@ -178,7 +178,27 @@ re-proves the check on every box, forever. it is a clamp.
 the dir is gitignored, so the clamp would reach no other box and no other reader — and its
 absence would be silent, which is the failure mode a clamp exists to prevent.
 
-### the four conditions — ALL of them
+### the five conditions — ALL of them
+
+0. 🛑 **the SUBJECT is one you are permitted to break, and you read that BEFORE you break it.**
+   conditions 1-4 all grade the break's SHAPE and say not one word about whose box it lands on.
+   so a probe can satisfy every one of them against a box nobody authorized.
+
+   ⚠️ **measured 2026-09-28.** `grove-aether-v20260921` was hibernated to prove a rung-4 halt
+   prints its cause. the break was minimal, restorable, and restored — and the box carries
+   `protected=true` in its own ec2 tags, which was read only afterward, from the very probe
+   output that followed. the human's rule is *"protected ones dont get provisioned unless asked
+   for"*; a stop is not a provision, so no extant clause named it, and that is the gap.
+
+   ⇒ the tag is one read, and it is free:
+
+   ```sh
+   rhx aws.ec2.get --tag exid=<grove> --env camp --org <org>   # its tags, `protected=` among them
+   ```
+
+   ⚠️ and this stays a RULE, never a mechanism. the human refused a mechanism for the protected
+   rule outright — *"thats just a rule"* — so a guard bolted onto `git.grove.stop` would answer
+   a refusal with a build.
 
 1. **the restore is a `trap … EXIT`, never a last line.** every step between the break and the
    restore can fail — a timeout, a crash, a bad exit — and each would otherwise leave the box
@@ -192,6 +212,19 @@ absence would be silent, which is the failure mode a clamp exists to prevent.
 4. **it reports whether the restore took.** a probe that breaks a box and goes quiet about the
    repair is worse than no probe (`rule.forbid.failhide`).
 
+### ⚠️ .the conditions bind a HAND-DRIVEN probe too, not only a play
+
+this exception is written for a play, because a play is what the parent rule forbids. but a
+deliberate break needs no play to happen: a sequence of sanctioned skills does it just as well —
+`duct.stop`, then `git.grove.stop`, then the check, then `git.grove.wake`. every step is a skill,
+so `rule.forbid.adhoc-shell` is satisfied and no line of this file is consulted.
+
+⇒ **the conditions grade the BREAK, never the artifact that performs it.** condition 0 in
+particular, since a hand-driven probe picks its subject in the moment, with no file to review.
+
+⚠️ and condition 1 has no `trap` to hang on by hand. what stands in for it is a restore driven
+**before** anything else once the check has spoken — never after a detour, however short.
+
 ### 🛑 the two this exception owes — neither is written yet
 
 | play | what it breaks | what it proves | status |
@@ -199,7 +232,7 @@ absence would be silent, which is the failure mode a clamp exists to prevent.
 | `prove.git-alias-seam` | `alias.tree` → an undefined function | `2.2.git`'s delegate check sees a broken delegate | ✋ **absent** |
 | `prove.keyrack-peer-probe-bites` | `pnpm rm -g` the keyrack peer | which of four keyrack calls actually reddens on an absent peer | ✋ **absent** |
 
-both probes are owed, tracked, under this exception's four conditions.
+both probes are owed, tracked, under this exception's five conditions.
 `prove.keyrack-peer-probe-bites` writes destructively — it needs a grove and must not be
 aimed at a laptop.
 
@@ -254,9 +287,12 @@ it if it ever drifts back.
 - **a DISCRIMINATION PROBE filed under `.play/temporary/` = blocker** — the exact inverse. that
   dir is gitignored, so a clamp placed there reaches no other box and no other reader, and its
   absence is silent
-- **a discrimination probe that fails any of its four conditions = blocker** — a restore that
-  is a last line rather than a `trap … EXIT`, a subject invented rather than found, a break
-  wider than the check under test, or a silent restore.
+- **a discrimination probe that fails any of its five conditions = blocker** — a subject broken
+  before its protection was read, a restore that is a last line rather than a `trap … EXIT`, a
+  subject invented rather than found, a break wider than the check under test, or a silent restore.
+- 🛑 **a deliberate break aimed at a box tagged `protected=true`, with no ask = blocker** — and it
+  binds a HAND-DRIVEN probe as hard as a play, because a sequence of sanctioned skills breaks a
+  box with no file for anyone to review.
 - ⚠️ **a discrimination probe deleted as a "write play" = blocker.** it is exempt, permanently,
   and `rule.require.seam-claims-have-an-owner` requires it. read exception 2 before any cull
   of a play that writes.

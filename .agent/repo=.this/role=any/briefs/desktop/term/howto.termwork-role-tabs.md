@@ -61,8 +61,8 @@ when the window has 2+ tabs you see two bars stacked:
   default). titles carry ≥1 space of whitespace on each side.
 - **tmux status line** (above it): `repo` on the left, `branch` on the right. the
   shell computes these and pushes them to tmux pane options `@repo`/`@branch` (see
-  `_set_terminal_title` in `src/zshrc.sh`); tmux reads them in `status-left`/
-  `status-right` (see `src/tmux.conf`). no git subprocess on a status refresh.
+  `_set_terminal_title` in `src/grove.provision/2.shell/2.5.zsh/zshrc.sh`); tmux reads them in `status-left`/
+  `status-right` (see `src/grove.provision/2.shell/2.8.tmux/tmux.conf`). no git subprocess on a status refresh.
 
 outside a git repo `@repo`/`@branch` are empty, so the footer clears (no stale value).
 
@@ -106,4 +106,4 @@ rhx grove.provision --what <slug> --mode apply
 
 - `howto.terminal-window-management.md` — full termwork api reference
 - `howto.termwork-roundtrip.md` — open/read/send/stop base flow
-- `src/termwork.sh` — the implementation (`--for` in `term.open`)
+- `src/grove.provision/2.shell/2.7.aliases/termwork.sh` — the implementation (`--for` in `term.open`)

@@ -49,7 +49,7 @@ claude's own native-installer migration is a common source: it installs the
 npm uninstall -g @anthropic-ai/claude-code   # 👎 removes the WRONG one
 ```
 
-`src/bash_aliases.sh` defines an `npm` **function** that routes to `pnpm` whenever
+`src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` defines an `npm` **function** that routes to `pnpm` whenever
 the cwd has no `package-lock.json`. from most directories that command uninstalls
 the pnpm copy you meant to keep, and leaves the shadow in place.
 
@@ -62,18 +62,22 @@ nodedir=~/.local/share/fnm/node-versions/v22.21.0/installation
 
 ## .the guard
 
-`configure_robot_brains()` in `src/install_env.pt5.devtools.sh` — reached via
-`sync.devenv.brains` (and the full `sync.devenv`) — converges all three:
+the `5.3.brains` bundle — `rhx grove.provision --what 5.3.brains --mode apply` —
+converges all three:
 
 | step | what it does |
 |------|--------------|
 | prune | uninstalls claude-code from **every** fnm node version |
-| converge | `pnpm install -g @anthropic-ai/claude-code@$CLAUDE_CODE_VERSION_PINNED` |
+| converge | `pnpm install -g @anthropic-ai/claude-code@$GROVE_BRAIN_CLAUDE_PIN` |
 | verify | asserts the resolved `claude` is the pinned version, else fails loud |
 
 the verify step is what makes recurrence detectable: a shadow reintroduced later
-turns the next `sync.devenv.brains` red with the fix named, rather than passing
-quietly (`rule.forbid.failhide`).
+turns the next apply red with the fix named, rather than a quiet pass
+(`rule.forbid.failhide`).
+
+🔴 **the verify asks the BINARY, never `pnpm`** — an in-place self-update rewrites
+`cli.js` and leaves `package.json` alone, so a package read reports the pin while
+the binary has floated (`gotcha.5-3-brains-pins.demo=publish-path-and-drift`).
 
 ## .the tell
 

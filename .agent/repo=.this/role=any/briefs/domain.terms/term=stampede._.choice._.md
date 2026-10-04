@@ -51,7 +51,7 @@ can be computed at all.
   the `SECS -eq 0 && N -ge 10` predicate that detects it
 - `.agent/repo=.this/role=any/skills/machine.usage.diagnose.sh` — the `watchdog STAMPEDE` row
   state, which suppresses the rate rather than print a false one
-- `src/init.lua` — the `last_run_s` guard that drops any fire that lands early
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` — the `last_run_s` guard that drops any fire that lands early
 
 **the origin:**
 

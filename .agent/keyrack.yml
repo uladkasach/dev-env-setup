@@ -1,3 +1,19 @@
+# ⚠️ this ONE line governs EVERY slug this repo reads, `extends:` manifests included
+#   - measured 2026-09-23, not assumed: `EHMPATHY_SEATURTLE_GITHUB_TOKEN` is declared
+#     under `org: ehmpathy` in a manifest below, and still resolved to `ahbode.prep.…`
+#     while this line read `ahbode`
+#   - ⇒ so a swap here REDIRECTS every read, and it redirects SILENTLY wherever two
+#     orgs both hold a value for a slug:
+#
+#       ahbode.prep.EHMPATHY_SEATURTLE_GITHUB_TOKEN → <other>.prep.…
+#       ahbode.test.FIREWORKS_API_KEY               → <other>.test.…
+#
+#   - 🛑 a `git.commit.set --push` under a swapped line authenticates as the OTHER org
+#
+# 🛑 so a swap is NOT the way to reach a second org's credential
+#   - `rhx grove.provision --org <org>` names the org per run, and swaps no line
+#   - the durable fix for a repo that must address SEVERAL orgs is an allowlist:
+#     `.dream/2026_09_23.keyrack-manifest-org-allowlist.dream.md`
 org: ahbode
 extends:
   - .agent/repo=bhrain/role=reviewer/keyrack.yml

@@ -11,8 +11,8 @@
 #         the non-obvious part is WHICH shell to parse under. `bash_aliases.sh`
 #         is named for bash, but zsh sources it too:
 #
-#           src/zshrc.sh:119  source ~/.bash_aliases      # zsh reads it
-#           src/zshrc.sh:124  export BASH_ENV=~/.bash_aliases  # bash reads it
+#           2.5.zsh/zshrc.sh:119  source ~/.bash_aliases      # zsh reads it
+#           2.5.zsh/zshrc.sh:124  export BASH_ENV=~/.bash_aliases  # bash reads it
 #
 #         so `bash -n` alone is a proxy: it answers "does bash parse it?" while
 #         the human reads "is it safe to source?". those come apart the moment a
@@ -24,7 +24,7 @@
 #
 # usage:
 #   shell.test.syntax.sh --all                    # every shell file in src/
-#   shell.test.syntax.sh --check src/bash_aliases.sh
+#   shell.test.syntax.sh --check src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh
 #   shell.test.syntax.sh --check a.sh --check b.sh # repeatable
 #   shell.test.syntax.sh --check x.sh --as zsh     # force one shell
 #   shell.test.syntax.sh --help
@@ -59,7 +59,7 @@ say_mal()  { echo "💥 $1" >&2; }   # malfunction — it broke on its own
 # .what = files that BOTH bash and zsh source, so both must parse them.
 #
 # .why  = `bash_aliases.sh` is the root: zsh sources it directly and bash
-#         inherits it via BASH_ENV (both declared in src/zshrc.sh). the other
+#         inherits it via BASH_ENV (both declared in 2.5.zsh/zshrc.sh). the other
 #         two are sourced BY bash_aliases, so they land in whichever shell read
 #         it — which is both.
 #
@@ -70,7 +70,7 @@ say_mal()  { echo "💥 $1" >&2; }   # malfunction — it broke on its own
 #
 # 🛑 .keyed by BASENAME, never by path — and that is a repair, not a shortcut
 #
-# .why  = this list held full paths (`src/bash_aliases.sh`) until 2026-09-08,
+# .why  = 📜 this list held full paths (`src/bash_aliases.sh`) until 2026-09-08,
 #         when the bundle restructure moved all three under
 #         `src/grove.provision/2.shell/2.7.aliases/`. every entry went stale in
 #         one commit.

@@ -18,7 +18,7 @@
 #     ships still drives a grove; this child does
 #
 # .why the TIMER is a bundle concern and the alias is not
-#   - `kitty.snap`, `power.off`, `power.restart` live in `src/bash_aliases.sh`,
+#   - `kitty.snap`, `power.off`, `power.restart` live in `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`,
 #     owned by `2.7.aliases` (`rule.forbid.two-writers-on-one-artifact`)
 #   - this bundle owns the part no alias can carry: a guard that fires
 #     when the human is not at the keyboard

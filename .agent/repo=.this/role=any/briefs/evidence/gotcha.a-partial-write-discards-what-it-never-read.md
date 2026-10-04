@@ -90,5 +90,5 @@ verb spells both.
 - `rule.forbid.failhide` — all three printed success while state was lost
 - `gotcha.a-check-that-cries-wolf-gets-silenced` — its mirror, where the CHECK is wrong
   rather than the write
-- `src/bash_aliases.sh` — `_git_grove_set` carries instance 3 inline
+- `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` — `_git_grove_set` carries instance 3 inline
 - `.agent/repo=.this/role=any/skills/git.grove.wake.sh` — instances 1 and 2, inline

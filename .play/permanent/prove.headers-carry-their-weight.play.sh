@@ -31,10 +31,10 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$HERE" || exit 1
 
 ####################################################################
-# .the bar — TWO bars, because a dispatcher and a phase differ in kind
+# .the bar — THREE bars, because three KINDS of file live in this tree
 #
-# 🛑 a ratio bar applied to an `_.sh` is NOISE, and noise gets silenced
-#   - an `_.sh` is ~5 lines of `bundle.upgrade` by design
+# 🛑 a ratio bar applied to a dispatcher is NOISE, and noise gets silenced
+#   - a dispatcher `_.sh` is ~5 lines of `bundle.upgrade` by design
 #   - so ANY header at all puts it over 55%, on every box, forever
 #   - a check that reddens on correct code trains a reader to skim it
 #   - (gotcha.a-check-that-cries-wolf-gets-silenced)
@@ -42,10 +42,33 @@ cd "$HERE" || exit 1
 # ⇒ so a dispatcher is bounded by its header's ABSOLUTE size, which is
 #   the fact that actually matters there: 40 lines to say what a bundle
 #   is, why its children run in that order, and what it pins
+#
+# 🛑 .and a LINE CAP applied to an ARTIFACT is the same defect — measured
+#
+# 📜 2026-09-29, and it is m.13: a check gone stale against a tree that
+#    moved under it
+#   - this bar was calibrated 2026-09-03 over `find src/grove.provision`
+#   - at that hour every installed ARTIFACT sat at the flat `src/` root,
+#     OUTSIDE that path, so the subject never saw one
+#   - the bundle cutover collocated each artifact into the bundle that
+#     owns it. that put SEVEN programs into this reader's subject and
+#     left its bar behind: `bash_aliases.sh` 4179 lines, `brains.auth.sh`
+#     2963, `ductwork.sh` 1977, `termwork.sh` 1801, `zshrc.sh` 720
+#   - ⇒ 30 of 222 files red, and the artifact rows can NEVER go green,
+#     because a 250-line cap on a shell library demands a decomposition
+#     this repo never chose
+#
+# ⚠️ .the KINDS differ in CONTRACT, which is why one bar cannot serve both
+#   - a PHASE is a thin converge step: `bundle.upgrade` drives it, and a
+#     long one is a phase that grew a second concern. the cap is the point
+#   - an ARTIFACT is a PROGRAM this repo copies onto a box. its length is
+#     its feature set, and no reader's budget bounds that
+#   - ⇒ an artifact keeps the RATIO bar, which is the play's real claim
+#     ("more prose than a reader will spend"), and loses the cap
 ####################################################################
-RATIO_MAX=55      # a phase file: how much of it may be prose
-LINES_MAX=250     # a phase file: how long it may be, full stop
-DISPATCH_MAX=40   # an `_.sh`: how many comment lines it may carry
+RATIO_MAX=55      # a phase or an artifact: how much of it may be prose
+LINES_MAX=250     # a PHASE only: how long a converge step may be
+DISPATCH_MAX=40   # a dispatcher `_.sh`: how many comment lines it carries
 
 total=0
 comment=0
@@ -84,15 +107,45 @@ while IFS= read -r f; do
   #   - ⇒ count the declarations, and let the file say which it is
   ##################################################################
   fns="$(grep -cE '^[a-z_0-9]+\(\) *\{' "$f")"
+  base="$(basename "$f")"
+
+  ##################################################################
+  # 🛑 .a PHASE is named by the RUNTIME, and the set is DERIVED
+  #
+  # .why these four names and no others
+  #   - `bundle.upgrade` drives exactly four phases, and its own header
+  #     calls them a CHAIN: provision.upsert → provision.verify →
+  #     configure.upsert → configure.verify
+  #   - so the set is the runtime's contract, not this play's opinion.
+  #     a fifth phase would need a runtime change, and that change is
+  #     what would bring this list along
+  #
+  # ⚠️ .why a PATH list would have been the wrong shape
+  #   - the tempting fix for the artifact rows is to name the seven
+  #     artifacts and skip them. that is a hand-written subject list,
+  #     which cannot report the member nobody added — the exact defect
+  #     this play's own `find` comment refuses one level up
+  #   - ⇒ name the PHASES, which a contract fixes, and let every other
+  #     file in the tree fall to the artifact bar by construction
+  ##################################################################
+  isphase=0
+  case "$base" in
+    provision.upsert.sh|provision.verify.sh \
+    |configure.upsert.sh|configure.verify.sh) isphase=1 ;;
+  esac
 
   over=""
-  if [[ "$(basename "$f")" == "_.sh" && "$fns" -le 1 ]]; then
+  if [[ "$base" == "_.sh" && "$fns" -le 1 ]]; then
     # a dispatcher — bounded by its header's absolute size, never its ratio
     [[ "$c" -gt "$DISPATCH_MAX" ]] && over="${c} comment lines"
   else
+    # a phase, an artifact, or a shared-operations `_.sh` — all ratio-bounded
     pct=$(( c * 100 / n ))
     [[ "$pct" -gt "$RATIO_MAX" ]] && over="${pct}% comment"
-    if [[ "$n" -gt "$LINES_MAX" ]]; then
+
+    # ⚠️ the LINE CAP is a PHASE claim only. a library's length is its
+    #    feature set, so the cap would redden it forever (see .the bar)
+    if [[ "$isphase" == 1 && "$n" -gt "$LINES_MAX" ]]; then
       [[ -n "$over" ]] && over="$over, "
       over="${over}${n} lines"
     fi

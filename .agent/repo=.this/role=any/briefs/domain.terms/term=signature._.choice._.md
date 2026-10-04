@@ -49,8 +49,8 @@ the raw text is never lost: the full first-hit message is kept verbatim on the l
 
 **the contract:**
 
-- `src/init.lua` → `as_signature(msg)` — the derivation (`%d+` → `#`, whitespace squeezed, 240 cap)
-- `src/init.lua` → `seen[sig]` — the per-signature `{ count, written, last, text }` record
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` → `as_signature(msg)` — the derivation (`%d+` → `#`, whitespace squeezed, 240 cap)
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` → `seen[sig]` — the per-signature `{ count, written, last, text }` record
 - `.agent/repo=.this/role=any/skills/nvim.errors.review.sh` → the awk `sig` derivation — the reader
   re-derives the same collapse to group the rank
 

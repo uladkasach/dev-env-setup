@@ -3,117 +3,51 @@
 # .what = the robot brains — claude-code, rhachet, and codex, plus their config
 #
 # .why no phase CALLS another
-#   - a delegated install-then-configure reports the CONFIG's status only,
-#     so a failed install can read ✔ (`rule.forbid.failhide`)
-#   - each phase installs or configures and returns its own status
-#     (`rule.require.bundle-as-sole-declaration`)
+#   - a delegated install-then-configure reports the CONFIG's status only (`rule.forbid.failhide`)
+#   - each phase returns its own status (`rule.require.bundle-as-sole-declaration`)
 #
-# .why every machine, no decline
-#   - a grove runs the brains too
+# .why every machine, no decline — a grove runs the brains too
 #
 # usage:
 #   rhx grove.provision --what 5.3.brains --mode apply
 ######################################################################
 
 ####################################################################
-# the brain pins — ONE declaration each, read by BOTH halves
+# the pins — ONE each, read by BOTH halves, so a second literal cannot drift
 #
-# .why here, never beside the install
-#   - the verify reads the LIVE BINARY against this same value
-#     (`gotcha.a-check-that-cries-wolf`, m.9 / m.13)
-#
-# .why the criterion is WHO CAN PUBLISH
-#   - first-party (rhachet, declastruct) is this org's own account;
-#     third-party (codex, claude-code) is somebody else's, reached
-#     by every box that floats it — the first-party float is accepted
-#   - a top-level pin bounds only this package, never its dependency tree
-#
-# .why a PIN at all, and not a float — no surprise updates
-#   - a float changes the box under a human who asked for no change
-#   - so the version moves when a human MOVES it, and on no other event
-#
-# .why the verify asks the BINARY, never the package metadata
-#   - claude's in-place updater rewrites the shipped cli and leaves the
-#     package metadata behind, so a package-only check misses drift
-#
-# .refs = gotcha.5-3-brains-pins.demo=publish-path-and-drift.md
+# .the criterion = WHO CAN PUBLISH
+#   - first-party (rhachet, declastruct) floats; third-party (codex, claude-code) is pinned
+#   - a pin moves when a human MOVES it, and the verify asks the BINARY
 #
 # .how to bump = a decision, so two steps, never one:
 #   npm view @openai/codex version
 #   codex --version
+#
+# .refs = gotcha.5-3-brains-pins.demo=publish-path-and-drift.md
 ####################################################################
 GROVE_BRAIN_CLAUDE_PIN="2.1.280"
 GROVE_BRAIN_CODEX_PIN="0.128.0"
 
 ####################################################################
-# the CANDIDATE claude — a second, PARALLEL install the default never sees
-#
-# .what = `claude.latest`, a newer cli a human can trial without moving the
-#   pin above. `claude` stays the pin; `claude.latest` is the candidate.
-#
-# .why it cannot be expressed as a second pnpm global
-#   pnpm global holds ONE version per package, so "both at once" has no way to
-#   be said there. trialing a newer cli by a `pnpm install -g` bump is an
-#   all-or-nothing flip whose only way back is a re-pin — and the pin exists
-#   because hooks are TRUNCATED beyond it (`define.claude-code-config.md`),
-#   so every guardrail in this repo rides on it.
-#   ⇒ the candidate gets its own prefix, and the two live side by side
-#
-# 🔴 .why the shim is `claude.latest` and NEVER `claude`
-#   `~/.local/bin` is prepended in `~/.zshrc` AFTER `.zshenv` laid down
-#   $PNPM_HOME/bin, so it outranks the pnpm shims in a human's shell. a file
-#   named `claude` there would silently become the default — the exact
-#   all-or-nothing flip this declaration exists to avoid. the verify reads
-#   for that file on every run.
-#
-# .why a SYMLINK named `latest`, rather than the name alone
-#   `latest` reads two ways: npm's dist-tag RIGHT NOW (dynamic, a network
-#   lookup per call), or the newest build INSTALLED HERE (static). the
-#   symlink makes it the second, and makes it auditable —
-#   `readlink ~/.local/opt/claude/latest` answers "latest as of when?"
-#
-# .how to opt OUT = set the pin to "". the next apply removes the shim, the
-#   symlink, and every versioned prefix — and touches the default not at all
+# the CANDIDATE claude — `claude.latest`, a parallel install the default never sees
+#   - `claude` stays the pin; a human trials a newer cli without moving it
+#   - 🔴 the shim is `claude.latest`, NEVER `claude`, which would become the default
+#   - ⚠️ set the pin ONLY while a trial is live; "" tears the candidate down
+#   - the memory cap RESTATES `claude()` in `2.7.aliases/bash_aliases.sh` — bump BOTH
+# .refs = define.5-3-brains.candidate-claude
 ####################################################################
-# ⚠️ set this ONLY while a trial is live, and empty it once the trial settles —
-#   a candidate equal to the default above is a second copy of one version, and
-#   makes `claude.latest` a synonym for `claude`
 GROVE_BRAIN_CLAUDE_LATEST_PIN=""               # "" = opted out; torn down next apply
 GROVE_BRAIN_CLAUDE_LATEST_PREFIX="$HOME/.local/opt/claude"
 GROVE_BRAIN_CLAUDE_LATEST_SHIM="$HOME/.local/bin/claude.latest"
-
-####################################################################
-# the candidate's memory cap
-#
-# ⚠️ .this RESTATES the 8G that `2.7.aliases/bash_aliases.sh` gives the `claude`
-#   shell function, and the restatement is forced rather than sloppy: the shim
-#   runs from `~/.local/bin` with no shell behind it, so it can source no alias
-#   file and borrow no function from one — the same bind `src/machine/
-#   kitty_snap_lowbatt` names for its absolute path.
-#   ⇒ a bump wants BOTH. the twin lives at `bash_aliases.sh`, in `claude()`
-#
-# .why the cap is on the shim and not merely on a wrapper
-#   the extant wrapper is a shell FUNCTION, so it caps a human's invocation and
-#   no call a tool spawns. a shim is a file on PATH, so every caller gets it
-####################################################################
 GROVE_BRAIN_CLAUDE_LATEST_MEMMAX="8G"
 
-####################################################################
-# .what = which of THREE states does the candidate's install sit in?
-# .why a state, never a boolean — ONE reader, so the upsert and the verify
-#   cannot cut the same set two ways (`gotcha.a-check-that-cries-wolf`, m.9)
-#
-# 🛑 .why it reads the PIN and not merely the presence of a dir
-#   the prefix is built in several steps (mkdir, package.json, pnpm add), so a
-#   run cut partway leaves a dir that passes a presence test and holds no
-#   binary. a presence guard would skip it on every apply thereafter and the
-#   box would be unrepairable by the only command it was given
+# .what = which of THREE states is the candidate in? one reader for both halves
+# .why the PIN, never a dir test — a run cut partway leaves a dir with no binary
 #   (`define.provision-defect-shapes`, shape 6)
 #
 # stdout: whole  = the pinned prefix holds a runnable bin AND `latest` names it
 #         half   = something under the prefix exists and one of those does not
 #         absent = never built
-####################################################################
 grove_provision_5_3_brains_claude_latest_state() {
   local dir="$GROVE_BRAIN_CLAUDE_LATEST_PREFIX/v$GROVE_BRAIN_CLAUDE_LATEST_PIN"
 
@@ -124,20 +58,8 @@ grove_provision_5_3_brains_claude_latest_state() {
   echo whole
 }
 
-####################################################################
-# .what = the shim, as the human's PATH lookup finds it
-# .why  = ONE renderer, so the upsert WRITES and the verify DIFFS one text —
-#   a shim asserted present and never CURRENT would keep an old cap, or an
-#   old target, with no reader to notice
-#
-# ⚠️ .why it names `latest` and not the pinned dir
-#   the symlink is the pointer a bump re-points. baked here, every bump would
-#   need this file rewritten too, and a box whose shim lagged would run a
-#   version the tree no longer declares
-#
-# ⚠️ .why `/bin/sh` and not bash — it is a two-branch exec with no bashism, and
-#   `sh` is the one interpreter present before any bundle of this repo has run
-####################################################################
+# .what = the shim, ONE renderer, so the upsert WRITES and the verify DIFFS one text
+# .why it names `latest`, not the pinned dir, and runs `/bin/sh` (.refs "the shim renderer")
 grove_provision_5_3_brains_claude_latest_shim_render() {
   cat <<EOF
 #!/bin/sh
@@ -165,6 +87,195 @@ fi
 
 exec "\$bin" "\$@"
 EOF
+}
+
+# .what = converge the candidate — its prefix, the `latest` pointer, and the shim.
+#   the pinned default is untouched by every line here
+grove_provision_5_3_brains_claude_latest_upsert() {
+
+  local prefix="$GROVE_BRAIN_CLAUDE_LATEST_PREFIX"
+  local shim="$GROVE_BRAIN_CLAUDE_LATEST_SHIM"
+  local pin="$GROVE_BRAIN_CLAUDE_LATEST_PIN"
+
+  # opted out — TEAR DOWN, never skip (.refs "opt in, opt out")
+  if [[ -z "$pin" ]]; then
+    if [[ -e "$shim" || -d "$prefix" ]]; then
+      rm -f "$shim" || return 1
+      rm -rf "$prefix" || return 1
+      echo "   🌙 claude.latest is opted out — its shim and prefixes removed"
+    else
+      echo "   🌙 claude.latest is opted out — no candidate installed"
+    fi
+    echo "      opt in: set GROVE_BRAIN_CLAUDE_LATEST_PIN in this bundle's _.sh"
+    return 0
+  fi
+
+  # 1. the versioned prefix, guarded by the three-valued reader
+  local dir="$prefix/v$pin"
+  local state
+  state="$(grove_provision_5_3_brains_claude_latest_state)"
+
+  if [[ "$state" == "whole" ]]; then
+    echo "   • claude.latest is built at the declared candidate ($pin)"
+  else
+    mkdir -p "$dir" || return 1
+
+    # WRITTEN, never `pnpm init`, with its build approval inside (.refs "the package.json")
+    cat > "$dir/package.json" <<'EOF' || return 1
+{
+  "name": "claude-latest",
+  "private": true,
+  "pnpm": {
+    "onlyBuiltDependencies": ["@anthropic-ai/claude-code"]
+  }
+}
+EOF
+
+    # `web_pnpm` — an unbounded registry call holds the duct (`rule.require.bounded-probes-in-verifies`)
+    if ! ( cd "$dir" && web_pnpm add "@anthropic-ai/claude-code@$pin" ); then
+      echo "   ✋ could not install the candidate claude@$pin" >&2
+      echo "      ⇒ the pinned default is untouched; only the candidate is absent" >&2
+      echo "      read why: cd $dir && pnpm add @anthropic-ai/claude-code@$pin" >&2
+      return 1
+    fi
+    echo "   • claude.latest candidate installed ✔ ($pin)"
+  fi
+
+  # 2. the `latest` pointer — `-n`, or a bump lands inside the old target (.refs "`ln -sfn`")
+  ln -sfn "v$pin" "$prefix/latest" || {
+    echo "   ✋ could not point $prefix/latest at v$pin" >&2
+    echo "      ⇒ the shim reads the pointer, so it would run the prior candidate" >&2
+    return 1
+  }
+
+  # 3. REAP every prefix the pin no longer names (.refs "the reap of undeclared prefixes")
+  local stale reaped=0
+  for stale in "$prefix"/v*; do
+    [[ -d "$stale" ]] || continue
+    [[ "$(basename "$stale")" == "v$pin" ]] && continue
+    rm -rf "$stale" || {
+      echo "   ✋ could not reap the undeclared candidate prefix $stale" >&2
+      return 1
+    }
+    echo "   • reaped an undeclared candidate prefix → $(basename "$stale")"
+    reaped=1
+  done
+  [[ "$reaped" -eq 1 ]] || true
+
+  # 4. the shim, RENDERED, so the verify can diff it
+  mkdir -p "$(dirname "$shim")" || return 1
+  grove_provision_5_3_brains_claude_latest_shim_render > "$shim" || {
+    echo "   ✋ could not write the claude.latest shim to $shim" >&2
+    return 1
+  }
+  chmod +x "$shim" || return 1
+  echo "   • claude.latest shim declared → $shim"
+}
+
+# .what = prove the candidate matches the tree, and that nothing in ~/.local/bin
+#   has displaced the pinned default. READ-ONLY
+grove_provision_5_3_brains_claude_latest_verify() {
+  local failed=0
+
+  # 🔴 a `claude` in ~/.local/bin would BECOME the default — asked on every run
+  #    (.refs "why the shim is `claude.latest` and never `claude`")
+  if [[ -e "$HOME/.local/bin/claude" ]]; then
+    echo "   ✋ a file named 'claude' sits in ~/.local/bin" >&2
+    echo "      ⇒ that dir outranks \$PNPM_HOME/bin in a human's shell, so this" >&2
+    echo "        file — not the declared pin — is what 'claude' now runs" >&2
+    echo "      ⇒ every pin check above still reads the pnpm copy, so it is" >&2
+    echo "        green on a box whose claude was swapped out from under it" >&2
+    echo "      ⇒ the candidate is reached as 'claude.latest' for exactly this" >&2
+    echo "        reason; no bundle here writes a 'claude' to this dir" >&2
+    echo "      fix: rm $HOME/.local/bin/claude" >&2
+    failed=1
+  fi
+
+  # the claim INVERTS with the pin: opted out, residue is the defect (.refs "opt in, opt out")
+  local latest_prefix="$GROVE_BRAIN_CLAUDE_LATEST_PREFIX"
+  local latest_shim="$GROVE_BRAIN_CLAUDE_LATEST_SHIM"
+  local latest_pin="$GROVE_BRAIN_CLAUDE_LATEST_PIN"
+
+  if [[ -z "$latest_pin" ]]; then
+    if [[ -e "$latest_shim" || -d "$latest_prefix" ]]; then
+      echo "   ✋ claude.latest is opted out and the box still carries it" >&2
+      echo "      ⇒ shim: ${latest_shim} $([[ -e "$latest_shim" ]] && echo present || echo absent)" >&2
+      echo "      ⇒ prefix: ${latest_prefix} $([[ -d "$latest_prefix" ]] && echo present || echo absent)" >&2
+      echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+      failed=1
+    else
+      echo "   • claude.latest is opted out, and no candidate is installed ✔"
+      echo "     opt in: set GROVE_BRAIN_CLAUDE_LATEST_PIN in this bundle's _.sh"
+    fi
+    return $failed
+  fi
+
+  # 1. the install, by the SAME reader the upsert guards on
+  local latest_state
+  latest_state="$(grove_provision_5_3_brains_claude_latest_state)"
+
+  if [[ "$latest_state" != "whole" ]]; then
+    echo "   ✋ the claude.latest candidate reads '$latest_state', not 'whole'" >&2
+    echo "      ⇒ expected a runnable bin at $latest_prefix/v$latest_pin, with" >&2
+    echo "        '$latest_prefix/latest' naming it" >&2
+    echo "      ⇒ found: latest → $(readlink "$latest_prefix/latest" 2>/dev/null || echo '(no symlink)')" >&2
+    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+    failed=1
+  else
+    echo "   • claude.latest candidate is built at $latest_pin ✔ (latest → v$latest_pin)"
+  fi
+
+  # 2. the shim is CURRENT — diffed against a fresh render, never a presence test
+  if [[ ! -x "$latest_shim" ]]; then
+    echo "   ✋ the claude.latest shim is absent or not executable" >&2
+    echo "      ⇒ looked for: $latest_shim" >&2
+    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+    failed=1
+  elif ! grove_provision_5_3_brains_claude_latest_shim_render | diff -q - "$latest_shim" >/dev/null 2>&1; then
+    echo "   ✋ the claude.latest shim has drifted from this checkout" >&2
+    echo "      ⇒ it may still name a prior target or a prior memory cap" >&2
+    echo "      read the diff: diff <(…render…) $latest_shim" >&2
+    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+    failed=1
+  else
+    echo "   • the claude.latest shim matches this checkout ✔"
+  fi
+
+  # 3. the SHIM runs and the BINARY answers (.refs "the verify runs the shim")
+  if [[ -x "$latest_shim" ]]; then
+    local latest_live
+    latest_live="$(timeout -k 5 "$GROVE_BRAIN_PROBE_SECONDS" "$latest_shim" --version 2>/dev/null \
+      | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+
+    if [[ -z "$latest_live" ]]; then
+      echo "   🌙 claude.latest ran, but did not answer a version this run"
+      echo "      ⇒ the candidate ($latest_pin) is unproven here, not disproven"
+    elif [[ "$latest_live" == "$latest_pin" ]]; then
+      echo "   • claude.latest is $latest_live, the declared candidate ✔"
+    else
+      echo "   ✋ claude.latest is $latest_live, but the declared candidate is $latest_pin" >&2
+      echo "      ⇒ the candidate drifted, so a trial reports on a version the" >&2
+      echo "        tree does not name — and a comparison against the pin is then" >&2
+      echo "        one nobody else can reproduce" >&2
+      echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+      echo "      or, if the drift is wanted: bump GROVE_BRAIN_CLAUDE_LATEST_PIN first" >&2
+      failed=1
+    fi
+
+    # 4. REACH — a 🌙, since this shell's PATH is not the human's
+    local latest_which
+    latest_which="$(command -v claude.latest 2>/dev/null || true)"
+    if [[ "$latest_which" == "$latest_shim" ]]; then
+      echo "   • claude.latest is on PATH ✔"
+    else
+      echo "   🌙 claude.latest is installed and this shell's PATH does not name it"
+      echo "      ⇒ found: ${latest_which:-(no match)}"
+      echo "      ⇒ ~/.local/bin reaches PATH from ~/.zshenv (owned by 2.5.zsh), so"
+      echo "        a shell that read neither rc will not see it — unproven here"
+    fi
+  fi
+
+  return $failed
 }
 
 grove_provision_5_3_brains() {

@@ -130,7 +130,7 @@ grove_provision_5_6_aws_configure_upsert() {
   # 4. the EMPTY credentials file that `AWS_SDK_LOAD_CONFIG=1` demands
   #
   # ⚠️ an empty file is load-bear, never clutter
-  #   - `src/zshrc.sh` exports `AWS_SDK_LOAD_CONFIG=1`, which routes v2's
+  #   - `2.shell/2.5.zsh/zshrc.sh` exports `AWS_SDK_LOAD_CONFIG=1`, which routes v2's
   #     region read through a loader that opens this file UNCONDITIONALLY
   #   - with the file absent it does not fall back, it throws:
   #
@@ -152,7 +152,7 @@ grove_provision_5_6_aws_configure_upsert() {
   {
     printf '%s\n' '# grove: intentionally EMPTY.'
     printf '%s\n' '# aws-sdk v2 opens this file unconditionally when AWS_SDK_LOAD_CONFIG=1,'
-    printf '%s\n' '# which src/zshrc.sh sets. an absent file throws ENOENT from Config.region.'
+    printf '%s\n' '# which 2.shell/2.5.zsh/zshrc.sh sets. an absent file throws ENOENT from Config.region.'
     printf '%s\n' '# this box has no key to store: its identity is ambient (the ec2 instance'
     printf '%s\n' '# role), declared as [profile ambient] in ~/.aws/config.'
   } > "$creds" || return 1

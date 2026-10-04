@@ -190,7 +190,8 @@ rhx keyrack.daemon.prune              # plan
 rhx keyrack.daemon.prune --mode apply # signal TERM
 ```
 
-Upstream repair is tracked in `.dream/2026_07_31.keyrack-daemon-expiry.dream.md`
+Upstream repair is tracked in
+`.dream/2026_09_29.a-keyrack-daemon-never-expires-and-the-prune-cannot-reach-all.dream.md`
 — two defects, both in already-shipped code: a `hasEverHadKeys` guard that
 prevents auto-termination for daemons that never held a key, and an `@all`
 prune glob pinned to the caller's own `homeHash`.

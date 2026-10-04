@@ -111,7 +111,7 @@ refusing because the pane is busy:
 rhx git.grove.send grove-1 --anyway --what 'y'
 ```
 
-(the fnm one is closed at cause — `src/zshrc.sh` carries
+(the fnm one is closed at cause — `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` carries
 `fnm use --install-if-missing`. the pnpm one is not.)
 
 ## .the tell

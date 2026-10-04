@@ -46,7 +46,7 @@ three instances, in one round:
 |---|---|
 | `grove.bootstrap.sh` + 4 `src/grove.*.sh` | the published repo cannot boot |
 | 9 `.play/permanent/*` + `play.run.sh` | every clamp reached exactly one box |
-| `src/lazy-lock.json` | SC-F1's nvim plugin pins, reverted in effect |
+| `src/grove.provision/4.terminal/4.5.nvim/lazy-lock.json` | SC-F1's nvim plugin pins, reverted in effect |
 
 ⚠️ **no gate could see any of them, and the reason is one line of `find`.** every
 sweep here walked the DISK, so an untracked file read exactly like a tracked one —

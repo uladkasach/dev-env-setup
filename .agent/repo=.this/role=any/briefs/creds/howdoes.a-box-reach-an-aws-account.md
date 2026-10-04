@@ -146,15 +146,35 @@ AccessDenied … is not authorized to perform: sts:AssumeRole
 on resource: arn:aws:iam::<prep-acct>:role/<name>
 ```
 
-two very different causes wear this one message:
+**three** very different causes wear this one message, and they want three
+different repairs:
 
-- the role **does not exist** under that name → our defect, a typo or a guess
-- the role exists and this grove is **not in its trust policy** → an infra ask
+| the cause | the repair | whose |
+|---|---|---|
+| 🔴 this grove's ORG has no business in that account | delete the ROW | **ours** |
+| the role **does not exist** under that name | fix the name — a typo or a guess | ours |
+| the role exists and this grove is **not in its trust policy** | an infra ask | infra's |
 
-confirm the name before you write a handoff:
+🛑 **row 1 is the one this brief omitted until 2026-09-24, and the omission
+TAUGHT a misread.** the two-cause version above was true and incomplete: it holds
+where the box SHOULD reach, and says none of what to do for a box that should
+not. a denial looks identical either way.
+
+⇒ so ask the questions IN ORDER (`rule.require.a-grove-reaches-its-own-org-only`):
+
+> **1. SHOULD this box reach here at all?**
+> **2. and only then — is it TRUSTED to?**
+
+⚠️ **the trap is that row 3's repair writes itself.** the fix-text is specific,
+it is addressed to somebody with the power to grant, and what it buys is a
+permanent cross-account expansion to silence a check that was right. measured
+2026-09-24: an aether grove refused five hops into ahbode and ehmpathy accounts,
+and an ask was drafted to have them granted. the ROWS were the defect.
+
+then confirm the name, before any handoff:
 
 ```sh
-rhx git.repo.get lines --in ahbode/infrastructure --words 'ROLE_NAME'
+rhx git.repo.get lines --in <org>/infrastructure --words 'ROLE_NAME'
 ```
 
 ⚠️ this is the exact hazard that cost a session on 2026-08-06: three guessed
@@ -220,6 +240,79 @@ grove does not have: `keyrack set --vault aws.config` on grove-1 prompted
 vault is `os.direct` (plaintext, no unlock) — correct, because the value is a
 profile name and not a secret.
 
+## .the `@all` + `aws.params` write — which identity it accepts, and from where
+
+a key stored at `--org @all --vault aws.params` is the BOX's credential
+(`rule.require.github-token-at-all-camp`). its identity rule is a hardcut, decided by the
+`--org` the human typed:
+
+```js
+// asKeyrackAwsParamIdentity.js:17 — @all → the grove's own ambient identity
+if (input.org === '@all') return { source: 'imds' };
+```
+
+and the SSM parameter it writes is derived, not typed (`asKeyrackAwsParamName.js:29`; `@all`
+becomes `_all_`, since `@` is outside SSM's legal charset):
+
+```
+/keyrack/infra/vault/aws.params/v1/<owner>/_all_/<env>/<KEY>
+```
+
+### 🛑 what the hardcut actually blocks — a PROFILE, and only a profile
+
+the guard is one line in the applier:
+
+```js
+// withKeyrackAwsParamEnvOverlay.js:23-24
+if (input.awsProfile === undefined) delete process.env.AWS_PROFILE;
+```
+
+it deletes `AWS_PROFILE` so no profile can hijack IMDS. it does **not** touch
+`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`, and those sit AHEAD of
+IMDS in the sdk's default chain.
+
+⇒ so **a laptop CAN write an `@all` key** — export credentials for the target account first:
+
+```sh
+eval $(aws configure export-credentials --profile <org>.camp --format env)
+rhx keyrack set --owner ehmpath --key <KEY> --org @all --env camp --vault aws.params
+```
+
+⚠️ `use.<org>.camp` alone is **not enough** — it sets `AWS_PROFILE`, which is the one
+variable the overlay deletes. the alias prints the `export-credentials` line for exactly this
+reason; that second line is what carries the identity through.
+
+⚠️ and the write must target the account the BOX will read from. a grove reads this
+parameter through IMDS, from its own account — so the credentials exported must belong to
+that same account, or the write lands somewhere the grove will never look.
+
+📜 measured 2026-09-23: the comment above (*"never a profile, never ambient SSO"*) was read
+as *"no laptop auth works"* and reported to a human as a halt. the guard line disproves it.
+see `gotcha.a-comment-states-intent-never-reach` — a comment states intent; the line states
+reach.
+
+### the region, which is NOT ambient
+
+`asKeyrackAwsParamRegion.js` takes the first of three, and fails loud on none:
+
+```
+AWS_REGION  →  AWS_DEFAULT_REGION  →  the aws profile's configured region
+```
+
+⚠️ the profile source is read at `vaultAdapterAwsParams.js:140`, **before** the overlay
+clears `AWS_PROFILE` — so a laptop write inherits the region from the profile that was live
+when the call started. a profile with no `region =` needs `AWS_REGION` prepended.
+
+### the two halves that fail separately
+
+| half | scope | symptom when absent |
+|---|---|---|
+| the VALUE in SSM | central — one write serves every box | `absent 🫧` |
+| the ENTRY in the host manifest | per `$HOME`, per seat | `absent 🫧` |
+
+they print the same word. a grove with two seats needs the entry in BOTH, or one seat reads
+`absent 🫧` against a parameter that is present and readable (`term=entry`).
+
 ## .why the skill proves with sts and never with a file read
 
 every one of the three failures above produces a **file that reads perfectly**.
@@ -235,13 +328,23 @@ somewhere else, and every later error is about the wrong resource.
 
 a bundle converges the machine toward one declaration. this is per **org+env**,
 and which orgs a box needs is a property of the work on that box, not of the
-box's baseline. grove-1 needs `ahbode`; a grove that only builds ehmpathy
-packages needs none.
+box's baseline.
 
 `5.6.aws` accordingly owns exactly what EVERY box needs — its own identity — and
-this skill adds the reaches that box's work requires. if a grove's org set ever
-becomes declared state, this becomes a bundle that loops the skill over that
-declaration.
+the skill adds the reaches that box's work requires.
+
+⚠️ **that org set DID become declared state, and `5.13.reach` is the bundle that
+loops the skill over it.** so the open question is no longer *whether* to declare
+it — it is **whose** declaration it reads:
+
+```sh
+grove_provision_5_13_reach_srcorg() { printf 'ahbode'; }   # one org, hardcoded
+```
+
+🔴 a table that names one org is the defect
+`rule.require.a-grove-reaches-its-own-org-only` forbids: every grove inherits it,
+whatever its own org is. the rows belong per-org, and an org with no table gets
+zero rows.
 
 ## .why per org+env, not per repo
 
@@ -256,11 +359,13 @@ is why `--account` is read from `declapract.use.yml` rather than typed.
   full reason for each choice in its header
 - `src/grove.provision/5.devtools/5.6.aws/` — `ambient`, `[default]`, and the
   empty credentials file, each with its own measurement
-- `src/zshenv.sh` — why the pointer is in `.zshenv` and not `.zshrc`
+- `src/grove.provision/2.shell/2.5.zsh/zshenv.sh` — why the pointer is in `.zshenv` and not `.zshrc`
 
 ## .see also
 
 - `howto.give-a-box-an-aws-account.md` — the human's path
+- `rule.require.a-grove-reaches-its-own-org-only` — WHICH rows a grove gets, and
+  why an `AccessDenied` is not automatically an infra ask
 - `rule.require.identical-commands-on-every-server` — the rule this serves
 - `rule.forbid.two-writers-on-one-artifact` — and why the fences satisfy it
 - `domain.terms/term=ambient` — the box's own identity vs a rack entry

@@ -76,6 +76,32 @@ character class in the path, so a reader sent after one hunts a cause with no pa
 measurement had two unusual properties — an `=` in the path, and a bare path where a
 pattern belongs — and the visible one is the one that gets written down.
 
+### ⚠️ .nor is "gitignored" the cause — measured 2026-09-23
+
+a third sample, and a third wrong guess at its cause. `--glob 'node_modules/**/*.js'`
+answered `0` on a string present six times, and the theory offered was *"grepsafe reads
+git-tracked files only, so it goes silent on gitignored paths"* — plausible, since
+`globsafe` had just listed 60 files under that same dir.
+
+one run disproved it. the SAME dir, the SAME pattern, a glob with no `/`:
+
+```
+rhx grepsafe --pattern 'asKeyrackAwsParamRegion' \
+  --path node_modules/rhachet/dist/…/aws.params --glob '*.js'
+   └─ lines: 6      ← gitignored, and read perfectly
+```
+
+⇒ `--path` + a bare-basename `--glob` is the WORKAROUND, and it doubles as the test that
+tells the two causes apart: if a no-`/` glob finds the string, the `/` was the cause and the
+new theory is dead.
+
+⚠️ this file warns twice that **a diagnosis from one sample names whatever was unusual about
+that sample** — and the third sample's unusual property was `node_modules`, so `node_modules`
+got theorized. the trap catches the reader of the very brief that names it.
+
+⇒ the cheap habit: before a new cause is written down, run the case the EXTANT cause
+predicts. one command, and it costs a brief nobody has to un-learn later.
+
 ## ⚠️ .why this one is dangerous rather than a mere irritation
 
 **an absent match and an unasked question print the same line.** `matches: 0` is exactly

@@ -9,13 +9,13 @@ pin, and imagemagick policy claims.
 
 this box, 2026-08-31, nvim 0.12.3: a file whose last line reads `# vim: shiftwidth=7
 tabstop=7` set both options on open, on a config with the three guard lines cut. the guarded
-config (as shipped) refused it — `src/init.lua` carries the pin.
+config (as shipped) refused it — `src/grove.provision/4.terminal/4.5.nvim/init.lua` carries the pin.
 
 ## m2 — seen to discriminate, two probes, two questions
 
 2026-08-31:
 
-**does the GUARD work?** `src/init.lua` opened the probe file above, beside the same config
+**does the GUARD work?** `src/grove.provision/4.terminal/4.5.nvim/init.lua` opened the probe file above, beside the same config
 with only the guard's three lines cut:
 
 | config | result |
@@ -42,7 +42,7 @@ reported `modeline=true modelineexpr=false exrc=false` — it fired for real, no
 
 2026-08-31, imagemagick 6.9.12 on this box:
 
-**does the POLICY work?** `src/imagemagick.policy.xml` placed at a temp seat path; every
+**does the POLICY work?** `src/grove.provision/4.terminal/4.5.nvim/imagemagick.policy.xml` placed at a temp seat path; every
 carried coder asked in both directions:
 
 | coder set | without the policy | with the policy |

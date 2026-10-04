@@ -3,35 +3,13 @@
 # .what = prove the three installed files match this checkout, the timer is
 #         ENABLED and ACTIVE, the reconciler's cwd is BUILT and AT THE PIN, the
 #         two gate skills ANSWER from it, and report the live gate state
-#
-# ⚠️ .why the timer needs BOTH `is-enabled` and `is-active`
-#   they answer different questions and neither implies the other: is-active
-#   asks about THIS boot, is-enabled about the NEXT. a `start` with no `enable`
-#   is active and disabled — green today, gone tomorrow.
-#
-# 🛑 .why SKILL REACH is its own claim, and the one that BIT
-#   every other check here can be green on a box where the reconciler cannot
-#   converge a gate at all. `rhx` finds a skill among the roles LINKED into its
-#   cwd, and linkage is `.agent/` + installed `rhachet-roles-*`
-#   (`isRepoLinked.ts`). a bare `git init` dir satisfies both skills'
-#   `require_git_repo` and can never satisfy that link:
-#
-#     ✋ ConstraintError: no skill "git.commit.uses" found in any linked role
-#
-#   every other claim here was ✔ against exactly that box, so this probe is not
-#   belt-and-braces — it is the only reader that sees the defect.
-#   `rule.forbid.the-driver-by-path` carve-out 3 records the same mechanism for
-#   a grove; it bites a laptop too.
-#
-#   ⇒ the state reader reads the SHAPE of a dir and proves no part of reach.
-#     only the ask proves it, and it asks the way the reconciler asks: from
-#     that cwd, with a `get`, which mutates no gate and trips no tty guard.
-#
-# ⚠️ .why LINGER is reported and not failed
-#   a headless box needs it; a laptop with a live session does not. one claim
-#   cannot be true of both, so this reports the state and names which box it
-#   described. the upsert attempts the grant, so no repair is deferred
-#   (`rule.forbid.deferred-provision-defects`).
+# .why
+#   - ⚠️ the timer needs BOTH `is-enabled` (next boot) and `is-active` (this one)
+#   - 🛑 SKILL REACH is its own claim — every other row was ✔ on a box whose
+#     cwd linked no role, so only an ask from that cwd proves the gate can move
+#   - ⚠️ LINGER and the live gate are reported, never failed
+#   - 🛑 the CONVERGE leg is unproven on a box with no drift, by design
+# .refs = howdoes.the-openhours-gate-converges.md — how the verify proves the gate
 #
 # guarantee:
 #   - READ-ONLY. it observes; it mutates no gate and no unit
@@ -98,13 +76,8 @@ grove_provision_5_18_openhours_provision_verify() {
     fi
   done
 
-  ####################################################################
-  # 2. the mode bit, which a byte-diff cannot see
-  #
-  # systemd runs the payload directly via ExecStart, so an unexecutable file
-  # makes every tick fail with 203/EXEC — loudly in the journal, and silently
-  # from the point of view of anyone who reads only the gate
-  ####################################################################
+  # 2. the mode bit, which a byte-diff cannot see — an unexecutable payload
+  #    fails every tick with 203/EXEC
   if [[ -x "$bin_dir/machine_openhours_reconcile" ]]; then
     echo "   • the reconciler is executable ✔"
   else
@@ -114,14 +87,8 @@ grove_provision_5_18_openhours_provision_verify() {
     failed=1
   fi
 
-  ####################################################################
-  # 2.5 the installed schedule matches what the tree declares
-  #
-  # 🛑 .why a DIFF and never a presence test
-  #   the payload reads this file and no other, so a stale copy is a box that
-  #   enforces yesterday's window while the repo declares today's — and every
-  #   other claim on this page stays green throughout
-  ####################################################################
+  # 2.5 the installed schedule matches the tree — a DIFF, never presence: a
+  #     stale copy enforces yesterday's window
   local want_schedule
   want_schedule="$(grove_provision_5_18_openhours_schedule_render)"
   if [[ ! -f "$GROVE_OPENHOURS_SCHEDULE" ]]; then
@@ -200,10 +167,7 @@ grove_provision_5_18_openhours_provision_verify() {
       ;;
   esac
 
-  # 🛑 and the state reader proves no part of REACH — it reads the shape of a
-  #   dir. only an ask proves the skill answers, and it asks the way the
-  #   reconciler asks: from that cwd, with a `get`, which mutates no gate and
-  #   trips no tty guard
+  # 🛑 the state reader proves no part of REACH — only an ask from that cwd does
   if [[ "$cwd_state" == "whole" ]]; then
     for skill in "git.commit.uses" "radio.uses"; do
       probe_rc=0
@@ -214,11 +178,7 @@ grove_provision_5_18_openhours_provision_verify() {
         echo "   ✋ rhx $skill did not answer (exit $probe_rc)" >&2
         echo "      ⇒ the timer ticks, the clock math runs, and the gate never" >&2
         echo "        moves — a failure with no symptom except an open gate" >&2
-        # ⚠️ the probe's OWN words, quoted — a swallowed stderr leaves a reader
-        #   unable to tell a broken box from a broken check
-        #   (`gotcha.a-check-that-cries-wolf-gets-silenced`, q1).
-        #   the SENTENCE, never the frames: a bun throw prints a stack AND a
-        #   numbered source-context block, and both bury the line that names why
+        # ⚠️ the probe's OWN sentence, quoted — never the stack frames (q1)
         echo "$probe_out" \
           | grep -iE '(error|✋|🛑|no skill|not found|required)' \
           | grep -vE '^\s*(at |[0-9]+ \|)' | head -4 \
@@ -243,14 +203,8 @@ grove_provision_5_18_openhours_provision_verify() {
     echo "      grant it from a seat with sudo: sudo loginctl enable-linger $USER"
   fi
 
-  ####################################################################
-  # 6. what the gate reads RIGHT NOW — reported, never failed
-  #
-  # .why it cannot be a claim: the correct value depends on the clock, so an
-  #   assert here would be a second copy of the policy — one in the payload
-  #   and one in its verify, free to drift. the payload owns the policy; this
-  #   line owns no policy and merely says what a human would otherwise `cat`
-  ####################################################################
+  # 6. what the gate reads RIGHT NOW — reported, never failed: an assert would
+  #    be a second copy of the policy the payload owns
   local commit_meter="$HOME/.rhachet/storage/repo=ehmpathy/role=mechanic/.meter/git.commit.uses.jsonc"
   local radio_meter="$HOME/.rhachet/storage/repo=bhuild/role=dispatcher/.meter/radio.uses.global.jsonc"
   local commit_now="open" radio_now="open"
@@ -259,19 +213,8 @@ grove_provision_5_18_openhours_provision_verify() {
   echo "   • gate right now — commit: $commit_now · radio: $radio_now"
   echo "     read the store: rhx rhachet.storage.get --what '.meter/*' --body"
 
-  ####################################################################
-  # 7. 🛑 the one claim NO verify here can make — reported, by design
-  #
-  # every check above is a READ, and the reconciler's whole job is a WRITE.
-  # that write happens only on DRIFT, so on a converged box the mutate leg has
-  # never run — and a green page says no part of whether it CAN.
-  #
-  # ⚠️ and it cannot be probed here. to manufacture drift, this verify would
-  #   have to open a gate a human closed, which is the one direction where a
-  #   failure leaves the box UNSAFE. so the honest proof is the next real
-  #   boundary crossing, and this names the line that reads it rather than
-  #   claim a guarantee it cannot hold (`rule.forbid.failhide`).
-  ####################################################################
+  # 7. 🛑 the one claim NO verify here can make — the CONVERGE leg runs only on
+  #    drift, and to manufacture drift would OPEN a gate a human closed
   echo "   🌙 the CONVERGE leg is unproven on a box with no drift"
   echo "      it runs only when the gate disagrees with the clock, so the next"
   echo "      real boundary crossing is what proves it. read the verdict:"

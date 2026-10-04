@@ -33,7 +33,7 @@ consumed it. so a send to a busy duct fails without a failure.
 - `duct.send --anyway` — send INTO the held program on purpose (answer its prompt)
 
 ## .refs
-- src/ductwork.sh                                       # `__duct_pane_command`, `__duct_pane_is_idle`
+- src/grove.provision/2.shell/2.7.aliases/ductwork.sh                                       # `__duct_pane_command`, `__duct_pane_is_idle`
 - .agent/repo=.this/role=any/skills/git.grove.send.sh   # forwards `--await` / `--anyway`
 
 ## .reason

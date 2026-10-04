@@ -43,7 +43,7 @@ machine. one word, two directions. `pull` states the direction, so `git.repo.pul
 
 ## .refs
 where the term is declared / used:
-- `src/bash_aliases.sh`   # the alias, and the first half of the loop:
+- `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`   # the alias, and the first half of the loop:
                           #   `git.repo.pull && grove.provision`
 
 ## .reason

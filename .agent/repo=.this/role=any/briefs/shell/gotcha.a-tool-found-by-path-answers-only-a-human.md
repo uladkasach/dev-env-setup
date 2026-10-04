@@ -101,7 +101,7 @@ dressed as a verdict about the box.
 
 ⚠️ and where a shell variable IS the right answer, `~/.zshenv` is the right file — read by
 every zsh, interactive or not — which is the lesson `AWS_PROFILE` taught on 2026-08-06 and
-the reason `src/zshenv.sh` exists.
+the reason `src/grove.provision/2.shell/2.5.zsh/zshenv.sh` exists.
 
 **but `.zshenv` is not a substitute for the rule above.** it reaches every ZSH; it reaches
 no bash, no `sh -c`, and no seat whose login-shell record is not zsh. so it serves a duct
@@ -149,5 +149,5 @@ and the site is "cleaned up" into uselessness (`rule.require.exemptions-name-the
 - `gotcha.a-check-that-cries-wolf-gets-silenced` — rung 1's verify is a worked example of
   a check whose verdict was about its own caller
 - `gotcha.bash-lc-becomes-a-half-zsh` — the shell seam this rests on
-- `src/zshenv.sh` — the file for env a PROGRAM must read
-- `src/git-credential-keyrack.sh` — carries rungs 2 and 3 inline
+- `src/grove.provision/2.shell/2.5.zsh/zshenv.sh` — the file for env a PROGRAM must read
+- `src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh` — carries rungs 2 and 3 inline

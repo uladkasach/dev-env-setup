@@ -622,6 +622,38 @@ quoted path inside a correction block — and that would spare a REAL dead point
 someone writes a ⚠️ above one (`rule.forbid.exemption-as-habit`). the record belongs outside
 the section, or written without the artifact in it.
 
+### 🛑 .the sharpest form — a READER that matches a LITERAL matches its own pattern line
+
+every instance above is prose that re-creates a dead POINTER, and each cost a false ✋. on
+2026-09-29 the same shape landed on **executable match logic**, and it cost the opposite —
+a false ✔, which is the dearer half.
+
+`prove.brief-pointers-reach` grew a file-level opt-in: a file that declares a coined token
+has its dead `src/` paths read as its subject rather than as citations. the token was matched
+with a literal, and the play went green on rows it had no business to spare:
+
+| the order | what claimed the exemption |
+|---|---|
+| 5th | the play's own **doc comment**, which spelled the token to explain it |
+| 6th | the play's own **grep pattern**, which spells the token by construction |
+
+the 6th is the one with no prose analogue. the 5th yields to the ordinary repair — name the
+shape, never the instance — and a backtick guard closed it. **the 6th cannot be closed by any
+guard**, because whatever the guard tests for, the guard's own source contains it.
+
+> **a reader that matches a literal token matches its own pattern line. the one surface that
+> must never spell a token contiguously is the file that READS it.**
+
+⇒ the repair is a **split at authorship**: adjacent quoted halves compose the token at run
+time (`"📜 record""-file:"`) and leave no contiguous literal on disk. it reads as obfuscation
+and is the opposite — the comment beside it names why, so the next author does not "tidy" the
+two halves back into one and silently re-arm the defect.
+
+⚠️ **and note which direction it failed in.** m.10's prose instances cry wolf; this one goes
+QUIET — it grants an exemption nobody declared, over a file whose rows were previously judged
+by their real class. so the tell is not a red row. it is a row whose REASON changed while the
+file did not (`…cries-wolf`, q1: read the evidence beside the verdict).
+
 ## .measurement 11 — the FIXTURE was obeyed exactly, and what it said was FALSE, 2026-08-14
 
 m.8 is an arm that passed for the wrong reason. this one is the mirror, and it is the harder
@@ -826,6 +858,42 @@ says *"this was deleted"* is a third answer, free to drift from both — m.9's s
 holder. `rule.require.one-command-provision` records the same trap at a remote boundary, where a
 local record keyed on a name outlived the box that name pointed at.
 
+### 🔴 .a second instance, and its consequence INVERTED the verdict — 2026-09-29
+
+the 2026-08-30 case cost a wrong **denominator**. this one nearly cost a wrong **direction**, and
+that is the half worth the second write-up.
+
+`prove.rack-consumers-are-dispositioned` walks `git grep -l 'keyrack get'` — the INDEX — and holds
+a census row per consumer. it went red with **7 defects: 6 STALE ROW, 1 UNDISPOSITIONED**, and its
+own fix-text for a stale row reads *"a row that resolves to no call reads as coverage. drop it."*
+
+that fix-text, obeyed, would have been a false ✔ over a live defect:
+
+| what the clamp reported | what the tree held |
+|---|---|
+| 6 rows whose files hold no rack read | true — the org axis moved all six reads into ONE holder |
+| the holder: **unnamed, unjudged, invisible** | `git.grove.rack.operations.sh`, **unstaged**, with 3 live `keyrack get` calls |
+
+⇒ `git grep` reads the index, so an unstaged file is not merely uncounted — it is **unreachable**,
+and the reads that moved into it left no trace in the reader's world at all. the six rows read as
+*coverage to retire* when the truth was *coverage consolidated into a file you cannot see*.
+
+🔴 **so the drop alone would have turned a 7-defect page green while three live reads sat
+unjudged** — a false ✔ manufactured by a correct repair, applied on a partial subject.
+
+⇒ the repair is m.14's own: read BOTH stores. the walk now unions `git grep` with a disk pass over
+`git ls-files --others`, and an untracked live consumer earns its own ✋ — because unstaged is not
+merely invisible here, it is **broken everywhere else**: 8 tracked skills `source` that holder and
+abort at that line on any box but the one that wrote it.
+
+✔ proven both directions the same day: a planted untracked consumer took the page 1 → 3 defects,
+and its removal returned it to 1. the residual 1 is the real ✋, and it is a human's — the index is
+theirs to write (`rule.forbid.writes-to-the-git-index`).
+
+⇒ the class beyond this one clamp is `prove.declared-skills-are-tracked`: **every skill a tracked
+file depends on must itself be tracked**, by `source` or by a fix-text that names it. measured at
+HEAD: 10 tracked dependents on 2 unstaged files.
+
 ## .measurement 15 — the subject had NOT SPOKEN YET, and its silence was read as its verdict, 2026-09-13
 
 every measurement above interrogates a READER that holds its subject's answer. this one is the
@@ -889,6 +957,235 @@ subject, re-read its capture before the verdict ships.
 this instance is its extreme: the accused component's own output, once read, was **better** than
 what the accusation asked it to become. the dispatch drafted against it would have spent a
 maintainer's time on a defect that was never there.
+
+## .measurement 16 — the DISCRIMINATOR was scoped to a different subject than the claim it guarded, 2026-09-28
+
+`prove.rack-reads-a-foreign-org` ran for the first time and reported a defect in the capability
+it guards. every row it printed was true, and the capability was sound.
+
+```
+   ├─ this checkout declares org: ahbode
+   ├─ a foreign org on the rack: aether
+   ✔ arm 0 — native org 'ahbode' answers, so the session is live
+   ✋ arm 1 — foreign org 'aether' answers EMPTY
+      ⇒ the scratch-gitroot read did NOT reach, and every reach skill
+        aimed at a foreign-org grove will fail the same way
+```
+
+one `git.grove.rack.unlock --org aether --env camp` later, the same play printed
+`🌲 the rack reaches a foreign org, and only through the gitroot ✔`, all three arms held, and
+arm 2 confirmed the plain read still refuses — so the pattern had never been broken.
+
+**the cause is arm 0, which is the play's own exit-2 discriminator.** an aws sso session is
+scoped to ONE org, so `ahbode`'s live session says not one word about `aether`. arm 0 read the
+NATIVE org, printed *"so the session is live"*, and arm 1 then leaned on that sentence while it
+depended on a DIFFERENT org's session.
+
+### .why this is not m.4 restated
+
+m.4 is a SUMMARY that named the wrong subject — a defect in the report, downstream of a correct
+verdict. this is a **discriminator**, and a discriminator's whole job is to refuse a verdict the
+evidence cannot support.
+
+⇒ so the failure inverts: a mis-scoped summary MISREPORTS a sound run, where a mis-scoped
+discriminator **manufactures** the false verdict it exists to prevent. it does not fail to catch
+the defect; it is the defect's author.
+
+### .the shape to watch for
+
+> **a discriminator proves its claim about the subject it READ, never about the subject the
+> guarded arm will DEPEND ON.** where those two differ, it grants permission it has not earned.
+
+⚠️ and the tell is absent from the page by construction: arm 0's ✔ and arm 1's ✋ are each
+honest, so q1 (does the evidence agree with the verdict?) passes cleanly. the disagreement is
+between arm 0's SCOPE and arm 1's DEPENDENCY, and neither line names its scope.
+
+⇒ the repair is to make the guarded arm's empty branch **three-valued** — ask whether the
+foreign org's own session is live before it grades the pattern, and exit 2 with the unlock
+command when it is not. proven both directions on 2026-09-28: green with the session live, and
+`🌙 … its session is NOT live … no claim proven` after a deliberate
+`rhx keyrack relock --key aether.camp.AWS_PROFILE`, restored after.
+
+⚠️ that probe is why this measurement can be trusted. a discriminator added and never seen to
+fire is the same defect one level up.
+
+## .measurement 17 — ONE action, TWO subjects, and every failure blamed on the remote one, 2026-09-28
+
+`git.grove.ready.verify` rung 2 (`reach`) drove `git.grove.wake` and, on any non-zero, halted with:
+
+```
+      └─ ✋ rung 2 (reach) does not hold
+
+  why: the grove did not wake — see …/wake.log for the aws error
+  fix:
+    rhx keyrack unlock --owner ehmpath --env camp
+```
+
+**the box was live, and its duct had answered `up 12 min` one command earlier.** the real cause sat
+in the log the halt itself cited: `aether.camp.AWS_PROFILE status: locked 🔒` — a fact about the
+LAPTOP's rack, never about the box.
+
+### .why this is neither m.4 nor m.16
+
+| | what was wrong |
+|---|---|
+| m.4 | the verdict was RIGHT; a summary beneath it named the wrong subject |
+| m.16 | a discriminator EXISTED and was scoped to the wrong subject |
+| **m.17** | **no discriminator existed at all** — one action was driven whose failure has two subjects, and the rung attributed it to one of them by construction |
+
+⇒ so the verdict was **false**, not merely mis-worded: reach held. a wake is idempotent and cheap,
+which is exactly what made *"just drive it"* read as a sound design — and a cheap action can still
+be ambiguous about what its failure proves.
+
+### 🔴 .the second harm — the fix-text was worse than absent
+
+`keyrack unlock --owner ehmpath --env camp`, with no `--org`, unlocks **another account's**
+profile for a foreign-org box. `_rack_profile_fix` warns about that command by name:
+
+> *do NOT take the rack's own hint … each unlock ANOTHER account's profile, and each looks like a
+> pass.*
+
+⇒ **the gate handed out the one command its own holder says is a trap.** a human who ran it would
+see a `🔓` and climb again to the identical halt, which is how a gate teaches a human it lies.
+
+### .the shape to watch for
+
+> **when a check drives ONE action to settle a claim, ask how many subjects that action's failure
+> could be about. where the answer is more than one, the check must read the cheap local subject
+> FIRST — or it will blame whichever subject its author had in mind.**
+
+⚠️ and the ambiguity is invisible in the green case: a wake that succeeds proves both subjects
+sound at once, so no green run can ever reveal that the failure path conflates them.
+
+⇒ the repair: ask the rack directly (`_rack_profile`) before the wake, and halt on the credential
+by name. a wake that fails *after* that read is genuinely about the box. proven both directions
+2026-09-28 with **no deliberate break** — one org's credential was locked and the other's live, so
+the pair isolates the discriminator and no other variable:
+
+- locked → `✋ THIS MACHINE holds no aws profile for env=camp org=ahbode — the box is unjudged,
+  never unwell`, with the org-scoped unlock as its fix
+- live → rungs 1..5, `✔ 176 · ✋ 0` on both seats
+
+🟡 the read is a **direct** one, deliberately — a grep of the wake log would have worked and would
+have made the rung depend on another component's output FORMAT, the invisible dependency
+`gotcha.the-duct-returns-the-send-not-the-answer` names.
+
+## .measurement 18 — a check ALREADY RED cannot report a new member of its own class, 2026-09-30
+
+`prove.headers-carry-their-weight` sat red at **27 rows**, deliberately — the debt was recorded in
+a dream (*"twenty-seven bundle files carry more header than a reader spends"*, 2026-09-29), whose
+own residue argued the rows were true, so the ✋ was honest. the debt was paid by 2026-10-04 and
+the dream pruned; the clamp reads 0 over.
+
+within the hour, a 12-line table was written into `5.3.brains/_.sh`'s header. the clamp's verdict
+did not change. its exit code did not change. **its one signal was a count**:
+
+```
+before the edit   → ✋ 27 file(s) carry more header than a reader will spend
+after the edit    → ✋ 28 file(s) carry more header than a reader will spend
+after the repair  → ✋ 27 file(s) carry more header than a reader will spend
+```
+
+### .why this is a new shape, and not m.13
+
+| | the blind spot |
+|---|---|
+| m.13 | a check NOBODY RUNS decays against a tree that moved under it |
+| **m.18** | **a check already RED is blind to a new member of the very class it grades** |
+
+m.13's subject is a check with no recent verdict. m.18's subject is a check whose verdict was on
+screen, in the same session, read by the same author — and the marginal row still landed unseen.
+
+⇒ so the two are not one claim at two intensities. a run repairs m.13 outright; **no run repairs
+m.18**, because the verdict a run prints is already ✋ either way.
+
+### 🔴 .the harm is a RATCHET, and it turns one way only
+
+a ✋ that already stands costs no attention to add to. so every author who touches a file in the red
+class pays no price, reads no new signal, and leaves the class one row larger. the debt the dream
+sized at 27 is therefore not a static 27 — it is a floor that rises while the ✋ holds.
+
+⚠️ and the author here had that dream open. **the record of the debt did not prevent an addition to
+it**, because the mechanism that would have refused the addition was the very check the debt had
+already exhausted.
+
+### .the shape to watch for
+
+> **before you trust that your edit broke no clamp, ask which clamps were ALREADY RED. a red clamp
+> grades your edit and prints the same word it printed before — so its verdict is not evidence, and
+> its count is the only place your row can appear.**
+
+⇒ the repair, where a class is red: read the COUNT, never the verdict, and treat a rise as a
+regression you own. that is the one signal the ✋ still carries.
+
+🟡 stated fairly, the counter: a per-file bar cannot refuse a marginal row without a per-file
+baseline, and a baseline calibrated against a red tree ratifies the debt as correct — m.12's own
+caveat (*a floor calibrated on a blind first read ratifies the blindness as its baseline*). so the
+answer is the COUNT read by a human, never a second mechanism.
+
+## .measurement 19 — the reader INHERITED the live copy of its own subject, 2026-09-30
+
+`prove.fnm-guard-reads-the-path-not-the-var` grades the fnm guard inside `zshenv.sh`. its three
+arms boot a throwaway shell, source the CHECKOUT's file, and read PATH:
+
+```sh
+env FNM_MULTISHELL_PATH="$2" zsh -c "source '$1'; case \":\$PATH:\" in …"
+```
+
+🛑 **zsh reads `~/.zshenv` on EVERY invocation** — login or not, interactive or not. so that one
+line sources TWO copies of its own subject: the live rc, then the file the arm named. every arm
+graded the COMPOSITION.
+
+### .why it stood green for a day
+
+the two copies AGREE on a converged box, and they agreed here: both carried the var-only guard,
+which skips its mint, so the live rc left PATH untouched and the arms read the checkout alone. the
+contamination was present from the first roll and **invisible by construction**.
+
+it surfaced the hour `rhx grove.provision --what 2.5.zsh --mode apply` put the repaired guard on
+the box, which made the two copies DISAGREE:
+
+```
+   arm 1 — a half-set env is repaired, not skipped
+      ✔ the guard re-minted, and the dir is on PATH          ← the LIVE rc did this
+   arm 3 — the fixture: the var-only guard must MISS
+      ✋ the fixture went through (got: REACHED)
+```
+
+⇒ arm 3 plants the var-only guard and demands a MISS. the live repaired guard had already put a
+reachable dir on PATH before the fixture was sourced at all, so the fixture could not fail — and
+the clamp correctly reported that **its own arm 1 proves no claim** (m.16's shape: the
+discriminator read another subject).
+
+### .the split that decides it — WHAT is the subject, the FILE or the SHELL?
+
+| the claim is about | the live rc is | so |
+|---|---|---|
+| a FILE the checkout holds | **contamination** | `zsh -f` — suppress every rc, source the subject by name |
+| the SHELL a caller gets | **the subject** | a bare `zsh -c` / `zsh -ic`, and `-f` would destroy the claim |
+
+⇒ measured across this repo's plays: `prove.fnm-guard-reads-the-path-not-the-var` (×3 readers),
+`prove.rc-hooks-never-reach-a-capture` (×2 fixture shapes), and
+`prove.dual-shell-files-hold-no-bash-only-syntax` (×1 dialect parse) are all row 1 and now carry
+`-f`. `prove.node-toolchain-reaches-a-noninteractive-zsh` and `prove.rc-is-quiet-on-boot` are row
+2 — their subject IS the booted shell, so they stay bare.
+
+⚠️ the two rows are one keystroke apart and read identically on a green page.
+
+### .what it costs, in each direction
+
+| the contamination | what it buys |
+|---|---|
+| a live rc that does the work | a **false ✔** — the arm passes on the rc's behalf |
+| a live rc that emits a byte, or fails to parse | a **false ✋** — the subject is blamed for the rc |
+
+⇒ `prove.rc-hooks-never-reach-a-capture`'s fixture carried the second: a live rc that printed one
+byte to stdout would make the REPAIRED shape read dirty, so a sound repair would report broken.
+
+> **a clamp whose reader inherits the live copy of its subject is green exactly while the box and
+> the checkout agree — and that is every hour but the one the clamp exists for.**
+
+## .the earlier corollary, restated
 
 ⇒ so a defect filed against another party's tool owes one extra check the local case does not:
 **quote its actual output in the report.** the draft here carried `(Bash completed with no

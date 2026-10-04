@@ -26,7 +26,7 @@ TUI as an interrupt is a regression, full stop.
      on the active tmux pane's `#{pane_current_command}`, else the window's
      foreground process. fails closed.
    - **tmux**, for BOTH — `bind -n C-S-c if -F '#{m:*nvim*,...}' 'send-keys C-S-c'`
-     in `src/tmux.conf`. it runs ON the host that holds nvim, so its read is a
+     in `src/grove.provision/2.shell/2.8.tmux/tmux.conf`. it runs ON the host that holds nvim, so its read is a
      fact rather than an inference.
 5. nvim maps `<C-S-c> → "+y`; tmux relays `extended-keys` + `set-clipboard`.
 
@@ -108,6 +108,6 @@ downstream. diagnose live; never assume.
 - `define.kitty-tmux-nvim-copy.md` — the full architecture + the two copy paths
 - `src/grove.provision/4.terminal/4.3.kitty/4.3.2.emulator/configure.upsert.sh` —
   `copy_notify.py`, the `map` lines
-- `src/tmux.conf` — extended-keys + clipboard relay
-- `src/init.lua` — nvim `<C-S-c>` yank keymap + `TextYankPost` toast
+- `src/grove.provision/2.shell/2.8.tmux/tmux.conf` — extended-keys + clipboard relay
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` — nvim `<C-S-c>` yank keymap + `TextYankPost` toast
 - `rule.require.solve-at-cause` — the gate fix uses kitty's own /proc pattern

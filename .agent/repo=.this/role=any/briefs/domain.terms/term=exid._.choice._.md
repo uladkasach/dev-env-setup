@@ -55,7 +55,7 @@ rhx git.grove.get <name>     # read exid; compare against what infra handed you
 ```
 
 ## .refs
-- src/bash_aliases.sh                                  # `--exid` on `git grove set`; the registry field
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                                  # `--exid` on `git grove set`; the registry field
 - .agent/repo=.this/role=any/skills/git.grove.wake.sh  # resolves a box BY exid
 - .agent/repo=.this/role=any/skills/git.grove.stop.sh
 - .agent/repo=.this/role=any/skills/aws.ec2.get.sh

@@ -24,14 +24,14 @@ set -o pipefail
 #       so each is remote-chosen in full. the vets below refuse a traversal and
 #       refuse a link — correctly — and then print the member at fault so a
 #       human can read it. a member name may hold an OSC 52, and
-#       `src/tmux.conf` sets `set-clipboard on`.
+#       `src/grove.provision/2.shell/2.8.tmux/tmux.conf` sets `set-clipboard on`.
 #
 #       ⇒ so the refusal path is the ATTACK path: a grove that plants
 #         `../../.ssh/authorized_keys` trips the guard, the pull is correctly
 #         refused, and the guard's own message hands over the clipboard write
 #         as a consolation prize.
 #
-# ⚠️ `src/ductwork.sh` claims round 5's boundary fix closed this class "for
+# ⚠️ `src/grove.provision/2.shell/2.7.aliases/ductwork.sh` claims round 5's boundary fix closed this class "for
 #    free, because the name it was handed was stripped on the way in". that
 #    holds only for names that arrive through `__duct_ssh_tmux`. this file
 #    rides its OWN `ssh`, so it inherited none of it — one lesson, two holders,
@@ -291,7 +291,7 @@ else
   #    login shell. the prior form wrapped `$FROM` in single quotes, which one
   #    single quote in the path closes. base64's alphabet is `[A-Za-z0-9+/=]`
   #    and holds no shell metacharacter, so the quotes cannot be closed
-  #    (`src/ductwork.sh`'s `__duct_ssh_tmux` carries the same reason in full)
+  #    (`src/grove.provision/2.shell/2.7.aliases/ductwork.sh`'s `__duct_ssh_tmux` carries the same reason in full)
   ######################################################################
   FROM_B64="$(printf '%s' "$FROM" | base64 | tr -d '\n')"
   # 🛑 `_grove_err_sunk`, and the ERR half ONLY — stdout is a GZIP STREAM here,

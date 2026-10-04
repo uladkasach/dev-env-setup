@@ -18,13 +18,30 @@
 #     `5.13.reach` is the worked example.
 ######################################################################
 
-GROVE_GIT_ORGS_DEFAULT="ehmpathy ahbode whodisio"
-
 grove_provision_5_10_repos_provision_upsert() {
-  # .the default holds when the caller stays silent, so a bare call is the case
-  #   - (`rule.prefer.defaults-match-common-case`)
-  local orgs="${GROVE_GIT_ORGS:-$GROVE_GIT_ORGS_DEFAULT}"
+  ####################################################################
+  # ⚠️ the SHARED reader, from this bundle's `_.sh`
+  #   - the set is PER-ORG, and it was a scalar declared here AND inline in
+  #     the verify — one fact, two holders, free to drift (m.9)
+  #   - ⇒ both halves now ask the one reader, so a new org's arm reaches
+  #     both or neither (`rule.forbid.two-writers-on-one-artifact`)
+  ####################################################################
+  local orgs; orgs="$(grove_provision_5_10_repos_orgs)"
   local cloned=0 present=0 failed=0 quarantined=0
+
+  ####################################################################
+  # 🛑 an org with no arm clones NO REPO, and says so
+  #   - an empty loop would print `cloned: 0` and return ✔, which reads as a
+  #     converged box (`rule.forbid.failhide`)
+  #   - ⇒ a 🌙: the claim was never asked, and the fix is a declaration
+  ####################################################################
+  if [[ -z "$orgs" ]]; then
+    echo "   🌙 no org set for '${GROVE_ORG:-<unset>}' — no repo is cloned"
+    echo "      ⇒ an org with no declared table gets ZERO rows, never another"
+    echo "        org's (rule.require.a-grove-reaches-its-own-org-only)"
+    echo "      fix: declare its arm in 5.10.repos/_.sh, beside its reason"
+    return 0
+  fi
 
   ####################################################################
   # preflight, so a miss is named once rather than repeated per org
@@ -51,9 +68,21 @@ grove_provision_5_10_repos_provision_upsert() {
     return 1
   fi
 
-  local organization repo into seen
+  local organization repo into seen clonedir
   for organization in $orgs; do
-    echo "   ├─ $organization"
+    ##################################################################
+    # 🛑 the DIR is the keyrack org, and the WIRE is github's name
+    #   - `aether-auctions/svc-x` clones to `~/git/aether/svc-x`
+    #   - `grove.org.sh` holds the one pair table and says why
+    #   - ⇒ the github name is used for the `gh` calls and nowhere else
+    ##################################################################
+    clonedir="$(grove_org_clonedir "$organization")"
+
+    if [[ "$clonedir" == "$organization" ]]; then
+      echo "   ├─ $organization"
+    else
+      echo "   ├─ $organization → ~/git/$clonedir"
+    fi
 
     # .read from a process substitution, NOT a pipe
     #   - a piped `while` runs in a subshell, so every count is discarded
@@ -61,7 +90,7 @@ grove_provision_5_10_repos_provision_upsert() {
     while read -r repo _; do
       [[ -z "$repo" ]] && continue
       seen=$(( seen + 1 ))
-      into="$HOME/git/$repo"
+      into="$HOME/git/$clonedir/${repo#*/}"
 
       # .`gh repo clone` fails outright on a non-empty dir
       #   - ⇒ without this guard a second run errors once per repo

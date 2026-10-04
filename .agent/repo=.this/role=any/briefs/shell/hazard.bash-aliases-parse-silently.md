@@ -2,7 +2,7 @@
 
 ## .what
 
-`src/bash_aliases.sh` is sourced, never executed. a parse error anywhere in the file kills
+`src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` is sourced, never executed. a parse error anywhere in the file kills
 **the whole file** — every alias and function after the fault, and often before it too. and
 because a login shell sources it with output discarded, the failure is invisible: you get a
 prompt, no error, and a shell where `brains.auth.usage` and every other alias simply do not
@@ -30,11 +30,11 @@ looked fine. only a `source` surfaced it.
 
 ## .the rule
 
-> after any edit to `src/bash_aliases.sh`, source it. a diff that reads well proves no more
+> after any edit to `bash_aliases.sh`, source it. a diff that reads well proves no more
 > than that it reads well — only the parser has an opinion that counts.
 
 ```sh
-source src/bash_aliases.sh && echo "syntax ok"
+source src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh && echo "syntax ok"
 ```
 
 this both parses the file **and** loads the functions, so the very next command can exercise

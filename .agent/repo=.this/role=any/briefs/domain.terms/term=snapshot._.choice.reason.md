@@ -106,7 +106,7 @@ rejected alternatives:
   | part | owner | why there |
   |---|---|---|
   | the low-battery timer | `4.3.4.snapshot` | fires with no human present; only a bundle can install it |
-  | `kitty.snap`, `power.off`, `power.restart` | `2.7.aliases`, via `src/bash_aliases.sh` | one file, one writer (`rule.forbid.two-writers-on-one-artifact`) |
+  | `kitty.snap`, `power.off`, `power.restart` | `2.7.aliases`, via `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` | one file, one writer (`rule.forbid.two-writers-on-one-artifact`) |
 
   a `cronhook` grouping cannot express that split, because it groups by the very
   thing the split ignores.

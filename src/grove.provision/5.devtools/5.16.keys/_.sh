@@ -24,22 +24,52 @@ grove_provision_5_16_keys_owner() { printf 'ehmpath'; }
 #   against. a row no manifest declares is worth a question; a manifest key
 #   no row carries is not automatically an absent row — only a human knows
 #   the workload. 📜 a derivation from the manifests was WRONG once
-# 🛑 the ORG SCOPE is ahbode + ehmpathy ONLY (the human, 2026-09-07). this
-#   box's rack holds five owners; the other three are ABSENT BY DECISION
+# 🛑 the ORG SCOPE is ahbode + ehmpathy (the human, 2026-09-07), plus aether
+#   for OPENROUTER_API_KEY alone (the human, 2026-10-04). every other owner on
+#   the rack is ABSENT BY DECISION
+#
+# 🔴 the rows are PER-ORG, and an unknown org gets ZERO — a key row is a claim
+#   about WORK, and the work belongs to an org
+#   (`rule.require.a-grove-reaches-its-own-org-only`)
 grove_provision_5_16_keys_required() {
-  printf 'ahbode:prep:FIREWORKS_API_KEY ehmpathy:prep:FIREWORKS_API_KEY'
-  printf ' ahbode:test:FIREWORKS_API_KEY ehmpathy:test:FIREWORKS_API_KEY'
-  # the bhrain root manifest's vendor set, at env.test — asked for 2026-09-07
-  printf ' ehmpathy:test:OPENAI_API_KEY ehmpathy:test:ANTHROPIC_API_KEY'
-  printf ' ehmpathy:test:TAVILY_API_KEY ehmpathy:test:XAI_API_KEY'
+  local org="${GROVE_ORG:-}"
+  [[ -n "$org" ]] || return 0
 
-  # the radio's robot identity — `radio.task.pull` pins env=prep and this key,
-  # and takes the ORG from the checkout (`getGithubTokenByAuthArg.js:40-49`)
-  # 🛑 these two can NOT be PLACED: `EPHEMERAL_VIA_GITHUB_APP` MINTS its value,
-  #   so a replica seals a 55-minute corpse that reads green forever — the ONLY
-  #   rows a fresh grove cannot converge unattended (`ehmpathy/rhachet#522`)
-  printf ' ahbode:prep:EHMPATH_BEAVER_GITHUB_TOKEN'
-  printf ' ehmpathy:prep:EHMPATH_BEAVER_GITHUB_TOKEN'
+  case "$org" in
+    ahbode)
+      printf 'ahbode:prep:FIREWORKS_API_KEY ahbode:test:FIREWORKS_API_KEY'
+      printf ' ahbode:prep:OPENROUTER_API_KEY ahbode:test:OPENROUTER_API_KEY'
+
+      # ⚠️ the ehmpathy rows ride AHBODE's opt-in, exactly as `5.13.reach`'s
+      #   do — ehmpathy is generic infra, and ahbode opted into it. no other
+      #   org inherits them
+      printf ' ehmpathy:prep:FIREWORKS_API_KEY ehmpathy:test:FIREWORKS_API_KEY'
+      printf ' ehmpathy:prep:OPENROUTER_API_KEY ehmpathy:test:OPENROUTER_API_KEY'
+
+      # the bhrain root manifest's vendor set, at env.test — asked for 2026-09-07
+      printf ' ehmpathy:test:OPENAI_API_KEY ehmpathy:test:ANTHROPIC_API_KEY'
+      printf ' ehmpathy:test:TAVILY_API_KEY ehmpathy:test:XAI_API_KEY'
+
+      # the radio's robot identity — `radio.task.pull` pins env=prep and this key,
+      # and takes the ORG from the checkout (`getGithubTokenByAuthArg.js:40-49`)
+      #
+      # 🛑 these two cannot ride `git.grove.auth.keys.set`: `keyrack get` DELIVERS the
+      #   minted token and never the stored blob, so a get→set pipe seals a corpse
+      #   that reads green forever (`ehmpathy/rhachet#522`)
+      # 🛑 the remedy is a VAULT, never a terminal on the box — `aws.params` holds
+      #   this mech, so it is written ONCE on a laptop and every grove mints its own
+      #   token with no prompt (`rule.require.one-command-provision`)
+      printf ' ahbode:prep:EHMPATH_BEAVER_GITHUB_TOKEN'
+      printf ' ehmpathy:prep:EHMPATH_BEAVER_GITHUB_TOKEN'
+      ;;
+    aether)
+      # asked for 2026-10-04 — OPENROUTER alone; aether's other vendor keys are not rows
+      printf 'aether:prep:OPENROUTER_API_KEY aether:test:OPENROUTER_API_KEY'
+      ;;
+    # 🛑 clause 3 — no arm, no rows. a row is a HARD REQUIREMENT, so a
+    #   fallback here fails a box's verify over another org's workload
+    *) return 0 ;;
+  esac
 }
 
 # .what = declare ONE org, plus the ONE key about to be read, in the scratch yml

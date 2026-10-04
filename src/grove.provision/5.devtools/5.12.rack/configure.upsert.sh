@@ -21,9 +21,8 @@ grove_provision_5_12_rack_configure_upsert() {
   env="$(grove_provision_5_12_rack_slug_env)"
   vault="$(grove_provision_5_12_rack_slug_vault)"
   param="$(grove_provision_5_12_rack_param_name)"
-  # .what = 0. the tools this phase leans on DECLINE rather than fail
-  # .why a hard fail on an absent neighbor turns one gap into a cascade — that
-  #   neighbor's own verify already reports it (rule.require.upgrade-entries-verify-themselves)
+  # .what = 0. an absent neighbor tool DECLINES, since its own verify reports it
+  #   (rule.require.upgrade-entries-verify-themselves)
   if ! command -v rhx >/dev/null 2>&1; then
     echo "   • declined — rhx is absent, and keyrack ships inside it (5.3.brains)"
     return 0
@@ -33,15 +32,10 @@ grove_provision_5_12_rack_configure_upsert() {
     return 0
   fi
   # .what = 1. an entry already wired needs no work
-  # .why `keyrack list`, never `get` — a get would UNLOCK the key into the daemon
-  # .why no `-q`: under `set -uo pipefail`, a matched `grep -q` SIGPIPEs the list into
-  #   a 141, so the `if` reads FALSE on the case it tests for (gotcha.pipefail-grep-q)
-  # .why `env -C "$gitroot"` — the CWD is part of a keyrack READ; a manifest whose
-  #   `extends` is unvendored THROWS from elsewhere, and `2>/dev/null` empties that
-  #   into a false "no such entry" (term=keyrack.gitroot)
-  # .why a flag, never an early `return 0` — a phase that wires N things falls
-  #   through, it never returns for one alone
-  # .refs = gotcha.5-12-rack.demo=entry-vs-value
+  # .why `list`, never `get` — a get would UNLOCK the key into the daemon
+  # .why no `-q` — under pipefail a matched `grep -q` reads FALSE (gotcha.pipefail-grep-q)
+  # .why `env -C` — the CWD is part of a keyrack READ (term=keyrack.gitroot)
+  # .why a flag, never an early `return 0` — a phase that wires N things falls through
   local gitroot
   gitroot="$(grove_provision_5_12_rack_gitroot)"
   local ghwired="false"
@@ -52,10 +46,8 @@ grove_provision_5_12_rack_configure_upsert() {
     echo "   • the manifest already names ${org}.${env}.${key} — no work"
     ghwired="true"
   fi
-  # .what = 2. a git root for the cli — made even when the github entry is wired,
-  #   since the aws entry (step 5) uses it too. see `_.sh` for why it is needed
-  # .why the cli wants a git ROOT, never a git PROJECT — an earlier draft cloned this
-  #   repo here and `rhx` died in config load (gotcha.5-12-rack.demo=entry-vs-value)
+  # .what = 2. a git ROOT for the cli, never a PROJECT — step 5 uses it too
+  #   (gotcha.5-12-rack.demo=entry-vs-value)
   if [[ -e "$gitroot/rhachet.use.ts" ]]; then
     # .replace the old clone shape — this bundle owns the dir entirely
     rm -rf "$gitroot"
@@ -71,14 +63,9 @@ grove_provision_5_12_rack_configure_upsert() {
     fi
   fi
   # .what = 2b. the manifest FILE itself, before any entry can go in it
-  # .why a seat with no manifest fails the set — a manifest is per-`$HOME`, so no
-  #   seat inherits another's (term=seat); it runs unconditionally, `initKeyrack` is
-  #   idempotent by contract
-  # .why init alone is NOT enough — it writes `hosts: {}`, an empty index, so a box
-  #   can hold a manifest and a live ssm value and still answer `absent 🫧`
-  # .why the output is captured and replayed on failure — init writes no secret, so
-  #   its log holds no value to hide (rule.forbid.failhide)
-  # .refs = gotcha.5-12-rack.demo=entry-vs-value
+  # .why unconditional — a manifest is per-`$HOME` (term=seat), and init is idempotent
+  # .why not enough alone — init writes `hosts: {}`, so a box still answers `absent 🫧`
+  # .why the log is replayed on failure — init writes no secret (rule.forbid.failhide)
   local initlog
   if ! initlog="$(env -C "$gitroot" rhx keyrack init \
         --owner "$(grove_provision_5_12_rack_slug_owner)" 2>&1)"; then
@@ -91,12 +78,8 @@ grove_provision_5_12_rack_configure_upsert() {
     return 1
   fi
   # .what = 2c. an `aws.params` entry is written on the ec2 PLATFORM only
-  # 🛑 `rule.forbid.aws-params-off-ec2` — steps 3 and 4 read ssm and PUT the value
-  #   back. on a local or house grove there is no ec2 identity, so the read runs as
-  #   whatever credential the human's shell holds: it either fails the provision, or
-  #   rewires this seat's entry to `aws.params` and writes into THAT account
-  # .why the aws gate above never caught it — a laptop HAS the aws cli; the absent
-  #   fact is the identity, never the binary
+  # 🛑 `rule.forbid.aws-params-off-ec2` — off ec2, steps 3-4 would read and PUT as
+  #   the human's own credential. the absent fact is the identity, never the binary
   if ! grove_provision_5_12_rack_platform_is_ec2; then
     echo "   🌙 declined — ${org}.${env}.${key} lives in aws.params, which only an ec2 box may reach"
     echo "      ⇒ this box is '${GROVE_ENV_SERVER:-unset}': no instance role, so no aws.params read or write"
@@ -132,18 +115,13 @@ grove_provision_5_12_rack_configure_upsert() {
   fi
   # .what = 4. write the manifest entry, with the SAME bytes back into ssm
   # .why `env -C`, never a `cd` — the cwd change stays scoped to this one command
-  # 🛑 THIS WRITE IS AN OPEN SECURITY DEFECT, uncloseable here — keyrack offers no
-  #   entry-only mode, so this PUTs the SAME bytes back onto the one parameter the
-  #   whole fleet reads; every grove's role must then hold `ssm:PutParameter` on it
-  # .why that inverts the fleet-wide-READ argument that chose `aws.params` — one
-  #   COMPROMISED box can now overwrite what every other box reads, silently undoing
-  #   a human's rotation (`rule.require.github-token-at-all-camp` forbids exactly
-  #   this command, and this is that command, on every fresh seat)
-  # .the two fixes, neither lives in this repo: an entry-only write upstream
-  #   (`keyrack recipient set` the candidate), or scope the role to
-  #   `ssm:GetParameter` and let this fail LOUD
-  # .why captured and replayed only on failure — keyrack masks the secret at its own
-  #   prompt, so this log is diagnostic (rule.forbid.failhide)
+  # 🛑 AN OPEN SECURITY DEFECT, uncloseable here — keyrack has no entry-only mode, so
+  #   this PUTs onto the param the whole fleet reads, and every grove role holds
+  #   `ssm:PutParameter`: one compromised box can undo a human's rotation
+  #   (`rule.require.github-token-at-all-camp` forbids exactly this command)
+  # .the fixes, neither in this repo: an entry-only write upstream, or a role
+  #   scoped to `ssm:GetParameter` so this fails LOUD
+  # .why the log is replayed only on failure — keyrack masks the secret itself
   local setlog rc
   setlog="$(printf '%s' "$token" | env -C "$gitroot" rhx keyrack set \
               --owner "$(grove_provision_5_12_rack_slug_owner)" \
@@ -165,27 +143,14 @@ grove_provision_5_12_rack_configure_upsert() {
 }
 
 ######################################################################
-# .what = wire `ahbode.camp.AWS_PROFILE` to the literal `ambient`, and DECLARE
+# .what = wire `<org>.camp.AWS_PROFILE` to the literal `ambient`, and DECLARE
 #         every env `5.13.reach` will later set
-#
-# 🛑 .why only camp gets `ambient`, though every env runs on the ambient badge
-#   - the rack value is a profile NAME, never the credential source. every env's
-#     source is the badge — each per-env profile body carries `credential_source
-#     = Ec2InstanceMetadata`, plus the `role_arn` it hops into
-#   - camp IS the badge, so it has no hop and names it directly
-#   - ⇒ `ambient` in a REACH env names a profile with no `role_arn`, so the hop
-#     never happens and every call answers as camp
-#     (measured; `aws.reach.set`'s header carries it)
-#
-# .why  = see `_.sh`
+# .why
 #   - a consumer had no way to learn WHICH profile to reach for
-#   - all 19 of svc-chat's suites threw `AWS_PROFILE not set` on a box that already
-#     held live credentials
-#   - it declines rather than fails where no ambient identity exists — a laptop has
-#     no instance role, so a consumer aimed at `ambient` fails LATER than one aimed
-#     at an absent name; `5.6.aws.configure.upsert` declines on the same fact
-#
-# .refs = gotcha.5-12-rack.demo=entry-vs-value
+#   - 🛑 only camp gets `ambient`: camp IS the badge, and a REACH env named
+#     `ambient` has no `role_arn`, so its hop never happens
+#   - it declines where no ambient identity exists, as `5.6.aws` does
+# .refs = gotcha.5-12-rack.demo=entry-vs-value · `aws.reach.set`'s header
 ######################################################################
 grove_provision_5_12_rack_upsert_awsprofile() {
   local gitroot="$1"
@@ -210,13 +175,18 @@ grove_provision_5_12_rack_upsert_awsprofile() {
     echo "        rhx grove.provision --what 5.6.aws --mode apply"
     return 0
   fi
-  # .why a NAMED org needs a repo keyrack.yml, and `@all` does not — the throwaway
-  #   root gets a minimal declaration; this is NOT written into an ahbode repo
-  #   instead, since that repo's own `.agent/keyrack.yml` would then hold two
-  #   writers, and `5.10.repos` clones it AFTER this bundle
-  #   (rule.forbid.two-writers-on-one-artifact)
-  # .refs = gotcha.5-12-rack.demo=entry-vs-value
+  # .why a NAMED org needs a keyrack.yml — written into the throwaway root, never an
+  #   org repo, whose own would then hold two writers (rule.forbid.two-writers-on-one-artifact)
   local row org envs env
+
+  # 🛑 no org, no rows — said out loud, since a silent exit 0 would claim the badge
+  #   was wired (`rule.require.a-grove-reaches-its-own-org-only` clause 3, `rule.forbid.failhide`)
+  if [[ -z "$(grove_provision_5_12_rack_awsprofile_rows)" ]]; then
+    echo "   🌙 this run names no org, so no AWS_PROFILE row was wired"
+    grove_org_absent_say
+    return 0
+  fi
+
   for row in $(grove_provision_5_12_rack_awsprofile_rows); do
     org="${row%%:*}"
     envs="${row#*:}"
@@ -232,11 +202,8 @@ grove_provision_5_12_rack_upsert_awsprofile() {
     grove_provision_5_12_rack_declare_org "$gitroot" "$org" || return 1
 
     for env in ${envs//,/ }; do
-      # .`-q` is absent for the same reason as the gh read above
-      # .why `env -C "$gitroot"` matters MORE here — a named-org lookup reads the
-      #   `keyrack.yml` written just above; read from elsewhere the cli throws, an
-      #   empty list reads as "no entry", and the loop re-drives a live set on every
-      #   apply (define.provision-defect-shapes, "the NINTH shape")
+      # .why no `-q` and `env -C`, as step 1 — here a wrong CWD re-drives a live set on
+      #   every apply (define.provision-defect-shapes, "the NINTH shape")
       if env -C "$gitroot" rhx keyrack list --owner "$owner" 2>/dev/null \
          | grep "${org}\.${env}\.${key}" >/dev/null; then
         echo "   • the manifest already names ${org}.${env}.${key} — no work"

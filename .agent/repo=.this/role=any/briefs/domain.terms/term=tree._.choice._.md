@@ -29,7 +29,7 @@ run would ever teach the canonical word.
 
 ## .refs
 where the term is declared / used:
-- src/bash_aliases.sh                       # git_alias_tree, and `--from main|tree`
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                       # git_alias_tree, and `--from main|tree`
 - src/grove.provision/2.shell/2.2.git/configure.upsert.sh  # alias.tree registration
 - .agent/repo=.this/role=any/skills/grove.provision.sh   # `--from main|tree`
 - .agent/repo=.this/role=any/briefs/grove/reach/define.git-forest-grove-tree.md

@@ -42,7 +42,7 @@ grove_provision_4_3_1_terminfo_configure_upsert() {
   #   - `2.5.zsh` owns ~/.zshrc by BYTE, and its verify demands `cmp -s` equality
   #   - 📜 grove-1 2026-07-31: the two bundles overwrote each other, forever
   #   - ⚠️ this bundle never paid for it, since its verify accepts EITHER rc
-  #   - ⇒ zsh is served the same line from `src/zshrc.sh`, which 2.5.zsh ships
+  #   - ⇒ zsh is served the same line from `src/grove.provision/2.shell/2.5.zsh/zshrc.sh`, which 2.5.zsh ships
   #   - this bundle keeps ~/.bashrc, which no bundle byte-owns
   ####################################################################
   for rc in "$HOME/.bashrc"; do

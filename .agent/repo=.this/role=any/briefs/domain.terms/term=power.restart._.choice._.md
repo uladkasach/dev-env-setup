@@ -58,7 +58,7 @@ as `rule.forbid.the-driver-by-path`'s ~140 worked examples. found by a human's o
 
 ## .refs
 
-- `src/bash_aliases.sh` — the declaration, with the ban recorded inline where the alias stood
+- `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` — the declaration, with the ban recorded inline where the alias stood
 - `src/grove.provision/1.system/1.2.power/configure.upsert.sh` — the fix-text, repaired
 - `.agent/repo=.this/role=any/briefs/desktop/system/system.power.spec.md` — the command table
 - `.agent/repo=.this/role=any/briefs/desktop/term/howto.restore-kitty-session.md` — why the snap

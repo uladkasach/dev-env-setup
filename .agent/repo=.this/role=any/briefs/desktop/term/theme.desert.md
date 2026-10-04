@@ -55,7 +55,7 @@ palette by reference contributes no definition, so its departure takes none.
 
 ### neovim
 
-- applied via: `src/init.lua` (synced by `grove.provision.nvim`)
+- applied via: `src/grove.provision/4.terminal/4.5.nvim/init.lua` (synced by `grove.provision.nvim`)
 - method: custom highlight groups set with `vim.api.nvim_set_hl()` — no external theme plugin
 - location: `~/.config/nvim/init.lua`
 - color map:

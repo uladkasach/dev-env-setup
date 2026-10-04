@@ -44,7 +44,7 @@ warrant for the SEMANTICS.
 ## .refs
 where the term is declared / used:
 - .agent/repo=.this/role=any/skills/git.grove.push.sh
-- src/bash_aliases.sh                  # git.commit.push — the NAME's precedent, and the
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                  # git.commit.push — the NAME's precedent, and the
                                        # opposite of its subject; see the split above
 
 ## .reason

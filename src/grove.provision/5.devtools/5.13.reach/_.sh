@@ -34,24 +34,49 @@ grove_provision_5_13_reach_owner() { printf 'ehmpath'; }
 #   | the SOURCE org  | whose clones DECLARE the role + account id | `_srcorg`      |
 #   | the TARGET org  | whose account the profile REACHES into     | the row        |
 #
-#   - they agreed for every row until 2026-09-13, so one scalar spelled both
-#   - ⇒ then a grove needed reach into an EHMPATHY account, by a role that
-#     `ahbode/infrastructure` declares — because infra is what CREATES the
-#     cross-account role, whatever account it points at
-#   - a scalar cannot hold that: the account must be read from ahbode's clones
-#     while the profile is NAMED `ehmpathy.<env>.<owner>`
-#
-# ⚠️ 📜 this IS the rewrite the prior comment warned of, and its estimate held
-#   - it said a second org costs "a table plus a loop in BOTH halves", citing
-#     `5.12.rack`'s own precedent — and that is exactly what it cost
-#   - ⇒ the warning was correct and is now spent. it is kept as a record
-#     rather than a live caution (`rule.require.timeless-lessons`)
+#   - a reach into an EHMPATHY account, by a role `ahbode/infrastructure` declares,
+#     is exactly the shape a scalar cannot hold: the account is read from ahbode's
+#     clones while the profile is NAMED `ehmpathy.<env>.<owner>`
+#   - .refs = gotcha.5-13-reach.demo=per-org-rows-and-the-reap, m1
 
 # .what = the ONE org whose CLONES declare the role names and account ids
-# .why a scalar is still right HERE = it is paired with `_rolesrc`, which names
-#      one file in one repo. a second declaring org owes a second source path,
-#      so the two move together or neither does
-grove_provision_5_13_reach_srcorg() { printf 'ahbode'; }
+# .why a scalar is still right HERE = it is paired with `_rolesrc`, which names one
+#      file in one repo. a second source org owes a second source path, so the two
+#      move together or neither does
+#
+# 🔴 and it is PER-ORG — a source org names WHOSE infra declares a row
+#   - 🛑 an org with no source repo has no rows to read, so it returns empty
+#     and `_envs` returns empty beside it. both halves refuse together, which
+#     is what keeps a half-applied pair impossible
+#     (`rule.require.a-grove-reaches-its-own-org-only`, clause 3)
+#   - .refs = gotcha.5-13-reach.demo=per-org-rows-and-the-reap, m2
+grove_provision_5_13_reach_srcorg() {
+  local org="${GROVE_ORG:-}"
+  [[ -n "$org" ]] || return 0
+
+  case "$org" in
+    ahbode) printf 'ahbode' ;;
+    # the GITHUB org — `grove_org_clonedir` maps it to `~/git/aether`
+    aether) printf 'aether-auctions' ;;
+    # ⚠️ a new org lands HERE, beside a `_envs` arm and a `_srcname` arm. the
+    #   three move together — a source org with no rows reads no file, and rows
+    #   with no source org compose no arn
+    *)      return 0 ;;
+  esac
+}
+
+# .what = the ONE repo, under the source org, that holds `provision/aws.auth/`
+# .why  = it is per-org: ahbode keeps its infra in a dedicated repo, while aether
+#         keeps the same `aws.auth/` tree inside its service repo. a literal
+#         `infrastructure` sent an aether box to a repo its org does not have
+# 🛑 an org with no arm returns 1, so every path below refuses rather than guess
+grove_provision_5_13_reach_srcname() {
+  case "$(grove_provision_5_13_reach_srcorg)" in
+    ahbode)          printf 'infrastructure' ;;
+    aether-auctions) printf 'svc-aether-auctions' ;;
+    *)               return 1 ;;
+  esac
+}
 
 # .what = the rows to wire, as `<org>:<env>:<reader>:<accountKey>:<roleKey>`
 #
@@ -62,55 +87,79 @@ grove_provision_5_13_reach_srcorg() { printf 'ahbode'; }
 # .note = test borrows prep's account key; declapract retired `dev`
 # .note = prod is reader by infra's design — a power role is a separate call
 #
-# 🛑 .why ehmpathy's test AND prep are ONE account, and `demo` is no env here
-#   - `demo` names the ACCOUNT, never a tier. ehmpathy holds one non-prod
-#     account and both of its non-prod tiers land in it
-#   - measured in `ehmpathy/sdk-aws-lambda`: `.github/workflows/test.yml` and
-#     `publish.yml` both oidc into that one account, and its `.agent/keyrack.yml`
-#     declares `env.prep: [AWS_PROFILE]` — so the slug a suite READS is
-#     `ehmpathy.prep.AWS_PROFILE`, never `ehmpathy.demo.*`
-#   - ⇒ two rows, one account key. a row per TIER is what a consumer selects by
-#   - 📜 a `demo` row was wired first and died at its own callee: keyrack's
-#     `KEYRACK_VALID_ENVS` holds no such value, so the profile body landed and
-#     the rack name refused — the half-applied pair this file warns of above.
-#     the enum was the SIGNAL, never the defect: `demo` was the wrong axis
+# 🛑 `demo` names the ACCOUNT, never a tier — ehmpathy holds one non-prod account
+#      and both of its non-prod tiers land in it. so two rows, one account key, and
+#      a row per TIER is what a consumer selects by
 #
 # 🛑 .the `<reader>` field, and why one declaration source was not enough
 #   - `declmap` — the two MAPS every ahbode reach is declared in: the account from
 #     a clone's `declapract.use.yml` under `awsAccountId:`, the role from
 #     `GROVE_ROLE_NAME` in `resources.role-names.ts`
 #   - `arnconst` — a PAIR OF PLAIN CONSTS beside the arn builder, in
-#     `resources.reach-arns.ts`
+#     `resources.reach-arns.ts`. infra's own fulcrum forbids a name it does not own
+#     in a slot whose contract claims source-of-truth, so the demo pair sits there
+#   - `arnmap` — the ROLE from `GROVE_ROLE_NAME` (as `declmap`), the ACCOUNT from a
+#     `ACCOUNT_ID_*` const in `resources.reach-arns.ts` (as `arnconst`). aether's shape
 #   - ⇒ the row NAMES its reader, and no reader falls back to the other. a
 #     fallback would read a typo'd key as "the other source's job" and decline
 #     with a reason that names the wrong repo (`rule.forbid.failhide`)
 #
-# 🛑 .why the two ehmpathy rows CANNOT use `declmap`, and it is by infra's design
-#   - `GROVE_ROLE_NAME`'s keys are TIER-shaped — `prepPower`, `prodReader` — so an
-#     org-shaped `ehmpathyDemo` key would cross the axes inside the map itself
-#   - infra's own fulcrum rules that a name it does NOT OWN may not sit in a slot
-#     whose contract claims source-of-truth, so the demo pair sits beside the arn
-#     builder instead, as `ACCOUNT_ID_EHMPATHY_DEMO` + `DEMO_POWER_ROLE_NAME`
-#   - 📜 measured 2026-09-14 against `ahbode/infrastructure`'s reach branch: a
-#     grep for `ehmpathyDemo` across that tree returns ONE hit, and it is the
-#     fulcrum line that forbids the key. this row read that key for a day, so its
-#     decline said "not readable HERE" for a name that will never be readable
-#     ANYWHERE (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4)
+# 🔴 the rows are PER-ORG, and an unknown org gets ZERO
+#   - a cross-org row is the org's own OPT-IN and stays under it. that ahbode opted
+#     into ehmpathy demo says not one word about aether, or any other org
+#     (`rule.require.a-grove-reaches-its-own-org-only`)
+#
+# .refs = gotcha.5-13-reach.demo=per-org-rows-and-the-reap, m3-m5 — an
+#   opt-in is the org's own decision and does not generalize
 grove_provision_5_13_reach_envs() {
-  printf 'ahbode:test:declmap:prep:prepPower ahbode:prep:declmap:prep:prepPower ahbode:prod:declmap:prod:prodReader ehmpathy:test:arnconst:ACCOUNT_ID_EHMPATHY_DEMO:DEMO_POWER_ROLE_NAME ehmpathy:prep:arnconst:ACCOUNT_ID_EHMPATHY_DEMO:DEMO_POWER_ROLE_NAME'
+  local org="${GROVE_ORG:-}"
+  [[ -n "$org" ]] || return 0
+
+  case "$org" in
+    ahbode)
+      printf 'ahbode:test:declmap:prep:prepPower ahbode:prep:declmap:prep:prepPower ahbode:prod:declmap:prod:prodReader'
+      # ⚠️ ahbode's OPT-IN into ehmpathy demo — a cross-org reach, enumerated,
+      #   for a named account and a named role. it is not a property of groves
+      printf ' ehmpathy:test:arnconst:ACCOUNT_ID_EHMPATHY_DEMO:DEMO_POWER_ROLE_NAME'
+      printf ' ehmpathy:prep:arnconst:ACCOUNT_ID_EHMPATHY_DEMO:DEMO_POWER_ROLE_NAME'
+      ;;
+    # aether's OWN reach, read from aether's own declarations — `arnmap`, since
+    #   aether's account ids live ONLY in `resources.reach-arns.ts`. 🛑 its
+    #   declapract `awsAccountId` keys are stale and disagree across clones: most
+    #   name prod's id as `dev` (measured 2026-10-01), so `declmap` would aim
+    #   test and prep at PROD — the agreement clamp halted it
+    aether)
+      printf 'aether:test:arnmap:ACCOUNT_ID_PREP:prepPower aether:prep:arnmap:ACCOUNT_ID_PREP:prepPower aether:prod:arnmap:ACCOUNT_ID_PROD:prodReader'
+      ;;
+    # 🛑 clause 3 — no arm, no rows. a fallback here is the defect, not a
+    #   convenience: it hands one org's accounts to every other org's boxes
+    *) return 0 ;;
+  esac
 }
 
 # .what = where the `declmap` reader finds the role-name map
 # .why  = a grep, not `node` — the file is a dependency-free constants module
+# 🛑 it DERIVES its org from `_srcorg` — a hardcoded `ahbode` here would let a
+#      new org's `_envs` arm read ahbode's declarations and compose ahbode's
+#      arns, which is the 2026-09-24 defect one level down
+#
+# 🛑 the dir is `grove_org_clonedir`'s answer, never `_srcorg`'s raw value
+#   - `_srcorg` names a GITHUB org; the dir a clone lands in is keyed on the
+#     KEYRACK org, and the two diverge for at least one org today
+#   - ⇒ a raw join reaches for a dir `5.10.repos` never made, and the decline
+#     it prints reads as "infrastructure is not cloned" on a box that holds it
 grove_provision_5_13_reach_rolesrc() {
-  printf '%s/git/ahbode/infrastructure/provision/aws.auth/resources.role-names.ts' "$HOME"
+  local repo; repo="$(grove_provision_5_13_reach_srcrepo)" || return 1
+  printf '%s/provision/aws.auth/resources.role-names.ts' "$repo"
 }
 
 # .what = where the `arnconst` reader finds its pair of plain consts
 # .why  = infra holds a foreign-owned account id and role name beside the arn that
 #         composes them, rather than in either declared map — see `_envs` above
+# 🛑 derived, for the same reason `_rolesrc` is
 grove_provision_5_13_reach_arnsrc() {
-  printf '%s/git/ahbode/infrastructure/provision/aws.auth/resources.reach-arns.ts' "$HOME"
+  local repo; repo="$(grove_provision_5_13_reach_srcrepo)" || return 1
+  printf '%s/provision/aws.auth/resources.reach-arns.ts' "$repo"
 }
 
 # .what = read one `export const <KEY> = '<value>' as const;` out of a ts module
@@ -123,7 +172,8 @@ grove_provision_5_13_reach_tsconst() {
   [[ -n "$key" ]] || return 2
   [[ -f "$src" ]] || return 1
 
-  grep -m1 -E "^export const ${key}[[:space:]]*=" "$src" \
+  # ⚠️ an optional TYPE annotation is allowed — aether writes `export const X: string = '…'`
+  grep -m1 -E "^export const ${key}([[:space:]]*:[^=]*)?[[:space:]]*=" "$src" \
     | sed -E "s/.*'([^']+)'.*/\1/"
 }
 
@@ -143,6 +193,9 @@ grove_provision_5_13_reach_declsrc() {
     arnconst)
       printf 'provision/aws.auth/resources.reach-arns.ts → the plain consts beside the arn builder'
       ;;
+    arnmap)
+      printf 'provision/aws.auth/resources.role-names.ts → GROVE_ROLE_NAME (role), and resources.reach-arns.ts → ACCOUNT_ID_* (account)'
+      ;;
     *) return 2 ;;
   esac
 }
@@ -160,7 +213,8 @@ grove_provision_5_13_reach_role() {
   [[ -n "$reader" && -n "$key" ]] || return 2
 
   case "$reader" in
-    declmap)
+    # `arnmap` reads its ROLE exactly as `declmap` does — only its account differs
+    declmap|arnmap)
       src="$(grove_provision_5_13_reach_rolesrc)"
       [[ -f "$src" ]] || return 1
       # take the GROVE_ROLE_NAME block only, then the key within it
@@ -189,7 +243,7 @@ grove_provision_5_13_reach_account() {
     # 🛑 the 12-digit clamp rides HERE too — an `arnconst` id composes the same
     #    `role_arn`, so a malformed one is the same defect the declmap half
     #    already refuses. one claim, two readers, one bound
-    arnconst)
+    arnconst|arnmap)
       grove_provision_5_13_reach_tsconst \
         "$(grove_provision_5_13_reach_arnsrc)" "$key" \
         | grep -m1 -oE '^[0-9]{12}$'
@@ -201,24 +255,31 @@ grove_provision_5_13_reach_account() {
 # .what = read an org's account id for one declapract key, across every clone
 #         that declares it, and demand they AGREE
 # 🛑 .why a first-match read is unsafe, however true the premise
-#   - the glob spans EVERY clone under `~/git/<org>/`, all writable
-#   - the winner is whatever `sort` puts first, so `aaa-repo` outranks infra
+#   - the glob spans EVERY clone under `~/git/<org>/`, all writable, and the winner
+#     is whatever `sort` puts first — so `aaa-repo` outranks infra
 #   - the value becomes a `role_arn` this box then assumes into
 #   - ⇒ one altered file redirects which ACCOUNT is reached, and says so nowhere
-#   - so a disagreement halts and names the files, rather than pick a winner
-#   - same shape as the grove trust anchor's (`git.grove.trust.gen`)
+#   - so a disagreement halts and names the files, rather than pick a winner — the
+#     same shape as the grove trust anchor's (`git.grove.trust.gen`)
 # .why exactly 12 digits, not `{6,}` = an aws account id IS twelve digits, and
 #      a malformed one composes a `role_arn` that reads as an infra defect
 # .note = never echoed — it is dox, and this repo is public
-# 🛑 it globs the SOURCE org, never the row's target org
-#   - a row may reach into an account no clone of that org declares: an ehmpathy
-#     account, by a role `ahbode/infrastructure` creates, is exactly that shape
-#   - ⇒ the declaration follows `_rolesrc`, which is an ahbode repo, so the two
-#     readers stay pointed at one org and cannot drift apart
+# 🛑 it globs the SOURCE org, never the row's target org, so the two readers stay
+#      pointed at one org and cannot drift apart
+# .refs = gotcha.5-13-reach.demo=per-org-rows-and-the-reap, m9
 grove_provision_5_13_reach_account_declmap() {
   local key="$1"
   local org repo found="" found_in="" seen="" conflicts=""
-  org="$(grove_provision_5_13_reach_srcorg)"
+  # 🛑 the DIR, never `_srcorg`'s raw github name — see `_rolesrc` for why
+  org="$(grove_org_clonedir "$(grove_provision_5_13_reach_srcorg)")"
+
+  # 🛑 an EMPTY source org must never reach the glob below
+  #   `"$HOME/git/"/*/declapract.use.yml` collapses to `~/git/*/…`, which spans
+  #   EVERY org's clones on the box — so an org with no declared source would
+  #   read some other org's account id and compose a `role_arn` out of it. that
+  #   is the 2026-09-24 defect, re-entered through a path-join
+  #   (`rule.require.a-grove-reaches-its-own-org-only`, clause 3)
+  [[ -n "$org" ]] || return 1
 
   for repo in "$HOME/git/$org"/*/declapract.use.yml; do
     [[ -f "$repo" ]] || continue
@@ -267,7 +328,11 @@ grove_provision_5_13_reach_account_declmap() {
 # .why  = `_rolesrc` and `_arnsrc` name two files in one repo, so the checkout is
 #         one fact and gets one holder
 grove_provision_5_13_reach_srcrepo() {
-  printf '%s/git/%s/infrastructure' "$HOME" "$(grove_provision_5_13_reach_srcorg)"
+  local org name
+  org="$(grove_provision_5_13_reach_srcorg)"
+  [[ -n "$org" ]] || return 1
+  name="$(grove_provision_5_13_reach_srcname)" || return 1
+  printf '%s/git/%s/%s' "$HOME" "$(grove_org_clonedir "$org")" "$name"
 }
 
 # .what = bring that clone CURRENT, where safe. stdout names which:
@@ -277,24 +342,23 @@ grove_provision_5_13_reach_srcrepo() {
 #   that bundle converges PRESENCE across ~140 clones and stops, on purpose — a
 #   grove is where work happens, so a blanket pull would churn trees it does not
 #   own. but a bundle that READS another repo as a source of truth owes the
-#   currency of that ONE clone (`rule.require.bundles-own-their-dependencies`).
-#
-#   📜 measured 2026-09-18 on grove-ahbode-v20260901: the demo pair HAD merged to
-#   infrastructure's main, the box held the clone (138 of 138 "already present"),
-#   and every apply read the stale file and declined. no command on the box could
-#   close it — the deterministic clause of `rule.require.one-command-provision`,
-#   defeated by a presence guard (`define.provision-defect-shapes`, shape 6).
+#   currency of that ONE clone (`rule.require.bundles-own-their-dependencies`)
 #
 # 🛑 `--ff-only`, and NEVER a merge or a rebase
 #   the clone is a human's checkout. a fast-forward advances a branch that has
 #   not diverged and REFUSES otherwise, so this can never author a commit, drop
-#   work, or leave a conflict behind for somebody to find later.
+#   work, or leave a conflict behind for somebody to find later
 #
-# ⚠️ every non-`current` outcome is a REPORT, never a failure
-#   a dirty or ahead tree is a human mid-work, which is normal on a grove. the
-#   phase names what it found and reads whatever the clone holds.
+# ⚠️ every non-`current` outcome is a REPORT, never a failure — a dirty or ahead
+#   tree is a human mid-work, which is normal on a grove
+#
+# .refs = gotcha.5-13-reach.demo=per-org-rows-and-the-reap, m6
 grove_provision_5_13_reach_sync() {
-  local repo; repo="$(grove_provision_5_13_reach_srcrepo)"
+  local repo
+  # ⚠️ an org with no declared source names no repo, so there is no clone to
+  #   bring current — and `_envs` returns empty beside it, so no row will read
+  #   one either. `absent` is the honest word for it
+  repo="$(grove_provision_5_13_reach_srcrepo)" || { echo absent; return 0; }
 
   git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || { echo absent; return 0; }
 
@@ -326,19 +390,14 @@ grove_provision_5_13_reach_sync() {
 #     LEAVES this table takes its declaration with it and leaves both halves
 #     on every box that ever applied it
 #   - ⇒ the box's reach became a function of every row this repo EVER held,
-#     rather than of the rows it holds now. two boxes with identical trees
-#     carried different reach, by the order in which they were applied
+#     rather than of the rows it holds now
 #   - (`rule.require.one-command-provision`, its deterministic clause)
-#
-# 📜 measured 2026-09-18 on grove-ahbode-v20260901. an `ehmpathy:demo` row was
-#   wired, wrote its profile body, died at keyrack's env enum, and was rewired
-#   to `ehmpathy:test` + `ehmpathy:prep`. the row left this table and
-#   `[profile ehmpathy.demo.ehmpath]` stayed on the box — live, and it named a
-#   real role in a real account, under a profile no declaration owned.
 #
 # ⚠️ the name is composed HERE and read back by `aws.reach.get --names`, which
 #   derives it from the same writer the fence does. so the diff is between two
 #   answers to one question, never between two spellings of one rule
+#
+# .refs = gotcha.5-13-reach.demo=per-org-rows-and-the-reap, m7
 ######################################################################
 grove_provision_5_13_reach_declared_profiles() {
   local owner pair rest org env
@@ -355,30 +414,22 @@ grove_provision_5_13_reach_declared_profiles() {
 # .what = the profile name every reach fence on THIS BOX carries, one per line
 #
 # 🛑 .why it SOURCES the grammar and does not drive `rhx aws.reach.get --names`
-#   - this bundle's rule is to DRIVE the skill rather than reimplement it, and
-#     that rule still holds for every WRITE: `aws.reach.set` and
-#     `aws.reach.del` are driven, because each owns two halves and a live proof
-#   - but a READ over `rhx` is not a read of the skill's answer. rhachet writes
-#     a banner to STDOUT — measured 2026-09-18:
+#   - this bundle's rule is to DRIVE the skill rather than reimplement it, and that
+#     holds for every WRITE: `set` and `del` are driven, since each owns two halves
+#     and a live proof
+#   - but a READ over `rhx` is not a read of the skill's answer — rhachet writes a
+#     banner to STDOUT, and a caller that diffs it against a declared set reads the
+#     banner as a profile name and tries to REAP it
+#   - ⇒ so the LIST is read from the one holder of the fence grammar, in process,
+#     with no transport between the answer and its reader (`rule.forbid.failhide` —
+#     a transport that edits the payload is a reader no verdict may rest on)
 #
-#       $ rhx aws.reach.get --names | cat -A
-#       $
-#       🪨 run solid skill repo=.this/role=any/skill=aws.reach.get$
-#       $
+# ⚠️ it is bounded to the fences THIS FAMILY wrote: `_fence_list` reads only
+#   `# grove: reach` blocks, so `5.6.aws`'s own `ambient` profile and a human's
+#   hand-written `[profile …]` can never be reaped
+#   (`rule.forbid.two-writers-on-one-artifact`)
 #
-#   - ⇒ a caller that diffs those lines against a declared set reads the banner
-#     as a profile name, finds it undeclared, and tries to REAP it. the reap
-#     refuses (the name holds a space and a slash), so the phase fails — on
-#     every box, forever, over a line the skill never printed
-#   - ⇒ so the LIST is read from the one holder of the fence grammar, in
-#     process, with no transport between the answer and its reader
-#   - (`project_rhx-not-pipe-safe`; `rule.forbid.failhide` — a transport that
-#      edits the payload is a reader that cannot be trusted with a verdict)
-#
-# ⚠️ it is bounded to the fences THIS FAMILY wrote
-#   - `_fence_list` reads only `# grove: reach` blocks, so `5.6.aws`'s own
-#     `ambient` profile and a human's hand-written `[profile …]` are invisible
-#     here and can never be reaped (`rule.forbid.two-writers-on-one-artifact`)
+# .refs = gotcha.5-13-reach.demo=per-org-rows-and-the-reap, m8
 ######################################################################
 grove_provision_5_13_reach_carried() {
   local ops

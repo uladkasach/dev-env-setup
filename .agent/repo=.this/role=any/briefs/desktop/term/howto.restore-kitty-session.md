@@ -100,10 +100,10 @@ DIFFERENT bundles own:
 | trigger | mechanism | owner | reliability |
 |---------|-----------|-------|-------------|
 | battery descends past 10%, then 5% | `kitty_snap_lowbatt` systemd user timer polls every 3 min; two stages, each snaps once per discharge episode, only on the way down | `4.3.4.snapshot` | reliable — kitty still alive |
-| cli reboot / shutdown | `power.off` / `power.restart` aliases snap first | `2.7.aliases`, via `src/bash_aliases.sh` | reliable — kitty still alive |
+| cli reboot / shutdown | `power.off` / `power.restart` aliases snap first | `2.7.aliases`, via `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` | reliable — kitty still alive |
 
 ⚠️ the split is deliberate, not an oversight. one file may have one writer
-(`rule.forbid.two-writers-on-one-artifact`), and `src/bash_aliases.sh` already
+(`rule.forbid.two-writers-on-one-artifact`), and `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` already
 has one. so the bundle owns the part no alias can carry — a guard that fires
 when the human is not at the keyboard — and the aliases own the by-hand snap.
 

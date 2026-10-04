@@ -18,13 +18,13 @@ memory the human does not have.
 ## .edit command line → ctrl+e
 
 `ctrl+e` opens the current shell input in `$EDITOR` (nvim) via zsh's
-`edit-command-line` widget. see `src/zshrc.sh`.
+`edit-command-line` widget. see `src/grove.provision/2.shell/2.5.zsh/zshrc.sh`.
 
 - primary: `ctrl+e`
 - fallback: `ctrl+x ctrl+e` (zsh's own default for this widget) stays bound too
 - `ctrl+e` used to be emacs `end-of-line`; that is intentionally given up (see above)
 
-`$EDITOR` and `$VISUAL` are both `nvim` (`src/zshrc.sh`), so the command opens in
+`$EDITOR` and `$VISUAL` are both `nvim` (`src/grove.provision/2.shell/2.5.zsh/zshrc.sh`), so the command opens in
 nvim, not vim.
 
 ## .apply
@@ -35,4 +35,4 @@ grove.provision.zshrc   # then open a new shell, or: source ~/.zshrc
 
 ## .see also
 
-- `src/zshrc.sh` — the `bindkey` lines + `$EDITOR`/`$VISUAL` exports
+- `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` — the `bindkey` lines + `$EDITOR`/`$VISUAL` exports

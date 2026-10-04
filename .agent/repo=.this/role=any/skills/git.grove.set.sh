@@ -9,6 +9,11 @@
 #
 # usage:
 #   rhx git.grove.set <name> --at <user@host:port>
+#   rhx git.grove.set <name> --org aether           # the keyrack org its creds live under
+#
+# ⚠️ every flag is a FIELD-LEVEL upsert: a flag given overwrites its own field,
+#    a flag absent keeps what the entry holds, and `--nat ''` clears one
+#    (`gotcha.a-partial-write-discards-what-it-never-read`)
 ######################################################################
 set -o pipefail
 

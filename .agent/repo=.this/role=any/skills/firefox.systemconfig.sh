@@ -45,7 +45,7 @@ require_flatpak_app() {
   fi
   if ! flatpak info "$APP" &>/dev/null; then
     echo "⛈️  $APP flatpak not installed"
-    echo "   install via: source ~/git/more/dev-env-setup/src/install_env.pt1.system.basics.sh && install_firefox"
+    echo "   install it: rhx grove.provision --what 1.3.1.firefox --mode apply"
     exit 2
   fi
 }

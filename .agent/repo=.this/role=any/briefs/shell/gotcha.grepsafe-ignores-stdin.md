@@ -45,6 +45,36 @@ git show origin/main:src/bundle.upgrade.sh | tail -n 40
 does not. to search rather than read, check the file out first and give `grepsafe` a real
 path.
 
+## 🛑 .how to SEARCH a skill's stdout instead — land it, then point at it
+
+the section above covers a git blob. the shape that bites more often is a **skill's stdout**,
+because a skill's output is exactly what a reader most wants to narrow:
+
+```sh
+# 👎 the pipe is dropped; this greps the repo and finds the WORD in briefs
+rhx keyrack list --owner ehmpath | rhx grepsafe --pattern 'BEAVER' --context 5
+```
+
+⚠️ **this shape is worse than the git-blob one, and the size tell does not catch it.** a repo
+grep for a domain word returns a plausible handful of rows from the very briefs that discuss
+the subject — so the output is short, on-topic, and wrong. the 2026-07-31 measurement was
+caught by a 269MB line count; a word like `BEAVER` produces no such signal.
+
+⇒ land the output first, then give `grepsafe` the real path:
+
+```sh
+# 👍 one hop through a file, and the search reads what the skill actually said
+rhx keyrack list --owner ehmpath | rhx teesafe --into .temp/rack.list.txt
+rhx grepsafe --pattern 'BEAVER|vault|mech' --path .temp/rack.list.txt
+```
+
+`.temp/` is gitignored, so the landed copy leaves no tracked artifact. ⚠️ read what you land:
+a rack `list` prints slugs, mechs, and vaults and no secret VALUES — a skill that would emit a
+token must never be teed, even into a gitignored path.
+
+🟡 `head` / `tail` / `wc` still compose directly, so reach for those where a window is enough
+and no pattern is needed.
+
 ## .the tell
 
 if a `grepsafe` line count is wildly larger than the file you meant to search, the pipe was
@@ -52,5 +82,7 @@ ignored. treat the result as void, not as a wide match.
 
 ## .see also
 
+- `.dream/2026_09_29.grepsafe-discards-a-pipe-in-silence-rather-than-refuse-it.dream.md` — the
+  upstream cure: a four-line refusal, and why a refusal beats a stdin read
 - `gotcha.pipefail-grep-q` — the other pipe-shaped trap, where `grep -q` SIGPIPEs its producer
 - `rule.require.trust-but-verify` — a plausible-looking output is not a measurement

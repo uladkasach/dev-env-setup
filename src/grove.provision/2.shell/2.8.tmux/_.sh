@@ -43,27 +43,11 @@ grove_provision_2_8_tmux_plugin_root() {
 
 # .what = every LIVE tmux server on this box, by socket name, one per line
 #   `..._live_sockets` → `default`, `duct_worktree_mechanic`, …
-#
-# 🛑 .why a box holds MORE THAN ONE server, and why that is the whole point
-#   - a conf is read at SERVER start, so each server holds its own copy IN MEMORY
-#   - ⇒ a write to `~/.tmux.conf` reaches exactly zero live servers
-#   - and a source into the DEFAULT socket reaches exactly one of however many
-#   - 📜 2026-09-13, this laptop: 16 sockets — the duct server, a `copygate`, and
-#     14 probe corpses left by `prove.*` plays. so the count is small and it is
-#     not one, and a phase that converges only `default` leaves the rest adrift
-#
-# ⚠️ .the ducts are SESSIONS on one server, not a server each
-#   - ductwork addresses `-t "$DUCT_SESSION"`, so 74 ducts share one socket
-#   - a prior draft here claimed one `-L` server per duct and was wrong
-#   - ⇒ it changes the MAGNITUDE and not the claim: a live server still holds an
-#     in-memory conf, and a removed plugin's option still outlives its `@plugin`
-#     line, so every live server must be sourced whatever the count
-#
-# .why the SOCKET DIR is asked rather than a session list
-#   - tmux keeps one unix socket per server under `${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/`
-#   - ⇒ the dir IS the inventory, so no second list can drift from it
-#   - a stale file is left for the caller's own bounded probe to answer
-#   - ⚠️ never `tmux ls`: it speaks to ONE server and reports its SESSIONS
+# .why
+#   - 🛑 each server holds its conf IN MEMORY, so every live one must be sourced
+#   - the SOCKET DIR is the inventory, never `tmux ls` (one server's sessions)
+#   - a stale socket file is left to the caller's own bounded probe
+# .refs = gotcha.2-8-tmux.demo=plugin-root-and-two-readers, m4
 #
 # guarantee:
 #   - READ-ONLY. it lists sockets; it starts no server and it kills none
@@ -77,6 +61,21 @@ grove_provision_2_8_tmux_live_sockets() {
   for sock in "$dir"/*; do
     [[ -S "$sock" ]] || continue
     printf '%s\n' "${sock##*/}"
+  done
+}
+
+# .what = every conf tmux would load AFTER `~/.tmux.conf`, which is on disk
+# .why there can only be one: a later conf wins every option both name, so a
+#   shadow turns the repo's conf into a suggestion (m2, m10). the upsert retires
+#   each; the verify names any that tmux still reports
+#
+# stdout: one path per line, deduped — the XDG root and its fallback coincide
+grove_provision_2_8_tmux_shadow_confs() {
+  local path seen=""
+  for path in "${XDG_CONFIG_HOME:-$HOME/.config}/tmux/tmux.conf" "$HOME/.config/tmux/tmux.conf"; do
+    [[ -f "$path" && "$seen" != *"|$path|"* ]] || continue
+    seen+="|$path|"
+    printf '%s\n' "$path"
   done
 }
 
@@ -95,11 +94,8 @@ GROVE_UPGRADE_2_8_TMUX_TPM_AT="e261deb1b47614eed3400089ce7197dc68acc4eb"  # mast
 #   (`@plugin` carries no ref, so the pin cannot live in the conf)
 # to bump: read the sha you mean, then change BOTH the value and its date
 #   gh api -X GET repos/tmux-plugins/tmux-resurrect/commits/master --jq .sha
-#
-# 🛑 there is no continuum pin, and its absence is DELIBERATE — the plugin is
-#   removed, since its per-server autosave timer storms a box that runs one tmux
-#   server per duct. the measurement, and why resurrect is unaffected, sit at the
-#   site that would re-introduce it: `tmux.conf`, where the `@plugin` line was
+# 🛑 no continuum pin, DELIBERATELY — the plugin is removed. the why sits where
+#   it would come back: `tmux.conf`, at its old `@plugin` line
 GROVE_UPGRADE_2_8_TMUX_RESURRECT_AT="cff343cf9e81983d3da0c8562b01616f12e8d548"  # master, 2023-03-06
 
 # .what = which of FOUR states is a PINNED plugin dir in?
@@ -148,6 +144,199 @@ grove_provision_2_8_tmux_tpm_state() {
   [[ "$head" == "$GROVE_UPGRADE_2_8_TMUX_TPM_AT" ]] || { echo adrift; return 0; }
 
   echo whole
+}
+
+# .what = the verify's LIVE claims: every server, pane and client holds what the conf declares
+#   `..._verify_live_servers "$conf_live" "$term_declared"` → 0 = none disproven, 1 = a ✋ printed
+# .why a conf on disk proves only what the NEXT server loads — each surface below reads it at
+#   its own moment and keeps its copy (.refs = gotcha.2-8-tmux.demo=verify-from-conf-to-client)
+#
+# guarantee:
+#   - READ-ONLY, and every ask is bounded (rule.require.bounded-probes-in-verifies)
+grove_provision_2_8_tmux_verify_live_servers() {
+  local conf_live="$1" term_declared="$2"
+  local failed=0
+
+  # 🛑 no live server still runs a plugin the conf no longer names — `status-right` IS the
+  #    timer, and an unreachable socket is a corpse, so a 🌙 (m7)
+  local sockets=() haunted=() mute=0 right sock_name
+  while read -r sock_name; do
+    [[ -n "$sock_name" ]] && sockets+=("$sock_name")
+  done < <(grove_provision_2_8_tmux_live_sockets)
+
+  for sock_name in "${sockets[@]}"; do
+    right="$(timeout -k 2 5 tmux -L "$sock_name" show-options -gv status-right 2>/dev/null)" \
+      || { mute=$(( mute + 1 )); continue; }
+    [[ "$right" == *continuum* ]] && haunted+=("$sock_name")
+  done
+
+  if [[ ${#sockets[@]} -eq 0 ]]; then
+    echo "   • no tmux server up — none holds a stale conf"
+  elif [[ ${#haunted[@]} -eq 0 ]]; then
+    echo "   • ${#sockets[@]} live server(s), none runs a removed plugin's hook ✔"
+  else
+    echo "   ✋ ${#haunted[@]} of ${#sockets[@]} live tmux server(s) still run a hook" >&2
+    echo "      from tmux-continuum, which this conf no longer names" >&2
+    echo "      ⇒ each fires continuum_save.sh on every status refresh, and the" >&2
+    echo "        timer is PER SERVER with no lock between them — measured at 118" >&2
+    echo "        concurrent saves, 543% cpu, load 40 on 12 cores" >&2
+    echo "      ⇒ the conf on disk is CORRECT; these servers booted before it and" >&2
+    echo "        hold their own copy in memory" >&2
+    echo "      fix: rhx grove.provision --what 2.8.tmux --mode apply" >&2
+    echo "        (its configure.upsert sources the conf into every live server)" >&2
+    echo "      sockets: ${haunted[*]}" >&2
+    failed=$(( failed + 1 ))
+  fi
+
+  [[ "$mute" -eq 0 ]] || {
+    echo "   🌙 $mute socket(s) did not answer — a socket outlives its server, so"
+    echo "      these are most likely corpses, and a corpse runs no timer"
+  }
+
+  # 🛑 every live SERVER holds the declared default-terminal — one started before the conf
+  #    still holds `screen` (m6)
+  local term_wrong=() term_live
+  for sock_name in "${sockets[@]}"; do
+    term_live="$(timeout -k 2 5 tmux -L "$sock_name" show-options -gv default-terminal 2>/dev/null)" \
+      || continue
+    [[ -n "$term_live" ]] || continue
+    [[ "$term_live" == "$term_declared" ]] || term_wrong+=("$sock_name=$term_live")
+  done
+
+  if [[ ${#sockets[@]} -eq 0 ]]; then
+    : # no server up — the claim above already covers what the next one loads
+  elif [[ ${#term_wrong[@]} -eq 0 ]]; then
+    echo "   • every live server holds default-terminal '$term_declared' ✔"
+  else
+    echo "   ✋ ${#term_wrong[@]} live server(s) hold a default-terminal the conf does NOT declare" >&2
+    echo "      ⇒ each pane spawned there inherits that TERM and EMITS to match, so" >&2
+    echo "        an 8-colour entry clamps colour at its source — invisible to every" >&2
+    echo "        claim above, which read the conf rather than the server" >&2
+    echo "      fix: rhx grove.provision --what 2.8.tmux --mode apply" >&2
+    echo "      ⚠️ a pane that ALREADY exists keeps its spawn-time TERM, so open a" >&2
+    echo "        new window or pane to see the repair" >&2
+    printf '        %s\n' "${term_wrong[@]}" >&2
+    failed=$(( failed + 1 ))
+  fi
+
+  # 🛑 every live PANE spawned with the declared TERM, read from its child's own
+  #    `/proc/<pid>/environ`; the fix-text names a repair for a box with no human (m8)
+  local pane_bad=0 pane_ok=0 pane_mute=0 p_pid p_term
+  if [[ -r /proc/self/environ ]]; then
+    for sock_name in "${sockets[@]}"; do
+      while read -r p_pid; do
+        [[ "$p_pid" =~ ^[0-9]+$ ]] || continue
+        if [[ -r "/proc/$p_pid/environ" ]]; then
+          p_term="$(tr '\0' '\n' < "/proc/$p_pid/environ" 2>/dev/null | grep -m1 '^TERM=')" \
+            || p_term=""
+        else
+          p_term=""
+        fi
+        if [[ -z "$p_term" ]]; then
+          pane_mute=$(( pane_mute + 1 ))
+        elif [[ "${p_term#TERM=}" == "$term_declared" ]]; then
+          pane_ok=$(( pane_ok + 1 ))
+        else
+          pane_bad=$(( pane_bad + 1 ))
+        fi
+      done < <(timeout -k 2 5 tmux -L "$sock_name" list-panes -a -F '#{pane_pid}' 2>/dev/null)
+    done
+
+    if [[ $(( pane_ok + pane_bad )) -eq 0 ]]; then
+      : # no pane answered; the 🌙 below carries it
+    elif [[ "$pane_bad" -eq 0 ]]; then
+      echo "   • all $pane_ok live pane(s) spawned with TERM=$term_declared ✔"
+    else
+      echo "   ✋ $pane_bad of $(( pane_ok + pane_bad )) live pane(s) hold a TERM the conf does NOT declare" >&2
+      echo "      ⇒ TERM is copied into a pane's child AT SPAWN and never re-read, so" >&2
+      echo "        these predate the conf reaching their server. the app inside each" >&2
+      echo "        reads that TERM, concludes 8 colours, and EMITS only 8-colour" >&2
+      echo "        codes — a clamp at the SOURCE that no client feature can undo" >&2
+      echo "      ⇒ no re-apply repairs a pane. the server is already correct, so a" >&2
+      echo "        NEW pane or window spawns right; these carry their old copy until" >&2
+      echo "        they exit" >&2
+      echo "      fix, per affected pane — whichever reaches it:" >&2
+      echo "        • a pane you sit at:  open a new one (prefix c / prefix %)" >&2
+      echo "        • a grove's duct:     rhx duct.reboot --on 'duct://<grove>/<tree>/<role>'" >&2
+      echo "          ⇒ the session, its name, its scrollback, and its cwd survive;" >&2
+      echo "            only the pane's child dies, and its replacement spawns with" >&2
+      echo "            the TERM the server now declares" >&2
+      failed=$(( failed + 1 ))
+    fi
+
+    [[ "$pane_mute" -eq 0 ]] || {
+      echo "   🌙 $pane_mute pane(s) did not answer — a pane can exit mid-read, and a"
+      echo "      foreign process denies its own environ"
+    }
+  else
+    echo "   🌙 /proc is unreadable here, so a pane's spawn-time TERM cannot be observed"
+  fi
+
+  # 🛑 every ATTACHED client carries the declared features — negotiated at attach, never
+  #    again, so a sourced server leaves an old client downsampled (m9). `A…Z` as in m4
+  local want=() decl
+  while read -r decl; do
+    decl="${decl#*terminal-features }"
+    decl="${decl//\'/}"
+    decl="${decl//\"/}"
+    decl="${decl%%[[:space:]]*}"
+    [[ "$decl" == *:* ]] && want+=("$decl")
+  done < <(grep -E "^[[:space:]]*set[[:space:]]+-as[[:space:]]+terminal-features" "$conf_live" 2>/dev/null)
+
+  if [[ ${#want[@]} -eq 0 ]]; then
+    echo "   • the conf declares no terminal-features — no client claim to grade"
+  else
+    local seen=0 blind=0 stale=() c_raw c_term c_feats pair p_term p_feat
+    for sock_name in "${sockets[@]}"; do
+      while read -r c_raw; do
+        [[ "$c_raw" == A*Z ]] || continue
+        c_raw="${c_raw#A}"; c_raw="${c_raw%Z}"
+        c_term="${c_raw%%|*}"
+        c_feats="${c_raw#*|}"
+        seen=$(( seen + 1 ))
+
+        # no features at all: this tmux carries no `client_termfeatures` (3.2+)
+        if [[ -z "$c_feats" ]]; then
+          blind=$(( blind + 1 ))
+          continue
+        fi
+
+        for pair in "${want[@]}"; do
+          p_term="${pair%%:*}"
+          p_feat="${pair##*:}"
+          [[ "$c_term" == "$p_term" ]] || continue
+          [[ ",$c_feats," == *",$p_feat,"* ]] && continue
+          stale+=("$sock_name:$c_term lacks $p_feat")
+        done
+      done < <(timeout -k 2 5 tmux -L "$sock_name" list-clients \
+                 -F 'A#{client_termname}|#{client_termfeatures}Z' 2>/dev/null)
+    done
+
+    if [[ "$seen" -eq 0 ]]; then
+      echo "   • no client attached — the next attach reads the conf's features fresh"
+    elif [[ ${#stale[@]} -eq 0 && "$blind" -eq 0 ]]; then
+      echo "   • all $seen attached client(s) carry the declared features ✔ (${want[*]})"
+    elif [[ ${#stale[@]} -eq 0 ]]; then
+      echo "   🌙 $blind of $seen attached client(s) named no features, so this tmux"
+      echo "      ($(tmux -V 2>/dev/null)) carries no 'client_termfeatures' (3.2+)"
+      echo "      ⇒ the claim is unproven on this run, not disproven"
+    else
+      echo "   ✋ ${#stale[@]} attached client(s) lack a feature the conf declares" >&2
+      echo "      ⇒ features are negotiated at ATTACH and never re-read, so a client" >&2
+      echo "        that attached before this conf reached its server keeps the OLD" >&2
+      echo "        set — and an RGB-less client DOWNSAMPLES every 24-bit colour an" >&2
+      echo "        app emits: orange reads red, red reads purple" >&2
+      echo "      ⇒ no re-apply repairs this. tmux offers no way to re-negotiate a" >&2
+      echo "        live client's features, so the human's own reattach is the one" >&2
+      echo "        repair — and it costs NO session, pane, or scrollback" >&2
+      echo "      fix, per affected client: prefix d, then reattach" >&2
+      echo "        (or close and reopen the terminal window)" >&2
+      printf '        %s\n' "${stale[@]}" >&2
+      failed=$(( failed + 1 ))
+    fi
+  fi
+
+  [[ "$failed" -eq 0 ]]
 }
 
 grove_provision_2_8_tmux() {

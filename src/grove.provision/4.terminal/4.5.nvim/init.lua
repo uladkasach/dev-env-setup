@@ -50,7 +50,7 @@ vim.o.termguicolors = true
 -- ✔ .SEEN TO DISCRIMINATE, 2026-08-31 — this file, against itself
 --      the option was proven above; that says none of whether THIS config sets
 --      it early enough. so the same probe file was opened under `-u
---      src/init.lua`, and under a copy with only these three lines cut:
+--      src/grove.provision/4.terminal/4.5.nvim/init.lua`, and under a copy with only these three lines cut:
 --
 --        as shipped        → sw=8 ts=8 modeline=false   ← refused
 --        guard lines cut   → sw=7 ts=7 modeline=true    ← obeyed

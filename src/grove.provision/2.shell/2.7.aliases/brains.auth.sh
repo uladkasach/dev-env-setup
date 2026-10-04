@@ -16,10 +16,10 @@
 #      it does not cover is a clamp that will rot.
 #      `hazard.bash-aliases-parse-silently.md` records the parse half of this.
 #
-# .how it loads: the same paved pattern as `src/ductwork.sh` and `src/termwork.sh` —
-#   `src/X.sh` is copied to `~/.bash_aliases.X.sh` by `sync.devenv.bashaliases`, and
-#   sourced from the head of `~/.bash_aliases`. add one, and you must add all three:
-#   the file, the source line, and the cp in the sync alias.
+# .how it loads: the same paved pattern as `ductwork.sh` and `termwork.sh`, its two peers
+#   in this very dir — `<bundle dir>/X.sh` is copied to `~/.bash_aliases.X.sh` by
+#   `2.7.aliases`'s configure phase, and sourced from the head of `~/.bash_aliases`. add
+#   one, and you must add all three: the file, the source line, and the cp in the phase.
 #
 # vision: .behavior/v2026_07_28.brain-budget-utilization/1.vision.yield.md
 # tests:  rhx brains.auth.test   (323 cases, hermetic, no network, no real ~/.claude)

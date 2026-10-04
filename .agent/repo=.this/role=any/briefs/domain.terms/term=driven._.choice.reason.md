@@ -12,10 +12,10 @@ already in the repo's mouth — no new coinage, and its shape conforms to
 
 ## .the trigger — one word decided whether a check was a clamp or a regression
 2026-08-15. `prove.git-never-prompts` swept `src/**` on its first run and printed **five rows**
-in `src/bash_aliases.sh`:
+in `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`:
 
 ```
-   ✋ src/bash_aliases.sh:… — git fetch, with NO GIT_TERMINAL_PROMPT=0
+   ✋ src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh:… — git fetch, with NO GIT_TERMINAL_PROMPT=0
 ```
 
 every one of those rows was TRUE about the text and WRONG about the subject. those lines are
@@ -37,9 +37,9 @@ the obvious cut is by DIRECTORY, and it is wrong in both directions:
 
 | file | under `src/`? | driven? |
 |---|---|---|
-| `src/bash_aliases.sh` | yes | **no** — a human types it |
+| `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` | yes | **no** — a human types it |
 | `grove.bootstrap.sh` | **no** — repo root | yes — the readme drives it |
-| `src/git-credential-keyrack.sh` | yes | yes — **git** invokes it |
+| `src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh` | yes | yes — **git** invokes it |
 
 the third row is the one that settles it. it lives beside the human-typed artifacts, is copied
 onto a box exactly as they are, and is driven — because the caller is a program. no path

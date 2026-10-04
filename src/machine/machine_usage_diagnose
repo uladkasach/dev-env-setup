@@ -419,13 +419,13 @@ awk -v s="$SLAB_G" 'BEGIN{exit !(s>1.5)}' && \
 # leak became a load, at the worst possible moment.
 [[ "$NVIM_BURST" -eq 1 ]] && \
   concern 2 "🌪️ nvim watchdog stampede — dozens of fires in one second" \
-            "the repo has the guard; this box lacks it:  sync.devenv.nvim"
+            "the repo has the guard; this box lacks it:  rhx grove.provision --what 4.5.nvim --mode apply"
 
 # the watchdog's own log became a burden once. the repo caps it at 2MB and
 # rotates; a log past that cap means the cap never reached this machine.
 [[ "$NVIM_LOG_M" -ge 4 ]] && \
   concern 3 "📜 nvim selfwatch.log is ${NVIM_LOG_M}M — its rotation cap is absent here" \
-            "the repo caps it at 2M; sync the config:  sync.devenv.nvim"
+            "the repo caps it at 2M; converge it:  rhx grove.provision --what 4.5.nvim --mode apply"
 
 echo ""
 echo "🐈 heres what concerns me..."

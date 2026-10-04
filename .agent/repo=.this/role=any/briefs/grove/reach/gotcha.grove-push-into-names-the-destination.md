@@ -170,9 +170,9 @@ the durable fix is upstream: the ⚠️ block in `git.grove.push`'s header, and 
 if a box already carries strays, remove them by hand, and mind the two traps that cleanup
 had to learn:
 
-- a **symlink** stray (`src/nvim.md`) is invisible to `[[ -e ]]`, because `-e`
-  follows the link and the target dangles one level up. the test must be
-  `-e || -L`.
+- a **symlink** stray — an `nvim.md` landed at the seat's `src/` root, one level
+  above the bundle dir that owns it — is invisible to `[[ -e ]]`, because `-e`
+  follows the link and the target dangles. the test must be `-e || -L`.
 - `readme.md` cannot be swept by name, since the root is *supposed* to have one.
   it is swept by **content** — identical to `.agent/readme.md` ⇒ impostor.
 

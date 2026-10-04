@@ -14,7 +14,7 @@ move content from a grove to here.
 ## .refs
 where the term is declared / used:
 - .agent/repo=.this/role=any/skills/git.grove.pull.sh
-- src/bash_aliases.sh                  # git.repo.pull — the same verb, with `repo` as its object
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                  # git.repo.pull — the same verb, with `repo` as its object
 - .agent/repo=.this/role=any/briefs/domain.terms/term=git.repo.pull._.choice._.md
 
 ## .reason

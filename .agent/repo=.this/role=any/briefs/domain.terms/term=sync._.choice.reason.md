@@ -22,9 +22,14 @@ repo has two — repo→machine and remote→repo. one word for both is the over
 2026-09-03. an nvim leak fix — `neominimap` excluded from itself, plus a breaker that wipes the
 leaked buffers — sat in a worktree for a full day. the alias read:
 
-```sh
+```sh 📜
 alias sync.devenv.nvim='... cp ~/git/more/dev-env-setup/src/init.lua ~/.config/nvim/init.lua ...'
 ```
+
+⚠️ **the alias body is verbatim**, and both the alias and that path are retired — the file
+moved into `4.terminal/4.5.nvim/`, and the whole `sync.devenv.*` family was deleted by the
+`grove.provision` cutover. the quote is the evidence for the hazard below; to modernize its
+path would show an alias nobody ever ran.
 
 a hardcoded source. the worktree held the fix; the main clone did not. so the correct advice
 ("run `sync.devenv.nvim`") was advice to copy the **old file over itself**, and it would have

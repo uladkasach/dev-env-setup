@@ -28,8 +28,8 @@ must outlive the ssh connection that started it.
 ## .refs
 where the term is declared / used:
 - .agent/repo=.this/role=any/skills/git.grove.send.sh
-- src/bash_aliases.sh                  # the `git grove send` dispatcher
-- src/ductwork.sh                      # duct.open / duct.send, the default transport
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                  # the `git grove send` dispatcher
+- src/grove.provision/2.shell/2.7.aliases/ductwork.sh                      # duct.open / duct.send, the default transport
 - .agent/repo=.this/role=any/briefs/grove/provision/howto.provision-a-grove.md
 
 ## .the pair

@@ -160,7 +160,41 @@ RULES=(
   #    correct IMDS call — measured, on `5.6.aws/configure.upsert.sh:68`.
   #    ⇒ this is q11 one layer in: the exempt matched a SUBSET of the forms the
   #      subject is written in, and the row it missed was correct code.
-  "a raw fetch outside the boundary§(^|[^_[:alnum:]-])(curl|wget)[[:space:]]+(-|http|'|\")§web_fetch (src/grove.web.sh)§169\\.254\\.169\\.254|metadata-token"
+  #
+  # 🛑 .the SECOND exempt — an API READ is not a DOWNLOAD, and `web_fetch`
+  #    cannot serve one. measured 2026-09-29
+  #
+  #    this rule reddened three rows in `2.7.aliases/brains.auth.sh` and named
+  #    `web_fetch` as the fix. every one is an anthropic oauth/usage call: a
+  #    bearer header handed to curl on its STDIN CONFIG (`-K -`, so the token
+  #    stays out of `/proc`), a reply whose BODY IS THE VALUE, and a status code
+  #    the caller branches on.
+  #
+  #    `web_fetch` fetches a URL to a FILE and verifies its sha. an API read has
+  #    no artifact to pin and no sha to verify, so the named fix cannot work —
+  #    `rule.require.errors-name-the-fix`, and the exact m.7 shape: one pattern
+  #    that spans two claims whose correct answer is OPPOSITE in each.
+  #
+  # ⚠️ .the carve-out is EARNED, never claimed — it demands both halves
+  #    a bound (`-m <n>`) **and** an out-of-band `%{http_code}`. the bound is the
+  #    guarantee that DOES apply to an API read (`rule.require.bounded-probes-in-verifies`),
+  #    and the status code is what makes it an API call rather than a download:
+  #    a fetch that reads its own code out of band has read a REPLY.
+  #
+  #    ⇒ so an unbounded API call still reddens, which is correct — the wire
+  #      concern this rule serves is the STALL, and a stall is what `-m` bounds.
+  #      a claimed exemption would have dropped that half silently
+  #      (`rule.forbid.exemption-as-habit`).
+  #
+  # ⚠️ .WHICH half is measured, and which is read off the regex
+  #    the tree-green half is measured, and `--prove` re-measures the BITE on
+  #    every run (0 → 3 on a planted bare fetch, 2026-09-29).
+  #    the unbounded-API half is proven by CONSTRUCTION: both alternatives
+  #    demand `-m`, so a `%{http_code}` line with no bound is exempted by
+  #    neither and the base pattern still matches it. no probe covers it,
+  #    because `--prove` pins its delta at 3 and a fourth plant would break
+  #    that contract — so this line names the gap rather than imply a run.
+  "a raw fetch outside the boundary§(^|[^_[:alnum:]-])(curl|wget)[[:space:]]+(-|http|'|\")§web_fetch (src/grove.web.sh)§169\\.254\\.169\\.254|metadata-token|-m[[:space:]][^|]*%\\{http_code\\}|%\\{http_code\\}[^|]*-m[[:space:]]"
 
   ####################################################################
   # ⚠️ a bare `git clone` is WORSE than a bare curl, not merely equal —
@@ -673,8 +707,8 @@ say_gone() {
 # 📜 .why NO derivation stands here — measured 2026-08-31
 #
 #    a subject derived from the entrypoint's `source` lines misses
-#    `src/emoji.index.build.sh`, which a bundle runs as
-#    `bash "$GROVE_SRC/emoji.index.build.sh"` from BOTH its phases — and whose
+#    `src/grove.provision/2.shell/2.9.emoji/emoji.index.build.sh`, which a bundle
+#    runs as `bash "$GROVE_SRC/…/emoji.index.build.sh"` from BOTH its phases — whose
 #    own header records two unbounded `curl -sfL` calls. the file this reader
 #    most obviously wants is the one its subject omits: q11 one layer up, where
 #    the DERIVATION matches a subset of the forms a run reaches a file in.

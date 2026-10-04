@@ -50,7 +50,7 @@ rule states the OBLIGATION, and records that the Bash allowlist permits what it 
 
 ## .refs
 where the term is declared / used:
-- src/ductwork.sh                                  # every `duct.*` operation
+- src/grove.provision/2.shell/2.7.aliases/ductwork.sh                                  # every `duct.*` operation
 - .agent/repo=.this/role=any/skills/git.grove.send.sh
 - .agent/repo=.this/role=any/skills/git.grove.read.sh
 - .agent/repo=.this/role=any/briefs/desktop/term/howto.headless-terminal-streams.md

@@ -57,7 +57,7 @@ anything the human can trigger and observe:
 |------|---------|
 | a keybind | `ctrl+d j` → next diff boundary |
 | a chord | `ctrl+d ctrl+j` → same, with ctrl held |
-| an alias | `sync.devenv` → apply every config |
+| an alias | `grove.provision` → apply every config |
 | a rewrite | kitty turns `ctrl+j` into `shift+enter` |
 | a default | nvim opens with the minimap on |
 | an absence | `j` alone after the chord does **not** repeat it |

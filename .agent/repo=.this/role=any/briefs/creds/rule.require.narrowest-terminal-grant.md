@@ -5,7 +5,7 @@
 # **A TERMINAL-CONTROL GRANT NAMES THE NARROWEST CHANNEL ITS CALLER USES. NEVER `yes`.**
 
 for kitty, that value is **`socket-only`**. it is the value at every launch site in
-`src/termwork.sh`, and it is not a preference.
+`src/grove.provision/2.shell/2.7.aliases/termwork.sh`, and it is not a preference.
 
 ## .why a terminal grant is different from every other grant
 
@@ -112,7 +112,7 @@ what survives instead is a pair:
 | artifact | holds |
 |---|---|
 | this brief | the rule, the values table, and the measurement |
-| `src/termwork.sh`, above the launches | the same reasoning, where the edit happens |
+| `src/grove.provision/2.shell/2.7.aliases/termwork.sh`, above the launches | the same reasoning, where the edit happens |
 
 ⇒ so the reader who reaches to widen the grant meets the argument at the keyboard, and the
 free sweep is one line whenever you want it:
@@ -123,7 +123,7 @@ rhx grepsafe --pattern 'allow_remote_control' --glob 'src/**'
 
 ## .the neighbour that widens the blast radius
 
-`src/tmux.conf` sets `allow-passthrough on`, which relays a child's escape sequences to the
+`src/grove.provision/2.shell/2.8.tmux/tmux.conf` sets `allow-passthrough on`, which relays a child's escape sequences to the
 outer terminal unexamined. `2.8.tmux` carries no server gate, so a grove holds it too.
 
 that is correct for its stated purpose (image.nvim renders pngs through it) and it is a
@@ -146,6 +146,6 @@ carries a sequence to a terminal that refuses it.
 - `rule.require.security-paramount` — the general form
 - `rule.prefer.prevent-over-correct` — rung 1 of its ladder: make the wrong action
   impossible rather than gate it
-- `src/termwork.sh` — the three launch sites, with this reasoning inline
+- `src/grove.provision/2.shell/2.7.aliases/termwork.sh` — the three launch sites, with this reasoning inline
 - `src/grove.provision/4.terminal/4.3.kitty/4.3.2.emulator/configure.verify.sh` — why the
   conf's value is not the policy in force

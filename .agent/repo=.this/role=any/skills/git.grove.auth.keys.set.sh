@@ -82,6 +82,8 @@
 # options:
 #   --mode     plan (default) or apply
 #   --refresh  re-place a row the grove already answers for (a rotated key)
+#   --org      whose WORK this box does; default the entry's, else the manifest's.
+#              `5.16.keys` gates its rows on it, so a wrong one yields wrong rows
 #   --owner    keyrack owner; default ehmpath
 #
 # guarantee:
@@ -102,11 +104,12 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "git.grove.auth.keys.set — place this box's required keys onto a grove's rack"
   echo ""
   echo "usage:"
-  echo "  rhx git.grove.auth.keys.set <grove> [--mode plan|apply] [--refresh]"
+  echo "  rhx git.grove.auth.keys.set <grove> [--mode plan|apply] [--refresh] [--org <org>]"
   echo ""
   echo "options:"
   echo "  --mode     plan (default) or apply"
   echo "  --refresh  re-place a row the grove already answers for"
+  echo "  --org      whose WORK this box does; default the entry's, else the manifest's"
   echo "  --owner    keyrack owner; default ehmpath"
   echo ""
   echo "the rows come from 5.16.keys. a value is piped straight from this box's"
@@ -118,6 +121,7 @@ fi
 GROVE=""
 MODE="plan"
 REFRESH="false"
+ORG=""
 KR_OWNER="ehmpath"
 # the checkout every remote `rhx` must run from — rhachet resolves a git root
 # before it dispatches, so a bare call from $HOME dies "Not inside a Git repository"
@@ -133,6 +137,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --mode)    MODE="$2"; shift 2 ;;
     --refresh) REFRESH="true"; shift ;;
+    --org)     ORG="$2"; shift 2 ;;
     --owner)   KR_OWNER="$2"; shift 2 ;;
     --skill|--repo|--role) shift 2 ;;
     --) shift ;;
@@ -151,6 +156,82 @@ if [[ -z "$GROVE" ]]; then
 fi
 
 REPO_ROOT="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+
+######################################################################
+# the grove's ssh alias, clamped before ssh reads it as a positional
+#
+# .why = ssh takes a first positional that starts with `-` as an OPTION, and one
+#        of them (`-oProxyCommand=`) runs a command HERE. the registry's own
+#        write grammar admits a `-` at the front, so the READ clamps
+#
+# ⚠️ this block sits AHEAD of the required rows on purpose — those rows are
+#    per-ORG, and the org is derived from this registry entry. see below
+######################################################################
+REGISTRY="${GIT_FOREST_DIR:-$HOME/.git.forest}/groves/$GROVE.json"
+if [[ ! -f "$REGISTRY" ]]; then
+  echo "✋ grove '$GROVE' is not registered" >&2
+  echo "   list them: rhx git.grove.list" >&2
+  exit 2
+fi
+SSH_ALIAS=$(jq -r '.sshAlias // .name' "$REGISTRY")
+
+######################################################################
+# 🛑 the ORG — an INPUT, and the one `5.16.keys` gates its rows on
+#
+# 📜 .measured 2026-09-28 — this skill reported "declares no required rows" for
+#    EVERY grove, and had done since 2026-09-24
+#
+#    on that date `5.16.keys` made its rows PER-ORG, gated on `$GROVE_ORG`:
+#
+#      grove_provision_5_16_keys_required() {
+#        local org="${GROVE_ORG:-}"
+#        [[ -n "$org" ]] || return 0      ← this arm, every time
+#
+#    a BUNDLE runs inside `grove.provision`, which exports that var. this skill
+#    runs on a laptop and exported none, so it took the empty arm and exited 2
+#    with a sentence that names the bundle rather than itself:
+#
+#      ✋ 5.16.keys declares no required rows
+#
+#    ⇒ one set, TWO readers, and they disagreed by 10 rows: the grove's verify
+#      named every one, and the placer that exists to close them saw zero. that
+#      is `rule.forbid.two-writers-on-one-artifact` in its quietest costume —
+#      both readers call the SAME function, and only one supplies its input
+#
+# 🛑 .why the verdict is the WORST shape a refusal can take
+#    it is a false ✋ whose subject is a different file. a human reads "5.16.keys
+#    declares no required rows" and goes to edit the bundle — where the rows are
+#    plainly declared and correct (`gotcha.a-check-that-cries-wolf-gets-silenced`,
+#    m.4: a true sentence over the wrong subject). the grove meanwhile cannot be
+#    converged by the one command sanctioned to converge it
+#
+# ⚠️ .the ladder is flag > registry > manifest, and it is NOT a probe
+#    `src/grove.org.sh` argues it directly: a read of the BOX answers "whose
+#    account is this?", never "whose work does this box do" — two questions that
+#    agree today and need not. so the org is declared, never inferred
+######################################################################
+if [[ -z "$ORG" ]]; then
+  ORG=$(jq -r '.org // ""' "$REGISTRY")
+  [[ "$ORG" == "null" ]] && ORG=""
+fi
+if [[ -z "$ORG" ]]; then
+  # the manifest's own line — the same source every keyrack call in this repo
+  # already falls back to when no `--org` is passed
+  ORG=$(jq -Rr 'select(startswith("org:")) | sub("^org:[[:space:]]*";"")' \
+        < "$REPO_ROOT/.agent/keyrack.yml" 2>/dev/null | head -1)
+  ORG="${ORG//[[:space:]]/}"
+fi
+
+# 🛑 a LIVE control, not defense in depth: `$ORG` reaches a keyrack command line
+#    and a `keyrack.yml` this skill WRITES on both boxes
+if [[ -z "$ORG" || "$ORG" == *[!A-Za-z0-9._@-]* ]]; then
+  echo "✋ the org is absent or holds a character a keyrack read cannot carry: '$ORG'" >&2
+  echo "   ⇒ 5.16.keys gates its rows on the org, so with none there are no rows" >&2
+  echo "   fix: name it, or declare it on the entry —" >&2
+  echo "     rhx git.grove.auth.keys.set $GROVE --org <org>" >&2
+  echo "     rhx git.grove.set $GROVE --org <org>" >&2
+  exit 2
+fi
 
 ######################################################################
 # the required rows come from `5.16.keys`, sourced — never respelled
@@ -173,23 +254,21 @@ fi
 # shellcheck disable=SC1090
 source "$KEYS_BUNDLE"
 
-REQUIRED="$(grove_provision_5_16_keys_required)"
-[[ -n "$REQUIRED" ]] || { echo "✋ 5.16.keys declares no required rows" >&2; exit 2; }
+# 🛑 the input the bundle reads. `grove.provision` exports this on a box; here
+#    the derivation above stands in for it, so BOTH readers of the row set are
+#    handed the same key
+export GROVE_ORG="$ORG"
 
-######################################################################
-# the grove's ssh alias, clamped before ssh reads it as a positional
-#
-# .why = ssh takes a first positional that starts with `-` as an OPTION, and one
-#        of them (`-oProxyCommand=`) runs a command HERE. the registry's own
-#        write grammar admits a `-` at the front, so the READ clamps
-######################################################################
-REGISTRY="${GIT_FOREST_DIR:-$HOME/.git.forest}/groves/$GROVE.json"
-if [[ ! -f "$REGISTRY" ]]; then
-  echo "✋ grove '$GROVE' is not registered" >&2
-  echo "   list them: rhx git.grove.list" >&2
+REQUIRED="$(grove_provision_5_16_keys_required)"
+if [[ -z "$REQUIRED" ]]; then
+  echo "✋ 5.16.keys declares no required rows for org '$ORG'" >&2
+  echo "   ⇒ the rows are PER-ORG, so an org with no arm gets none — that is" >&2
+  echo "     deliberate (rule.require.a-grove-reaches-its-own-org-only), never" >&2
+  echo "     a gap to paper over here" >&2
+  echo "   ⇒ if this org DOES owe rows, they belong in the bundle's case arm:" >&2
+  echo "     src/grove.provision/5.devtools/5.16.keys/_.sh" >&2
   exit 2
 fi
-SSH_ALIAS=$(jq -r '.sshAlias // .name' "$REGISTRY")
 if [[ -z "$SSH_ALIAS" || "$SSH_ALIAS" == -* || "$SSH_ALIAS" == *[!A-Za-z0-9._@-]* ]]; then
   echo "✋ grove '$GROVE' names an ssh alias that is not a host: '$SSH_ALIAS'" >&2
   echo "   └─ ssh reads a '-' at the front as an option, and one of them" >&2
@@ -201,7 +280,7 @@ fi
 ######################################################################
 # the sink, for any byte a GROVE chose
 #
-# .why = a terminal OBEYS what it is sent, and `src/tmux.conf` sets
+# .why = a terminal OBEYS what it is sent, and `src/grove.provision/2.shell/2.8.tmux/tmux.conf` sets
 #        `set-clipboard on` — so one OSC 52 in a grove's output rewrites this
 #        human's clipboard. every relay below goes through the sink
 ######################################################################
@@ -352,9 +431,39 @@ for row in $REQUIRED; do
   #   verify green forever after — because a dead token is still bytes, and the
   #   verify counts bytes (`rule.forbid.failhide`).
   #
-  # ⇒ the repair for such a row is never a placement. `acquireForSet` guards its
-  #   own prompt on `process.stdin.isTTY`, so the key must be SET on the far box
-  #   at a terminal — and a duct pane is one, since a duct is tmux
+  # ⇒ the repair for such a row is never a placement.
+  #
+  # 🛑 .and it is never a TERMINAL ON THE GROVE either — corrected 2026-09-28
+  #   this guard's fix-text read *"set it ON the grove, in a duct pane (a tty)"*,
+  #   on the argument that `acquireForSet` guards its prompt on
+  #   `process.stdin.isTTY` and a duct pane satisfies that. every clause of that
+  #   was TRUE and the conclusion was a forbidden act:
+  #
+  #     `rule.require.one-command-provision` — "any prompt, confirm, or tty read
+  #     on the provision path = blocker" … "a prompt is fatal on a duct — a duct
+  #     is tmux, so an interactive prompt sits on the pane and EATS the next
+  #     command sent down it"
+  #
+  #   ⇒ so the fix-text named the ONE remedy the invariant forbids, and named it
+  #     as routine. a human who obeyed it either wedged the duct or broke the
+  #     invariant to close a row (`gotcha.a-check-that-cries-wolf-gets-silenced`,
+  #     m.4 — a correct verdict whose REPAIR is wrong).
+  #
+  # 🛑 .what closes it: a CENTRAL vault, written ONCE, on a human's own laptop
+  #   the stored source is a PERMANENT json blob — `{appId, installationId,
+  #   privateKey}` — and a github app private key carries no clock. only the
+  #   DELIVERED token expires. so the blob is perfectly shareable; what cannot be
+  #   shared is a `get`'s output, which is the token.
+  #
+  #   `aws.params` holds this mech (`setKeyrackAwsParamGithubApp` persists the
+  #   blob into SSM and roundtrip-verifies it under the org's own profile). that
+  #   vault is central rather than a replica, so ONE write reaches every grove,
+  #   and each box mints its own token from the blob with no prompt anywhere.
+  #   `@all.camp.GITHUB_TOKEN` already works exactly this way.
+  #
+  #   ⚠️ that one-time set DOES prompt for a pem path, and that is fine: a laptop
+  #     at a human's keyboard is not the provision path. the invariant forbids a
+  #     tty in the loop that RAISES A BOX, and this sits outside that loop
   local_mech="$(printf '%s\n' "$RACK_LIST" | awk -v s="$slug" '
     { line = $0; sub(/^[^A-Za-z@]*/, "", line) }
     line == s     { hit = 1 }
@@ -367,10 +476,12 @@ for row in $REQUIRED; do
     # 🛑 `$'\n'`, never a literal `\n` — `printf '%s'` renders this block, so a
     #   backslash-n arrives on screen as two characters and the fix reads as one
     #   unusable line (📜 measured 2026-09-07, on this guard's first run)
-    HALT_LINES+="     # $slug — set it ON the grove, in a duct pane (a tty):"$'\n'
-    HALT_LINES+="     rhx duct.open $GROVE"$'\n'
-    HALT_LINES+="     #   then, in that pane:"$'\n'
-    HALT_LINES+="     env -C \$HOME/$KR_REPO rhx keyrack set --owner $KR_OWNER --key $key --org $org --env $env --mech $local_mech"$'\n'
+    HALT_LINES+="     # $slug — its source is a permanent blob; only a get's"$'\n'
+    HALT_LINES+="     #   output expires, so file the blob CENTRALLY, once, HERE"$'\n'
+    HALT_LINES+="     #   on this laptop. ⚠️ NEVER on the grove: a tty on the"$'\n'
+    HALT_LINES+="     #   provision path is a blocker, and a prompt wedges a duct"$'\n'
+    HALT_LINES+="     rhx keyrack set --owner $KR_OWNER --key $key --org $org --env $env --mech $local_mech --vault aws.params"$'\n'
+    HALT_LINES+="     #   thereafter every grove reads the blob and mints its own"$'\n'
     continue
   fi
 

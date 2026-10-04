@@ -82,6 +82,48 @@ each row below is a measurement that shaped one clause of its header.
   root gets a minimal `keyrack.yml` that names the org and its envs; the durable fix
   belongs upstream (`rule.require.solve-at-cause`)
 
+## the row table was a flat SCALAR, so a grove held another org's badge
+
+- 📜 2026-09-24: `_awsprofile_rows` read `ahbode:camp ehmpathy:prod` as one flat list for
+  every box. so an **aether** grove was told to hold an ehmpathy profile and **no aether
+  badge of its own**
+- the camp row is the box's OWN BADGE, needed by every grove for ITS org, whatever that
+  org is — so it is composed from `GROVE_ORG` and never listed
+- every other row is a CROSS-ORG reach, and a cross-org reach is an opt-in that belongs
+  to the org which granted it (`rule.require.a-grove-reaches-its-own-org-only`)
+- 🛑 an org with no opt-in table gets its camp row and NO OTHER. it does not inherit
+  ahbode's, however convenient that would be
+- ⇒ and `camp` is granted by DERIVATION in `_declared` too, so a NEW org needs no edit to
+  hold its own badge — only to wire a REACH
+
+## ehmpathy's env set moved, twice, and neither move was a fix to the other
+
+- 📜 `ambient` was a fact about what is READABLE, never about what EXISTS in aws. ehmpathy
+  holds its own accounts; the grant and the declaration were owed
+  (uladkasach/dev-env-setup#123) and landed for the non-prod tiers
+- ⚠️ do NOT restate the absence as *"no ehmpathy account exists"* — that claim stood in
+  the header until 2026-09-06 and was wrong
+- 📜 2026-09-18: ehmpathy's `test` and `prep` LEFT `_awsprofile_rows`. `5.13.reach` now
+  wires both to a real hop into the demo account, so to list them here would be two
+  writers on one slug. their declaration lives under **ahbode**, which is why that bundle
+  parts its SOURCE org from its TARGET org
+- `prod` stays `ambient`: no ehmpathy repo declares an `awsAccountId` — all 92 of its
+  clones that carry a `declapract.use.yml` are libraries (measured 2026-09-13)
+- 🛑 `demo` is NOT declared: it names the ACCOUNT, never a tier, and keyrack's own
+  `KEYRACK_VALID_ENVS` holds no such value — a row wired that way writes the profile body
+  and then refuses the rack name
+- ⇒ a row STAYS until a hop replaces it: `ambient` is what lets `keyrack.source()` read
+  the ssm params those suites need
+
+## one yml, one org — a loop that left the last org declared
+
+- 📜 the upsert's loop left `ehmpathy` declared in the scratch yml. the verify then called
+  a **present** `ahbode.camp` entry absent, and named a fix that would have re-run the
+  same loop forever
+- the file carries one `org:` line, so it declares one org at a time, and a NAMED-org read
+  resolves against the yml IN SCOPE
+- ⇒ both halves call `_declare_org` per org, before that org's slugs are touched
+
 ## .see also
 
 - `5.12.rack/_.sh` — the header these measurements back

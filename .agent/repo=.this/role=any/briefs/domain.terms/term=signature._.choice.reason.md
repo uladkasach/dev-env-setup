@@ -29,7 +29,7 @@ the collapse is implemented **twice**, and the pair must stay in agreement:
 
 | site | why it derives the signature |
 |------|------------------------------|
-| `src/init.lua` → `as_signature()` | to dedup **at write time** (the repeat window, the tally) |
+| `src/grove.provision/4.terminal/4.5.nvim/init.lua` → `as_signature()` | to dedup **at write time** (the repeat window, the tally) |
 | `nvim.errors.review.sh` → the awk `sig` block | to group **at read time** (the rank) |
 
 they are deliberately not shared — one is lua inside nvim, the other awk in a shell reader, with no

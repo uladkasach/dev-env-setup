@@ -7,10 +7,28 @@
 #
 # .what = drives the WHOLE provision, in the one order that works:
 #
+#           0. grants  — ask the HUMAN-ONLY credentials FIRST, before any reach
 #           1. reach   — wake the tunnel, trust the host key
 #           2. ground  — push, then ONE apply. the seat WITH sudo goes first
 #           3. camper  — push, then ONE apply. the seat that does the work
 #           4. gate    — `git.grove.provision test`, with no command in between
+#
+# ⚠️ .why step 0 exists, and why it runs before the tunnel
+#         a grant only a HUMAN can make is one no bundle can converge. a pat is
+#         MINTED at github by a person; no box derives one. so its absence is
+#         not a defect a run can repair — it is a question for the human, and
+#         the cost of that question depends entirely on WHEN it is asked.
+#
+#         📜 measured 2026-09-21 on `grove-aether-v20260921`. the box provisioned
+#            both seats, then reported 15 claims, 3 of which were one absent
+#            `@all.camp.GITHUB_TOKEN`. the human was asked for it AFTER a full
+#            unattended run — so the run had to be driven twice, and the first
+#            pass answered a question nobody had been given the chance to settle.
+#
+#         ⇒ the rule this serves: **a human-only grant is asked UPFRONT, at the
+#           cheapest moment, never discovered mid-run.** a machine-fixable gap
+#           belongs in a bundle (`rule.forbid.deferred-provision-defects`); a
+#           human-only grant belongs in this step.
 #
 # .why a SKILL and not the howto = `howto.provision-a-grove.md` carried these
 #         as seven prose commands for a human to type in order. that is a skill
@@ -44,11 +62,12 @@
 #   rhx git.grove.provision boot <name>                        # plan — name the steps, run none
 #   rhx git.grove.provision boot <name> --mode apply
 #   rhx git.grove.provision boot <name> --mode apply --from 3  # resume at the camper
+#   rhx git.grove.provision boot <name> --from 0               # ask the grants alone
 #   rhx git.grove.provision boot <name> --mode apply --trust replace   # a REBUILT box
 #
 # options:
 #   --mode    plan | apply             default plan
-#   --from    first step to run (1-4)  default 1
+#   --from    first step to run (0-4)  default 0
 #   --trust   verified | replace | tofu | keep    default verified — the host key
 #             is checked against the box's OWN boot record (ec2 console / ssm).
 #             `replace` for a REBUILT box whose key changed (still verified);
@@ -59,6 +78,8 @@
 # guarantee:
 #   - exit 0 = the box provisioned AND passed the gate
 #   - exit 3 = a step did not hold; it is named, with its fix
+#              (a step-0 halt names a command for a HUMAN to run, never a repair
+#               this skill could have made)
 #   - exit 2 = bad input
 #   - exit 1 = malfunction
 ######################################################################
@@ -78,20 +99,26 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "  rhx git.grove.provision boot <name> [--mode plan|apply] [--from N] [--trust verified|replace|tofu|keep]"
   echo ""
   echo "the steps:"
+  echo "  0. grants  — ask the HUMAN-ONLY credentials first, before any reach"
   echo "  1. reach   — wake the tunnel, trust the host key"
   echo "  2. ground  — push, then ONE apply (the seat WITH sudo goes first)"
   echo "  3. camper  — push, then ONE apply (the seat that does the work)"
   echo "  4. gate    — git.grove.provision test, with no command in between"
   echo ""
   echo "the ORDER is the point: ground converges every box-wide fact, so the"
-  echo "camper's apply asks for no root at all."
+  echo "camper's apply asks for no root at all — and step 0 runs first so a"
+  echo "grant only a human can make is asked BEFORE a 45-minute unattended run,"
+  echo "never discovered as a claim at the end of one."
   echo "exit 0 = provisioned + gated | 3 = a step failed | 2 = bad input"
   exit 0
 fi
 
 GROVE=""
 MODE="plan"
-FROM=1
+# ⚠️ 0, never 1 — step 0 is the grants preflight, and it runs on EVERY default
+#    invocation. to default to 1 would make the preflight opt-in, which is the
+#    same as absent: a human who knew to ask for it did not need it.
+FROM=0
 ####################################################################
 # 🛑 the default is VERIFIED, and never `tofu`
 #
@@ -141,8 +168,8 @@ done
 }
 [[ "$MODE" == "plan" || "$MODE" == "apply" ]] || {
   echo "✋ --mode must be plan or apply" >&2; exit 2; }
-[[ "$FROM" =~ ^[1-4]$ ]] || {
-  echo "✋ --from must be 1-4" >&2; exit 2; }
+[[ "$FROM" =~ ^[0-4]$ ]] || {
+  echo "✋ --from must be 0-4" >&2; exit 2; }
 [[ "$TRUST" =~ ^(verified|tofu|replace|keep)$ ]] || {
   echo "✋ --trust must be verified, replace, tofu, or keep" >&2; exit 2; }
 [[ "$WITHIN" =~ ^[0-9]+$ ]] || {
@@ -151,6 +178,11 @@ done
 # the transport, shared so it cannot drift from every other grove read
 # (`rule.forbid.two-writers-on-one-artifact`)
 source "$(dirname "${BASH_SOURCE[0]}")/git.grove.operations.sh"
+
+# the RACK read, shared for the same reason — `_rack_profile` carries the org
+# axis and RELAYS keyrack's stderr, and `_rack_profile_fix` names the one repair
+# each state wants. seven other skills already read the rack through it
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.rack.operations.sh"
 
 RHX="${RHX:-rhx}"
 
@@ -173,12 +205,60 @@ INTO='git/more/dev-env-setup'
 #    (`rule.require.prove-the-path-the-human-runs`).
 UPGRADE='bash $HOME/git/more/dev-env-setup/src/grove.provision._.sh --mode apply'
 
+# 🛑 .the ORG is an INPUT, and a grove CANNOT derive its own
+#
+# .measured 2026-09-28 on `grove-aether-v20260921`, ground seat, first apply:
+#
+#     ✋ ahbode.test — the hop is declared, and this box is REFUSED it
+#     ✋ ahbode.prep — the hop is declared, and this box is REFUSED it
+#     ✋ ahbode.prod — the hop is declared, and this box is REFUSED it
+#     ✋ ehmpathy.test — the hop is declared, and this box is REFUSED it
+#     ✋ ehmpathy.prep — the hop is declared, and this box is REFUSED it
+#
+#    five `5.13.reach` claims, every one an ahbode/ehmpathy hop, on an AETHER box.
+#    the tree was right: `5.13.reach/_.sh` gates each row on `$GROVE_ORG` and
+#    carries only an `ahbode)` arm, so aether is owed ZERO rows.
+#
+# ⚠️ the defect is upstream of the tree — `grove_org_derive` falls back to the
+#    PUSHED `.agent/keyrack.yml`, and this repo's manifest declares `org: ahbode`.
+#    so every foreign-org grove inherits ahbode's whole reach table, and every
+#    refusal it then prints is AWS-correct (`5.13.reach/configure.verify.sh`
+#    records the same measurement from 2026-09-24).
+#
+# ⇒ the registry already holds the answer, beside `account` and `env`, so the
+#   boot reads it and passes `--org`. a `boot` that omits the flag reproduces
+#   this on every foreign-org grove, and the human would owe it by hand forever
+#   (`rule.require.one-command-provision`).
+BOOT_ORG=$(jq -r '.org // ""' \
+  "${GIT_FOREST_DIR:-$HOME/.git.forest}/groves/$GROVE.json" 2>/dev/null) || BOOT_ORG=""
+[[ "$BOOT_ORG" == "null" ]] && BOOT_ORG=""
+
+# 🛑 a LIVE clamp — this reaches a command line on a remote box
+if [[ -n "$BOOT_ORG" && "$BOOT_ORG" == *[!A-Za-z0-9._@-]* ]]; then
+  echo "✋ the registry's org holds a character a send cannot carry: '$BOOT_ORG'" >&2
+  echo "   want: [A-Za-z0-9._@-]" >&2
+  echo "   fix it: rhx git.grove.set $GROVE --org <org>" >&2
+  exit 2
+fi
+
+[[ -n "$BOOT_ORG" ]] && UPGRADE="$UPGRADE --org $BOOT_ORG"
+
 echo "🐢 heres the wave..."
 echo ""
 echo "🌱 git.grove.provision boot $GROVE --mode $MODE"
 echo "   ├─ steps: $FROM..4"
 echo "   ├─ trust: $TRUST"
 echo "   ├─ within: ${WITHIN}s per apply"
+# ⚠️ an ABSENT org is reported out loud, because its consequence is silent: the
+#    apply then derives ahbode off the pushed manifest, and a foreign-org box
+#    inherits a reach table it is refused every row of
+if [[ -n "$BOOT_ORG" ]]; then
+  echo "   ├─ org: $BOOT_ORG (the registry's)"
+else
+  echo "   ├─ org: <none> — the apply will derive it off the pushed manifest"
+  echo "   │  └─ set it if this box is not an ahbode one:"
+  echo "   │     rhx git.grove.set $GROVE --org <org>"
+fi
 echo "   └─ run"
 
 ######################################################################
@@ -520,6 +600,159 @@ drive_seat() {
     "then resume the GATE alone, once it reports done —" \
     "$RHX git.grove.provision boot $GROVE --mode apply --from 4 --trust keep"
 }
+
+######################################################################
+# 0. grants — the credentials only a HUMAN can place
+#
+# .what = one rung per grant no box can derive. each answers ✔ (it is placed),
+#         ✋ (it is genuinely absent — halt, and name the command a human runs),
+#         or 🌙 (this laptop could not tell — say so, and DO NOT halt)
+#
+# 🛑 .the third arm is the whole discipline. a preflight that cannot reach the
+#      vault has learned no fact about the grant, and to score that silence as
+#      an absence is a false ✋ — the failure that gets a check silenced
+#      (`gotcha.a-check-that-cries-wolf-gets-silenced`). to score it as a ✔ is
+#      the other half, and `rule.forbid.failhide` forbids it. so it says 🌙,
+#      names why it could not tell, and lets the run proceed.
+#
+# ⚠️ .the probe reads a NAME, never a value. `--query Parameter.Name` with no
+#      `--with-decryption` proves the parameter exists and pulls no secret into
+#      this process — existence is the whole question, and the VALUE is the
+#      box's to read through its own instance role.
+#
+# 🛑 .ONE rung, and the count is a MEASUREMENT — do not add a second by analogy
+#
+#      a grant earns a rung only where all THREE hold: human-only · placeable at
+#      minute 0 · blocks the run. the pat holds all three. two other human-only
+#      grants were applied against that test on 2026-09-23 and DECLINED:
+#
+#      | the grant | why no rung |
+#      |---|---|
+#      | the 5.13.reach cross-account trust | a human, but not at a KEYBOARD — the
+#      |   | ask is another team's roadmap, and a probe from this laptop measures
+#      |   | the LAPTOP's reach rather than the grove's. to read the trust policy
+#      |   | direct needs credentials in each TARGET account = 3 sso logins, and
+#      |   | an sso login can open a browser ⇒ the preflight turns INTERACTIVE
+#      | the EPHEMERAL_VIA_GITHUB_APP rows | a human, but not YET — the mint needs
+#      |   | a tty ON THE BOX, and at minute 0 of a first boot no box exists
+#
+#      ⇒ each is a CLAIM, and the reach ask is filed in
+#        `briefs/creds/handoff.infra.grove-account-reach.md`.
+#
+#      ⚠️ a rung for either would answer 🌙 on every run, forever. a rung whose
+#         verdict never varies reports no fact while it claims to — and it is the
+#         rung that gets `--from 1`'d past, which takes this one down with it.
+#
+#      ⇒ the full account, and the two-question test, live in
+#        `briefs/grove/provision/rule.require.ask-human-grants-upfront.md`.
+######################################################################
+
+# .what = the ssm parameter that holds the box's github token
+# .why SOURCED from the bundle that owns the name, never re-derived here — the
+#   name is one fact, and a second copy of it drifts the day the template moves
+#   (`rule.forbid.two-writers-on-one-artifact`)
+_grant_param_github_token() {
+  local owner_dir bundle
+  owner_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+  bundle="$owner_dir/src/grove.provision/5.devtools/5.12.rack/_.sh"
+  [[ -f "$bundle" ]] || return 1
+  # shellcheck disable=SC1090
+  source "$bundle" || return 1
+  grove_provision_5_12_rack_param_name
+}
+
+if [[ "$FROM" -le 0 ]]; then
+  say "├─ 0. grants"
+
+  _grant_param="$(_grant_param_github_token)" || _grant_param=""
+
+  if [[ -z "$_grant_param" ]]; then
+    say "│  └─ 🌙 could not tell — 5.12.rack/_.sh is not beside this checkout,"
+    say "│       so the parameter name has no single holder to read it from"
+  else
+    # ⚠️ the profile comes from the RACK, never from a --profile a caller typed.
+    #    a camp profile is a credential keyrack DECLARES, so a raw read is a
+    #    blocker under `rule.require.reach-credentials-through-keyrack`.
+    #
+    # 🛑 .the read goes through `_rack_profile` — never a raw `keyrack get` here
+    #
+    #    a raw `keyrack get … 2>/dev/null` carries two defects the one holder
+    #    retires at a stroke:
+    #
+    #    1. 🔴 **it GUESSED.** its empty-read arm said `— likely locked 🔒`, and
+    #       `locked 🔒` / `absent 🫧` both exit 2 with empty stdout. only the
+    #       rack's own stderr parts them — which the `2>/dev/null` threw away.
+    #       ⇒ and they want OPPOSITE repairs: an unlock, or a `keyrack set`
+    #       that has no entry-only mode and OVERWRITES whatever is live at that
+    #       slug. a reader sent to the wrong one of those two can destroy a
+    #       live credential (`term=swallow`, `term=entry`,
+    #       `rule.require.github-token-at-all-camp`'s five-cause table).
+    #
+    #    2. 🔴 **it passed no `--org`**, so it read whatever org THIS CHECKOUT's
+    #       manifest names. for a foreign-org grove that is another account's
+    #       profile entirely — the read succeeds, and answers about the wrong
+    #       account (`term=keyrack.gitroot`; the same shape rung 2 of the ready
+    #       ladder was repaired for).
+    #
+    #    ⇒ neither defect reddened one row. the first prints a plausible hint,
+    #    the second returns a real profile — so both are false ✔ shapes, and a
+    #    green page is exactly what each produced.
+    _grant_profile=""
+    if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
+      _grant_profile="$(_rack_profile camp "$BOOT_ORG")" || _grant_profile=""
+    fi
+
+    _grant_say=""
+    _grant_rc=0
+    if ! command -v aws >/dev/null 2>&1; then
+      _grant_rc=97
+      _grant_say="the aws cli is absent on this laptop"
+    elif [[ -z "${AWS_ACCESS_KEY_ID:-}" && -z "$_grant_profile" ]]; then
+      _grant_rc=97
+      _grant_say="the rack handed over no camp AWS_PROFILE — its own status is above"
+      # the repair each state wants, from the one holder that knows them apart
+      _rack_profile_fix camp "$BOOT_ORG"
+    else
+      # .why `--query Parameter.Name`: existence, with no secret pulled
+      if [[ -n "$_grant_profile" ]]; then
+        _grant_say="$(aws ssm get-parameter --profile "$_grant_profile" \
+                       --name "$_grant_param" --query Parameter.Name \
+                       --output text 2>&1)" || _grant_rc=$?
+      else
+        _grant_say="$(aws ssm get-parameter \
+                       --name "$_grant_param" --query Parameter.Name \
+                       --output text 2>&1)" || _grant_rc=$?
+      fi
+    fi
+
+    if [[ "$_grant_rc" -eq 0 && "$_grant_say" == "$_grant_param" ]]; then
+      say "│  └─ ✔ @all.camp.GITHUB_TOKEN is placed"
+    elif [[ "$_grant_rc" -eq 97 ]]; then
+      say "│  └─ 🌙 could not tell whether @all.camp.GITHUB_TOKEN is placed"
+      say "│       ⇒ $_grant_say"
+      say "│       ⇒ so this run proceeds, and 5.12.rack will report it on the box"
+    elif [[ "$_grant_say" == *ParameterNotFound* ]]; then
+      # 🛑 the ONE arm that halts, and only because the repair is a HUMAN's
+      #    alone: a pat is minted at github, so no bundle can converge it
+      halt 0 grants \
+        "@all.camp.GITHUB_TOKEN is absent, and only a human can place it" \
+        "a pat is MINTED at github — no box derives one, so no bundle converges it." \
+        "without it the grove cannot clone a private repo over https, and the" \
+        "gate's tree step fails ~45 minutes from now. place it FIRST:" \
+        "  1. mint a classic pat at github.com/settings/tokens (repo + read:org)" \
+        "  2. take camp credentials — an aws.params write needs an identity:" \
+        "     use.ahction.camp --owner admin" \
+        "  3. place it once, for the whole fleet:" \
+        "     $RHX keyrack set --owner ehmpath --key GITHUB_TOKEN --org @all --env camp --vault aws.params" \
+        "  4. then re-run this:" \
+        "     $RHX git.grove.provision boot $GROVE --mode $MODE"
+    else
+      say "│  └─ 🌙 could not tell whether @all.camp.GITHUB_TOKEN is placed"
+      say "│       ⇒ the ssm read answered: $_grant_say"
+      say "│       ⇒ an unreadable vault is NOT an absent key, so this does not halt"
+    fi
+  fi
+fi
 
 ######################################################################
 # 1. reach — the tunnel, then the host key

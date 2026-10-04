@@ -24,7 +24,7 @@ objection nobody ever re-tested, on evidence that no longer applies.
 
 on 2026-08-14 the stone `5.1.execution.from_vision` showed 11/11 reviewers terminal — 8 approved,
 3 exhausted — every one marked `cached` at `i003`/`i006`/`i007`. its guard globs `src/**/*`, and
-`src/bash_aliases.sh` had since been substantially rewritten (a key-scheme migration, two function
+`src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` had since been substantially rewritten (a key-scheme migration, two function
 renames, a new command, three deleted functions). the grades were real; their subject was gone.
 
 ## .the rule
