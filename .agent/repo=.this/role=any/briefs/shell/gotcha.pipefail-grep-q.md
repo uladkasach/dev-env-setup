@@ -207,7 +207,7 @@ the questions the play asks, so you can read its rows:
    | file | sets | note |
    |---|---|---|
    | `src/grove.provision._.sh` | `-uo` | the driver — every bundle phase inherits it |
-   | `src/git-credential-keyrack.sh` | `-uo` | git invokes it on every fetch |
+   | `src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh` | `-uo` | git invokes it on every fetch |
    | `src/backup_env.sh` | `-uo` | human-run |
    | `src/machine/kitty.snapshot.terminals.sh` | `-uo` | **unattended, systemd timer** |
    | `src/machine/machine_usage_snapshot` | `-euo` | **unattended, systemd timer** |

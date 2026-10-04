@@ -2,8 +2,8 @@
 
 ## .what
 
-in a file that BOTH bash and zsh source — `src/bash_aliases.sh`, `src/ductwork.sh`,
-`src/termwork.sh` — never write `for f in <dir>/*.ext`. use `find` fed into a `while read`.
+in a file that BOTH bash and zsh source — `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`, `src/grove.provision/2.shell/2.7.aliases/ductwork.sh`,
+`src/grove.provision/2.shell/2.7.aliases/termwork.sh` — never write `for f in <dir>/*.ext`. use `find` fed into a `while read`.
 
 ## .why
 
@@ -84,7 +84,7 @@ surface that spawns a fresh shell — plus rules like this one for the syntax th
 
 ## .where to look
 
-`src/bash_aliases.sh` still holds glob-form loops — worktree walks, `*.json`, `*.patch`. a
+`src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` still holds glob-form loops — worktree walks, `*.json`, `*.patch`. a
 `_worktrees` or `.patch` dir is routinely empty, so each is a live instance. a pattern that
 is near-certain to match (`/proc/[0-9]*`) is the low-risk end of the same defect.
 

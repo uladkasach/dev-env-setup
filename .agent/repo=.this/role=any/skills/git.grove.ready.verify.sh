@@ -194,6 +194,12 @@ _in_range() { [[ "$1" -ge "$FROM" && "$1" -le "$UPTO" ]]; }
 ######################################################################
 source "$(dirname "${BASH_SOURCE[0]}")/git.grove.operations.sh"
 
+# 🛑 the rack holder — rung 2 asks it whether THIS MACHINE holds a profile at
+#    all, before it blames the box for a credential it never had
+#    (`term=keyrack.gitroot`)
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.rack.operations.sh"
+
 ######################################################################
 # rung 1 — registry
 #
@@ -223,10 +229,44 @@ source "$(dirname "${BASH_SOURCE[0]}")/git.grove.operations.sh"
 #      READER is the hardest shape to see: every line of code is correct, and
 #      the sentence above them is not.
 ######################################################################
+######################################################################
+# the ENTRY read — hoisted ABOVE every rung, on purpose
+#
+# .what = one read of the registry entry, into EXID / ACCOUNT / ENV / ORG.
+#
+# 🛑 .why it is hoisted rather than left inside rung 1
+#    `--from N` skips the rungs beneath N. so a read that lives inside rung 1
+#    leaves its variables UNSET for every resumed climb — and the resume is the
+#    common case here, because the ladder's own halts end in `--from <rung>`.
+#
+#    ⇒ rung 2 needs ENV and ORG to reach the rack at all, and a `--from 2`
+#      climb is exactly the call the previous halt told the human to make.
+#
+# ⚠️ and it is ONE reader, never a new one. the org was read a second time
+#    further down, beside the plan that consumes it; that read is now this
+#    block's, and the two cannot drift (`…cries-wolf`, m.9).
+#
+# 🟡 an ABSENT entry is tolerated here and HALTS AT RUNG 1. this block only
+#    reads — every assertion stays in the rung that owns it, so a climb that
+#    starts at rung 1 still reports the absence as a rung-1 failure rather
+#    than as a bare jq error from above the ladder.
+######################################################################
+source ~/.bash_aliases 2>/dev/null || true
+ENTRY="${GIT_FOREST_DIR:-$HOME/.git.forest}/groves/$GROVE.json"
+EXID=""; ACCOUNT=""; ENV="camp"; GROVE_ORG_DECLARED=""
+if [[ -f "$ENTRY" ]]; then
+  EXID=$(jq -r '.exid // .name // ""' "$ENTRY")
+  ACCOUNT=$(jq -r '.account // ""' "$ENTRY")
+  ENV=$(jq -r '.env // "camp"' "$ENTRY")
+  GROVE_ORG_DECLARED=$(jq -r '.org // ""' "$ENTRY")
+  for V in EXID ACCOUNT ENV GROVE_ORG_DECLARED; do
+    [[ "${!V}" == "null" ]] && declare "$V="
+  done
+  [[ -n "$ENV" ]] || ENV="camp"
+fi
+
 if _in_range 1; then
   echo "      ├─ 1. registry"
-  source ~/.bash_aliases 2>/dev/null || true
-  ENTRY="${GIT_FOREST_DIR:-$HOME/.git.forest}/groves/$GROVE.json"
   if [[ ! -f "$ENTRY" ]]; then
     halt 1 registry \
       "no registry entry names '$GROVE', so no command can address it" \
@@ -235,9 +275,6 @@ if _in_range 1; then
       "  see what IS registered —" \
       "rhx git.grove.list"
   fi
-  EXID=$(jq -r '.exid // .name' "$ENTRY")
-  ACCOUNT=$(jq -r '.account // ""' "$ENTRY")
-  ENV=$(jq -r '.env // "camp"' "$ENTRY")
   echo "      │  ├─ exid:    $EXID"
   echo "      │  ├─ account: ${ACCOUNT:-<unset>}"
   echo "      │  └─ env:     $ENV"
@@ -268,17 +305,68 @@ fi
 # a wake is idempotent and cheap, so this rung simply drives it. its account
 # assertion is the real test: it refuses when the active credentials point at
 # an account other than the one the entry recorded.
+#
+# 🔴 .but a FAILED wake has TWO subjects, and only one of them is the box
+#    measured 2026-09-28 on `grove-aether-v20260921`. this rung printed:
+#
+#      └─ ✋ rung 2 (reach) does not hold
+#        why: the grove did not wake — see …/wake.log for the aws error
+#
+#    the box was `running`, and its duct answered `up 12 min` one command
+#    earlier. the real cause sat in that very log: `aether.camp.AWS_PROFILE
+#    status: locked 🔒` — a fact about THIS MACHINE's rack, not about the box.
+#
+# ⚠️ the verdict was not merely mis-worded, it was WRONG: reach held. and the
+#    fix-text it printed was worse than useless — `keyrack unlock --env camp`
+#    with no `--org` unlocks ANOTHER account's profile for a foreign-org box,
+#    which `_rack_profile_fix` warns about by name. so the gate handed out the
+#    one command its own holder says looks like a pass and is not.
+#
+# ⇒ the cure is to ask the LOCAL subject first. the rack read is free, local,
+#   and deterministic, so a halt on it names the credential and the wake is
+#   never reached. a wake that fails AFTER it is then genuinely about the box.
+#
+# 🟡 and this is not a grep of the wake log. keying on another component's
+#   stderr would make this rung depend on that component's output FORMAT — the
+#   invisible dependency `gotcha.the-duct-returns-the-send-not-the-answer`
+#   names. `_rack_profile` is a direct read, so the discriminator reads its own
+#   subject (`…cries-wolf`, q15).
+#
+# ✔ .PROVEN BOTH DIRECTIONS 2026-09-28 — and with NO deliberate break, because
+#   a locked credential was already live on one org and not the other:
+#     · locked   → `grove-ahbode-v20260811`, org ahbode, `--from 2`:
+#         ✋ THIS MACHINE holds no aws profile for env=camp org=ahbode
+#            — the box is unjudged, never unwell
+#         fix: rhx git.grove.rack.unlock --org ahbode --env camp --key AWS_PROFILE
+#     · unlocked → `grove-aether-v20260921`, org aether, rungs 1..5:
+#         ✔ awake · ✔ 176 · ✋ 0 on both seats · ✔ every bundle verify held
+#
+#   ⚠️ the two boxes differ ONLY in whether this laptop held their org's
+#     profile, so the pair isolates the discriminator and no other variable.
 ######################################################################
 if _in_range 2; then
   echo "      ├─ 2. reach"
+
+  # the LOCAL subject — does this machine hold a profile for that box's org?
+  if ! _rack_profile "$ENV" "$GROVE_ORG_DECLARED" >/dev/null; then
+    halt 2 reach \
+      "THIS MACHINE holds no aws profile for env=$ENV${GROVE_ORG_DECLARED:+ org=$GROVE_ORG_DECLARED} — the box is unjudged, never unwell" \
+      "rhx git.grove.rack.unlock${GROVE_ORG_DECLARED:+ --org $GROVE_ORG_DECLARED} --env $ENV --key AWS_PROFILE" \
+      "" \
+      "  ⚠️ a plain 'keyrack unlock --env $ENV' is the WRONG command for a" \
+      "  foreign-org box: it unlocks another account's profile and looks" \
+      "  like a pass. the org-scoped unlock above is the one that reaches."
+  fi
+
+  # the REMOTE subject — now a failure here really is about the box
   if ! rhx git.grove.wake "$GROVE" >"$LOGDIR"/wake.log 2>&1; then
     halt 2 reach \
-      "the grove did not wake — see $LOGDIR/wake.log for the aws error" \
-      "rhx keyrack unlock --owner ehmpath --env camp" \
+      "the grove did not wake, and the rack DID hand over a profile — so this is the box" \
       "rhx git.grove.wake $GROVE" \
       "" \
-      "  a wake is idempotent, so a second attempt is free. a box resumed" \
-      "  from hibernate often needs one." \
+      "  a wake is idempotent, so a second attempt is free — and a box resumed" \
+      "  from hibernate often needs one, because a large box can outrun the" \
+      "  aws waiter's bound on its first descent." \
       "" \
       "  read what it said —" \
       "tail -30 $LOGDIR/wake.log"
@@ -377,6 +465,49 @@ _ask_bare() {
 GROUND="$GROVE.ground"
 GROUND_ENTRY="${GIT_FOREST_DIR:-$HOME/.git.forest}/groves/$GROUND.json"
 [[ -f "$GROUND_ENTRY" ]] || GROUND=""
+
+######################################################################
+# 🛑 the ORG a plan is judged under is an INPUT, and a grove cannot derive it
+#
+# .measured 2026-09-28 on `grove-aether-v20260921`, rung 4, after BOTH seats
+#  had converged clean with `--org aether`:
+#
+#     ├─ grove-aether-v20260921.ground — ✔ 233 · ✋ 7
+#
+#  seven claims on a box whose own applies raised none. every one an
+#  ahbode/ehmpathy row: five in `5.13.reach`, two in `5.16.keys`
+#  (`ahbode.prep.EHMPATH_BEAVER_GITHUB_TOKEN`, `ehmpathy.prep.…`).
+#
+# ⚠️ the cause is not the tree. both bundles gate every row on `$GROVE_ORG`,
+#    and an AETHER box is owed ZERO rows in each. the plan this rung sends
+#    carried no `--org`, so `grove_org_derive` fell back to the PUSHED
+#    `.agent/keyrack.yml` — which declares `org: ahbode` — and the box was
+#    judged against another org's whole table.
+#
+# 🔴 and this is the shape that decays a gate. every refusal it printed was
+#    AWS-correct, with a named fix and a runnable command, so the page reads
+#    as a real 7-claim box. a human who runs those fixes converges no row and
+#    learns the gate lies (`gotcha.a-check-that-cries-wolf-gets-silenced`)
+#
+# ⇒ the registry holds the answer, beside `account` and `env`. read it here,
+#   once, and carry it into the plan — the same read `git.grove.provision boot`
+#   makes for its applies, so the two cannot disagree on the org of one box
+######################################################################
+# ⚠️ the read itself is HOISTED — see `the ENTRY read` above the ladder. do NOT
+#    restore it here: that makes a SECOND reader of the entry beside rung 1's,
+#    and leaves it unset for every rung beneath its own line — so rung 2 cannot
+#    name the org it needs (`…cries-wolf`, m.9).
+
+# 🛑 a LIVE clamp — this reaches a command line on a remote box
+if [[ -n "$GROVE_ORG_DECLARED" && "$GROVE_ORG_DECLARED" == *[!A-Za-z0-9._@-]* ]]; then
+  echo "✋ the registry's org holds a character a send cannot carry: '$GROVE_ORG_DECLARED'" >&2
+  echo "   want: [A-Za-z0-9._@-]" >&2
+  echo "   fix it: rhx git.grove.set $GROVE --org <org>" >&2
+  exit 2
+fi
+
+PLAN_ORG_FLAG=""
+[[ -n "$GROVE_ORG_DECLARED" ]] && PLAN_ORG_FLAG=" --org $GROVE_ORG_DECLARED"
 
 ######################################################################
 # rung 3 — duct
@@ -499,7 +630,74 @@ if _in_range 4; then
     echo "      │  │            sudo-less seat cannot see the system half"
   fi
 
+  # ⚠️ report the org the plan is judged under. an ABSENT one is the loud case,
+  #    because its consequence is silent: the plan then derives ahbode off the
+  #    pushed manifest, and a foreign-org box is judged against ahbode's table
+  if [[ -n "$GROVE_ORG_DECLARED" ]]; then
+    echo "      │  ├─ org: $GROVE_ORG_DECLARED (the registry's)"
+  else
+    echo "      │  ├─ org: <none> — the plan will derive it off the pushed manifest"
+    echo "      │  │       set it if this box is not an ahbode one:"
+    echo "      │  │         rhx git.grove.set $GROVE --org <org>"
+  fi
+
+  # ⚠️ declared OUTSIDE the loop, because the halt comes after it — see the 🛑
+  #    block beside `$CLAIMS` for why a per-seat halt left the second seat dark
+  SEATS_DIED=()
+  SEATS_UNCONVERGED=()
+
   for SEAT in "${SEATS[@]}"; do
+    ##################################################################
+    # 🛑 look up the seat's SHELL first, OUT LOUD, before any silenced probe
+    #
+    # every probe below ends `>/dev/null 2>&1`, which is right for its own
+    # output — `test -f` says all it has to say in its exit code. but
+    # `_ask_at` calls `_shell_at` FIRST, and `_shell_at` exits 3 with its
+    # whole diagnosis on stderr. that `2>&1` swallows the diagnosis, and the
+    # `exit 3` then fires with not one line printed.
+    #
+    # 📜 .MEASURED 2026-09-28 — rung 4, against a grove that was STOPPED
+    #
+    #        ├─ 4. tree
+    #        │  ├─ seats: …ground (converges), … (works)
+    #        │  ├─ org: aether (the registry's)
+    #      🪨 run solid skill … git.grove.ready.verify
+    #         └─ 💥 failed with an error
+    #
+    #   exit 3, no `why:`, no `fix:`, for a cause that is ONE command to
+    #   repair — `rhx git.grove.wake <grove>`. the box was simply asleep.
+    #
+    # ⚠️ and this is rung 3's measurement, recurred at rung 4. that one was
+    #   repaired with `_ask_bare`, which fixed the rung and not the SHAPE:
+    #   the shape is a fallible step INSIDE a silenced context, and it recurs
+    #   wherever a probe hides stderr it did not author
+    #   (`rule.forbid.failhide`, `rule.require.errors-name-the-fix`).
+    #
+    # ⇒ the repair is to HOIST the fallible step out, un-silenced. asked here,
+    #   its fault prints and exits loud; asked inside a probe, it cannot. the
+    #   probes below then keep their redirects honestly, because the only
+    #   stream left for them to hide is their own stdout.
+    #
+    # ✔ .PROVEN BOTH DIRECTIONS 2026-09-28, against a box deliberately hibernated
+    #
+    #   · broken   → the fault PRINTS: `✋ could not learn which shell serves …`
+    #     with a `why:` and a `fix:`, exit 3 — where the same cause gave exit 3
+    #     and not one line before the hoist
+    #   · restored → `✔ 176 · ✋ 0` on both seats, `✔ every bundle verify held`
+    #
+    # ⚠️ and the break found a SECOND defect the green path CANNOT show: the text
+    #   that printed asserted ONE cause (a pane another job holds) for a code with
+    #   several, so the repair it named read a pane that never existed while the
+    #   box slept. the verdict was right and its reason named another subject —
+    #   m.4, recurred INSIDE the repair for a silent halt. `_shell_at` now names
+    #   every cause with its own fix, cheapest-first
+    #   (`git.grove.operations.sh`, its 97 block)
+    #
+    # ⇒ so a LOUD fault is not yet a CORRECT one. the hoist bought the first, and
+    #   only the deliberate break could show the second was owed.
+    ##################################################################
+    _shell_at "$SEAT" >/dev/null || exit 3
+
     # ⚠️ the CHECKOUT first, as its own question. a box with no checkout and a
     #    box whose bundles have not converged both produce "0 ✔", and they take
     #    opposite repairs: one needs the repo pushed onto it, the other an apply
@@ -577,7 +775,10 @@ if _in_range 4; then
     fi
 
     TREE_LOG="$LOGDIR/tree.$SEAT.log"
-    _ask_at "$SEAT" "bash $GROVE_ENTRY --mode plan" >"$TREE_LOG" 2>&1 || true
+    # ⚠️ `$PLAN_ORG_FLAG` carries the REGISTRY's org, derived once above. without
+    #    it the plan judges a foreign-org box against ahbode's whole table, and
+    #    every refusal reads correct — see the 🛑 block beside `GROUND=`
+    _ask_at "$SEAT" "bash $GROVE_ENTRY --mode plan$PLAN_ORG_FLAG" >"$TREE_LOG" 2>&1 || true
 
     # judge the TALLY, never the exit code. a plan that ran no verify at all
     # would exit 0 and prove no bundle (`rule.forbid.failhide`)
@@ -599,36 +800,89 @@ if _in_range 4; then
     MARKS=$(_count '✔' "$TREE_LOG")
     echo "      │  ├─ $SEAT — ✔ $MARKS · ✋ $CLAIMS"
 
+    ##################################################################
+    # 🛑 print the claims BESIDE the number, and record the seat — never halt here
+    #
+    # two defects, one edit, and each was measured on this rung:
+    #
+    # 1. the claims were not printed at all. the halt said `which bundles
+    #    claimed — grep -B2 '✋' <log>`, and `grep` is not on a driver's
+    #    permitted command set — so the one line that answers *which* was the
+    #    one line the driver is refused. a fix-text that cannot be run names no
+    #    fix (`rule.require.errors-name-the-fix`). ⇒ the rung already holds the
+    #    log, so it prints the headlines itself (`_say_claims`).
+    #
+    # 2. 🔴 a halt INSIDE this loop leaves the SECOND seat unjudged, forever
+    #    the rung halts at the first seat that does not hold, so a claim on
+    #    ground hides the camper's whole verdict. that is tolerable for a claim
+    #    a driver can clear — the next climb reads it. it is NOT tolerable for a
+    #    claim only a HUMAN can clear: ground then fails every climb, and the
+    #    camper's state is dark for as long as the credential is owed.
+    #
+    #    .measured 2026-09-28, grove-ahbode-v20260811: ground carried exactly 2
+    #      claims, both `EHMPATH_BEAVER_GITHUB_TOKEN` rows whose repair is a
+    #      human's paste on a laptop (a mint-only mech has no rack-readable
+    #      source). so rung 4 could never report the camper again, and the
+    #      camper's own 2 rows were knowable only by a hand-read of its log.
+    #
+    # ⇒ so the loop COLLECTS and the halt comes after it. a seat's verdict is
+    #   never withheld on account of a seat before it, and the halt names every
+    #   seat that failed at once — which is also one fewer remote plan per climb
+    #   than a halt-then-resume loop costs.
+    ##################################################################
+    if [[ "$CLAIMS" -gt 0 ]]; then
+      mapfile -t CLAIM_LINES < <(_say_claims "$TREE_LOG")
+      for I in "${!CLAIM_LINES[@]}"; do
+        if [[ "$I" -eq $(( ${#CLAIM_LINES[@]} - 1 )) ]]; then
+          echo "      │  │  └─ ${CLAIM_LINES[$I]}"
+        else
+          echo "      │  │  ├─ ${CLAIM_LINES[$I]}"
+        fi
+      done
+    fi
+
     # the checkout is proven present above, so a plan that marks NO ✔ did not
     # merely find a bare box — it never reached a verify at all
     if [[ "$MARKS" -eq 0 ]]; then
-      halt 4 tree \
-        "the checkout is on seat '$SEAT', yet the plan marked no ✔ at all — the run died before it reached one verify" \
-        "rhx git.grove.send $SEAT --reply \\" \
-        "  --what 'bash $GROVE_ENTRY --mode plan'" \
-        "" \
-        "  read what the plan said —" \
-        "tail -40 $TREE_LOG"
-    fi
-    if [[ "$CLAIMS" -gt 0 ]]; then
-      halt 4 tree \
-        "$CLAIMS bundle verify(s) did not hold on seat '$SEAT' — that seat is not yet converged" \
-        "rhx git.grove.send $SEAT --bare --why 'no tmux yet' \\" \
-        "  --detach --log '\\\$HOME/grove.provision.log' \\" \
-        "  --what 'bash $GROVE_ENTRY --mode apply'" \
-        "" \
-        "  ⚠️ DETACHED on purpose. a full apply outruns an ssh connection, and a" \
-        "     grove can sleep mid-run — a detached job owns its own session." \
-        "" \
-        "  ⚠️ if this seat has NO sudo, the apply will claim on every system" \
-        "     bundle and each claim will read as 'the config is absent'. prove" \
-        "     the seat before you trust its verdict —" \
-        "rhx git.grove.send $SEAT --reply --play prove.ground-seat-converges" \
-        "" \
-        "  which bundles claimed —" \
-        "grep -B2 '✋' $TREE_LOG"
+      SEATS_DIED+=("$SEAT")
+    elif [[ "$CLAIMS" -gt 0 ]]; then
+      SEATS_UNCONVERGED+=("$SEAT ($CLAIMS)")
     fi
   done
+
+  # ⚠️ a run that DIED is reported first and alone. its cause is upstream of
+  #    every claim, so an apply aimed at it repairs the wrong subject
+  #    (`rule.require.solve-at-cause`)
+  if [[ "${#SEATS_DIED[@]}" -gt 0 ]]; then
+    halt 4 tree \
+      "the checkout is on ${SEATS_DIED[*]}, yet the plan marked no ✔ at all — the run died before it reached one verify" \
+      "rhx git.grove.send ${SEATS_DIED[0]} --reply \\" \
+      "  --what 'bash $GROVE_ENTRY --mode plan$PLAN_ORG_FLAG'" \
+      "" \
+      "  read what the plan said —" \
+      "tail -40 $LOGDIR/tree.${SEATS_DIED[0]}.log"
+  fi
+  if [[ "${#SEATS_UNCONVERGED[@]}" -gt 0 ]]; then
+    halt 4 tree \
+      "bundle verify(s) did not hold on ${SEATS_UNCONVERGED[*]} — each claim is named above, under the seat that raised it" \
+      "per seat, ground FIRST —" \
+      "rhx git.grove.send <seat> --bare --why 'no tmux yet' \\" \
+      "  --detach --log '\\\$HOME/grove.provision.log' \\" \
+      "  --what 'bash $GROVE_ENTRY --mode apply$PLAN_ORG_FLAG'" \
+      "" \
+      "  ⚠️ DETACHED on purpose. a full apply outruns an ssh connection, and a" \
+      "     grove can sleep mid-run — a detached job owns its own session." \
+      "" \
+      "  ⚠️ read each claim before you apply. a claim whose repair is a HUMAN's" \
+      "     paste — a mint-only credential has no rack-readable source — is one" \
+      "     no apply on this box can ever clear, and a tty on the provision" \
+      "     path is itself a blocker." \
+      "" \
+      "  ⚠️ if a seat has NO sudo, the apply will claim on every system" \
+      "     bundle and each claim will read as 'the config is absent'. prove" \
+      "     the seat before you trust its verdict —" \
+      "rhx git.grove.send <seat> --reply --play prove.ground-seat-converges"
+  fi
   echo "      │  └─ ✔ every bundle verify held"
 fi
 

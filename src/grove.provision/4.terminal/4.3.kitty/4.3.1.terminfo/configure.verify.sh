@@ -27,7 +27,7 @@ grove_provision_4_3_1_terminfo_configure_verify() {
 
   # both rc files are read though configure.upsert writes only ~/.bashrc —
   # `2.5.zsh` byte-owns ~/.zshrc (cp + cmp -s equality), so the line ships
-  # inside `src/zshrc.sh` instead, and `2.5.zsh` delivers it. this asks "is
+  # inside `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` instead, and `2.5.zsh` delivers it. this asks "is
   # the declaration on disk?", never "did I write it?" — so one grep proves
   # both shells, and stays green on the healthy zsh case
   for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do

@@ -43,7 +43,7 @@ set -uo pipefail
 #         `ec2:CreateTags` may write — and the boxes this skill reports on are
 #         GROVES, which are assumed compromised. so `\(.Key)=\(.Value)` is a
 #         grove-authored string on its way to a terminal that OBEYS bytes, and
-#         `src/tmux.conf` sets `set-clipboard on`: one OSC 52 in a tag writes
+#         `src/grove.provision/2.shell/2.8.tmux/tmux.conf` sets `set-clipboard on`: one OSC 52 in a tag writes
 #         this human's clipboard, and the next paste is a command they vouch for.
 #
 #         ⚠️ `.AgentVersion` is the same shape one layer out — it is reported BY
@@ -85,18 +85,29 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "aws.ec2.get"
   echo ""
   echo "usage:"
-  echo "  rhx aws.ec2.get --tag <key=value> [--tag ...] [--env <env>] [--state <state|all>]"
-  echo "  rhx aws.ec2.get --id <instance-id> [--env <env>]"
+  echo "  rhx aws.ec2.get --tag <key=value> [--tag ...] [--env <env>] [--org <org>] [--state <state|all>]"
+  echo "  rhx aws.ec2.get --id <instance-id> [--env <env>] [--org <org>]"
   echo ""
   echo "options:"
   echo "  --tag    key=value tag filter; repeatable (all must match)"
   echo "  --id     instance id; skips the tag lookup"
   echo "  --env    aws env for credentials via keyrack; default camp"
+  echo "  --org    keyrack org whose credential to read; default the manifest's."
+  echo "           ⚠️ a box in ANOTHER org needs this — without it the read lands"
+  echo "           in this checkout's account and reports an empty tree"
   echo "  --state  instance state filter, or 'all'; default all"
   exit 0
 fi
 
+# 🛑 the rack read for a FOREIGN org needs a scratch gitroot, and that holder is
+#    where it lives. an `aws.*` skill reaches for it because the capability is
+#    generic — read this laptop's rack for ANY org — and `aws.reach.set` already
+#    carries the same dance inline (`term=keyrack.gitroot`)
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.rack.operations.sh"
+
 ENV="camp"
+ORG=""
 STATE="all"
 ID=""
 SSM="false"
@@ -107,6 +118,7 @@ while [[ $# -gt 0 ]]; do
     --tag)   TAGS+=("$2"); shift 2 ;;
     --id)    ID="$2"; shift 2 ;;
     --env)   ENV="$2"; shift 2 ;;
+    --org)   ORG="$2"; shift 2 ;;
     --state) STATE="$2"; shift 2 ;;
     --ssm)   SSM="true"; shift ;;
     --skill|--repo|--role) shift 2 ;;
@@ -131,13 +143,22 @@ if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
   # ⚠️ the rack's stderr is NOT redirected — see git.grove.wake.sh for the
   #    measurement. locked 🔒 and absent 🫧 share exit code 2 and differ only
   #    in that stream, and they want opposite repairs.
-  AWS_PROFILE=$(rhx keyrack get --owner ehmpath --env "$ENV" --key AWS_PROFILE --value) || AWS_PROFILE=""
+  # 🛑 .and the ORG axis is load-bear: without it this skill reads one account
+  #    only, the one this checkout's manifest names
+  #
+  #    measured: a foreign grove was hibernated and this skill was the natural
+  #    read of "is the box actually up?" — its own `.why`. it could not answer,
+  #    because no flag existed to name the org that box lives in
+  #
+  #    ⇒ and the absence was the QUIET kind: with no `--org`, a read against a
+  #      foreign box does not refuse — it answers about ANOTHER account, finds no
+  #      instance, and reports an empty tree that the guarantee above declares
+  #      "not an error" (`rule.forbid.failhide`)
+  AWS_PROFILE="$(_rack_profile "$ENV" "$ORG")" || AWS_PROFILE=""
   if [[ -z "$AWS_PROFILE" ]]; then
-    echo "✋ the rack did not hand over AWS_PROFILE for env=$ENV" >&2
+    echo "✋ the rack did not hand over AWS_PROFILE for env=$ENV${ORG:+ org=$ORG}" >&2
     echo "" >&2
-    echo "  fix: the rack named it above — read that line, not this one." >&2
-    echo "       locked 🔒 wants an unlock; absent 🫧 wants a set, and a" >&2
-    echo "       set overwrites a live value, so read it before you type." >&2
+    _rack_profile_fix "$ENV" "$ORG"
     exit 1
   fi
   if ! eval "$(aws configure export-credentials --profile "$AWS_PROFILE" --format env 2>/dev/null)"; then
@@ -186,7 +207,10 @@ fi
 
 echo "🐢 righteous"
 echo ""
-echo "🔭 aws.ec2.get${ID:+ --id $ID}$(for T in "${TAGS[@]}"; do printf ' --tag %s' "$T"; done)"
+# ⚠️ `--org` is echoed too — it SELECTS THE ACCOUNT the rows below were read from,
+#    so a header that omits it leaves the `account:` line beneath unexplained
+#    (`howto.write.skills-stdout` — a header shows the resolved inputs)
+echo "🔭 aws.ec2.get${ID:+ --id $ID}$(for T in "${TAGS[@]}"; do printf ' --tag %s' "$T"; done)${ORG:+ --org $ORG}"
 echo "   ├─ account: $ACCOUNT"
 echo "   ├─ state:   $STATE"
 

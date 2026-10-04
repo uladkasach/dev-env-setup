@@ -39,7 +39,7 @@ git tree status --repo @all       # worktree status across all repos
 
 - trees live at `@gitroot/../_worktrees/$reponame.$branch/`
 - `git tree` carries no notion of grove — every tree it makes is on the local machine
-- see `git_alias_tree` in `src/bash_aliases.sh`
+- see `git_alias_tree` in `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`
 
 ## .the grove level
 
@@ -52,7 +52,7 @@ git grove send <name> --what '<cmd>'                           # drive it throug
 git grove read <name>                                          # read what the duct holds
 ```
 
-- the dispatcher is `_git_grove` in `src/bash_aliases.sh`; the registry is one json file
+- the dispatcher is `_git_grove` in `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`; the registry is one json file
   per grove under `~/.git.forest/groves`
 - the richer operations are skills, not aliases —
   `.agent/repo=.this/role=any/skills/git.grove.*.sh` carries `wake`, `stop`, `push`,

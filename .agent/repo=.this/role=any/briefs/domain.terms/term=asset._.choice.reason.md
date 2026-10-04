@@ -29,7 +29,7 @@ src/firefox/firefox.cfg                 # a payload firefox's autoconfig parser 
 
 the `shell.syntax.verify` skill uses the word this way, and correctly: *"src/machine — payloads
 installed into ~/.local/bin"*. every payload is an asset; not every asset is a payload
-(`src/tmux.conf` is read, never run).
+(`src/grove.provision/2.shell/2.8.tmux/tmux.conf` is read, never run).
 
 so the pair is a genus/species, not a synonym. use `asset` for the ownership + diff claim, and
 `payload` only when the point is that a mechanism executes it.

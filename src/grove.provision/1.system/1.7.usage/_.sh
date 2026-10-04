@@ -5,7 +5,7 @@
 #         (the full capture, written to a file)
 #
 # .why this bundle exists — the defect it closes
-#   - `src/bash_aliases.sh` declared two aliases named after commands no
+#   - `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` declared two aliases named after commands no
 #     driven step ever installed — dead code an alias made look live
 #   - .refs = gotcha.1-7-usage.demo=alias-hid-dead-code.md
 #

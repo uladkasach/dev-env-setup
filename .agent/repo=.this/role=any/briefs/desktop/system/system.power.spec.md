@@ -45,7 +45,7 @@ brings your terminals back. `1.2.power`'s own fix-text recommended the lossy one
 (off / restart / suspend), **`machine.*` owns the session-level acts**
 (lock / logout).
 
-⚠️ **every command above is read from `src/bash_aliases.sh`.** this table is a
+⚠️ **every command above is read from `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`.** this table is a
 second holder of that file's contents, so it drifts with no signal
 (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.9). it carried
 `machine.shutdown` — a command this repo has never declared — while the real
@@ -54,8 +54,14 @@ verb was `power.off`.
 ⇒ a reader who wants the live set asks the file, never this table:
 
 ```sh
-rhx grepsafe --pattern "^alias (machine|power)\." --glob 'src/bash_aliases.sh'
+rhx grepsafe --pattern "^alias (machine|power)\." --glob 'bash_aliases.sh' --path src/grove.provision
 ```
+
+⚠️ the `--glob` is a **basename**, and `--path` carries the directory. grepsafe matches
+`--glob` against the basename alone, so a `/` inside it matches no file and reports that as
+a clean `0 matches`, exit 0 — indistinguishable from "no such alias"
+(`gotcha.grepsafe-glob-goes-quiet`). a fix-text is read aloud and typed, so a silent zero
+here hands a human the wrong answer with this page's authority behind it.
 
 🛑 and `machine.lock` is the row that most needed to exist. the two idle rows
 above say this box never locks itself, so a deliberate lock is the ONLY lock —

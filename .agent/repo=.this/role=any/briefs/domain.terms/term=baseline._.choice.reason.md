@@ -55,7 +55,7 @@ rather than implied:
 | concept | what it does | where it lives |
 |---|---|---|
 | the baseline | holds common versions, so the common case costs no download | `5.1.node` |
-| the hardened hook | makes a prompt impossible, for ANY version | `src/zshrc.sh` |
+| the hardened hook | makes a prompt impossible, for ANY version | `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` |
 
 a baseline reaches only repos already known, and a grove clones repos nobody
 enumerated. so the baseline is an optimization and the hook is the guarantee. to

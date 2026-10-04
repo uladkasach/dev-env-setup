@@ -47,64 +47,14 @@ __duct_ensure_dirs() {
 ######################################################################
 # .what = the ONE builder of a registry path. it owns the name grammar, and
 #         refuses a name that cannot be one
-#
-# 🛑 .why the path joins go through here, and not one of them keys on `..`
-#      the registry filename is DERIVED DATA, never a name a caller supplies.
-#      four readers joined a name to a path — `register_host`, `register_duct`,
-#      `unregister_duct`, `get_duct_host` — and each did it inline, so the
-#      grammar had four holders and no reader (`gotcha.a-check-that-cries-wolf`,
-#      m.9). the `ducts/` pair was the expensive one, because its name arrives
-#      from OFF THE BOX:
-#
-#        `duct.list --refresh` asks a grove's tmux for its session names and
-#        writes one file per answer. a grove is assumed compromised, so those
-#        names are remote-chosen bytes that became a LAPTOP PATH — an arbitrary
-#        `mkdir -p`, and a write that overwrites any `*.json` this human can
-#        write. a session named `../../.claude/settings` lands on
-#        `~/.claude/settings.json` and replaces it with a two-key object — a file
-#        with no `hooks` block and no `permissions` block, which is every
-#        pretooluse gate in this repo, removed by a `duct.list`
-#        (`rule.require.security-paramount`).
-#
-# 🛑 .why a `..` deny-list is the WRONG fix, and was refused
-#      it names one shape of the attack rather than the property the path needs,
-#      so it is a character deny-list by another name (`rule.require.solve-at-cause`).
-#      `mkdir -p` plus a `.json` suffix leaves plenty of shapes a list must then
-#      grow to hold, and the day it misses one it is silent.
-#
-#      ⇒ so this states the ALLOWED grammar instead — the same one the URI
-#        already advertises at `__duct_parse_uri`. a name is one or more
-#        segments of `[A-Za-z0-9._-]`, and no segment may be `.` or `..`.
-#        `..` fails because it is not a legal SEGMENT, never because it was
-#        enumerated.
-#
-# ⚠️ .what the READER of this claim holds, and what it cannot
-#      `2.7.aliases`'s configure.verify counts the joins that name the registry
-#      dir LITERALLY, on one line, and demands exactly one. so it holds the
-#      additive regression it was shaped for — a fifth reader that writes
-#      `"$DUCTWORK_DIR/ducts/$name.json"` inline takes the count to 2 and reddens.
-#
-#      it does NOT hold a join that ALIASES the dir first:
-#
-#        local base="$DUCTWORK_DIR/ducts"     # ← counts 1 (this line)
-#        printf '%s\n' "$base/$name.json"     # ← counts 0. total stays 1. green.
-#
-#      ⇒ so read the row as *"no NEW literal join was added"*, never as
-#        *"every join goes through here"*. the second is true of the tree today
-#        and is a claim only a human re-read can renew (q11 — a count is a claim
-#        about a set, and a set is only as big as its reader's reach).
-#
-# 🛑 .do NOT widen that pattern to catch the alias
-#      a rule that counts `"$<var>/$<var>"` joins would flag `bash_aliases.sh`'s
-#      worktree paths, `git-credential-keyrack.sh`, `zshenv.sh`, and every
-#      `$GROVE_SRC/…` in the bundle phases — well over 200 correct lines in
-#      `src/` alone. that is round 15's deleted reader rebuilt: a false ✋ at
-#      scale, which decays into a silenced check
-#      (`gotcha.a-check-that-cries-wolf-gets-silenced`).
-#
-# ⚠️ .the refusal is a hard return, and callers must read it
-#      to write the row anyway under a scrubbed name would be a false ✔ — the
-#      registry would hold a duct whose real name it lost.
+# .why
+#   - 🛑 a duct name arrives from a grove, assumed compromised — joined raw, a
+#     session named `../../.claude/settings` overwrites the hooks file
+#   - 🛑 it states the ALLOWED grammar, never a `..` deny-list: segments of
+#     `[A-Za-z0-9._-]`, and no segment is `.` or `..`
+#   - ⚠️ the refusal is a hard return, and callers must read it
+#   - ⚠️ the verify's join count holds a NEW literal join, never an aliased one
+# .refs = gotcha.2-7-ductwork.demo=sink-builder-and-seam, m1
 #
 # usage: file="$(__duct_as_registry_file ducts "$session")" || return $?
 ######################################################################
@@ -119,23 +69,10 @@ __duct_as_registry_file() {
   while [[ -n "$rest" ]]; do
     segment="${rest%%/*}"
     if [[ "$rest" == */* ]]; then rest="${rest#*/}"; else rest=""; fi
-    # 🛑 the two refusals below relay a GROVE-CHOSEN value, so they use `printf`
-    #    with the values as ARGUMENTS — never `echo`, and never in the format.
-    #
-    #    ⚠️ this is the one site where the verb rule is load-bear rather than
-    #    hygienic, and the reason is a nasty inversion: **the refusal path is the
-    #    ONLY place this value is ever printed.** the guard fires precisely
-    #    BECAUSE the segment holds a byte outside [A-Za-z0-9._-] — and `\` is
-    #    such a byte. so the escape-shaped name is the one that reaches here.
-    #
-    #    the byte sink upstream (`__duct_ssh_tmux`) has no work to do on it:
-    #    `\`,`0`,`3`,`3`,`]`,`5`,`2` are all PRINTABLE, so it correctly passes
-    #    them (`term=relay._.choice._.md`, property 2). zsh's builtin `echo`
-    #    then EXPANDS `\033` and authors a REAL OSC 52 clipboard write — see the
-    #    hex measurement at `:822-826` in this file.
-    #
-    #    the values are arguments, not format: a `%` in a grove-chosen name
-    #    would otherwise be read as a printf directive.
+    # 🛑 the two refusals below relay a GROVE-CHOSEN value, so `printf` with the
+    #    values as ARGUMENTS — never `echo`, never in the format. the refusal is
+    #    the ONLY place this value prints, and zsh's `echo` expands a `\033` the
+    #    byte sink correctly passed (.refs = gotcha.2-7-ductwork.demo=sink-builder-and-seam, m2)
     if [[ -z "$segment" || "$segment" == "." || "$segment" == ".." ]]; then
       printf "✋ duct: '%s' is not a %s name — the segment '%s' is not one\n" \
         "$name" "$kind" "$segment" >&2
@@ -156,145 +93,20 @@ __duct_as_registry_file() {
 
 ######################################################################
 # .what = the ONE sink for bytes a REMOTE box chose, on their way to a terminal
-#
-# 🛑 .why a terminal is an ingress boundary, and it is the one nobody guards
-#      a grove is assumed compromised. its stdout is remote-chosen bytes, and a
-#      terminal does not merely DISPLAY those — it OBEYS them. so `cat` of a
-#      grove file is `eval` at the emulator, and this repo's own kitty config
-#      hands that eval a payload worth the effort:
-#
-#        `set-clipboard on` — OSC 52 lets the far side WRITE THIS HUMAN'S
-#        CLIPBOARD. the next paste into any shell is text a grove chose, and a
-#        paste is a command a human vouched for.
-#
-#      that is a grove that reaches the laptop through a channel with no ssh, no
-#      credential, and no prompt — the trust gradient inverted by an `echo`
-#      (`rule.require.security-paramount`).
-#
-# ⚠️ .what it strips, and why by CLASS rather than by sequence
-#      every C0 control but tab and newline, plus ESC and the C1 range. an
-#      allow-list of harmless sequences is the same mistake as a character
-#      deny-list: OSC 52 is one payload of many (OSC 8 hyperlinks, DCS, the
-#      title-set-and-report pair), and a list must grow forever while a grove
-#      reads the terminfo it is aimed at. so no ESC survives at all
-#      (`rule.require.solve-at-cause`).
-#
-# 🛑 .why it is NOT applied to a duct's own pane read
-#      `duct.read` renders a tmux pane, and tmux has ALREADY interpreted those
-#      escapes into its own screen model — `capture-pane -p` emits plain text
-#      unless asked for `-e`. a strip there would be theatre. the sites that
-#      need this are the ones that relay a remote file or a remote command's
-#      stdout VERBATIM.
-#
-# ⚠️ .it is a filter, never a check — it changes bytes on purpose
-#      so a caller that must compare output against a fingerprint or a hash
-#      compares the RAW bytes, and pipes only the copy a human reads.
-#
-# 🛑 .MEASURED 2026-08-31 — ONE `tr` over `\177-\237` DESTROYS UTF-8
-#      that range is 0x7F-0x9F, and 0x80-0x9F is a subrange of utf-8's
-#      CONTINUATION bytes. so the one-pass form did this to its own output:
-#
-#        in    ├─ tag=<ESC>[31mred<ESC>[0m 🐢
-#        out   342 342  tag=[31mred[0m  360 242
-#
-#      `├` is E2 94 9C; both 0x94 and 0x9C fall in that range, so only E2
-#      survived — a lone lead byte. 🐢 (F0 9F 90 A2) came out as F0 A2. EVERY
-#      box character and EVERY emoji this repo relays was corrupted, on every
-#      read, from the day the sink was written.
-#
-#      ⇒ that is not cosmetic. `git.grove.pull` prints the member at fault to
-#        justify a refusal, and `git.grove.push` prints the paths a `--delete`
-#        would take. a human who cannot read those bytes cannot audit the
-#        verdict — so the sink ate the very evidence its callers exist to show.
-#
-# ⚠️ .the probe this file PRESCRIBED could never have caught it
-#      the old 🌙 asked for `printf 'a\033]52;c;ZXZpbA==\007b\tc\n'` — pure
-#      ASCII. a fixture that holds only ASCII cannot see a defect whose whole
-#      subject is non-ASCII (`gotcha.a-check-that-cries-wolf-gets-silenced`,
-#      m.12: a pattern that matches a SUBSET reports the subset as the whole).
-#      so the probe below now carries a box character AND an emoji, and it lives
-#      in `2.7.aliases`'s configure.verify — a check nobody runs decays (m.13).
-#
-# .the THREE stages, and why one `tr` cannot be all of them
-#      1. `tr` — the C0 block and DEL, by byte. these are single-byte characters
-#         in valid utf-8, so they can never sit INSIDE a multi-byte sequence and
-#         a byte-wise cut of them is exact:
-#           \000-\010  NUL..BS      \013 VT   \014 FF
-#           \016-\037  SO..US       — ESC is \033, and it sits inside this range
-#           \177       DEL
-#         ⇒ TAB (\011) and LF (\012) are the two it KEEPS, deliberately: they
-#           are the only control bytes ordinary output carries, and a cut of
-#           them would mangle every table and every log this ever relays.
-#
-#      2. `iconv -c` — DROP every byte that is not valid utf-8. this is what
-#         retires a RAW C1 byte, since a bare \233 is CSI to a terminal in an
-#         8-bit mode and is invalid utf-8 in any other. it also makes stage 3 a
-#         FIXED POINT: afterward every \302 is followed by \200-\277, so a pair
-#         cut in stage 3 can never leave a fresh \302 beside a fresh C1 tail.
-#
-#      3. `sed` — cut U+0080..U+009F **as characters**, which utf-8 spells
-#         \xC2\x80..\xC2\x9F. iconv KEEPS these, because they are valid utf-8 —
-#         and a terminal still obeys U+009B as CSI. this is the one hazard the
-#         old byte-range closed only by accident, while it ate every other
-#         multi-byte character to do so.
-#
-# ⚠️ .the ORDER is load-bear, and stage 1 must precede stage 2
-#      a `\302` followed by a C0 byte followed by `\233` is invalid utf-8 today.
-#      cut the C0 byte FIRST and it becomes `\302\233` — a legitimately encoded
-#      CSI, synthesized by the sink itself. stage 2 then drops or stage 3 cuts
-#      it. reverse the two and that sequence walks straight out.
-#
-# ⚠️ .`iconv` is glibc, so its absence is a broken box, not a supported one
-#
-# 🛑 .the sink OWNS its own `pipefail` — never the caller's
-#      *"`set -o pipefail` turns an absent stage into a non-zero exit"* is a claim
-#      about the CALLER's shell state, which a function cannot know. a function
-#      that does not set the option itself guarantees no such thing.
-#
-#      📜 measured 2026-09-01, with `iconv` hidden behind a crafted PATH:
-#
-#        | tree     | caller       | rc  | bytes out | raw ESC |
-#        |----------|--------------|-----|-----------|---------|
-#        | healthy  | pipefail     | 0   | 16        | none    |
-#        | healthy  | bare         | 0   | 16        | none    |
-#        | crippled | pipefail     | 127 | 0         | none    |
-#        | crippled | bare         | **0** | 0       | none    |
-#
-#      row 4 is the falsification: a caller with default options was told the
-#      strip had succeeded.
-#
-# ✔ .and note WHICH half was true all along — the SAFETY half
-#      every crippled row emitted ZERO bytes. an absent stage drops the stream
-#      rather than relays it, so no unstripped byte ever reached a terminal.
-#      the defect was purely in the SIGNAL: correct behavior, silently.
-#
-#      ⚠️ that is why it survived. a claim whose dangerous half is true reads
-#        as verified whenever anybody spot-checks it, and the half that is
-#        false is the half no test looks at
-#        (`gotcha.a-check-that-cries-wolf-gets-silenced`).
-#
-# ⇒ the subshell below carries `set -o pipefail`, so the exit code is this
-#   function's guarantee at every caller, whatever options that caller holds.
-#   a subshell rather than `local -`, because this file is sourced by bash AND
-#   zsh, and `local -` is a bash-ism.
-#
-# ✔ .MEASURED BOTH DIRECTIONS 2026-08-31, on this checkout
-#      the payload carries an OSC 52, a C1 CSI in BOTH spellings (encoded
-#      \302\233 and bare \233), a TAB, a box glyph and an emoji:
-#
-#        printf 'a\033]52;c;ZXZpbA==\007\302\233X\233Y\tb \342\224\234 \360\237\220\242 z\n' \
-#          | __duct_strip_escapes | od -An -tx1
-#
-#        61 5d 35 32 3b 63 3b 5a 58 5a 70 62 41 3d 3d 58
-#        59 09 62 20 e2 94 9c 20 f0 9f 90 a2 20 7a 0a
-#
-#      ATE, as it must: `1b` (ESC), `07` (BEL), and `9b` in both spellings —
-#      the OSC 52 survives only as inert text (`]52;c;ZXZpbA==`).
-#      LET THROUGH, as it must: `09` (TAB), `e2 94 9c` (├), `f0 9f 90 a2` (🐢).
-#
-#      ⇒ that pair is the whole claim, and `2.7.aliases`'s configure.verify
-#        re-asks it on every `grove.provision`, against the INSTALLED copy — so
-#        it cannot decay against a tree that moves (m.13).
+# .why
+#   - 🛑 a terminal OBEYS bytes, and `set-clipboard on` lets an OSC 52 from a
+#     grove write this human's clipboard — the next paste is the grove's command
+#   - it strips by CLASS: every C0 but TAB and LF, plus ESC and C1
+#   - it is a filter, never a check — a hash compare reads the RAW bytes
+#   - 🛑 THREE stages, in order: `tr` (C0+DEL by byte), `iconv -c` (invalid
+#     utf-8, so a raw C1), `sed` (U+0080..U+009F as characters). one `tr` over
+#     `\177-\237` ate every box glyph and emoji, since that range is utf-8's
+#     continuation bytes
+#   - 🛑 it owns its own `pipefail`, in a subshell — a caller's options cannot
+#     be known, and `local -` is a bash-ism
+#   - ⚠️ `iconv` is glibc, so its absence is a broken box
+# .refs = gotcha.2-7-ductwork.demo=sink-builder-and-seam, m3 — every
+#   measurement, both directions; `2.7.aliases`'s configure.verify re-runs it
 #
 # usage:  ssh "$host" 'cat /some/log' | __duct_strip_escapes
 ######################################################################
@@ -490,69 +302,16 @@ __duct_is_remote() {
 # .what = run ONE tmux command on the duct's host, every argument
 #         delivered as literal bytes
 #
-# 🛑 .why — ssh HANDS ITS ARGUMENTS TO A SHELL, so an interpolated value is
-#          CODE, never data
-#
-#    `ssh host "tmux send-keys -t '$S' '$what' Enter"` is the shape ten call
-#    sites here would each spell. ssh joins its arguments into one string and
-#    hands that string to a login shell on the far side. so a single quote in any
-#    interpolated value closes the quote, and every byte after it runs as the
-#    seat that owns the duct — on a box that holds the org's clones.
-#
-#    two of those values are genuinely attacker-reachable, and neither is
-#    exotic:
-#
-#      • $DUCT_SESSION carries a BRANCH NAME, and `git check-ref-format`
-#        permits a single quote in one. so a hostile branch is a payload.
-#      • $pane_cwd (`duct.reboot`) is read OFF THE REMOTE BOX, which is the
-#        untrusted side in full. a compromised grove hands its own string
-#        back, and the local shell runs it — the same trust inversion that
-#        `rule.require.narrowest-terminal-grant` closes at the terminal.
-#
-# ⚠️ a character DENY-LIST does not close this, and reads as if it does.
-#    `git.grove.send` refuses `;`, `&&`, `||`, and a newline — the four a
-#    HUMAN types to chain two commands — and permits `'`, a backtick, `$( )`,
-#    and a bare `&`, which are the four that break OUT of a quote. that list is
-#    aimed at the wrong threat, and a deny-list is a claim about a
-#    grammar that always holds more shapes than its author enumerated
-#    (gotcha.a-check-that-cries-wolf-gets-silenced, m.12 / q11).
-#
-# ⇒ base64 is the fix at CAUSE (rule.require.solve-at-cause). its alphabet is
-#   [A-Za-z0-9+/=] and holds no shell metacharacter, so a single quote cannot
-#   appear in it and the quotes below cannot be closed. every argument then
-#   arrives as literal bytes, whatever its shape, and no deny-list is
-#   load-bear anywhere above.
-#
-# ⚠️ and it is ONE helper on purpose. ten call sites that each quote their own
-#    way are ten readers of one rule, free to drift with no signal (m.9). a
-#    new remote tmux call gets the guarantee by calling this.
-#
-# .note = each arg is quoted, the verb and flags included. the far-side shell
-#         removes those quotes, so tmux receives an argv identical to the
-#         local branch's — same command, same semantics, no injection.
-#
-# ⚠️ .why `--tty` is a flag HERE, and not a second helper
-#      an `attach` needs a tty and every other call must NOT have one — ssh with
-#      `-t` on a non-interactive call allocates a pty and mangles the output a
-#      caller reads. that is one difference in one ssh flag, so it is one
-#      optional marker rather than a second copy of the encoder.
-#
-#      🛑 a second helper would be the m.9 shape this header already refuses:
-#        one guarantee, two holders, free to drift. a helper with no way to say
-#        "with a tty" leaves the one call that needs one to write its own `ssh`
-#        line — and that line sits RAW.
-#
-# ⚠️ .why `--host` exists, for the same reason
-#      `__duct_list_host_sessions` asks a host that is NOT the parsed
-#      `$DUCT_HOST` — it walks the registry, one host at a time. with no
-#      `--host` it cannot call this helper and must write its own `ssh` line,
-#      whose remote string is a fixed literal that interpolates no value.
-#
-#      🛑 that last clause is what carries such a line past a security read: it
-#        is SAFE, and it is still a second seam. the cost of a second seam is
-#        not that today's copy is wrong — it is that the NEXT author reads two
-#        shapes and picks either. so the flag exists to leave exactly one `ssh`
-#        in this file, a claim a check can hold with no allowlist to rot.
+# .why
+#   - 🛑 ssh joins its args into one line for a far-side SHELL, so an
+#     interpolated value is CODE — and a branch name or a remote pane cwd can
+#     carry a quote
+#   - 🛑 base64 is the fix at CAUSE: its alphabet holds no shell metacharacter,
+#     so no deny-list is load-bear (`git.grove.send`'s refuses the wrong four)
+#   - it is ONE function, so a new remote tmux call inherits the guarantee
+#   - `--tty` and `--host` are flags, never a second function — each would
+#     leave a second raw `ssh` seam for the next author to copy
+# .refs = gotcha.2-7-ductwork.demo=sink-builder-and-seam, m4
 #
 # usage:
 #   __duct_ssh_tmux send-keys -t "$DUCT_SESSION" "$what" Enter
@@ -580,75 +339,16 @@ __duct_ssh_tmux() {
     remote_cmd+=" \"\$(printf %s '$b64' | base64 -d)\""
   done
 
-  ####################################################################
-  # 🛑 THE ANSWER IS STRIPPED HERE — this helper is BOTH boundaries
+  # 🛑 this helper is BOTH boundaries: it encodes what LEAVES and strips what
+  #    ARRIVES, so a grove's answer (a pane cwd, a tty, a session name) is inert
+  #    before any caller holds it. `--tty` is EXEMPT — an attach's stdout IS
+  #    escapes, and the exposure is the one a human chose
+  #    (.refs = gotcha.2-7-ductwork.demo=sink-builder-and-seam, m5)
   #
-  # 📜 measured 2026-08-31 by a redteam of this file, and it is the sharpest
-  #    kind of miss: this file DEFINES `__duct_strip_escapes` and states the
-  #    threat in full — and applied it to no verb of its own. every consumer
-  #    OUTSIDE it was fixed in three prior rounds. four sites in here were not:
-  #
-  #      `duct.reboot`'s `$pane_cwd`   ← `display-message -p '#{pane_current_path}'`
-  #      `duct.refresh`'s `$ttys`      ← `list-clients -F '#{client_tty}'`
-  #      `duct.list --on`'s names      ← `list-sessions -F '#{session_name}'`
-  #      the registry refusal message, which echoed the bytes it refused
-  #
-  #    the reboot one is the live attack. a linux dir name may hold any byte but
-  #    `/` and NUL, so a grove `cd`s its pane into a dir whose NAME carries an
-  #    OSC 52 — and `duct.reboot` is a command this repo's own fix-texts tell a
-  #    human to run, with a key binding on it. tmux emits `-p` format output
-  #    RAW, so the sequence reached kitty and rewrote the human's clipboard.
-  #    the next paste is a command the grove chose and the human vouches for.
-  #
-  # 🛑 .why the strip is HERE and not at those four echoes
-  #      four echoes are four readers of one rule, free to drift, and a fifth
-  #      caller tomorrow inherits none of it — the m.9 shape this header already
-  #      refuses for the OUTBOUND direction. so the fix is symmetric with the
-  #      one above it: this helper encodes what LEAVES and sanitizes what
-  #      ARRIVES, and every value that crosses from a grove into this process is
-  #      inert before any caller can touch it (`rule.require.solve-at-cause`).
-  #
-  #      ⇒ that closes the fourth site for free — the registry builder's
-  #        refusal can no longer echo a live escape, because the name it was
-  #        handed was stripped on the way in. a boundary fix that closes a site
-  #        nobody aimed at is the sign the boundary is the right one.
-  #
-  # ⚠️ .why `--tty` is EXEMPT, and it is not an oversight
-  #      a `--tty` call is `attach` — an interactive tmux client, whose entire
-  #      stdout IS escape sequences. to strip there would not harden it; it
-  #      would render the session unusable.
-  #
-  #      and the exposure is the one a human chose: an attach to a grove's tmux
-  #      is `ssh grove` by another name, and it carries the same accepted risk
-  #      that any interactive remote shell does. the sites this closes are the
-  #      ones where a human asked for a FACT and got a payload
-  #      (`rule.require.exemptions-name-their-trigger` — the trigger is a tty,
-  #      never a verdict about which verbs look safe).
-  #
-  # ⚠️ .capture-pane is stripped too — no exemption is carved for `duct.read`
-  #      `capture-pane -p` emits already-interpreted text. that holds today and
-  #      it is a claim about TMUX's behavior, not about ours — and the sink
-  #      keeps TAB and LF, so a strip costs a correct pane read no fidelity at
-  #      all. an exemption that buys no capability and rests on a third party
-  #      is one to retire.
-  ####################################################################
-  # 🛑 the HOST is clamped before ssh reads it as a positional
-  #
-  # .why  `ssh` treats its first positional as a host ONLY IF it does not begin
-  #       with `-`. one that does is parsed as an OPTION — and ssh has one that
-  #       runs a command: `-oProxyCommand=<cmd>`, executed HERE, on the laptop,
-  #       before any connection is attempted.
-  #
-  #       `$DUCT_HOST` is `${rest%%/*}` off a `--on` URI, and
-  #       `__duct_as_registry_file`'s name grammar (`[A-Za-z0-9._-]`) ADMITS a
-  #       `-` at the front. so the registry itself can hold one.
-  #
-  # ⚠️ termwork holds `__term_as_ssh_host` for exactly this — round 5's twin
-  #    shape, one seam over. so this reuses that function rather than
-  #    spells a second copy of the grammar
-  #    (`rule.forbid.two-writers-on-one-artifact`), and falls back to an inline
-  #    clamp only where termwork is not loaded, since a duct must work in a
-  #    shell that sourced ductwork alone.
+  # 🛑 the HOST is clamped first: ssh reads a positional that begins with `-` as
+  #    an OPTION, and `-oProxyCommand=` runs a command on THIS box. termwork's
+  #    `__term_as_ssh_host` is reused where loaded; the inline clamp covers a
+  #    shell that sourced ductwork alone
   if command -v __term_as_ssh_host >/dev/null 2>&1; then
     host="$(__term_as_ssh_host "$host")" || return $?
   elif [[ -z "$host" || "$host" == -* ]]; then
@@ -662,74 +362,15 @@ __duct_ssh_tmux() {
     return $?
   fi
 
-  ####################################################################
-  # 🛑 BOTH STREAMS, and the status is SSH's — one pipe answered neither
-  #
-  # 📜 measured 2026-08-31, a redteam of this file, and it is two defects that
-  #    a single line held at once. the line was:
-  #
-  #      ssh "$host" "$remote_cmd" | __duct_strip_escapes
-  #
-  # ✋ defect 1 — a pipe carries STDOUT. ssh relays the remote command's stderr
-  #    byte-for-byte onto this process's fd 2 (`SSH_MSG_CHANNEL_EXTENDED_DATA`),
-  #    so that half reached the terminal RAW while the header three screens up
-  #    claimed "every value that crosses from a grove into this process is inert
-  #    before any caller can touch it". the claim was true of one stream of two.
-  #
-  #    ⇒ and the second stream is the one a grove controls most cheaply: a login
-  #      rc writes freely on it, so no verb of ours need be involved at all.
-  #
-  # ✋ defect 2 — `$?` after a pipe is the LAST stage's, so the caller read the
-  #    SINK's status, never ssh's. `__duct_strip_escapes` exits 0 on an empty
-  #    stream, so `__duct_probe_remote_session` answered "reachable, session
-  #    present" for a host that refused the connection, and
-  #    `__duct_list_host_sessions` could never return its 3. that 3 is what stops
-  #    `__duct_refresh_host` from `rm -f`-ing every registered duct of a host
-  #    that is merely ASLEEP — the exact catastrophe the 255 code exists for.
-  #
-  #    🛑 `set -o pipefail` is NOT the fix. this file is sourced into an
-  #      interactive zsh whose `setopt` list does not carry `pipe_fail`, and into
-  #      a bare `bash -c` through `$BASH_ENV`. a guarantee that depends on an
-  #      option the HOST shell may not hold is not a guarantee — and the two
-  #      shells spell the function-local form differently, so to set it here
-  #      would be two writers of one rule (`rule.forbid.two-writers-on-one-artifact`).
-  #
-  # ⇒ so ssh runs with NO pipe on it. its status is therefore its own, and each
-  #   stream reaches the one sink AT CAPTURE — the idiom `git.grove.push`
-  #   already states at its `STALE` read: stripped at capture, never at print.
-  #
-  # ⚠️ .why a scratch FILE for stderr, and not `2> >(__duct_strip_escapes >&2)`
-  #    a process substitution is asynchronous. `__duct_probe_remote_session`
-  #    captures this function's fd 2 with `2>&1 1>/dev/null`, and a command
-  #    substitution may close before an async writer has written — so the
-  #    evidence would arrive sometimes. a check that reports the truth on most
-  #    runs is worse than one that never does (`gotcha.a-check-that-cries-wolf`).
-  #
-  # .note = the scratch path comes from `mktemp`, never a fixed name — two seats
-  #         share `/tmp` on a grove (`rule.forbid.fixed-paths-in-a-shared-tmp`)
-  #
-  # 🛑 .the `rm -f` is NOT a trap, and that is deliberate — 2026-08-31
-  #    a Ctrl-C during the ssh aborts before that line, so an abort leaks the
-  #    file. the obvious repair is the `trap … EXIT` that `git.grove.pull` uses
-  #    four files over. it is WRONG HERE, and the difference is the process:
-  #
-  #      `git.grove.pull` is an EXECUTABLE — its own process, its own trap table
-  #      this is a FUNCTION sourced into a human's INTERACTIVE shell
-  #
-  #    a trap is a property of the SHELL, not of the function. an EXIT trap set
-  #    here fires when the human closes their terminal and clobbers whatever
-  #    they had; a RETURN trap is not unset on return, so every LATER function
-  #    return in that shell re-runs `rm -f "$duct_err"` against a name that is
-  #    `local` and therefore gone — `rm` noise on an unrelated command.
-  #
-  #    ⇒ that is `rule.forbid.two-writers-on-one-artifact`, where the artifact
-  #      is the interactive shell's signal disposition. a fix that quiets a
-  #      leaked temp file by that trade is not a fix.
-  #
-  #    ⚠️ the residue, and its OWNER: a 0600 file in $TMPDIR after an abort.
-  #       it is litter, not exposure — `mktemp` gives it the human's own uid
-  #       and no other mode. `1.8.tmpfiles` installs the sweep that owns it.
-  ####################################################################
+  # 🛑 BOTH streams, and the status is SSH's. ssh runs with NO pipe on it: a
+  #    pipe carries stdout only (stderr reached the terminal raw), and `$?` after
+  #    a pipe is the SINK's — which read an asleep host as "session present".
+  #    `pipefail` is no fix, since the host shell's options are not ours
+  #   - stderr goes to a `mktemp` FILE, never `2> >(…)`: a process substitution
+  #     is async, so the evidence would arrive sometimes
+  #   - the `rm -f` is NOT a trap: a trap set in a function belongs to the
+  #     human's interactive shell. the abort residue is a 0600 file `1.8.tmpfiles` sweeps
+  #   (.refs = gotcha.2-7-ductwork.demo=sink-builder-and-seam, m6)
   local duct_err duct_out duct_rc=0
   duct_err="$(mktemp "${TMPDIR:-/tmp}/duct.ssh.err.XXXXXX" 2>/dev/null)" || {
     echo "💥 duct: could not open a scratch file for ssh's stderr" >&2
@@ -778,16 +419,9 @@ __duct_probe_remote_session() {
   # alone cannot tell them apart, but ssh's own words can
   # (rule.forbid.failhide, rule.require.failloud)
   #
-  # 🛑 .the bytes this holds are ALREADY INERT, and that is load-bear
-  #    `__duct_say_unreachable` REPLAYS this value verbatim into a human's
-  #    terminal, inside an "ssh said" fence. the swap below keeps the stderr
-  #    half, so an unsanitized stderr here is a designed route AROUND the sink.
-  #
-  #    it is inert because `__duct_ssh_tmux` sanitizes BOTH streams at
-  #    capture, at the one seam. ⇒ do NOT restore a `| __duct_strip_escapes`
-  #    pipe there and do NOT strip at the replay: either move would put the
-  #    guarantee back in two places, and the replay is the copy nobody re-reads
-  #    (`rule.require.solve-at-cause`, m.9).
+  # 🛑 the bytes this holds are ALREADY INERT — `__duct_ssh_tmux` strips both
+  #    streams at capture. do NOT add a second strip here or at the replay
+  #    (.refs = gotcha.2-7-ductwork.demo=sink-builder-and-seam, m7)
   DUCT_PROBE_STDERR=$(__duct_ssh_tmux has-session -t "$DUCT_SESSION" 2>&1 1>/dev/null)
   local code=$?
   [[ $code -eq 255 ]] && return 255
@@ -857,27 +491,9 @@ __duct_say_unreachable() {
     echo "   ├─ ssh said" >&2
     echo "   │  ├─" >&2
     echo "   │  │" >&2
-    # 🛑 `printf`, never `echo` — and this is NOT the strip the block above
-    #    forbids. that block is right twice over: the value IS inert, and a
-    #    second strip here would be m.9. the defect is the VERB.
-    #
-    #    📜 measured 2026-09-01, both dialects, over a payload with NO 0x1b in
-    #      it — just the printable characters `\`, `0`, `3`, `3`:
-    #
-    #        bash  `echo "$said"`  → four printable characters. inert ✔
-    #        zsh   `echo "$said"`  → 1b 5d 35 32 … an OSC 52 CLIPBOARD WRITE
-    #
-    #      the sink is a BYTE filter and had no work to do: no C0, no C1, valid
-    #      UTF-8. zsh's builtin `echo` expands backslash escapes by default, so
-    #      it AUTHORS an escape the sink never saw and could not have seen.
-    #      `src/zshrc.sh:204` sources this file into an interactive zsh, and the
-    #      duct verbs are functions there with no `bash -c` wrapper — so the
-    #      unsafe half is the half a human types.
-    #
-    # ⚠️ `$said` is `DUCT_PROBE_STDERR` — ssh's own stderr on a 255. a `Banner`
-    #    and a `Received disconnect from …: <text>` both land there BEFORE
-    #    authentication, so a grove that is merely asleep chooses these bytes —
-    #    which is the exact state this function exists to explain.
+    # 🛑 `printf`, never `echo` — the VERB rule, not a second strip. zsh's `echo`
+    #    expands a `\033` the sink correctly passed, and a pre-auth `Banner` lets
+    #    an asleep grove choose these bytes (.refs = gotcha.2-7-ductwork.demo=sink-builder-and-seam, m2, m7)
     printf '%s\n' "$said" | sed 's/^/   │  │  /' >&2
     echo "   │  │" >&2
     echo "   │  └─" >&2
@@ -1102,7 +718,7 @@ duct.send() {
       #    `__duct_pane_command` sinks the bytes, and a sink cannot see an escape
       #    spelled as TEXT: the four printable characters `\`,`0`,`3`,`3` are
       #    inert to it and correctly pass. zsh's builtin `echo` then expands them
-      #    into a real ESC, and `src/zshrc.sh:204` sources this file into an
+      #    into a real ESC, and `src/grove.provision/2.shell/2.5.zsh/zshrc.sh:204` sources this file into an
       #    interactive zsh — so the unsafe half is the half a human types.
       #
       #    this is the same pair `:808` and `:1656` hold — one cause, four
@@ -1886,7 +1502,7 @@ duct.refresh() {
     #    ⇒ the sink makes the bytes inert; `echo` in zsh makes them live
     #      again. `:865-876` measures it: the four printable characters
     #      `\`,`0`,`3`,`3` pass the sink CORRECTLY and zsh's builtin `echo`
-    #      re-authors a real ESC out of them. `src/zshrc.sh:204` sources this
+    #      re-authors a real ESC out of them. `src/grove.provision/2.shell/2.5.zsh/zshrc.sh:204` sources this
     #      file into an interactive zsh, so that is the shell this function
     #      runs in when a human types `duct.refresh`.
     #
@@ -1894,7 +1510,7 @@ duct.refresh() {
     #    tmux takes a client's ttyname FROM THE CLIENT, so any process that
     #    can reach the duct's socket on an owned grove chooses this string. a
     #    ttyname that spells `\033]52;c;<b64>\007` as printable text becomes a
-    #    real OSC 52 here, and `src/tmux.conf` sets `set-clipboard on` — so
+    #    real OSC 52 here, and `src/grove.provision/2.shell/2.8.tmux/tmux.conf` sets `set-clipboard on` — so
     #    the next paste is a command the grove chose and the human vouches for.
     #
     # ⚠️ BOTH halves, for the same reason `duct.reboot` gives at `:1773`:

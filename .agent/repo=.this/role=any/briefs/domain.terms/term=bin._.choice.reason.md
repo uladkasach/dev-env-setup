@@ -62,14 +62,14 @@ $ usql --version
 usql:34: command not found: usql                    ← exit 127
 ```
 
-no usql binary existed anywhere. the phase had been told "present" by `src/bash_aliases.sh`.
+no usql binary existed anywhere. the phase had been told "present" by `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`.
 
 the harm is not that it failed — it is that it failed **plausibly**. "wrong version" sends a reader
 to reconcile a pin; "absent" sends them to install. one of those roads does not exist.
 
 ### the shadowed names, enumerated
 
-`src/bash_aliases.sh` declares five functions that share a name with a real binary, several of them
+`src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` declares five functions that share a name with a real binary, several of them
 `export -f`'d so a non-interactive `bash` inherits them:
 
 | name | wraps |

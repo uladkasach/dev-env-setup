@@ -138,7 +138,7 @@ if [[ ! -r "$LOG" ]]; then
   echo "   │"
   echo "   └─ 💥 no log at ${LOG}"
   echo "      ├─ 🪄 either no core ever crossed 800M, or the watchdog is absent"
-  echo "      └─ 🪄 confirm it is installed:  sync.devenv.nvim"
+  echo "      └─ 🪄 confirm it is installed:  rhx grove.provision --what 4.5.nvim --mode apply"
   echo ""
   exit 0
 fi
@@ -264,7 +264,7 @@ if [[ "$MODE" == "history" ]]; then
       echo "      └─ 🪄 restart the core to pick it up; no config change is owed"
     else
       echo "   └─ 🌊 the fix is NOT in the live config at ${LIVE_CFG}"
-      echo "      └─ 🪄 deliver it:  sync.devenv.nvim"
+      echo "      └─ 🪄 deliver it:  rhx grove.provision --what 4.5.nvim --mode apply"
     fi
   else
     echo "   └─ 🌴 no core shows a buffer leak (worst: ${WORST_B} bufs)"
@@ -550,7 +550,7 @@ echo "   ├─ 🌕 ts:     ${T0} → ${T1}   (+${D_TS}  treesitter-attached bu
 if [[ "$L1" -lt 0 ]]; then
   D_LUA=0; D_MARK=0; D_CHAN=0
   echo "   └─ 💥 lua/marks/chans absent from this log — the instrument predates them"
-  echo "         └─ 🪄 sync the wider instrument, then re-read:  sync.devenv.nvim"
+  echo "         └─ 🪄 sync the wider instrument, then re-read:  rhx grove.provision --what 4.5.nvim --mode apply"
 else
   D_LUA=$(( L1 - L0 ))
   D_MARK=$(( M1 - M0 ))
@@ -581,7 +581,7 @@ if [[ "$BURST" -eq 1 ]]; then
   echo "   │  └─ 🪄 each fire costs a /proc read + a buffer walk + a log append"
   echo "   │"
   echo "   ├─ 🌊 the repo has the guard for this; this machine does not"
-  echo "   │  └─ 🪄 sync it:  sync.devenv.nvim"
+  echo "   │  └─ 🪄 sync it:  rhx grove.provision --what 4.5.nvim --mode apply"
   echo "   │"
   echo "   └─ 🌊 no rate is derivable from this window — ${N} lines in ${SECS}s"
   echo "      └─ 🪄 the +${D_RSS}M is growth accrued while the core was unscheduled"

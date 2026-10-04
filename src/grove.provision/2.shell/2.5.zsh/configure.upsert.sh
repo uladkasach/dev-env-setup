@@ -11,7 +11,7 @@
 #   - ⇒ every bundle that copies a checked-in file reads one answer
 #
 # .why the rc is OVERWRITTEN rather than merged
-#   - `src/zshrc.sh` is the whole declaration
+#   - `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` is the whole declaration
 #   - a merge leaves a past revision's line beside its replacement
 #   - zsh takes the LAST assignment
 #   - ⇒ the live shell would depend on read order rather than on this repo
@@ -67,7 +67,7 @@ grove_provision_2_5_zsh_configure_upsert() {
   #   - ⇒ one exported value outranked every rack entry and pinned all four envs to `ambient`
   #   - what this file still carries is `AWS_SDK_LOAD_CONFIG=1`
   #   - a program genuinely must read that from a non-interactive shell
-  #   - see `src/zshenv.sh`'s own 📜 block
+  #   - see `src/grove.provision/2.shell/2.5.zsh/zshenv.sh`'s own 📜 block
   ####################################################################
   local env_src="$bundle_dir/zshenv.sh"
 

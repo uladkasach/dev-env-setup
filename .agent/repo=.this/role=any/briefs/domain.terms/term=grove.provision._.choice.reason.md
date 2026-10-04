@@ -92,7 +92,7 @@ re-read the SHAPE, not only the letters.
   grove.provision throughout? i thought we agreed on the hard cutover."* — then, offered a
   scoped or a full rename: *"Full rename — I did mean everywhere"*
 - `term=grove._.choice._.md` — the laptop-is-a-grove settlement the name rests on
-- `.dream/2026_07_28.rename-install-env-to-grove-provision.dream.md` — the PRIOR hard cut,
+- `.dream/2026_07_28.rename-install-env-to-a-converge-verb.dream.md` — the PRIOR hard cut,
   whose shape this one repeats
 
 ## .disputes

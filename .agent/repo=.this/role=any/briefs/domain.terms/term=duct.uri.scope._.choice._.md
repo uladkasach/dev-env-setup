@@ -34,8 +34,8 @@ keeps one vocabulary, and an address widens or narrows by how much of it you wri
 as "the whole grove", so one dropped segment would kill every duct on the box.
 
 ## .refs
-- src/ductwork.sh                                  # `__duct_parse_uri_scope`, `DUCT_SCOPE`
-- src/ductwork.sh                                  # `duct.list --on`
+- src/grove.provision/2.shell/2.7.aliases/ductwork.sh                                  # `__duct_parse_uri_scope`, `DUCT_SCOPE`
+- src/grove.provision/2.shell/2.7.aliases/ductwork.sh                                  # `duct.list --on`
 - .agent/repo=.this/role=any/skills/duct.list.sh   # the rhx surface
 
 ## .reason

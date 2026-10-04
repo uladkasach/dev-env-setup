@@ -212,7 +212,7 @@ source ~/.bash_aliases 2>/dev/null || true
 #    — and both run at the exact minute a human has just pasted a pat and
 #    reads the screen for the verdict.
 #
-#   a terminal OBEYS bytes. `src/tmux.conf` sets `set-clipboard on`, so one
+#   a terminal OBEYS bytes. `src/grove.provision/2.shell/2.8.tmux/tmux.conf` sets `set-clipboard on`, so one
 #   OSC 52 in that output writes this human's clipboard, and the next paste
 #   is a command the grove chose. a `bash -lc` runs the box's login rc, so a
 #   compromised grove needs no verb of ours to emit it.

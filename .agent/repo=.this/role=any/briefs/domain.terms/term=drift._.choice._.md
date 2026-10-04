@@ -145,7 +145,7 @@ hides which revision a box actually ran.
 - src/grove.provision/2.shell/2.7.aliases/configure.verify.sh    # the same, same run
 - src/grove.provision/1.system/1.8.tmpfiles/provision.verify.sh  # `read the drift: diff $src $dst`
 - src/grove.provision/3.cosmic/3.2.theme/configure.upsert.sh     # a drift check that CRIED WOLF — see below
-- src/bash_aliases.sh                                           # declaration drift, the `brains` incident
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                                           # declaration drift, the `brains` incident
 - src/grove.for.sh / src/grove.env.sh / src/grove.pkg.sh     # "two homes drift", the deletion fix
 - src/bundle.upgrade.sh                                         # derived in one place, so the two cannot drift
 - .agent/repo=.this/role=any/skills/audio.record.operations.sh   # `__audio_header_drifted` — the by-construction verdict

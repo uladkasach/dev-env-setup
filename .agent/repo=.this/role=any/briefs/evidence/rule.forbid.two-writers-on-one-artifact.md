@@ -53,7 +53,7 @@ pointed at the wrong bundle.
 
 put the line **in the checkout**, so the byte-owner ships it. that is already how
 every other concern reaches `~/.zshrc` — starship's init, fzf's bindings and fnm's
-hook all sit inside `src/zshrc.sh` and are delivered by `2.5.zsh`. terminfo was the
+hook all sit inside `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` and are delivered by `2.5.zsh`. terminfo was the
 one bundle that wrote the file directly, and it was the one bundle with the defect.
 
 the appender keeps whatever files no bundle byte-owns (`~/.bashrc`, `~/.profile`),

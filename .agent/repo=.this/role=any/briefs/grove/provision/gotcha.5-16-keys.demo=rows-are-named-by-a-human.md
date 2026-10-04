@@ -75,17 +75,42 @@ bhrain ROOT        env.test  OPENAI · ANTHROPIC · TAVILY · XAI · FIREWORKS
 - ⇒ `nheuron`, `whodis`, and `whodisio` are ABSENT BY DECISION, not by oversight. a
   reader who "completes the set" from the rack would widen a scope a human narrowed
 
-## the ephemeral row cannot be PLACED, and that is its mechanism
+## the ephemeral row cannot be PLACED — and the reason that stood was WRONG
 
-- `EHMPATH_BEAVER_GITHUB_TOKEN` is `EPHEMERAL_VIA_GITHUB_APP`, so a `get` MINTS a
-  55-minute token rather than hand back what the rack stores
-- ⇒ a placement would seal a corpse that reads green forever. `git.grove.auth.keys.set`
-  refuses it at step 0 and prints the duct-pane `keyrack set` instead
-- 📜 the stored source has no read path and no write path
-  (`vaultAdapterOsSecure.js:144` and `:193`) — an UPSTREAM gap, not a defect here
-- the ask is `ehmpathy/rhachet#522`. until it lands, a human types the pem on each box,
-  once per org
-- ⚠️ so these two rows are the ONLY ones a fresh grove cannot converge unattended
+`EHMPATH_BEAVER_GITHUB_TOKEN` is `EPHEMERAL_VIA_GITHUB_APP`, and it cannot ride
+`git.grove.auth.keys.set`. the refusal is right; the reason recorded until 2026-09-28 was
+not, in a way that mattered:
+
+> 👎 *"EPHEMERAL_VIA_GITHUB_APP MINTS its value, so there is no stored value to copy"*
+
+- the mech stores a **PERMANENT json blob** — `{appId, installationId, privateKey}` — and
+  `mechAdapterGithubApp.validate` says so outright: a `source` is that blob, a `cached` is
+  the `ghs_` token. the blob does not expire; a github app private key has no clock on it
+- 👍 what is true: **`keyrack get` DELIVERS the minted token and never hands back the
+  source.** so a get→set pipe — which is exactly what the placer does — copies the
+  55-minute token rather than the blob, and seals a corpse that reads green forever
+  (`ehmpathy/rhachet#522`)
+- ⇒ **same refusal, different cause, and only the true cause names a fix.** *"no value
+  exists"* is a dead end; *"get returns the wrong one of two stored facts"* points straight
+  at the vault
+
+### 🛑 so the remedy is a VAULT, never a terminal on the box
+
+`rule.require.one-command-provision`: *"any prompt, confirm, or tty read on the provision
+path = blocker"*. so *"set it at a terminal"* is not a workaround for a grove — it is the
+forbidden act, and a fix-text that names it sends a human to break an invariant
+(`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4: a true verdict whose REPAIR is wrong).
+
+- `aws.params` holds this mech — `setKeyrackAwsParamGithubApp` persists the blob into SSM
+  and roundtrip-verifies it under the org's own profile
+- that vault is CENTRAL, so it is written ONCE, on a human's own laptop, and every grove
+  thereafter reads the blob and mints its own token with **no prompt on any box, ever** —
+  which is what `@all.camp.GITHUB_TOKEN` already does
+- ⚠️ the one-time set still prompts for a pem path, and that is FINE: a laptop at a human's
+  keyboard is not the provision path. what the invariant forbids is a tty in the loop that
+  raises a box
+- ⚠️ until that one write lands, these two rows are the only ones a fresh grove cannot
+  converge unattended
 
 ## why EMPTY collapses FIVE states, and why the count is not four
 

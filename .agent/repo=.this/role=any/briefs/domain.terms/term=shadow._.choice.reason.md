@@ -41,7 +41,7 @@ version*, so it accumulates, and `fnm use` to any of them surfaces a different c
 
 1. no `alias claude=` exists — the "pin" was only ever *"the pnpm copy happens to be first"*
 2. `eval "$(fnm env --use-on-cd)"` puts `/run/user/$UID/fnm_multishells/*/bin` near the front
-3. the `PNPM_HOME` prepend in `src/zshrc.sh` is guarded by a `case ":$PATH:"` check, so when
+3. the `PNPM_HOME` prepend in `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` is guarded by a `case ":$PATH:"` check, so when
    `~/.local/share/pnpm` is already inherited *anywhere* in PATH the prepend is a no-op — and it
    stays **behind** fnm's bin forever
 

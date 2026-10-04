@@ -130,7 +130,7 @@ SELF_REL=""
 ######################################################################
 CENSUS=(
   "src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh|2|MIXED|:57 AWS_PROFILE → export (NAME). :3650 a DSN → mktemp 0700 tmpfs + config 0600 + trap rm (MEMORY, RAM-only)"
-  "src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh|1|MEMORY|:404 GITHUB_TOKEN → stdout, git's credential-helper protocol. git holds no copy; it re-asks per fetch"
+  "src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh|1|MEMORY|:120 GITHUB_TOKEN → stdout, git's credential-helper protocol. git holds no copy; it re-asks per fetch"
   "src/grove.provision/5.devtools/5.4.gh/configure.upsert.sh|1|PERSISTS|:207 GITHUB_TOKEN → gh auth login --with-token → ~/.config/gh/hosts.yml CLEARTEXT. an OPEN finding — see its justification below"
   "src/grove.provision/2.shell/2.7.aliases/brains.auth.sh|1|PERSISTS|:894 the parked claude oauth token → ~/.claude/.credentials.json on a swap. ACCEPTED, not open — see its justification below"
   "src/grove.provision/5.devtools/5.13.reach/configure.verify.sh|1|NAME|:60 AWS_PROFILE → compared against the declared name"
@@ -138,20 +138,34 @@ CENSUS=(
   ".agent/repo=.this/role=any/skills/git.grove.auth.keys.set.sh|4|PERSISTS|:479 the value → a pipe → ssh → the grove's OWN rack. ACCEPTED — the placement IS the product; see its justification below. the other three keep no value: :403 → wc -c (a LENGTH), :450/:497 → head -c1 on the far side (an EXIT CODE)"
   "src/grove.provision/5.devtools/5.12.rack/configure.verify.sh|2|MEMORY|:72/:155 fetches to prove the rack ANSWERS on this seat; the bytes are counted and compared, never stored"
   ".agent/repo=.this/role=any/skills/git.grove.auth.github.set.sh|1|MEMORY|:389 a reachability PROBE, redirected to /dev/null on the remote"
-  ".agent/repo=.this/role=any/skills/git.grove.wake.sh|1|NAME|:232 AWS_PROFILE → exported for the aws cli"
-  ".agent/repo=.this/role=any/skills/git.grove.stop.sh|1|NAME|:165 AWS_PROFILE → exported for the aws cli"
-  ".agent/repo=.this/role=any/skills/git.grove.trust.gen.sh|1|NAME|:503 AWS_PROFILE → exported for the aws cli"
-  ".agent/repo=.this/role=any/skills/aws.ec2.get.sh|1|NAME|:134 AWS_PROFILE → exported for the aws cli"
-  ".agent/repo=.this/role=any/skills/aws.whoami.sh|1|NAME|:68 AWS_PROFILE → exported for the aws cli"
+  ".agent/repo=.this/role=any/skills/git.grove.rack.operations.sh|3|NAME|the ONE holder eight skills read through. every call asks AWS_PROFILE: :229 the plain read, :233 the native org, :113 the foreign org via a scratch gitroot. the value → stdout, then the caller's env. :110 writes a keyrack.yml that carries slug NAMES only, never a value"
   ".agent/repo=.this/role=any/skills/aws.reach.set.sh|2|NAME|:551/:597 AWS_PROFILE → read to compare declared vs racked"
+  ".agent/repo=.this/role=any/skills/aws.reach.del.sh|1|NAME|:248 AWS_PROFILE → a RE-READ after the del, since an absent entry and a refused del share one exit code. compared, then dropped"
+  ".play/permanent/prove.rack-reads-a-foreign-org.play.sh|1|NAME|:194 AWS_PROFILE → arm 2, the counter-direction of a two-arm probe. tested -z only; never echoed, never stored, never exported"
 )
+
+# 🛑 .why SIX rows left this census on 2026-09-29, and why that is not a loosen
+#   `git.grove.wake` · `git.grove.stop` · `git.grove.trust.gen` · `aws.ec2.get`
+#   · `aws.whoami` · `git.grove.provision.boot` each held its own inline
+#   `keyrack get` for AWS_PROFILE. the org axis moved all six reads into ONE
+#   holder — `git.grove.rack.operations.sh`, the row above — so the six now
+#   call `_rack_profile` and reach the rack through it.
+#
+#   ⇒ the reads did not go away; they were CONSOLIDATED, and the census follows
+#   the call rather than the caller. six rows collapsed into one, and the one
+#   carries the disposition for every seat that reads through it.
+#
+# ⚠️ their rows were not merely stale — they were stale AND the holder that
+#   replaced them was unstaged, so `git grep` could reach neither. the six read
+#   as coverage removed while the reads themselves sat unjudged. §3's disk walk
+#   is what closed that gap; the row drop alone would have bought a green page.
 
 ######################################################################
 # .what = 2. THE COUNTER — proven to discriminate before it reads a real file
 #
 # 🛑 .why
 #   - this repo documents its own call shapes in PROSE, beside the calls
-#   - `git-credential-keyrack.sh` carries `rhx keyrack get` in a comment at :238 and inside an `echo` fix-text at :423, one screen from the live call at :404
+#   - `git-credential-keyrack.sh` carries `keyrack get` in its usage comment at :24 and inside an `echo` fix-text at :139, one screen from the live call at :120
 #   - a naive counter reads 3 where the answer is 1
 #   - this is m.8: the reader re-authors its subject, gains a second place to be wrong no pattern review would surface
 ######################################################################
@@ -183,9 +197,44 @@ fi
 echo "   ├─ counter: ✔ discriminates (4/4 fixtures)"
 
 ######################################################################
-# 3. DISCOVER every file that reaches the rack
+# .what = 3. DISCOVER every file that reaches the rack — from the DISK
+#
+# 🛑 .why the DISK, and not `git grep`
+#   - `git grep` reads the INDEX. a file that is not staged is invisible
+#     to it, and the invisibility is silent — the page reads complete
+#   - measured 2026-09-29: `git.grove.rack.operations.sh` was untracked
+#     and held THREE live `keyrack get` calls. it was the holder the org
+#     axis moved six skills' reads INTO, so the six rows read STALE while
+#     the reads they described sat one file away, unreachable and unjudged
+#   - ⇒ that is `…cries-wolf` m.14 verbatim — a subject with two stores,
+#     and a count that names neither. the index and the disk disagreed,
+#     and only the disk holds what a run of this repo would execute
+#
+# ⚠️ .why UNTRACKED is reported as its own ✋, never merely absorbed
+#   - a rack read is a security decision; an unstaged one is a decision
+#     no reviewer can see, since `git diff` shows it not at all
+#   - and it BREAKS every other box: a `git.grove.push` carries indexed
+#     content, so 8 tracked skills that `source` that helper die at their
+#     source line on any box but the one that authored it
+#   - the index is the human's (`rule.forbid.writes-to-the-git-index`), so
+#     this reader NAMES the gap and stages naught
 ######################################################################
-mapfile -t RAW < <(git grep -l -E 'keyrack get' -- '*.sh' 2>/dev/null | sort -u)
+mapfile -t RAW < <(
+  {
+    git grep -l -E 'keyrack get' -- '*.sh'
+    git ls-files --others --exclude-standard -- '*.sh' | while IFS= read -r u; do
+      [[ -f "$u" ]] && grep -lE 'keyrack get' "$u"
+    done
+  } | sort -u
+)
+
+# the untracked slice, kept apart so §4 can name each one
+mapfile -t UNTRACKED_SH < <(git ls-files --others --exclude-standard -- '*.sh' | sort -u)
+_is_untracked() {
+  local q="$1" u
+  for u in "${UNTRACKED_SH[@]}"; do [[ "$u" == "$q" ]] && return 0; done
+  return 1
+}
 
 # drop THIS file, and say so — an exclusion nobody can see is a hole
 SELF_DROPPED=0
@@ -234,6 +283,17 @@ for f in "${FOUND[@]}"; do
     continue
   fi
   LIVE_FILES+=("$f")
+
+  # 🛑 the index gap — reported BEFORE the row is sought, because an
+  #    untracked consumer is a defect whatever its census row says
+  if _is_untracked "$f"; then
+    echo "   ✋ UNTRACKED — $f"
+    echo "      · $n live 'keyrack get' call(s), and the file is not indexed"
+    echo "      · so no reviewer sees the read, and a push carries none of it:"
+    echo "        every tracked caller that sources it dies on any other box"
+    echo "      · the index is a human's to write; hand them this path"
+    FAIL=$((FAIL + 1))
+  fi
 
   row=""
   for c in "${CENSUS[@]}"; do

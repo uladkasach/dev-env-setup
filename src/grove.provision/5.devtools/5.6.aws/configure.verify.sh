@@ -104,7 +104,7 @@ grove_provision_5_6_aws_configure_verify() {
   # claim 3 — the credentials file aws-sdk v2 opens unconditionally
   #
   # .this is asked here, never left to an sdk to discover
-  #   - `src/zshrc.sh` sets AWS_SDK_LOAD_CONFIG=1, which routes v2's region
+  #   - `2.shell/2.5.zsh/zshrc.sh` sets AWS_SDK_LOAD_CONFIG=1, which routes v2's region
   #     lookup through a loader that opens that file unconditionally
   #   - ⇒ absent, it throws ENOENT from `Config.region`, four steps from a
   #     symptom that reads as a credential problem (see `configure.upsert.sh`)
@@ -113,7 +113,7 @@ grove_provision_5_6_aws_configure_verify() {
     echo "   • ~/.aws/credentials is present ✔ (aws-sdk v2 opens it unconditionally)"
   else
     echo "   ✋ ~/.aws/credentials is ABSENT" >&2
-    echo "      ⇒ this box sets AWS_SDK_LOAD_CONFIG=1 (src/zshrc.sh), so aws-sdk" >&2
+    echo "      ⇒ this box sets AWS_SDK_LOAD_CONFIG=1 (2.5.zsh/zshrc.sh), so aws-sdk" >&2
     echo "        v2 opens that file to derive a region and throws ENOENT when" >&2
     echo "        it is absent — even with valid credentials already in env" >&2
     echo "      fix: rhx grove.provision --what 5.6.aws --mode apply" >&2

@@ -45,7 +45,7 @@ LOUD — ssh names the host it could not look up — so it costs a command, neve
 
 ## .refs
 where the term is declared / used:
-- src/bash_aliases.sh                  # _git_grove_ssh_alias, sshAlias registry field
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                  # _git_grove_ssh_alias, sshAlias registry field
 - src/grove.provision/2.shell/2.2.git/configure.upsert.sh  # git alias precedent
 - .agent/repo=.this/role=any/skills/git.grove.wake.sh     # writes/repairs the Host block ([SET]/[KEEP]/[REPLACE])
 

@@ -18,7 +18,7 @@ data from a non-git source too.
 ## .the evidence — two sources, one shape
 
 the decisive fact is that this repo derives chunks from **two** producers, and they were verified
-directly in `src/init.lua`:
+directly in `src/grove.provision/4.terminal/4.5.nvim/init.lua`:
 
 | producer | call site | vendor vocabulary |
 |----------|-----------|-------------------|
@@ -40,7 +40,7 @@ and the reader would go hunt a git hunk that is absent from a codediff buffer.
 
 ## .the count that settles it empirically
 
-a scan of `src/init.lua` for both words:
+a scan of `src/grove.provision/4.terminal/4.5.nvim/init.lua` for both words:
 
 - `chunk` — 30+ uses, **all** in repo-declared code: locals, params, the `{start, fin}` shape, the
   `print('chunk N bot')` echoes
@@ -69,4 +69,4 @@ none open.
 - [etymonline: hunk](https://www.etymonline.com/word/hunk) — from dutch *homp*
 - [git diff docs — unified format "hunks"](https://git-scm.com/docs/git-diff) — where `hunk` became
   software vocabulary
-- `src/init.lua` — the two producers and the shared `{start, fin}` contract
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` — the two producers and the shared `{start, fin}` contract

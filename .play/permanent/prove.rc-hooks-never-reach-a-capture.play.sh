@@ -108,8 +108,14 @@ else
   _tmp="$(mktemp -d)" || { echo "   ✋ could not make a scratch dir" >&2; exit 1; }
   trap 'rm -rf "$_tmp"' EXIT
 
+  # 🛑 `-f` on both shells below — zsh reads `~/.zshenv` on EVERY invocation, so
+  #    without it each shape is graded COMPOSED with the live rc. a live rc that
+  #    emitted one byte to stdout would make the repaired shape read dirty and
+  #    report a false ✋ against a sound repair. the live box is arm 1b's subject,
+  #    never this arm's (`…cries-wolf`, m.19)
+  #
   # the BROKEN shape: a chpwd hook that prints to stdout, plus a bare `cd`
-  broke="$(zsh -c '
+  broke="$(zsh -f -c '
     _emit() { printf "\e]7;probe\a" }
     chpwd_functions=(_emit)
     capture=$( cd "'"$_tmp"'"; echo PAYLOAD )
@@ -117,7 +123,7 @@ else
   ' 2>/dev/null)"
 
   # the REPAIRED shape: the same hook, sunk to a non-stdout fd, plus `cd -q`
-  fixed="$(zsh -c '
+  fixed="$(zsh -f -c '
     _sink=/dev/null
     _emit() { printf "\e]7;probe\a" >$_sink }
     chpwd_functions=(_emit)

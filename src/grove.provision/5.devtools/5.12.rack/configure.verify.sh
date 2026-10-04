@@ -140,6 +140,14 @@ grove_provision_5_12_rack_verify_awsprofile() {
   #    to drift. a read that split on the wrong field would ask for an env named
   #    after the org, and every answer would be empty
   local row org envs env got
+
+  # 🛑 no org, no rows — a 🌙, never a ✔. see the same block in the upsert
+  if [[ -z "$(grove_provision_5_12_rack_awsprofile_rows)" ]]; then
+    echo "   🌙 this run names no org, so no AWS_PROFILE row was checked"
+    grove_org_absent_say
+    return 0
+  fi
+
   for row in $(grove_provision_5_12_rack_awsprofile_rows); do
     org="${row%%:*}"
     envs="${row#*:}"

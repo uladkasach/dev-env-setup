@@ -136,8 +136,22 @@ fi
 #    ⇒ so the exemption is the exact conventional dummy VALUE, and no more. a
 #      real account id is never `123456789012`, so no real value hides behind
 #      this (`rule.require.exemptions-name-their-trigger`)
+#
+# ⚠️ `000000000000` joined the list 2026-09-28, after it reported a false ✋
+#    against `prove.grove-ports-are-claimed-once`, whose FIXTURE registers a
+#    throwaway grove with `"account": "000000000000"` beside
+#    `"env": "prove-no-such-env"`.
+#
+#    ⇒ the fixture is not the defect and a placeholder cannot serve there: the
+#      field must hold twelve digits for the entry to parse at all, so `<acct>`
+#      would break the very shape the play exists to exercise.
+#
+#    🟡 and twelve zeros is the safest dummy on this list — it is the canonical
+#      "no account", so no real value can hide behind it either. a reader that
+#      condemns an obviously-reserved id is the first step toward a reader
+#      nobody believes (`gotcha.a-check-that-cries-wolf-gets-silenced`)
 ######################################################################
-DUMMY='123456789012|0123456789abcdef|012345678901|111122223333|999999999999'
+DUMMY='123456789012|0123456789abcdef|012345678901|111122223333|999999999999|000000000000'
 
 # .what = one rule = a name, a pattern, what to use instead, and its OWN exempts
 # .why  = a row that names the FIX is actionable; one that names a smell is not

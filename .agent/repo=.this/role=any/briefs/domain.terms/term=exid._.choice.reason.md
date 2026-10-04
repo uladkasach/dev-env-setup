@@ -87,7 +87,7 @@ are not wrong values, they are correct-looking addresses.**
 
 - **discovery** — the 2026-08-10 near-miss above, caught by a human, one command before a
   convergence run against an unidentified box
-- **it is declared here** — 13 occurrences in `src/bash_aliases.sh`, 40 across 4 skills
+- **it is declared here** — 13 occurrences in `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`, 40 across 4 skills
   (`git.grove.wake`, `git.grove.stop`, `git.grove.trust.gen`, `aws.ec2.get`). ⚠️ this check
   was run BEFORE the cluster was written, because the round prior itemized a term for an
   operation that did not exist (`gotcha.my-own-note-became-my-evidence`)

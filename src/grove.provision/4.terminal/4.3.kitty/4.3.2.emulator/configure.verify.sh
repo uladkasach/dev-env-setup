@@ -1,36 +1,18 @@
 #!/usr/bin/env bash
 ######################################################################
 # .what = prove kitty is shaped as declared; READ-ONLY, repairs no claim
-#
 # .why
-#   - presence is not correctness (.refs = gotcha.4-3-2-emulator.demo=kitty-loader-truth, m1)
-#   - claims 2-5 are CONTENT-BLIND, so claim 1c diffs the live artifacts
-#     against the checked-in source
-#   - claim 4 stands apart from the upsert's own return code: it returns 0
-#     silently when kitty is absent from PATH
-#
-# exit: 0 = every claim holds, incl. parse | 1 = a claim failed, and is named
-#       3 = every checkable claim holds and the parse was NOT observed
+#   - presence is not correctness, and kitty's own loader is the one truthful reader
+#   - claim 4 stands apart from the upsert, which returns 0 when kitty is absent
+# .refs = gotcha.4-3-2-emulator.demo=kitty-loader-truth — m1-m12, cited per claim
+# exit: 0 = no claim disproven (an unproven one says 🌙) | 1 = a claim failed, and is named
 ######################################################################
-
-# .what = print one ✋ failure (a headline plus optional detail lines), and count it
-_kitty_verify_fail() {
-  printf '   ✋ %s\n' "$1" >&2
-  shift
-  local line
-  for line in "$@"; do
-    [[ -n "$line" ]] && printf '      %s\n' "$line" >&2
-  done
-  failed=$(( failed + 1 ))
-}
 
 grove_provision_4_3_2_emulator_configure_verify() {
   local conf_dir="$HOME/.config/kitty"
   local conf="$conf_dir/kitty.conf"
   local bundle_dir="$GROVE_SRC/grove.provision/4.terminal/4.3.kitty/4.3.2.emulator"
   local failed=0 unverified=0
-
-  # 1. the conf exists
   if [[ ! -f "$conf" ]]; then
     _kitty_verify_fail "no kitty.conf at $conf" \
       "⇒ configure.upsert did not take" \
@@ -39,14 +21,7 @@ grove_provision_4_3_2_emulator_configure_verify() {
   fi
   echo "   • kitty.conf present"
 
-  ####################################################################
-  # 1b. the conf kitty READS is the one this bundle writes
-  #
-  # .why kitty prefers `KITTY_CONFIG_DIRECTORY`, and defaults to
-  #   ~/.config/kitty — a shell rc, a .desktop Exec, or a systemd unit can
-  #   export it, and claims 2-5 below then describe a conf that shapes no
-  #   terminal
-  ####################################################################
+  # 1b. the conf kitty READS is the one this bundle writes (m10)
   local live_conf_dir="${KITTY_CONFIG_DIRECTORY:-$HOME/.config/kitty}"
   if [[ "$live_conf_dir" == "$conf_dir" ]]; then
     echo "   • kitty reads the conf this bundle writes ✔"
@@ -56,20 +31,13 @@ grove_provision_4_3_2_emulator_configure_verify() {
       "fix: unset KITTY_CONFIG_DIRECTORY, or point it at $conf_dir"
   fi
 
-  ####################################################################
-  # 1c. the live conf, kittens, and theme match the checked-in source
-  #
-  # .why the deployed artifact is a plain `cp`, so a byte-diff is decisive —
-  #   claims 2-5 check five PROPERTIES, and every one holds on a stale copy
-  ####################################################################
+  # 1c. the live conf, kittens, and theme match the checkout, byte for byte (m10).
+  #     ⚠️ the kitten set for 1d is DERIVED here, never re-typed — a second list drifts
   local pair dest mismatched=() named_absent=() kittens=()
   for pair in kitty.conf:kitty.conf copy_notify.py:copy_notify.py \
     reboot_window.py:reboot_window.py scroll_window.py:scroll_window.py \
     desert.conf:themes/desert.conf; do
     dest="$conf_dir/${pair#*:}"
-    # ⚠️ the kitten set is DERIVED here, never re-typed for claim 1d below
-    #   - a second list of one set is free to drift from this one, and the
-    #     kitten it forgets is the one whose key silently dies
     [[ "${pair%%:*}" == *.py ]] && kittens+=("${pair#*:}")
     if [[ ! -f "$dest" ]]; then named_absent+=("${pair#*:}")
     elif ! cmp -s "$bundle_dir/${pair%%:*}" "$dest"; then mismatched+=("${pair#*:}")
@@ -83,19 +51,7 @@ grove_provision_4_3_2_emulator_configure_verify() {
     echo "   • kitty.conf, its kittens, and its theme match this checkout ✔"
   fi
 
-  ####################################################################
-  # 1d. the kittens PARSE
-  #
-  # 🛑 claim 1c proves the BYTES match the checkout and says none of whether
-  #   python accepts them
-  #   - a kitten is loaded lazily, at the first keypress that maps to it
-  #   - ⇒ a syntax error surfaces to a HUMAN mid-task, never to an apply
-  #   - and it surfaces as a DEAD KEY, the same shape a wrong gate has, so
-  #     the two are indistinguishable at the keyboard
-  #
-  # .why kitty's own interpreter — the box may carry no system python3, and
-  #   this bundle has already put kitty's on disk
-  ####################################################################
+  # 1d. the kittens PARSE, per kitty's own interpreter — a lazy load hides a break (m10)
   local kitten unparsed=()
   for kitten in "${kittens[@]}"; do
     [[ -f "$conf_dir/$kitten" ]] || continue
@@ -118,18 +74,7 @@ except SyntaxError as e:
     echo "   • all ${#kittens[@]} kittens parse ✔"
   fi
 
-  ####################################################################
-  # 2. the remote-control policy resolves to a DISABLED value, per kitty
-  #
-  # .why kitty's own loader reads, never a text-grep re-implementation
-  #   - remote control is opt-in PER TERMINAL: the upsert writes `no`; a
-  #     launch's own `-o` flags OUTRANK this file (rule.require.narrowest-terminal-grant)
-  #   - kitty resolves the LAST assignment, and resolves `include` IN PLACE
-  #   - a `== "yes"` deny has two holes: `true`/`y` pass verbatim, and
-  #     `socket`/`socket-only` accept unconditionally — an ALLOWLIST of the
-  #     three disabled spellings is the only safe read
-  #   - .refs = gotcha.4-3-2-emulator.demo=kitty-loader-truth, m2-m6
-  ####################################################################
+  # 2. kitty's loader RESOLVES remote control to a disabled value — an allowlist (m2-m6)
   local rc_policy="" rc_source=""
   if command -v kitty >/dev/null 2>&1; then
     rc_policy="$(timeout -k 5 20 kitty +runpy "
@@ -166,15 +111,11 @@ print(load_config('$conf').allow_remote_control)
       "⚠️ the line at fault may sit in an included file — kitty resolves 'include' in" \
       "  place: grep -n 'allow_remote_control\\|include' $conf" \
       "fix: write 'allow_remote_control no' here; opt in PER TERMINAL at launch instead," \
-      "  as src/termwork.sh does" \
+      "  as src/grove.provision/2.shell/2.7.aliases/termwork.sh does" \
       "read why: rule.require.narrowest-terminal-grant"
   fi
 
-  ####################################################################
-  # 2b. the policy is STATED, not defaulted — asked apart from claim 2, since
-  #   the loader above answers what kitty RESOLVES, declared or defaulted, so
-  #   a release is free to change kitty's default with no diff here to show it
-  ####################################################################
+  # 2b. the policy is STATED, not defaulted — a release may flip a default with no diff here
   if grep -Eq '^[[:space:]]*allow_remote_control[[:space:]]+' "$conf"; then
     echo "   • the policy is stated, not defaulted ✔"
   else
@@ -191,22 +132,8 @@ print(load_config('$conf').allow_remote_control)
       "  finds no window to talk to"
   fi
 
-  ####################################################################
-  # 2c. the DECLARED window size wins
-  #
-  # .why
-  #   - `remember_window_size` defaults to yes and OVERRIDES initial_window_*
-  #   - ⇒ size becomes cached state — the inversion this bundle exists to stop
-  #     (rule.require.judge-declared-state-not-live-state)
-  #
-  # .why the LOADER, never a grep — claim 2's two reasons, verbatim
-  #   - kitty resolves the LAST assignment, and resolves `include` IN PLACE
-  #   - the value has several truthy spellings
-  #
-  # ⚠️ split from 2d on purpose, as 2 is from 2b
-  #   - here = what kitty RESOLVES · 2d = whether we STATED it
-  #   - ⇒ a defaulted pass leaves no diff to show a release that flipped it
-  ####################################################################
+  # 2c. the DECLARED window size wins over `remember_window_size`, per the loader — and
+  #     2d. that override is STATED, not defaulted, the same split as 2b (m11)
   local rws=""
   if command -v kitty >/dev/null 2>&1; then
     rws="$(timeout -k 5 20 kitty +runpy "
@@ -237,9 +164,6 @@ print(load_config('$conf').remember_window_size)
     esac
   fi
 
-  ####################################################################
-  # 2d. the override is STATED, not defaulted — the same split as 2b
-  ####################################################################
   if grep -Eq '^[[:space:]]*remember_window_size[[:space:]]+' "$conf"; then
     echo "   • the size-override policy is stated, not defaulted ✔"
   else
@@ -249,13 +173,7 @@ print(load_config('$conf').remember_window_size)
       "fix: rhx grove.provision --what 4.3.2.emulator --mode apply"
   fi
 
-  ####################################################################
-  # 3. every file kitty.conf NAMES actually exists, and the theme is included
-  #
-  # .why an absent kitten fails at KEYPRESS, never at startup, so ctrl+c does
-  #   no copy, three layers from the file that is absent
-  #   (rule.require.seam-claims-have-an-owner)
-  ####################################################################
+  # 3. every file kitty.conf NAMES exists, and the theme is included (m10)
   if [[ ${#named_absent[@]} -eq 0 ]]; then
     echo "   • the theme and all ${#kittens[@]} kittens are on disk ✔"
   else
@@ -271,11 +189,7 @@ print(load_config('$conf').remember_window_size)
       "fix: rhx grove.provision --what 4.3.2.emulator --mode apply"
   fi
 
-  ####################################################################
-  # 3b. notify-send, which copy_notify.py calls on its copy branch — checked
-  #   here since provision.upsert owns the PACKAGE install, and the CALL has
-  #   no owner: it fails mid-copy on a stripped box
-  ####################################################################
+  # 3b. notify-send, which copy_notify.py calls on each copy — a call with no other owner (m10)
   if command -v notify-send >/dev/null 2>&1; then
     echo "   • notify-send is reachable, so the copy toast can fire ✔"
   else
@@ -284,21 +198,7 @@ print(load_config('$conf').remember_window_size)
       "  reads as a broken clipboard" \
       "fix: rhx grove.provision --what 4.3.2.emulator --mode apply"
   fi
-  ####################################################################
-  # 4. kitty is the SELECTED default terminal, not merely a registered option
-  #
-  # 🛑 MANDATORY — settled by the human 2026-09-03: *"kitty is the
-  #   default-terminal, that must be mandatorily enforced"*
-  #   - ptyxis held this on the laptop, and ptyxis is not kitty
-  #   - a ✋ here is CORRECT and stays red until the box is right
-  #
-  # 📜 this claim was DELETED on 2026-09-03 and restored the same minute
-  #   - *"drop ptyxis"* was read as "drop the claim about ptyxis"
-  #   - ⇒ the reader that CATCHES the defect was removed, and the defect kept
-  #   - it cited `gotcha.a-check-that-cries-wolf-gets-silenced` as its reason,
-  #     and that brief says the opposite: a check that reddens on a REAL defect
-  #     is the one kind that must never be silenced
-  ####################################################################
+  # 4. kitty is the SELECTED default terminal. 🛑 MANDATORY — never drop this claim (m12)
   local selected; selected="$(update-alternatives --query x-terminal-emulator 2>/dev/null \
     | grep -E '^Value:' | awk '{print $2}')"
   case "$selected" in
@@ -311,14 +211,7 @@ print(load_config('$conf').remember_window_size)
                "⚠️ needs root, so run it from a seat with sudo" ;;
   esac
 
-  ####################################################################
-  # 5. does the conf actually PARSE, per kitty's own loader
-  #
-  # .why never `kitty --debug-config` — kitty rejects it as unknown, so a
-  #   row built on it never settles. a `map` to an unknown action binds
-  #   lazily, so this claim covers only what kitty reads at load
-  #   (.refs = gotcha.4-3-2-emulator.demo=kitty-loader-truth, m7-m9)
-  ####################################################################
+  # 5. the conf PARSES per kitty's loader (m7-m9) — judge the sentinel; CAPTURE, never `grep -q`
   if command -v kitty >/dev/null 2>&1; then
     local parse_out parse_rc=0
     parse_out="$(timeout -k 5 20 kitty +runpy "
@@ -329,16 +222,11 @@ for b in bad:
     print('BADLINE line %s: %s' % (b.number, b.exception))
 print('PARSE_READ_OK')
 " 2>&1)" || parse_rc=$?
-    # ⚠️ judge the sentinel, never the exit code: `+runpy` exits 0 for a conf
-    #   full of bad lines, since kitty CARRIES ON
     if [[ "$parse_rc" -ne 0 ]] || [[ "$parse_out" != *PARSE_READ_OK* ]]; then
       echo "   🌙 kitty's config loader did not answer; parse unproven"
       echo "      ⇒ it said: $(printf '%s' "$parse_out" | head -2 | tr '\n' ' ')"
       unverified=$(( unverified + 1 ))
     else
-      # ⚠️ matches are CAPTURED, never `grep -q` — it exits on its first match,
-      #   which SIGPIPEs the producer; under `pipefail` that reads 141 and
-      #   opens the wrong branch (gotcha.pipefail-grep-q)
       local complaints
       complaints="$(printf '%s\n' "$parse_out" \
         | grep -E '^BADLINE |unknown config key' || true)"
@@ -358,6 +246,5 @@ print('PARSE_READ_OK')
     unverified=$(( unverified + 1 ))
   fi
 
-  # a disproven claim fails; an UNPROVEN one is stated above with a 🌙 and does not
   [[ "$failed" -eq 0 ]] || return 1
 }

@@ -72,7 +72,7 @@ same sense, the shorter and more common wins.
 
 ## .evidence
 
-**distribution scan** — `^(function use\.|alias use\.)` across `src/bash_aliases.sh` returns ~30
+**distribution scan** — `^(function use\.|alias use\.)` across `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` returns ~30
 declarations, listed in the `.refs` of the say file. every one reads as "make X active now". a
 single sense across 30 declarations, over 5 unlike mechanisms, is what earns the verb its place.
 
@@ -84,11 +84,11 @@ itemization worth and deliberately excluded:
 | `camp`, `prep`, `prod`, `test` | env slugs of the ehmpathy keyrack manifest — imported vocab |
 | `owner` | a keyrack cli flag — imported vocab |
 | `profile` | aws vocabulary — imported |
-| `ahbode`, `ehmpathy`, `aether` | proper nouns (orgs), not domain terms |
+| `ahbode`, `ehmpathy`, `ahction` | proper nouns (orgs), not domain terms |
 
 ## .the watch-item
 
-`use.screencast` (`src/bash_aliases.sh:116`) is the family's weakest member — it launches an app
+`use.screencast` (`src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh:116`) is the family's weakest member — it launches an app
 rather than activates a context, so it stretches the sense stated above. one outlier does not
 unseat a 30-member family, and it is recorded here rather than disputed.
 

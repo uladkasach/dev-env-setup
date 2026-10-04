@@ -772,7 +772,7 @@ true on every laptop** — so it cannot be found by any amount of work on a deve
 
 ### .measured — the credential helper's repo ladder, 2026-08-15
 
-`src/git-credential-keyrack.sh` picks a cwd to run `rhx keyrack get` from. its rung 2 says,
+`src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh` picks a cwd to run `rhx keyrack get` from. its rung 2 says,
 in its own header, exactly what it needs:
 
 > *"THIS repo's checkout — it owns `.agent/keyrack.yml`, the one manifest that declares the
@@ -869,7 +869,7 @@ is yes unless `GIT_TERMINAL_PROMPT=0` sits on the call itself.
 shared runtime, and the bootstrap), with a fixture that refuses a stdin redirect as a guard
 and spares a local `git config` and a `git clone` named inside an echo.
 
-⚠️ `src/bash_aliases.sh` is deliberately OUT of that claim. those are aliases a human types,
+⚠️ `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` is deliberately OUT of that claim. those are aliases a human types,
 and for a human a credential prompt is the correct affordance — a check that demanded the
 guard there would ship a plausible regression.
 

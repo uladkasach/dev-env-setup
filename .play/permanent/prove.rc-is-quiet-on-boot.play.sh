@@ -214,6 +214,26 @@ echo ""
 #    a converged box boots silent on both streams. a tool that warns here is
 #    an exemption to argue for out loud, never one to grant by a loose pattern
 #    (`rule.require.exemptions-name-their-trigger`).
+#
+# 🛑 .the ✋ names TWO subjects, and it now says which one spoke
+#
+#    this arm boots a NESTED shell: its parent is whatever process drives the
+#    play, so the boot inherits that process's env. and the rc has guards that
+#    key on inherited state — `zshenv.sh:247` skips its own `fnm env` eval
+#    whenever `FNM_MULTISHELL_PATH` is already set, on purpose, so a nested
+#    shell does not mint a second per-shell dir.
+#
+#    ⇒ so a parent that exports the VAR without its bin dir on PATH makes a
+#      HEALTHY rc speak: `fnm use` finds the var set, the dir unreachable, and
+#      says so. the line is real and the rc is not its cause.
+#
+# ⚠️ the ✋ STANDS either way — a human's every `$( )` is a nested shell too, so
+#    a nested-only break is a break. what the re-boot below changes is only
+#    WHICH REPAIR the fix-text names, and those repairs are opposite: repair
+#    the rc, versus repair the parent that half-set the env
+#    (`rule.require.a-cue-is-not-a-claim`, and
+#    `gotcha.a-check-withholds-what-it-already-holds` — this arm already held
+#    the means to tell them apart, and withheld it)
 ######################################################################
 echo "   arm 0b — that same shell writes no ERROR to stderr"
 
@@ -228,8 +248,30 @@ else
     printf '%s\n' "$_boot_err" | sed 's/^/           /' >&2
     echo "         ⇒ the rc is broken, and arm 0 above cannot see it — a byte" >&2
     echo "           count on stdout reads ✔ while the shell says this" >&2
-    echo "         fix: repair the line the message names. do NOT sink it —" >&2
-    echo "              a sink hides a defect rather than repairs it" >&2
+
+    ##################################################################
+    # who spoke — the rc, or the env this play inherited?
+    #
+    # ⚠️ the scrub names ONE var, and names it deliberately. a blanket
+    #    `env -i` would boot a shell no human ever opens, so its silence
+    #    would prove naught about the rc
+    ##################################################################
+    _boot_err_fresh="$(env -u FNM_MULTISHELL_PATH zsh -ic true 2>&1 >/dev/null)"
+    if [[ -z "$_boot_err_fresh" ]]; then
+      echo "         ⇒ and a FRESH boot is QUIET: the same shell, with the" >&2
+      echo "           inherited FNM_MULTISHELL_PATH scrubbed, said not one word" >&2
+      echo "         ⇒ so the rc is healthy for a terminal, and the line above" >&2
+      echo "           is a NESTED-shell break: this play's parent exported the" >&2
+      echo "           var without its bin dir on PATH, so the rc's own" >&2
+      echo "           nested-shell guard (zshenv.sh:247) skipped the eval that" >&2
+      echo "           would have put it there" >&2
+      echo "         fix: repair the PARENT that half-set the env — or make the" >&2
+      echo "              rc's guard read the PATH entry rather than the var" >&2
+    else
+      echo "         ⇒ and a FRESH boot speaks too, so this is the rc itself" >&2
+      echo "         fix: repair the line the message names. do NOT sink it —" >&2
+      echo "              a sink hides a defect rather than repairs it" >&2
+    fi
     _fail
   fi
 fi

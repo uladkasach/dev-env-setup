@@ -131,7 +131,7 @@ two guards cap nvim, so no single core can freeze the machine.
 
 ### layer 1 — systemd memory cap (`nvim()` wrapper)
 
-`src/bash_aliases.sh` defines an `nvim()` function that launches nvim inside a
+`src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` defines an `nvim()` function that launches nvim inside a
 systemd user scope:
 
 - `MemoryHigh=1500M` — kernel throttles + reclaims (graceful)
@@ -210,6 +210,6 @@ per-thread **wchan + cpu-secs**. a thread in state `R` whose wchan reads
 
 - system.runaway_monitor.spec.md — general runaway process detection
 - nvim.neominimap.custom-handler.md — vdiff handler with proper cache
-- src/bash_aliases.sh — the `nvim()` memory-cap wrapper (layer 1)
-- src/init.lua — the self-watchdog block (layer 2), search `self-watchdog`
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh — the `nvim()` memory-cap wrapper (layer 1)
+- src/grove.provision/4.terminal/4.5.nvim/init.lua — the self-watchdog block (layer 2), search `self-watchdog`
 - .agent/**/skills/nvim.inspect.embed.sh — live /proc inspector

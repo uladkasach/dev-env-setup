@@ -11,7 +11,7 @@
 #   - ⇒ the claim asks whether the generated stylesheet is the DESERT one
 #
 # .#333333 is the sentinel
-#   - it is the desert window background, declared in `src/cosmic.theme.ron`
+#   - it is the desert window background, declared in `src/grove.provision/3.cosmic/3.2.theme/cosmic.theme.ron`
 #   - COSMIC writes it as `rgba(51, 51, 51, ...)`, so both forms are accepted
 #
 # guarantee

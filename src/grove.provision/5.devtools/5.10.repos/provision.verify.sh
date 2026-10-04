@@ -42,7 +42,16 @@ GROVE_REPOS_GH_PROBE_SECONDS=15
 GROVE_REPOS_GH_LIST_SECONDS=60
 
 grove_provision_5_10_repos_provision_verify() {
-  local orgs="${GROVE_GIT_ORGS:-ehmpathy ahbode whodisio}"
+  # .the SHARED reader, so this half and the upsert cut ONE set
+  #   - it held an inline copy of the upsert's scalar until 2026-09-24
+  local orgs; orgs="$(grove_provision_5_10_repos_orgs)"
+
+  if [[ -z "$orgs" ]]; then
+    echo "   🌙 no org set for '${GROVE_ORG:-<unset>}' — no clone is claimed here"
+    echo "      ⇒ this judges no repo; the table declares no arm for that org"
+    echo "      fix: declare its arm in 5.10.repos/_.sh, beside its reason"
+    return 0
+  fi
 
   if ! command -v gh >/dev/null 2>&1; then
     echo "   ✋ gh is absent, so no org's repos can be listed or cloned" >&2
@@ -70,31 +79,58 @@ grove_provision_5_10_repos_provision_verify() {
     return 1
   fi
 
-  local organization present absent broken repo
+  local organization present absent broken repo clonedir into
   local halves=()
   for organization in $orgs; do
     present=0
     absent=0
     broken=0
+    ##################################################################
+    # 🛑 the SHARED alias, so this half reads the dir the upsert WROTE
+    #   - `aether-auctions/svc-x` lives at `~/git/aether/svc-x`
+    #   - a join that spelled github's name here would find no clone and
+    #     report every repo absent on a converged box (m.9)
+    ##################################################################
+    clonedir="$(grove_org_clonedir "$organization")"
     while read -r repo _; do
       [[ -z "$repo" ]] && continue
+      into="$HOME/git/$clonedir/${repo#*/}"
       ################################################################
       # ⚠️ the SHARED reader, from this bundle's `_.sh`
       #   - it names the STATE rather than answers a boolean
       #   - ⇒ an inline test would be a second cut of the set the upsert cuts
       #   - ⇒ THIS half needs three answers, and a predicate gives two
       ################################################################
-      case "$(grove_provision_5_10_repos_state "$HOME/git/$repo")" in
+      case "$(grove_provision_5_10_repos_state "$into")" in
         whole)  present=$(( present + 1 )) ;;
         absent) absent=$(( absent + 1 )) ;;
-        half)   broken=$(( broken + 1 )); halves+=("$HOME/git/$repo") ;;
+        half)   broken=$(( broken + 1 )); halves+=("$into") ;;
       esac
     done < <(timeout -k 5 "$GROVE_REPOS_GH_LIST_SECONDS" gh repo list "$organization" --limit 1000 2>/dev/null)
 
     if (( absent == 0 && broken == 0 && present > 0 )); then
       echo "   • $organization — all $present repos on disk ✔"
     elif (( present == 0 && absent == 0 && broken == 0 )); then
+      ################################################################
+      # 🛑 an empty list is a CREDENTIAL fact, and it names its owner
+      #
+      # 📜 measured 2026-09-24 on grove-aether-v20260921: the org table was
+      #    repaired to ask for `aether-auctions`, and this line answered for
+      #    every apply thereafter. the box's `@all.camp.GITHUB_TOKEN` sees
+      #    `ahbode` and `ehmpathy` and no other org, so the list is genuinely
+      #    empty and no command ON the box can close it.
+      #
+      # ⚠️ `the token can see no repos here` alone read as a fact with no
+      #    repair, and the repair is not the driver's to make — a PAT's org
+      #    scope is a human's grant (`rule.require.seam-claims-have-an-owner`)
+      ################################################################
       echo "   🌙 $organization — the token can see no repos here"
+      echo "      ⇒ an empty list is the TOKEN's scope, never an empty org. no"
+      echo "        command on this box widens it — a PAT's org scope is granted"
+      echo "      read what it CAN see:  gh api user/orgs --jq '.[].login'"
+      echo "      fix: re-scope @all.camp.GITHUB_TOKEN to include '$organization',"
+      echo "        then place it again —"
+      echo "        rhx git.grove.auth.github.set <grove>"
     else
       ################################################################
       # ⚠️ the fix-text SPLITS ON MODE, and that split is load-bear

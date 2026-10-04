@@ -6,6 +6,15 @@
 stable NAME, never a position — `5.11.usql` already runs before `5.10.repos`. this
 brief traces why each swap exists.
 
+## yq runs FIRST, on the highest digit in the section
+
+`5.17.yq` depends on no bundle here at all. its one need is `curl`, which
+`2.1.toolkit` put down a whole section earlier — so it sits at the head of the list
+and its digit is simply the free tail at the time it was written.
+
+⇒ it is the clearest case for the rule: a bundle with **zero** in-section
+dependencies runs first, and its number tells a reader none of that.
+
 ## node and rust come first
 
 node and rust are the two runtimes every leaf beneath them leans on. `5.3.brains`

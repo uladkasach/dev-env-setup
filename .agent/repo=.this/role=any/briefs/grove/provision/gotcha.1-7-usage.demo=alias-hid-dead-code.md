@@ -7,7 +7,7 @@ pointed at commands no driven step ever installed.
 
 ## the trace
 
-`src/bash_aliases.sh` had declared these two for a long time:
+`src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` had declared these two for a long time:
 
 ```
 alias machine.usage.observe='machine_resource_observe'

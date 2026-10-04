@@ -36,7 +36,7 @@ reason an existence test cannot qualify a file as an asset (`term=drift._.choice
 - src/machine/kitty_snap_lowbatt{,.service,.timer} # 4.3.4.snapshot
 - src/machine/machine_usage_snapshot               # 1.7.usage
 - src/machine/machine_resource_procs_monitor       # 1.6.2.monitor
-- src/init.lua, src/tmux.conf, src/starship.toml   # the long-extant ones
+- src/grove.provision/4.terminal/4.5.nvim/init.lua, src/grove.provision/2.shell/2.8.tmux/tmux.conf, src/grove.provision/2.shell/2.6.starship/starship.toml   # the long-extant ones
 - .agent/repo=.this/role=any/briefs/grove/provision/rule.require.bundles-own-their-dependencies.md
 
 ## .reason

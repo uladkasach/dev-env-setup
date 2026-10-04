@@ -31,9 +31,12 @@ a file's **name advertises one consumer; its consumers are whoever sources it**.
 silently:
 
 ```
-src/bash_aliases.sh          ← the name says bash
-src/zshrc.sh:119   source ~/.bash_aliases          ← zsh consumes it
-src/zshrc.sh:124   export BASH_ENV=~/.bash_aliases ← bash consumes it
+src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh
+   ← the name says bash
+
+src/grove.provision/2.shell/2.5.zsh/zshrc.sh
+   :119  source ~/.bash_aliases             ← zsh consumes it
+   :124  export BASH_ENV=~/.bash_aliases    ← bash consumes it
 ```
 
 measured 2026-09-05: the file named for bash has **two** consumers. so `bash -n` answers *"does
@@ -49,7 +52,7 @@ so the consumer set must be **named per file**, never inferred from the extensio
 - `.agent/repo=.this/role=any/skills/shell.test.syntax.sh` — `consumers_of()` derives the set;
   `DUAL_CONSUMED` names the files read by both shells; the report prints the set per file, so a
   pass never claims more than what was parsed
-- `src/zshrc.sh` — the declaration the consumer set is derived from (lines 119, 124)
+- `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` — the declaration the consumer set is derived from (lines 119, 124)
 
 **the origin:**
 

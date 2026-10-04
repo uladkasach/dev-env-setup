@@ -65,7 +65,7 @@ grove_provision_5_2_rust_provision_upsert() {
     # `--no-modify-path` — rustup edits shell rc files this repo owns, and
     # `~/.zshenv` is `2.5.zsh`'s by byte; without the flag rustup's append
     # collides with that bundle's `cmp -s` and reads as a two-writer defect.
-    # the append was redundant regardless — src/zshenv.sh already puts
+    # the append was redundant regardless — src/grove.provision/2.shell/2.5.zsh/zshenv.sh already puts
     # ~/.cargo/bin on PATH, guarded — and rustup still WRITES ~/.cargo/env
     # itself, since the flag governs only rc files
     # .refs = gotcha.5-2-rust.demo=pin-tier-and-rc-collision, m4

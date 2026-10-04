@@ -10,10 +10,10 @@ several are `export -f`'d, so a non-interactive `bash` inherits them:
 
 | function | declared in | wraps |
 |---|---|---|
-| `nvim` | `src/bash_aliases.sh` | a memory cap, so a runaway nvim cannot freeze the machine |
-| `usql` | `src/bash_aliases.sh` | a `--key` flag that fetches a dsn from keyrack |
-| `npm` / `npx` | `src/bash_aliases.sh` | routes to pnpm in a pnpm project |
-| `tsx` | `src/bash_aliases.sh` | `npx tsx` |
+| `nvim` | `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` | a memory cap, so a runaway nvim cannot freeze the machine |
+| `usql` | `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` | a `--key` flag that fetches a dsn from keyrack |
+| `npm` / `npx` | `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` | routes to pnpm in a pnpm project |
+| `tsx` | `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` | `npx tsx` |
 
 so any `*.verify` phase that asks `command -v` about one of those names is answered by the
 **alias file**, not by the box.
@@ -101,7 +101,7 @@ the bytes arrived, not that the capacity exists.
 
 ## .enforcement
 
-- `command -v <name>` in a `*.verify` phase, where `src/bash_aliases.sh` declares a function of
+- `command -v <name>` in a `*.verify` phase, where `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` declares a function of
   that name = **blocker** — use `bundle.bin.of`
 - a phase that resolves a binary path and then invokes the bare NAME anyway = **blocker**
 - a new function in `bash_aliases.sh` that shadows a binary name, with no matching audit of the

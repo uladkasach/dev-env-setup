@@ -105,4 +105,4 @@ recorded here rather than answered.
 - `rule.require.prove-the-path-the-human-runs` — the rule this is an instance of
 - `gotcha.the-duct-returns-the-send-not-the-answer` — the other half of the transport seam
 - `src/grove.provision/2.shell/2.5.zsh/configure.upsert.sh` — the owner of both files
-- `src/zshenv.sh` — where `AWS_SDK_LOAD_CONFIG=1` is declared
+- `src/grove.provision/2.shell/2.5.zsh/zshenv.sh` — where `AWS_SDK_LOAD_CONFIG=1` is declared

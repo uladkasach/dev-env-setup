@@ -18,7 +18,7 @@ for CI, agent loops, and fast feedback. two levels: **parse** (syntax only) and
 ## .the skill (preferred path)
 
 ```sh
-rhx nvim.test.headless --check src/init.lua        # parse only (loadfile, no exec)
+rhx nvim.test.headless --check src/grove.provision/4.terminal/4.5.nvim/init.lua        # parse only (loadfile, no exec)
 rhx nvim.test.headless --run tests/foo.test.lua    # run a lua test file
 rhx nvim.test.headless --run tests/foo.test.lua --clean  # -u NONE (no user config)
 rhx nvim.test.headless --lua "print(1+1)"          # inline snippet
@@ -35,7 +35,7 @@ error), `2` constraint (bad args, file absent, nvim absent).
 catches pure syntax errors:
 
 ```sh
-nvim --headless -c "lua local ok,err=loadfile('src/init.lua'); print(ok and 'SYNTAX OK' or ('ERR: '..vim.inspect(err)))" -c "qa"
+nvim --headless -c "lua local ok,err=loadfile('src/grove.provision/4.terminal/4.5.nvim/init.lua'); print(ok and 'SYNTAX OK' or ('ERR: '..vim.inspect(err)))" -c "qa"
 ```
 
 use this on a full `init.lua` — it will NOT trigger the plugin `require`s, so it

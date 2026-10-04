@@ -199,7 +199,7 @@ file at all on a bash-record seat. an entire run once held only `/usr/bin:/bin`;
 installed "absent from PATH". what made a second apply look necessary was never
 idempotency — it was a DIFFERENT PATH (`gotcha.a-tool-found-by-path-answers-only-a-human`).
 
-**fix:** `grove.provision._.sh` sources `src/zshenv.sh` before it drives any bundle, so the run
+**fix:** `grove.provision._.sh` sources `src/grove.provision/2.shell/2.5.zsh/zshenv.sh` before it drives any bundle, so the run
 carries the same PATH whoever launched it. within a phase, verify by explicit path in any step
 that installs to a dir it may have just created.
 

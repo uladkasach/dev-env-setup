@@ -86,7 +86,7 @@ fi
 
 # ── tmuxcheck mode: verify the tmux status-line reads @repo / @branch ─────────
 # .why = the shell (_set_terminal_title in zshrc) pushes $repo + $branch to the
-#        pane options @repo/@branch inside tmux; src/tmux.conf reads them in
+#        pane options @repo/@branch inside tmux; src/grove.provision/2.shell/2.8.tmux/tmux.conf reads them in
 #        status-left/right (no string parse). this sets those options on a real
 #        pane and asserts the status format strings render them — so a rename or a
 #        bad option ref is caught before a human reloads tmux.
@@ -104,7 +104,7 @@ if [[ "$MODE" == "tmuxcheck" ]]; then
   tmux kill-session -t "$S" 2>/dev/null || true
   tmux new-session -d -s "$S" 2>/dev/null
 
-  # the status format strings, exactly as src/tmux.conf reads them
+  # the status format strings, exactly as src/grove.provision/2.shell/2.8.tmux/tmux.conf reads them
   EXPR_LEFT=' #{@repo} '
   EXPR_RIGHT=' #{@branch} '
 
@@ -154,7 +154,7 @@ if [[ "$MODE" == "demo" ]]; then
 
   # preview the status line WITHOUT a touch to the deployed config: scope the
   # repo/branch format to THESE sessions only (no -g, so the human's other
-  # sessions keep their status). mirrors src/tmux.conf's status-left/right.
+  # sessions keep their status). mirrors src/grove.provision/2.shell/2.8.tmux/tmux.conf's status-left/right.
   for S in "$TREE/mechanic" "$TREE/foreman"; do
     tmux set -t "$S" status-left  " #{@repo} "   >/dev/null 2>&1
     tmux set -t "$S" status-right " #{@branch} " >/dev/null 2>&1

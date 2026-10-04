@@ -49,10 +49,8 @@ reports a **write** rather than a **behavior**. so a configure's report must nam
 
 **the contracts:**
 
-- `src/install_env.pt*.sh` — 27 `configure_*` operations (firefox, kitty, ptyxis, keyd, cosmic,
-  git, tmux, codium, sysctl, …)
-- `src/bash_aliases.sh` — several `sync.devenv.*` aliases source a module and call a
-  `configure_*`. that is the layer order: a sync may *invoke* a configure; they are not one act
+- `src/grove.provision/**/configure.upsert.sh` — one `configure` phase per bundle (firefox,
+  kitty, keyd, cosmic, git, tmux, codium, sysctl, …), each with a `configure.verify.sh` beside it
 - `.agent/repo=.this/role=any/briefs/grove/provision/rule.require.install-via-procedures.md` — why a human is
   always told to run the procedure rather than a one-off command
 

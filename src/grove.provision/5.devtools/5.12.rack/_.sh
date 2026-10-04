@@ -51,26 +51,29 @@ grove_provision_5_12_rack_awsprofile_key()   { printf 'AWS_PROFILE'; }
 grove_provision_5_12_rack_awsprofile_vault() { printf 'os.direct'; }
 grove_provision_5_12_rack_awsprofile_value() { printf 'ambient'; }
 
-# .what = the orgs whose AWS_PROFILE is the box's own badge, as `<org>:<env>,<env>`
-# 🛑 the env sets DIFFER on purpose, and neither may hold the other's
-#   - `5.13.reach` overwrites ahbode's test/prep/prod with per-account profile
-#     names, so to list them here is two writers on one slug
-#   - ehmpathy's `prod` holds `ambient` because no hop is DECLARED for it: no
-#     ehmpathy repo declares an `awsAccountId` (all 92 of its clones that carry
-#     a `declapract.use.yml` are libraries, measured 2026-09-13)
-#   - ⚠️ ehmpathy's `test` and `prep` LEFT this row on 2026-09-18: `5.13.reach`
-#     now wires both to a real hop into the demo account, so to list them here
-#     is two writers on one slug. their declaration lives under ahbode, which is
-#     why that bundle parts its SOURCE org from its TARGET org
-#   - ⚠️ `ambient` was a fact about what is READABLE, never about what EXISTS in
-#     aws. ehmpathy holds its own accounts; the grant and the declaration were
-#     owed (uladkasach/dev-env-setup#123) and landed for the non-prod tiers. do
-#     NOT restate the absence as "no account exists" — that claim stood here
-#     until 2026-09-06 and was wrong
-#   - ⇒ a row STAYS until the hop replaces it: `ambient` is what lets
-#     `keyrack.source()` read the ssm params those suites need
+# .what = the orgs whose AWS_PROFILE is the box's own badge, as `<org>:<env>`
+# 🔴 the rows are PER-ORG, and the camp row is DERIVED, never listed
+#   - `<org>:camp` is the box's OWN BADGE; every OTHER row is a CROSS-ORG reach,
+#     an opt-in owned by the org that granted it
+#     (`rule.require.a-grove-reaches-its-own-org-only`)
+#   - 🛑 an org with no opt-in table gets its camp row and NO OTHER. it does not
+#     inherit ahbode's, however convenient that would be
+#   - an env `5.13.reach` wires may NOT appear here — that is two writers on one
+#     slug. a row stays only until a real hop replaces it
+#   - .refs = gotcha.5-12-rack.demo=entry-vs-value
 grove_provision_5_12_rack_awsprofile_rows() {
-  printf 'ahbode:camp ehmpathy:prod'
+  local org="${GROVE_ORG:-}"
+  [[ -n "$org" ]] || return 0
+
+  # clause 1 — the box's own badge, for its own org, always
+  printf '%s:camp' "$org"
+
+  # clause 2 — the cross-org opt-ins, per org that holds one
+  # ⚠️ ehmpathy is a CANDIDATE only because it is generic infra. that ahbode
+  #   opted in says not one word about any other org
+  case "$org" in
+    ahbode) printf ' ehmpathy:prod' ;;
+  esac
 }
 
 # .what = per org, the envs the scratch keyrack.yml DECLARES — a superset of its row
@@ -78,9 +81,16 @@ grove_provision_5_12_rack_awsprofile_rows() {
 # 🛑 this must hold every env `5.13.reach` wires for that org, else its set writes
 #      the profile body and then fails on the rack name — a half-applied pair
 #      (one fact, two holders: `gotcha.a-check-that-cries-wolf-gets-silenced`, m.9)
+#
+# 🔴 `camp` is granted by DERIVATION, so a NEW org needs no edit here to hold its
+#      own badge — only to wire a REACH, which it must then match
+#   - 🛑 an org that is neither this grove's own nor a declared opt-in target
+#     still REFUSES (`rule.require.a-grove-reaches-its-own-org-only`, clause 3)
 grove_provision_5_12_rack_declared() {
-  case "$1" in
-    ahbode)   printf 'camp test prep prod' ;;
+  local want="$1" own="${GROVE_ORG:-}" envs=""
+
+  case "$want" in
+    ahbode)   envs='test prep prod' ;;
     # ⚠️ `test` and `prep` are declared for `5.13.reach`'s two ehmpathy rows, and
     #   for no row of THIS bundle — both are deliberately absent from
     #   `_awsprofile_rows` above, since that would be two writers on one slug. a
@@ -89,9 +99,21 @@ grove_provision_5_12_rack_declared() {
     # 🛑 `demo` is NOT declared: it names the ACCOUNT, never a tier, and keyrack's
     #   own `KEYRACK_VALID_ENVS` holds no such value — so a row wired that way
     #   writes the profile body and then refuses the rack name
-    ehmpathy) printf 'test prep prod' ;;
-    *)        return 1 ;;
+    ehmpathy) envs='test prep prod' ;;
+    # aether's OWN reach — the three envs `5.13.reach`'s aether arm wires
+    aether)   envs='test prep prod' ;;
+    # 🛑 clause 3 — an org with no declared table gets no env, and the caller
+    #   halts. it does NOT fall through to whichever table is written here
+    *)        [[ "$want" == "$own" && -n "$own" ]] || return 1 ;;
   esac
+
+  # the own-org camp badge, prepended for ANY org this grove belongs to
+  if [[ "$want" == "$own" && -n "$own" ]]; then
+    printf 'camp%s' "${envs:+ $envs}"
+    return 0
+  fi
+
+  printf '%s' "$envs"
 }
 
 # .what = the ssm parameter name, computed the same way keyrack computes it
@@ -119,9 +141,7 @@ grove_provision_5_12_rack_gitroot() { printf '%s/.local/state/keyrack.gitroot' "
 #   - the file carries one `org:` line, so it declares one org at a time
 #   - a NAMED-org read resolves against the yml IN SCOPE, so a read of org B
 #     against org A's declaration answers EMPTY
-#   - 📜 measured: after the upsert's loop left `ehmpathy` declared, the verify
-#     called a present `ahbode.camp` entry absent, and named a fix that would
-#     have re-run the same loop forever
+#   - .refs = gotcha.5-12-rack.demo=entry-vs-value
 grove_provision_5_12_rack_declare_org() {
   local gitroot="$1" org="$2" key e
   key="$(grove_provision_5_12_rack_awsprofile_key)"

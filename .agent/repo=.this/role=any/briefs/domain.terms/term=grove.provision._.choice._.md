@@ -82,7 +82,7 @@ where the term is declared / used:
 - `src/grove.provision._.sh`                                # the entrypoint
 - `src/grove.provision/**`                                  # the bundle tree it drives
 - `.agent/repo=.this/role=any/skills/grove.provision.sh`    # the rhx skill
-- `src/bash_aliases.sh`                                     # the alias + its `<TAB>` synonyms
+- `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`                                     # the alias + its `<TAB>` synonyms
 - `.agent/…/briefs/grove/provision/rule.require.one-command-provision.md`   # the bar it must meet
 
 ## .reason

@@ -53,7 +53,7 @@ robot's commit identity, so one rotation breaks the other's job.
 | consumer | reads it | when |
 |---|---|---|
 | `gh` cli | `5.4.gh/configure.upsert.sh` | once, at apply time |
-| plain https git | `src/git-credential-keyrack.sh` | every fetch, at run time |
+| plain https git | `src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh` | every fetch, at run time |
 | the setter | `git.grove.auth.github.set` skill | when a human places it |
 
 ⚠️ they read the rack by different routes, so **one can be green while the other
@@ -272,7 +272,7 @@ times, at the cost of a real pat each (`term=entry`).
 ## .see also
 
 - `.agent/keyrack.yml` — where the key is DECLARED (an undeclared key reads absent forever)
-- `src/git-credential-keyrack.sh` — the https git consumer
+- `src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh` — the https git consumer
 - `src/grove.provision/5.devtools/5.4.gh/configure.upsert.sh` — the gh consumer
 - `.agent/repo=.this/role=any/skills/git.grove.auth.github.set.sh` — the setter
 - `domain.terms/term=slug` / `term=entry` — the address vs the stored record

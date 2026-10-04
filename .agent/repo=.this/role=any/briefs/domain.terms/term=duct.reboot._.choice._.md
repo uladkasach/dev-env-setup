@@ -47,7 +47,7 @@ that boundary is what keeps the two verbs distinct: **`open` creates, `reboot` r
 reach for `refresh` first: it is free and cannot lose work.
 
 ## .refs
-- src/ductwork.sh                                     # duct.reboot()
+- src/grove.provision/2.shell/2.7.aliases/ductwork.sh                                     # duct.reboot()
 - .agent/repo=.this/role=any/skills/duct.reboot.sh
 - lifted from ehmpathy/nheuron's `duct.reboot`, with the remote branch added
 

@@ -34,6 +34,28 @@ grove_provision_5_16_keys_configure_verify() {
     return 0
   fi
 
+  # 🛑 ZERO ROWS IS A STATE, and it may never read as a pass
+  #   the rows are keyed on `GROVE_ORG`, so an org with no arm — and a run
+  #   with no org at all — asks for no key and this loop runs zero times. that
+  #   is CORRECT (`rule.require.a-grove-reaches-its-own-org-only`, clause 3)
+  #   and it is not a ✔: a silent exit 0 claims the box can read its keys,
+  #   while what happened is that none were checked (`rule.forbid.failhide`)
+  #
+  #   ⇒ 🌙, never ✔ and never ✋ — this bundle learned no fact about the rack
+  if [[ -z "$(grove_provision_5_16_keys_required)" ]]; then
+    if [[ -z "${GROVE_ORG:-}" ]]; then
+      echo "   🌙 this run names no org, so no key row is owed — and none was read"
+      grove_org_absent_say
+      return 0
+    fi
+    echo "   🌙 no key row is declared for org '${GROVE_ORG}', so none was read"
+    echo "      ⇒ an org with no table gets ZERO rows, never another org's"
+    echo "        (rule.require.a-grove-reaches-its-own-org-only)"
+    echo "      ⇒ if this grove's work DOES need vendor keys, add its arm:"
+    echo "        src/grove.provision/5.devtools/5.16.keys/_.sh → \`_required\`"
+    return 0
+  fi
+
   # 🛑 .off the ec2 platform, a key lives in `os.secure` and NEVER in `aws.params`
   #   - a local or house grove has no ec2 identity to read ssm with
   #   - ⇒ the account-alignment yardstick below is void there, and a fix-text
@@ -114,21 +136,37 @@ grove_provision_5_16_keys_configure_verify() {
     # 🛑 the count is FIVE, and the fifth arrived 2026-09-07 with this bundle's
     #   first `EPHEMERAL_VIA_GITHUB_APP` row. it is the one state a PLACEMENT can
     #   never close — `git.grove.auth.keys.set` refuses such a row at step 0,
-    #   because `get` MINTS its value rather than hand back what the rack stores,
-    #   so a placement would seal a 55-minute corpse that reads green forever
+    #   because `keyrack get` DELIVERS the minted token and never hands back the
+    #   blob the rack stores, so a get→set pipe seals a 55-minute corpse that
+    #   reads green forever (`ehmpathy/rhachet#522`)
     #
     #   ⇒ a fix-text that named four would send a human to `keyrack list` and an
     #     unlock, and neither touches that cause. a list of causes is a claim
     #     about a SET, and this set grew
     #     (`gotcha.a-check-that-cries-wolf-gets-silenced`, q11)
+    #
+    # 🛑 .the fifth row's REPAIR was wrong until 2026-09-28, and worse than the
+    #   miss it replaced. it read "set it HERE, at a terminal" — printed by a
+    #   bundle that runs ON A GROVE, where a tty read is a declared blocker
+    #   (`rule.require.one-command-provision`). a human who obeyed it either
+    #   wedged the duct with a prompt no one could answer, or broke the
+    #   invariant to close a row.
+    #   ⇒ a correct verdict whose repair is forbidden (m.4). the vault is what
+    #     closes this, and it is written once on a LAPTOP — never on the box
     echo "      ⇒ EMPTY collapses five states, and each wants a different repair:" >&2
     echo "         · this seat's \$HOME holds no manifest entry for the slug" >&2
     echo "         · the session lapsed" >&2
     echo "         · this box cannot read that vault" >&2
     echo "         · an aws.params value was written into a DIFFERENT account" >&2
-    echo "         · the key MINTS its value (an ephemeral mech), so no replica" >&2
-    echo "           can be placed from another box — set it HERE, at a terminal:" >&2
-    echo "             rhx keyrack set --owner ${owner} --key ${key} --org ${org} --env ${env}" >&2
+    echo "         · the key is an EPHEMERAL mech, so \`get\` hands back a minted" >&2
+    echo "           token rather than the stored blob — and a replica placed" >&2
+    echo "           from that is a corpse. ⚠️ do NOT 'set it here': this box is" >&2
+    echo "           a grove, and a tty on the provision path is a blocker." >&2
+    echo "           the repair is CENTRAL, run once on a human's own laptop —" >&2
+    echo "             rhx keyrack set --owner ${owner} --key ${key} \\" >&2
+    echo "               --org ${org} --env ${env} --vault aws.params" >&2
+    echo "           thereafter every grove reads the blob and mints its own" >&2
+    echo "           token, with no prompt on any box" >&2
     echo "      ⇒ read the rack before you write to it — a set OVERWRITES:" >&2
     echo "         rhx keyrack list --owner ${owner}" >&2
     echo "         rhx keyrack unlock --owner ${owner} --env ${env}" >&2

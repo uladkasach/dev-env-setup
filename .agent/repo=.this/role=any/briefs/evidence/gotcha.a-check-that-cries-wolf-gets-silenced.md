@@ -43,6 +43,10 @@ turned out to have, and the repair that closed it.
 | 12 | the pattern matched a SUBSET, and the total was true of the subset — so it went green |
 | 14 | the reader was right and the SUBJECT had two stores; index and tree disagreed, silently |
 | 15 | the subject had NOT SPOKEN YET, and its silence was scored as its verdict |
+| 16 | the DISCRIMINATOR read one subject, and the arm it guarded depended on another |
+| 17 | ONE action settled a claim about TWO subjects, so every failure was blamed on the remote one |
+| 18 | it was ALREADY RED, so a new member of its own class moved no verdict — only a count |
+| 19 | the reader INHERITED the live copy of its own subject, so every arm graded a composition |
 
 ⚠️ m.3 sits after m.4 in the write-up because it was recorded late. the number is a stable
 citation, never a sequence.
@@ -52,8 +56,14 @@ no defect in a reader's logic and so yields no question in `.the test`.
 
 ## .the test
 
-before you trust a check that just went red, ask these fourteen, in order. each reaches a
+before you trust a check that just went red, ask these eighteen, in order. each reaches a
 defect the ones before it cannot. the tag names the measurement that taught it.
+
+⚠️ q17 is the one that fires when a check did **not** just go red — read it before you read your
+edit as clean.
+
+⚠️ q18 is the one that fires on a check that just went red **the hour you converged a box** — ask
+it before you blame the subject.
 
 **q1 (m.1) — does the output it printed as evidence agree with its verdict?**
 if the two contradict on one screen, suspect the check first. print what you observed, not
@@ -143,6 +153,12 @@ that reached one of them makes the two disagree with no signal. a count is a cla
 and a set with two stores has two true answers.
 ⇒ name the store, or read both and demand they agree. ⚠️ a third store reads from no command at
 all — the record a reader keeps beside the set — which is q12's trap one step out.
+🔴 **and the store choice can invert a verdict, not merely dent a count.** measured again
+2026-09-29: an index-keyed walk could not reach an UNSTAGED file, so the reads that had moved into
+it left no trace at all — and six rows that described those reads read `STALE ROW`, whose own
+fix-text says *drop it*. to obey that text would have turned a 7-defect page green over three live
+reads nobody had judged. ⇒ **a false ✔ manufactured by a correct repair, applied on a partial
+subject** — so ask q13 before you act on ANY row, never only before you trust a total.
 
 **q14 (m.15) — has this subject FINISHED, or did I read it mid-flight?**
 q1-q13 all presume a subject that already spoke. this one asks whether it did. an empty capture has
@@ -156,6 +172,66 @@ to a human twice and dreamt as a defect. its real output, once it spoke, was a t
 `✋ aws sso login timed out` with a status, a cause, and a fix.
 ⇒ the repair is cheap and it is the same one q1 asks for, one step earlier: **quote the subject's
 output in the report.** a quote of an empty string is visibly not a verdict.
+
+**q15 (m.16) — did the DISCRIMINATOR that let this verdict through read the same subject the
+verdict is about?**
+q1-q14 interrogate the check's reader, set, reach, store, or timing. this one interrogates the
+**guard that decided a verdict was safe to render at all** — and it is the only question whose
+subject is a passing row.
+⇒ a discriminator proves its claim about what it READ. where the guarded arm depends on something
+else, the ✔ grants permission it never earned, and the guarded arm's ✋ is manufactured by the very
+row that was supposed to prevent it.
+⚠️ **q1 passes cleanly here, and that is the trap.** `✔ arm 0 — native org 'ahbode' answers, so the
+session is live` beside `✋ arm 1 — foreign org 'aether' answers EMPTY` is two honest lines; an sso
+session is scoped to ONE org, so the first settles no part of the second. the pattern was sound,
+and one unlock turned every arm green.
+⇒ the repair: make the guarded arm's empty branch **three-valued** — ask whether ITS OWN subject is
+live before you grade the claim, and decline (exit 2) rather than condemn when it is not.
+
+**q16 (m.17) — how many subjects could the failure of this one action be about?**
+q15 asks about a discriminator that EXISTS and is mis-scoped. this asks the prior question: was
+there one at all? a check that drives a single action to settle a claim inherits every subject that
+action touches — and it will report whichever one its author had in mind.
+⇒ `git.grove.wake` fails when the box is down AND when the LAPTOP's rack is locked. rung 2 drove it
+and halted `the grove did not wake` against a box whose duct had answered `up 12 min` one command
+earlier. the verdict was false, not merely mis-worded: reach held.
+⚠️ **a cheap, idempotent action is the trap here.** *"a wake is free, so just drive it"* is sound
+about cost and says not one word about ambiguity — and the green case cannot expose it, because a
+wake that succeeds proves both subjects sound at once.
+🔴 and watch the fix-text it emits: rung 2 printed `keyrack unlock --env camp` with no `--org`,
+which for a foreign-org box unlocks ANOTHER account's profile. the holder warns about that exact
+command by name, so **the gate handed out the one command its own holder calls a trap** — a human
+who runs it sees a `🔓` and climbs again to the identical halt.
+⇒ the repair: read the cheap LOCAL subject first, with a direct read (never a grep of the remote
+action's log — that is the output-format dependency `gotcha.the-duct-returns-the-send-not-the-answer`
+names), and halt on it by name. the remote action's failure then means the remote subject.
+
+**q17 (m.18) — which of the checks over my edit were ALREADY RED?**
+q1-q16 all interrogate a check that just went red, on the premise that the red is news. this asks
+the case where it is not: a clamp already ✋ grades your edit and prints the same word it printed
+before, so **its verdict is not evidence and its count is the only place your row can appear.**
+⇒ `prove.headers-carry-their-weight` sat red at 27 rows by design (the debt has its own dream). a
+12-line table added to `5.3.brains/_.sh` took it to 28 — same verdict, same exit code, and no reader
+diffs a count. the row was caught by a re-read of the number, never by the ✋.
+⚠️ **the harm is a ratchet.** a ✋ that already stands costs no attention to add to, so the debt a
+dream sized at N is a FLOOR that rises while the ✋ holds — and the author here had that dream open.
+⇒ the repair: where a class is red, read the COUNT rather than the verdict, and treat a rise as a
+regression you own. 🟡 a per-file baseline is NOT the answer — one calibrated against a red tree
+ratifies the debt as correct, which is q11's own caveat one step out.
+
+**q18 (m.19) — does this reader INHERIT a live copy of its own subject?**
+q1-q17 all grade what a reader reads. this grades what its SHELL read before it got to read at all.
+`zsh` sources `~/.zshenv` on every invocation, login or not, so a clamp that boots a shell to grade
+a FILE grades the live rc composed with the file it named — and the two agree on a converged box, so
+it reads green from its first roll.
+⇒ it surfaces the hour you converge the box, which is the hour the copies DISAGREE — so the ✋
+arrives with a fresh apply beside it and reads as a defect the apply introduced. it is neither: the
+clamp was blind the whole time, and the apply is what let it see.
+⚠️ **the subject settles it, and the two cases are one keystroke apart.** a claim about a FILE wants
+`zsh -f` (suppress every rc, source the subject by name); a claim about the SHELL a caller gets wants
+a bare `zsh -c` / `zsh -ic`, where `-f` would destroy the claim outright.
+⇒ the general form reaches past zsh: a reader whose own environment pre-executes its subject — a
+sourced rc, an inherited export, a preloaded module — cannot name which copy produced its verdict.
 
 ## 🛑 .measurement 13 — a check NOBODY RUNS decays into a false ✋ on its own
 

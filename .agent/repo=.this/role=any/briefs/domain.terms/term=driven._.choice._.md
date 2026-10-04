@@ -24,7 +24,7 @@ the set:
 | `src/grove.provision/**` | `bundle.upgrade`, at every depth |
 | `src/grove.*.sh`, `src/bundle.upgrade.sh` | the entrypoint sources them |
 | `grove.bootstrap.sh` | the readme, before the repo exists |
-| `src/git-credential-keyrack.sh` | **git**, on every fetch |
+| `src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh` | **git**, on every fetch |
 
 ## 🛑 .the DIRECTORY does not decide membership — the CALLER does
 `src/` holds both halves, side by side. `git-credential-keyrack.sh` and `bash_aliases.sh` are
@@ -58,7 +58,7 @@ it is the whole point of the word. a driven file runs with:
 ## .refs
 where the term is declared / used — ⚠️ no COUNT here: the set is discovered from the tree, and
 a count in a brief is a second declaration that decays with no signal (`repo.overview.md`).
-- src/git-credential-keyrack.sh                             # driven, and it sits in `src/`
+- src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh                             # driven, and it sits in `src/`
 - .agent/repo=.this/role=any/briefs/grove/provision/define.provision-defect-shapes.md  # `.the NINTH shape`
 
 ## .reason

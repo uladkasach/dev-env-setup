@@ -23,6 +23,17 @@ every such gate this repo has written confused the tool's EFFECT (inert without 
 with whether it should be HELD on the box at all. one list, installed everywhere, is cheaper
 than a second list to keep in sync (`rule.require.identical-bundle-composition`).
 
+## m3 — `yq` cannot sit on an apt list, since apt cannot serve it on every box class
+
+📜 2026-09-11: jammy (a grove) offers NO `yq` candidate at all — not in universe, not in
+backports — while noble (a laptop) offers 3.1.0-3.
+
+- a name on the toolkit list is an APT name, and an apt name that resolves on one box class
+  and not the other is a bundle that cannot meet `rule.require.identical-bundle-composition`
+- ⇒ `yq` moved to its own bundle, `5.17.yq`, which fetches ONE pinned static binary — the
+  same artifact on every box
+- ⚠️ every name left on the essentials line must name a package EVERY box class carries
+
 ## .see also
 
 - `rule.require.bundle-as-sole-declaration` — why `curl` is essential though unused here

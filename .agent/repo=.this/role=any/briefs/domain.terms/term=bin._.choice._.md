@@ -20,7 +20,7 @@ name deliberately unset.
 > `bundle.bin.of nvim` → `/usr/local/bin/nvim`, never the literal string `nvim`
 
 a **bin** is what the BOX holds. it is explicitly not what the shell would run, because those two
-differ on every box that sources `src/bash_aliases.sh`.
+differ on every box that sources `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`.
 
 ## .why the word is load-bear
 

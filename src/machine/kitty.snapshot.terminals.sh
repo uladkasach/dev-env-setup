@@ -168,7 +168,7 @@ humanize_age() {
 #
 #         `render_json` was hardened for this and `render_human` was not — it
 #         `echo`s both straight to a terminal that OBEYS them. with
-#         `set-clipboard on` in `src/tmux.conf`, an OSC 52 in a directory name
+#         `set-clipboard on` in `src/grove.provision/2.shell/2.8.tmux/tmux.conf`, an OSC 52 in a directory name
 #         REWRITES THIS HUMAN'S CLIPBOARD, and `--save` writes the same bytes to
 #         a file a howto tells a human to `cat`.
 #

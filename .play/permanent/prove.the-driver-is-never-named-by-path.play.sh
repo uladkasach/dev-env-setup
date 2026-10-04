@@ -169,8 +169,55 @@ echo ""
 #
 #    ⇒ a path that carries `…` is prose. a path a reader could paste is a call.
 ######################################################################
+######################################################################
+# 🛑 .carve-out 3 is a FORM, so it is read as one — never listed per file
+#
+# the rule carves out *"a ONE-BUNDLE apply on a grove, sent over a duct"*. that
+# is a shape, and CARVED above is a list of PATHS, so the two cannot express one
+# claim: every new prose page that documents the routine send reddens, and the
+# only repair a path list offers is one more row.
+#
+# ⚠️ measured 2026-09-29: two such rows were red at HEAD —
+#    `howto.opt-into-openhours.md:32` and
+#    `.dream/v2026_09_13.fix.cross-repo-hook-blocks-the-grove-carve-out.md:28`.
+#    both transcribe the rule's own `.the routine form` block verbatim, so the
+#    clamp condemned the rule's sanctioned example. that is
+#    `gotcha.a-check-that-cries-wolf-gets-silenced` m.7 — one pattern, two
+#    claims, and the correct value is OPPOSITE in each.
+#
+# ⇒ a path list would have grown a row per page, forever, which is
+#   `rule.forbid.exemption-as-habit`'s own tell: an exemption whose
+#   justification never varies names a permanent condition.
+#
+# .the discriminator is the rule's own: WHICH BOX does this land on?
+#   - `git.grove.send` names a FAR SIDE by construction, and a grove's `rhx`
+#     resolves no repo skill — so a path form inside a send's `--what` payload
+#     IS carve-out 3, read rather than claimed
+#   - a path form with no send near it lands on THIS box, where `rhx` resolves
+#     the skill, and that is the blocker
+#
+# ⚠️ the window is 3 lines, because the routine form wraps on a `\` — the send
+#    and the payload sit on different lines in every extant instance
+######################################################################
+SENDER='git\.grove\.send'
+SEND_WINDOW=3
+
 PAT='(bash|sh|source)[[:space:]]+[^[:space:]"'"'"']*grove\.provision\._\.sh'
 ELLIPSIS='(bash|sh|source)[[:space:]]+[^[:space:]"'"'"']*…'
+
+# ⚠️ ONE reader for ONE set. the prior form counted `n_all` and `n_prose` with
+#    two greps and subtracted — two readers of one set, free to disagree on the
+#    input the check exists to catch (`…cries-wolf`, m.9). awk classifies each
+#    hit once and emits only the rows that are neither prose nor a send.
+_real_hits() {
+  awk -v pat="$PAT" -v ell="$ELLIPSIS" -v snd="$SENDER" -v win="$SEND_WINDOW" '
+    { for (i = win; i > 0; i--) hist[i + 1] = hist[i]; hist[1] = $0 }
+    $0 ~ pat && $0 !~ ell {
+      for (i = 1; i <= win + 1; i++) if (hist[i] ~ snd) next
+      printf "%d:%s\n", NR, $0
+    }
+  ' "$1"
+}
 
 hits=0
 carved_seen=()
@@ -181,15 +228,12 @@ while IFS= read -r f; do
     carved_seen+=("$f")
     continue
   fi
-  # a file whose ONLY matches are the prose ellipsis form has named the shape,
-  # never invoked it. read the two sets and demand a difference
-  n_all="$(grep -cE "$PAT" "$_root/$f")"
-  n_prose="$(grep -E "$PAT" "$_root/$f" | grep -cE "$ELLIPSIS")"
-  [[ "$n_all" -eq "$n_prose" ]] && continue
+  real="$(_real_hits "$_root/$f")"
+  [[ -z "$real" ]] && continue
   hits=$(( hits + 1 ))
   if [[ "$hits" -le 20 ]]; then
     echo "   ✋ P  $f" >&2
-    grep -nE "$PAT" "$_root/$f" | grep -vE "$ELLIPSIS" | head -3 | while IFS= read -r line; do
+    printf '%s\n' "$real" | head -3 | while IFS= read -r line; do
       echo "         $line" >&2
     done
   fi

@@ -18,7 +18,7 @@ these are independent. mouse-drag can work while visual-mode copy is dead, and v
 1. human presses `ctrl+c` (or `ctrl+shift+c`) in kitty
 2. kitty runs the `copy_notify.py` kitten (declared by `4.3.2.emulator`)
 3. the kitten's **forward branch** writes the keyboard-protocol key `CSI 99;6u` (= `<C-S-c>`) to its child
-4. nvim's keymap `<C-S-c> → "+y` (`src/init.lua`) does the yank into the `+` clipboard register
+4. nvim's keymap `<C-S-c> → "+y` (`src/grove.provision/4.terminal/4.5.nvim/init.lua`) does the yank into the `+` clipboard register
 5. `set-clipboard on` in tmux + kitty's OSC 52 relay carries the `+` register out to the desktop clipboard
 
 the forward is `CSI 99;6u`, **never** the raw `^C` byte — so `ctrl+c` can never SIGINT the shell. interrupt lives on `ctrl+x` instead.
@@ -86,7 +86,7 @@ bind serves the local duct too, so both paths now agree.
 
 ## .the tmux relay (necessary but not sufficient)
 
-`src/tmux.conf` must relay the protocol + clipboard, or the extended key + OSC 52 die in transit:
+`src/grove.provision/2.shell/2.8.tmux/tmux.conf` must relay the protocol + clipboard, or the extended key + OSC 52 die in transit:
 
 ```
 set -s extended-keys on
@@ -97,7 +97,7 @@ set -as terminal-features 'xterm-kitty:clipboard'
 
 **subtlety:** these are server options. a live `source-file` sets them but does NOT re-run the per-client keyboard-protocol handshake — a detach + reattach does. also each `set -as` appends, so repeated live sources leave the `terminal-features` list duplicated many times over (harmless, but a tell that the conf was re-sourced live rather than via a fresh server).
 
-**these relay lines are required and are not the gate.** `src/tmux.conf` carries
+**these relay lines are required and are not the gate.** `src/grove.provision/2.shell/2.8.tmux/tmux.conf` carries
 BOTH concerns and they are independent:
 
 | line | role |
@@ -141,6 +141,6 @@ gate) or the forward fired but died downstream. (write the log under the repo
 ## .see also
 
 - `src/grove.provision/4.terminal/4.3.kitty/4.3.2.emulator/configure.upsert.sh` — `copy_notify.py` + `reboot_window.py` kittens, the `map ctrl+c` / `map ctrl+shift+c` lines
-- `src/tmux.conf` — extended-keys + clipboard relay
-- `src/init.lua` — nvim `<C-S-c>` / `<C-c>` yank keymaps + `TextYankPost` toast
+- `src/grove.provision/2.shell/2.8.tmux/tmux.conf` — extended-keys + clipboard relay
+- `src/grove.provision/4.terminal/4.5.nvim/init.lua` — nvim `<C-S-c>` / `<C-c>` yank keymaps + `TextYankPost` toast
 - `rule.require.solve-at-cause` — the gate fix works with kitty's own /proc pattern, not a time hack

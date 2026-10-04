@@ -60,6 +60,28 @@ nobody re-read it (`term=decline._.choice.reason.md` carries this as its own ⚠
 a ✋ now, since a box must be reachable NON-INTERACTIVELY after one apply
 (`rule.require.one-command-provision`).
 
+## m4 — a guard read below its write's privilege, and truncated a live rc
+
+measured 2026-09-14, grove-ahbode-v20260901: a ground apply read `/home/camper/.zshrc` as
+ABSENT — the real answer was `Permission denied` — and truncated a live 39300-byte rc to 0
+bytes. every login on that seat then landed in a bare zsh: no starship, no aliases, no
+repo:branch title. the binary ran; the seat's own configuration was gone.
+
+- a human seat's home is `drwxr-x---` (750), so a DIFFERENT seat cannot traverse it.
+  `[[ -f ]]` answers FALSE for "i cannot see" exactly as it answers FALSE for "absent" —
+  two states, one answer
+- the seeder's write runs under `sudo`, which CAN reach that path, and that write is
+  `install /dev/null`, which TRUNCATES rather than creates
+- ⇒ the guard was BLIND precisely where the write was POTENT
+- ⚠️ `configure.verify`'s `zsh -n` parse row reported ✔ throughout, because an EMPTY file is
+  valid zsh. only its `cmp` row went red
+
+> **a guard must read at the privilege its write uses.**
+
+⇒ the guard is `sudo -n test -f`. on a seat with NO sudo it reports "no startup file", and
+the very next `sudo -n install` fails for the identical reason — guard and write are one
+mechanism, so they cannot disagree.
+
 ## .see also
 
 - `rule.require.seam-claims-have-an-owner` — the seat-gap fix in m1 and m3

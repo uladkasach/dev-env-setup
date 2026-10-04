@@ -9,11 +9,11 @@
 #
 # 🛑 .THE CLASS THIS CLAMPS — measured THREE times on 2026-09-02 alone
 #
-#    | what was untracked                    | what it cost                    |
-#    |---------------------------------------|---------------------------------|
-#    | `grove.bootstrap.sh` + 4 `src/grove.*` | the published repo cannot boot  |
-#    | 9 `.play/permanent/*` + its runner     | every clamp reached one box     |
-#    | `src/lazy-lock.json`                   | SC-F1's plugin pins, reverted   |
+#    | what was untracked                                     | what it cost                   |
+#    |--------------------------------------------------------|--------------------------------|
+#    | `grove.bootstrap.sh` + 4 `src/grove.*`                 | the published repo cannot boot |
+#    | 9 `.play/permanent/*` + its runner                     | every clamp reached one box    |
+#    | `src/grove.provision/4.terminal/4.5.nvim/lazy-lock.json` | SC-F1's plugin pins, reverted  |
 #
 #   - the third is the sharpest, the reason this play is `prove.*` rather than a note
 #   - `4.5.nvim/configure.upsert.sh` copies the lockfile to `~/.config/nvim/`; `configure.verify.sh` `cmp`s it — a fully-owned asset, both phases correct

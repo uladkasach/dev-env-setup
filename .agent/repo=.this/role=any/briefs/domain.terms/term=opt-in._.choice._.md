@@ -2,6 +2,7 @@
 
 term.chosen   = opt-in
 term.kind     = adj
+term.boundary = bundle        # ⚠️ a SECOND boundary now exists — see below
 term.synonyms.forbidden:
 - optional
 - opt-out
@@ -30,6 +31,26 @@ its ask in the tree and converges (`rule.require.one-command-provision`).
 
 🛑 `--include` validates against `GROVE_OPTIN_APPS`, which only `6.apps` bundles append to.
 so `--include openhours` names an app no bundle offers and is refused.
+
+## 🔴 .a SECOND boundary — recorded 2026-09-24, and the split is OWED
+
+`rule.require.a-grove-reaches-its-own-org-only` uses `opt-in` for a different subject, and
+the concept underneath is the same one: **a default of none, turned on by an explicit
+declaration.** what differs is the boundary, so the repair is to QUALIFY rather than to
+coin (`rule.require.boundary-qualified-terms`, its context arm):
+
+| boundary | of WHAT | who declares it | lifespan |
+|---|---|---|---|
+| `bundle` | a bundle converges what the human asked for | a HUMAN, per box | one run, or until edited |
+| `reach` | one org grants another org's groves reach into a named account | an ORG, per account+role | until that org revokes it |
+
+⚠️ **they are not interchangeable, and the flat name invites the swap.** a `bundle` opt-in is
+a per-box convenience whose absence costs a human an editor; a `reach` opt-in is a permanent
+cross-account grant whose over-application is the defect the rule above was written from.
+
+⇒ the qualified names are `bundle.opt-in` and `reach.opt-in`. this cluster is not renamed yet
+— the gap is recorded here so the next reader does not read one sense as both, and the rename
+is owed on the next touch, files first, no sweep.
 
 ## .refs
 where the term is declared / used:

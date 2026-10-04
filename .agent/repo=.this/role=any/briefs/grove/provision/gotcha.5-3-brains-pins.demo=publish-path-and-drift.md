@@ -49,6 +49,26 @@ three dated measurements shaped the brain-pin policy in `5.3.brains/_.sh`.
 - a check on the PACKAGE version reports ✔ on a drifted box; the verify asks the
   BINARY instead
 
+## the hooks, bitten at the pin — 2.1.280, 2026-10-04
+
+the pin's old reason was *"hooks are TRUNCATED beyond it"*, a conclusion whose measurement was lost
+(the dream that chased it read: which hooks, at which version, observed how — no record answered).
+so it was re-measured by a BITE, never by a load — the LAST hook of each list, in a FRESH process:
+
+| list | the last hook | the bite | a fresh `claude -p` at 2.1.280 |
+|---|---|---|---|
+| `PreToolUse [Bash]`, 6 hooks | 4 `forbid-suspicious-shell-syntax`, 5 `forbid-stderr-redirect` | `echo bite 2>&1` | 🛑 BLOCKED by hook 4 |
+| `PreToolUse [Write\|Edit]`, 3 hooks | 3 `forbid-terms.blocklist` | a write of "helpers" | 🛑 BLOCKED, `⛔ helpers` |
+
+⇒ at 2.1.280 both lists run WHOLE. the claim is not reproduced at the pin, and beyond it is unmeasured.
+
+🔴 **a LONG-LIVED session is not that evidence.** the same two bites, sent from a session that began
+2026-10-01 12:07 on the same binary, both went THROUGH, and neither hook left a nudge record. that
+session's `.claude/settings.json` was rewritten at 14:43 by a stash/rebase/unstash — the bytes equal
+to HEAD, only the mtime moved — and from then the project hooks did not apply in it.
+⇒ prove a hook from a FRESH process. a session that outlived a rewrite of its settings may run with
+none, and reads exactly like one whose hooks pass.
+
 ## .see also
 
 - `5.3.brains/_.sh` — the pin declarations these measurements justify

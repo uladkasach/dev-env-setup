@@ -14,7 +14,7 @@ term.synonyms.forbidden:
 a brief that names a property of a subject which **HOLDS RIGHT NOW** and will bite whoever
 forgets it — stated in the present tense, and true whether or not it has ever fired.
 
-`src/bash_aliases.sh` IS sourced rather than executed, so a parse error anywhere kills every
+`src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` IS sourced rather than executed, so a parse error anywhere kills every
 alias silently. that was true before anybody was bitten, is true today, and stays true after
 the fix. a hazard names the shape of the trap, never the day it closed.
 

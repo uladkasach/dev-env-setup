@@ -3,8 +3,90 @@
 > **to:** whoever owns `ahbode/infrastructure`
 > **from:** dev-env-setup, grove-1
 > **date:** 2026-08-08
-> **status:** ✅ **no ask that blocks us.** the grant we needed already exists
-> and is proven. one optional hardener is named at the bottom.
+> **status:** ✅ **no ask that blocks us — for a grove in the AHBODE camp account.**
+> the grant we needed already exists and is proven, and its trust names ONE camp
+> role.
+>
+> 🛑 **a 2026-09-23 ask for a SECOND camp account was WITHDRAWN the next day.
+> do not send it.** it was a defect on OUR side, dressed as an infra ask —
+> see the withdrawal below.
+
+## 🛑 .the scope of that ✅, stated because it was not
+
+the grant below is proven for a box whose badge is **ahbode's** camp grove role.
+`AllowGroveCampAssumeRole` names that one role as a principal, so the ✅ is a fact
+about **one camp account**, never about "a grove."
+
+⚠️ the original status line read `✅ no ask that blocks us` with no account named,
+and a reader with a grove in another camp account would take it at face value. that
+is the cost of an unwritten scope: a measured, true claim that misleads the next
+reader (`rule.require.trust-but-verify` — a claim's BOUNDS are part of the claim).
+
+## 🛑 .WITHDRAWN 2026-09-24 — an ask that would have WIDENED a blast radius
+
+a 2026-09-23 section asked infra to trust `aether-camp-grove-role` on
+`ahbode-prep-for-grove`, `ahbode-prod-for-grove`, and `ehmpathy-demo-for-grove`.
+
+**it is withdrawn in full. it was never infra's to answer.**
+
+### .what was actually measured
+
+an aether grove refused five `sts:AssumeRole` calls into ahbode and ehmpathy
+accounts. every word of that is true, and the conclusion drawn from it was
+backwards.
+
+the box did not LACK a grant. **it was told to want reach it has no business
+having** — by this repo:
+
+| holder | what it declares |
+|---|---|
+| `5.13.reach/_.sh` → `_envs` | `ahbode:test ahbode:prep ahbode:prod ehmpathy:test ehmpathy:prep` |
+| `5.13.reach/_.sh` → `_srcorg` | `ahbode` |
+| `5.12.rack/_.sh` → `_declared` | `ahbode) camp test prep prod` · `ehmpathy) test prep prod` · `*) return 1` |
+| `5.16.keys/_.sh` → its rows | `ahbode:prep:…` · `ehmpathy:prep:…` |
+
+**four hardcoded tables. not one `aether` row, and no org-scope mechanism at
+all.** so an aether grove inherits ahbode's reach table by construction, and the
+five refusals are aws correctly denying a hop nobody should have asked for.
+
+### 🔴 .why the wrong repair was the DANGEROUS one
+
+the two repairs point in opposite directions, and the ask took the wrong one:
+
+| repair | effect |
+|---|---|
+| ✋ the ask, as filed | an **aether** box gains assume-role into **ahbode prod** and **ehmpathy demo** |
+| ✔ the real fix | the rows stop being asked for, and the reach is never wired |
+
+⇒ **a defect whose symptom is AccessDenied has a repair that reads as "grant
+it."** that is the trap: the fix-text writes itself, it is addressed to somebody
+with the power to grant, and it is a permanent cross-account expansion bought to
+silence a check that was right.
+
+⚠️ and this handoff **taught the misread**. its own line — *"an AccessDenied on
+`sts:AssumeRole` means the role EXISTS and this box sits outside its trust
+policy — an infra ask, not a box defect"* — is true and **incomplete**. it holds
+where the box SHOULD reach. it says none of what to do for a box that should
+not, and a denial looks identical either way.
+
+⇒ **the question a denial raises is `should this box reach here at all?`, and
+only then `is it trusted to?`** the second was asked first, for five rows, and
+the first was never asked.
+
+### .the fix, and it is ours
+
+scope the row tables to the grove's own org. until that lands, the five reach
+claims and the two `5.16.keys` claims on an aether grove are **ahbode's tables
+applied to an aether box** — one defect, seven symptoms
+(`rule.require.solve-at-cause`, its bulk-failure clause).
+
+### ✔ .the durable ask that SURVIVES the withdrawal
+
+it stands because it is about ahbode's own groves, and it costs nobody a grant:
+
+> the trust list is **per camp account, enumerated by hand**, so every new
+> **ahbode** camp account repeats this handoff. a condition on the ORGANIZATION
+> rather than a list of role arns retires that round trip.
 
 ## .the short version
 

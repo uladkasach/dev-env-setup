@@ -41,7 +41,7 @@ suppresses rustup's own rc edits. four measurements back both choices.
 
 - the box read as converged. the red line named the INNOCENT bundle
   (`rule.forbid.two-writers-on-one-artifact`)
-- the append was redundant the whole time: `src/zshenv.sh:101` already puts
+- the append was redundant the whole time: `src/grove.provision/2.shell/2.5.zsh/zshenv.sh:101` already puts
   `~/.cargo/bin` on PATH, guarded. `~/.cargo/env` was sourced from `~/.zshrc` alone,
   which no program reads (`gotcha.a-tool-found-by-path-answers-only-a-human`)
 - ⇒ `--no-modify-path` suppresses the rc edits. rustup still WRITES `~/.cargo/env`

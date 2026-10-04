@@ -34,7 +34,7 @@ rule tells a future author where the next alias goes with no further argument.
 - resolution = `power.restart` is canonical. `machine.reboot` is deleted, not deprecated —
                a kept alias is a live second path (`rule.require.grove-provision-as-the-only-entrypoint`,
                the forwarder argument, applied at alias scale). the ban is recorded inline
-               in `src/bash_aliases.sh` where the alias stood, so the next author meets it
+               in `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh` where the alias stood, so the next author meets it
                at the place they would re-add it. dispute closed.
 
 ## .evidence
@@ -46,6 +46,11 @@ src/bash_aliases.sh:125  alias machine.logout='loginctl terminate-user "$USER"'
 src/bash_aliases.sh:126  alias machine.reboot='systemctl reboot'
 src/bash_aliases.sh:486  alias power.restart='kitty.snap; reboot'
 ```
+
+⚠️ the capture is **verbatim**, and the path it names is the file's pre-cutover one — it
+moved into `2.shell/2.7.aliases/` after this measurement. a transcript is evidence; to
+rewrite its paths would fabricate a measurement nobody took. the live path is in the
+`.resolution` above.
 
 live references to the forbidden half: **two.** its own declaration, and one fix-text —
 
@@ -76,8 +81,12 @@ no clamp reads the alias namespaces, so a future `machine.reboot` would be caugh
 reader and not by a check. it is one grep if it is ever worth one:
 
 ```sh
-rhx grepsafe --pattern "^alias machine\.(reboot|off|suspend)" --glob 'src/bash_aliases.sh'
+rhx grepsafe --pattern "^alias machine\.(reboot|off|suspend)" --glob 'bash_aliases.sh' --path src/grove.provision
 ```
+
+⚠️ the `--glob` is a **basename**; `--path` carries the directory. a `/` inside `--glob`
+matches no file and reports a clean `0 matches`, exit 0 — which reads here as "the ban
+holds" (`gotcha.grepsafe-glob-goes-quiet`).
 
 ⚠️ **not written as a play.** the population it would guard is one entry, the ban is stated
 where a re-add happens, and a check nobody runs decays into a false ✋ on its own

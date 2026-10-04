@@ -45,8 +45,8 @@ remains a bare label — it names no tree and no role, so it makes no claim on t
 
 ## .refs
 where the term is declared / used:
-- src/bash_aliases.sh                       # `git tree set --from main|this`, `git release main`
-- src/bash_aliases.sh                       # git.repo.pull — checks out main
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                       # `git tree set --from main|this`, `git release main`
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                       # git.repo.pull — checks out main
 - src/grove.provision/2.shell/2.2.git/configure.upsert.sh  # init.defaultBranch main
 - .agent/repo=.this/role=any/skills/grove.provision.sh   # `--from main|tree` (proposed)
 

@@ -65,7 +65,7 @@ grove_provision_2_5_zsh_provision_upsert() {
   #   converge its own rc until a command reaches it, and no command can reach it
   #   until an rc exists (rule.require.seam-claims-have-an-owner)
   # .why an EMPTY `.zshrc` rather than a fresh artifact — `2.5.zsh.configure.upsert`
-  #   copies `src/zshrc.sh` over it on that seat's own apply, so this seeds an
+  #   copies `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` over it on that seat's own apply, so this seeds an
   #   artifact the SAME bundle finishes (rule.forbid.two-writers-on-one-artifact)
   # .why it sweeps EVERY seat, not only the records this run writes — a box left
   #   half-converged by an earlier apply would never be repaired otherwise

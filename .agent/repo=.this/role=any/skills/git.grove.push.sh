@@ -134,7 +134,7 @@ set -o pipefail
 #       reports the files that exist AT THE DESTINATION and not in the source,
 #       so those bytes are FILENAMES THE GROVE WROTE, relayed here by rsync's
 #       own protocol. a linux filename may hold any byte but `/` and NUL, so an
-#       OSC 52 fits in one — and `src/tmux.conf` sets `set-clipboard on`, so it
+#       OSC 52 fits in one — and `src/grove.provision/2.shell/2.8.tmux/tmux.conf` sets `set-clipboard on`, so it
 #       writes this human's clipboard.
 #
 #       ⚠️ and the stale-file block runs ABOVE the mode gate, so it fires on
@@ -583,7 +583,7 @@ fi
 #    `$INTO` is CODE on the far side, and single quotes around it are closed by
 #    one single quote in the path. base64's alphabet is `[A-Za-z0-9+/=]` and
 #    holds no shell metacharacter, so they cannot be
-#    (`src/ductwork.sh`'s `__duct_ssh_tmux` carries the reason in full).
+#    (`src/grove.provision/2.shell/2.7.aliases/ductwork.sh`'s `__duct_ssh_tmux` carries the reason in full).
 #
 #    ⇒ `--into` is local argv today, so this is the cheap half of the class
 #      rather than a live hole. it is closed anyway: a guarantee that holds

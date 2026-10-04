@@ -3,56 +3,36 @@
 # .what = yq — a jq-syntax processor for yaml, as ONE pinned static binary
 # .ref  = https://github.com/mikefarah/yq
 #
-# .who depends on it
-#   - the declapract cycles gate reads `.dpdmrc.yaml` through it:
-#       dpdm --exclude "$(yq -r '.exclude | join("|") // "^$"' .dpdmrc.yaml)"
-#   - ⇒ with no yq the `$(…)` collapses to an EMPTY string, dpdm then scans
-#     node_modules, and the gate reports hundreds of cycles that do not exist
-#   - a false ✋ on every run is the shape that gets a check silenced
-#     (`gotcha.a-check-that-cries-wolf-gets-silenced`)
+# .why it exists
+#   - the declapract cycles gate filters `.dpdmrc.yaml` through it; with no yq
+#     that `$(…)` collapses to EMPTY, dpdm scans node_modules, and the gate
+#     reports hundreds of cycles that do not exist — a false ✋ every run
 #
-# 🛑 .why this is a BUNDLE and not a name on `2.1.toolkit`'s apt line
-#   - a name on that line must be a package EVERY box class carries
-#   - measured 2026-09-11: jammy (a grove) offers NO candidate at all — not in
-#     universe, not in backports — while noble (a laptop) offers 3.1.0-3
-#   - ⇒ an apt name that resolves on one box class and not the other cannot meet
-#     `rule.require.identical-bundle-composition`
-#   - a pinned static binary is the SAME artifact on every box, so it can
+# .why a BUNDLE, never an apt name on `2.1.toolkit`
+#   - jammy offers no candidate at all, noble offers one, so an apt name reaches
+#     one box class alone (`rule.require.identical-bundle-composition`)
+#   - a pinned static binary is the SAME artifact on every box
+#   - ⛔ not pipx: it reaches both by a runtime, a venv, and a resolver this repo
+#     would then own (`rule.avoid.python-runtimes`)
 #
-# 🛑 .why NOT pipx, and not a python runtime of any kind
-#   - pipx does reach both classes, and that is the whole trap: it buys the
-#     reach by a runtime, a venv, and a resolver this repo would then own
-#   - `rule.avoid.python-runtimes` carries the full argument
-#   - the go build needs no runtime at all, which is why it wins on both axes
+# ⚠️ two programs are named `yq`, and ours is mikefarah's go build — never apt's
+#   `python3-yq`, which wraps `jq`. the verify reads `bundle.bin.at`, by file
 #
-# ⚠️ .the two programs named `yq` are NOT the same program
-#   | build              | what it is                    | filter syntax |
-#   |--------------------|-------------------------------|---------------|
-#   | mikefarah (THIS)   | a go binary, yaml-native      | jq-like       |
-#   | apt `python3-yq`   | a python wrapper around `jq`  | jq, via json  |
-#   - a laptop that took the apt one carries a SECOND `yq` at `/usr/bin/yq`
-#   - `~/.local/bin` precedes `/usr/bin` on this repo's PATH, so ours wins —
-#     and the verify reads `bundle.bin.at`, which does not depend on that
+# .it applies to EVERY machine — the gate runs wherever the repo is linted
 #
-# .it applies to EVERY machine
-#   - the cycles gate runs wherever the repo is linted, which is every box
-#   - so there is no decline
+# .refs = gotcha.5-17-yq.demo=apt-gap-and-two-programs.md
 #
 # usage:
 #   rhx grove.provision --what 5.17.yq --mode apply
 ######################################################################
 
 ######################################################################
-# 🛑 the version is declared HERE, once, because TWO phases read it
+# 🛑 the version is declared HERE, once, because TWO phases read it — typed in
+#   both, a bump of one leaves the other behind, and a correct install then
+#   reports the WRONG version with a fix-text that changes no state
 #
-# 📜 2026-08-13, `5.11.usql`: typed in both, the two drift the instant one moves
-#   - a bump of the upsert left the verify behind, so a correct install
-#     reported `✋ the WRONG version` and named a re-apply that changed no state
-#   - ⇒ the pin and the check must read the SAME variable
-#
-# .the DIGEST stays in the upsert
-#   - the verify reads a binary on disk, where a digest describes a gone file
-#   - one reader means one home (`rule.prefer.most-common-denominator`)
+# .the DIGEST stays in the upsert — a verify reads a binary on disk, where a
+#   digest describes a gone file (`rule.prefer.most-common-denominator`)
 #
 # .to bump: read the digest the REGISTRY states, never one computed locally
 #       gh api -X GET repos/mikefarah/yq/releases/latest \

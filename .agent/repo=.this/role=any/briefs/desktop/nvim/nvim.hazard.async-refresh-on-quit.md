@@ -56,7 +56,7 @@ vim.api.nvim_create_autocmd({ 'QuitPre', 'VimLeavePre' }, {
 once off, the already-queued callbacks re-check the plugin's enabled flag and
 take the harmless "no minimap" branch instead of the `set_buf` path.
 
-lives in `src/init.lua` inside the neominimap `config`. it is a config-level
+lives in `src/grove.provision/4.terminal/4.5.nvim/init.lua` inside the neominimap `config`. it is a config-level
 guard, so it survives plugin updates.
 
 ## .the general rule
@@ -106,4 +106,4 @@ reopen at the same cwd via `kitty.snap` records if you took one.
 
 - howto.diagnose-nvim-hang.md — general nvim runaway/hang triage
 - nvim.neominimap.custom-handler.md — the vdiff handler (another async surface)
-- src/init.lua — the `QuitPre` guard, in the neominimap `config` block
+- src/grove.provision/4.terminal/4.5.nvim/init.lua — the `QuitPre` guard, in the neominimap `config` block

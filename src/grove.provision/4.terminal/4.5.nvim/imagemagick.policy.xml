@@ -77,7 +77,7 @@
        LABEL and CAPTION render text through a font stack. EPHEMERAL DELETES
        its input after read, which is a write primitive dressed as a decoder.
 
-       none of the six formats `src/init.lua` declares renderable
+       none of the six formats `src/grove.provision/4.terminal/4.5.nvim/init.lua` declares renderable
        (png jpg jpeg gif webp avif) reaches any of these.
   -->
   <policy domain="coder" rights="none" pattern="{TEXT,SHOW,WIN,PLT,LABEL,CAPTION,EPHEMERAL}" />

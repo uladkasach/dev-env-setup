@@ -41,8 +41,8 @@ reports success.
 
 ## .refs
 where the term is declared / used:
-- src/ductwork.sh                                  # `__duct_parse_uri`, every `--on`
-- src/bash_aliases.sh                              # `_git_grove_duct_uri`
+- src/grove.provision/2.shell/2.7.aliases/ductwork.sh                                  # `__duct_parse_uri`, every `--on`
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                              # `_git_grove_duct_uri`
 - .agent/repo=.this/role=any/briefs/desktop/term/howto.headless-terminal-streams.md
 
 ## .reason

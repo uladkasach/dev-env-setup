@@ -124,6 +124,33 @@ driver's own exit code, and 97 means the duct gave no answer at all
 ⚠️ this converges ONE bundle and gates no box. a grove is RAISED by
 `rhx git.grove.provision boot <name> --mode apply`, which still holds every clause above.
 
+### ✔ .carve-out 3 is READ as a form, never listed per file — 2026-09-29
+
+carve-outs 1, 2, and 4 name a FILE, so `prove.the-driver-is-never-named-by-path` can carry them
+in a path list. **carve-out 3 names a SHAPE**, and a path list cannot express a shape — so every
+page that documented the routine send reddened, and the only repair a list offered was one more
+row.
+
+⚠️ measured: two rows were red at HEAD, and both transcribe the `.the routine form` block above
+verbatim — `howto.opt-into-openhours.md:32` and
+`.dream/v2026_09_13.fix.cross-repo-hook-blocks-the-grove-carve-out.md:28`. ⇒ **the clamp
+condemned this rule's own sanctioned example** (`…cries-wolf`, m.7 — one pattern, two claims,
+opposite correct values).
+
+⇒ the clamp now reads the discriminator this rule already declares — **which box does it land
+on?** a path form inside a `git.grove.send` payload names a far side by construction, so it IS
+carve-out 3, read rather than claimed. a path form with no send near it lands on THIS box, and
+that is the blocker.
+
+✔ **proven in BOTH directions the same day**, which is what parts a read from a loosened check: a
+planted `bash …/grove.provision._.sh` with no send beside it reddened (1 hit, named by file and
+line), and its removal returned the clamp to green. a carve-out that cannot be seen to refuse is
+not a carve-out — it is a hole (`rule.require.seam-claims-have-an-owner`).
+
+⚠️ so a path list row for this class is now a DEFECT, not a tidy-up: it would grant by name what
+the form read already grants by measurement, and the two would drift
+(`rule.forbid.exemption-as-habit`).
+
 ## .the forwarder is not a third entrypoint
 
 `rhx grove.provision` holds no bundle of its own. it adds exactly one axis (`--from`), forwards

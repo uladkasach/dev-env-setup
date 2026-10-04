@@ -2,21 +2,11 @@
 ######################################################################
 # .what = prove that, for each declared env, the rack NAMES a profile and that
 #         profile ANSWERS in the account the tree declares
-#
-# ⚠️ it re-asks what the upsert already proved
-#   - the upsert's proof was about the moment it ran
-#   - a plan is the one read that tells a human a box is converged, unchanged
-#   - ⇒ a plan that skipped this would call a box fine while every suite fails
-#
-# ⚠️ it checks the ACCOUNT, never merely that a call succeeds
-#   - a profile pointed at the wrong account assumes CLEANLY and answers happily
-#   - ⇒ only the account in the returned identity tells the two apart
-#   - ⇒ that is why `aws.reach.set` refuses a recalled `--account`
-#
-# 🛑 the account is COMPARED, never printed
-#   - this repo is PUBLIC and a duct keeps scrollback
-#   - ⇒ a mismatch reports "not the declared account" and quotes no id
-#   - (`rule.forbid.dox-in-public-repo`)
+# .why
+#   - ⚠️ it re-asks what the upsert proved — a plan is the one read a human trusts
+#   - ⚠️ it checks the ACCOUNT, since a wrong-account profile assumes cleanly
+#   - 🛑 the account is COMPARED, never printed (`rule.forbid.dox-in-public-repo`)
+# .refs = gotcha.5-13-reach.demo=per-org-rows-and-the-reap, m10
 #
 # guarantee:
 #   - read-only: one sts call and one rack read per env, and no write
@@ -45,8 +35,9 @@ grove_provision_5_13_reach_configure_verify() {
   #   - ⇒ an empty answer here would mean the wrong cwd, never an absent entry
   #   - (`gotcha.a-check-that-cries-wolf-gets-silenced`)
   ####################################################################
-  local gitroot
+  local gitroot srcname
   gitroot="$(grove_provision_5_12_rack_gitroot)"
+  srcname="$(grove_provision_5_13_reach_srcorg)/$(grove_provision_5_13_reach_srcname)"
 
   # ⚠️ parse the row the SAME way the upsert does — one table, two readers, free
   #    to drift. a `${pair##*:}` here reads the ROLE key as the account key, so
@@ -75,24 +66,13 @@ grove_provision_5_13_reach_configure_verify() {
                --org "$org" --env "$env" --unlock --value 2>/dev/null | tail -1)"
 
     if [[ -z "$named" ]]; then
-      ################################################################
-      # 🛑 an UNWIRED row whose DECLARATION is unreadable is UNPROVEN,
-      #    never broken — decline exactly where the UPSERT declined
-      #   - the upsert cannot wire a role or an account it cannot read, so
-      #     it `continue`s with no claim. a ✋ here names a defect nobody
-      #     can repair: its fix-text asks for a re-apply of this bundle,
-      #     and that re-apply declines identically, forever
-      #   - ⇒ the owed work is a DECLARATION in another repo, so say that
-      #     instead — a box must be repairable by the command it is given
-      #   - ⇒ one table, two readers: the upsert's decline conditions and
-      #     these are the SAME two reads, in the same order
-      #   - (`rule.require.one-command-provision`, its unrepairable-fix-text
-      #      clause; `gotcha.a-check-that-cries-wolf-gets-silenced`)
-      ################################################################
+      # 🛑 an UNWIRED row whose DECLARATION is unreadable is UNPROVEN, never
+      #    broken — it declines on the upsert's SAME two reads, in order, since a
+      #    ✋ would name a re-apply that declines forever (m10)
       if [[ -z "$(grove_provision_5_13_reach_role "$reader" "$rkey")" ]]; then
         echo "   • ${org}.${env} declined — the role key '${rkey}' is not readable here"
         echo "     ⇒ the upsert declined for the same reason, so no hop is owed yet"
-        echo "     ⇒ it is DECLARED in ahbode/infrastructure, by the '${reader}' reader:"
+        echo "     ⇒ it is DECLARED in ${srcname}, by the '${reader}' reader:"
         echo "       ${declsrc}"
         continue
       fi
@@ -102,7 +82,7 @@ grove_provision_5_13_reach_configure_verify() {
       if [[ -z "$(grove_provision_5_13_reach_account "$reader" "$akey")" ]]; then
         echo "   • ${org}.${env} declined — the account key '${akey}' is not readable here"
         echo "     ⇒ the upsert declined for the same reason, so no hop is owed yet"
-        echo "     ⇒ it is DECLARED in ahbode/infrastructure, by the '${reader}' reader:"
+        echo "     ⇒ it is DECLARED in ${srcname}, by the '${reader}' reader:"
         echo "       ${declsrc}"
         continue
       fi
@@ -116,10 +96,37 @@ grove_provision_5_13_reach_configure_verify() {
     fi
 
     # 2. does that profile ANSWER, and from the account the tree declares?
-    seen="$(aws sts get-caller-identity --profile "$named" \
-              --query Account --output text 2>/dev/null)"
+    # ⚠️ the refusal is CAPTURED, never discarded — aws's sentence sorts the causes (m10)
+    said="$(aws sts get-caller-identity --profile "$named" \
+              --query Account --output text 2>&1)" || true
+    seen="$(printf '%s\n' "$said" | grep -oE '^[0-9]{12}$' | head -1)"
 
-    if [[ -z "$seen" || "$seen" == "None" ]]; then
+    if [[ -z "$seen" ]]; then
+      # 🛑 THREE causes read identically here, and want OPPOSITE fixes. the two
+      #    AssumeRole denials are sorted only by the ORG, which this code cannot
+      #    ask — so the fix-text puts "should this org reach here AT ALL?" FIRST,
+      #    before any infra ask. no id is printed for either cause
+      #    (`rule.require.a-grove-reaches-its-own-org-only`, m10)
+      if [[ "$said" == *AccessDenied* && "$said" == *AssumeRole* ]]; then
+        echo "   ✋ ${org}.${env} — the hop is declared, and this box is REFUSED it" >&2
+        echo "      ⇒ a re-apply of this bundle refuses identically. TWO causes wear" >&2
+        echo "        this one message, and they want OPPOSITE repairs:" >&2
+        echo "      1. does a '${org}' row belong on a grove of THIS org at all?" >&2
+        echo "         no  ⇒ 🔴 OURS. delete the row; no grant is owed, and none may" >&2
+        echo "               be sought (rule.require.a-grove-reaches-its-own-org-only)" >&2
+        echo "      2. only if yes — the role EXISTS and this box sits outside its" >&2
+        echo "         trust policy ⇒ an infra ask. the grant owed: trust this box's" >&2
+        echo "         CAMP role as a principal on" >&2
+        echo "         '$(grove_provision_5_13_reach_role "$reader" "$rkey")', beside the camp role already there" >&2
+        echo "      ⇒ ask 1 FIRST. its answer is the ORG's, and the refusal says no" >&2
+        echo "        word about it — an ask filed on a no buys a standing hop into" >&2
+        echo "        another org's accounts, to silence a check that was right" >&2
+        echo "      ⇒ read the refusal in full, on the box (it names the ids):" >&2
+        echo "        aws sts get-caller-identity --profile ${named}" >&2
+        failed=1
+        continue
+      fi
+
       echo "   ✋ the rack names '${named}' for ${org}.${env}, and it does not answer" >&2
       echo "      ⇒ a named profile with no live body is a profile aws cannot find" >&2
       echo "        — the half-applied pair aws.reach.set exists to prevent" >&2
@@ -162,21 +169,19 @@ grove_provision_5_13_reach_configure_verify() {
     echo "   ✔ ${org}.${env} answers as '${named}', in the declared account"
   done
 
-  ####################################################################
-  # every reach this box carries that no row declares
-  #
-  # 🛑 .why the VERIFY asks too, and not the upsert alone
-  #   - `--mode plan` short-circuits every upsert and always runs every verify,
-  #     so a plan is the one read that tells a human a box is converged
-  #   - ⇒ a drift the upsert alone could see is a drift no plan ever reports,
-  #     and this bundle's whole subject is a pointer nobody re-reads
-  #   - (`rule.require.one-command-provision`, its plan-proves-the-verifies half)
-  #
-  # ⚠️ it is a ✋ and not a 🌙 — a profile that names a real role in a real
-  #   account, under a name this repo does not declare, is live reach nobody
-  #   decided to grant. the fix is one command and the box repairs itself
-  ####################################################################
+  # every reach this box carries that no row declares — asked HERE too, since a
+  # plan runs no upsert. a ✋, never a 🌙: it is live reach nobody granted (m10)
   local declared carried seen
+
+  # 🛑 an UNKNOWN org proves no drift — see the same block in the upsert
+  #   with no org this run read no table, so every carried fence would read as
+  #   undeclared and this check would ✋ on a box that may be perfectly correct
+  if [[ -z "${GROVE_ORG:-}" ]]; then
+    echo "   🌙 this run names no org, so no reach is declared — drift is unproven"
+    grove_org_absent_say
+    return $failed
+  fi
+
   declared="$(grove_provision_5_13_reach_declared_profiles)"
 
   # ⚠️ an unreadable fence list is a 🌙, never a ✔ — see the same block in the

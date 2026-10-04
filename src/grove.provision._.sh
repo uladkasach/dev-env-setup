@@ -121,7 +121,7 @@ set -uo pipefail   # deliberately NOT -e: a bundle reports, then the run decides
 #
 # .why HERE and not at each call site: a per-call fix is a second list, and a
 #         second list drifts — this repo's most repeated defect.
-#         `src/zshrc.sh` carries the CI=1 lesson, and a driver that declares it
+#         `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` carries the CI=1 lesson, and a driver that declares it
 #         nowhere inherits none of that — the drift in miniature. one
 #         declaration at the top of the run covers every bundle — a bundle
 #         invoked alone via `--what` too.
@@ -150,18 +150,56 @@ set -uo pipefail   # deliberately NOT -e: a bundle reports, then the run decides
 # ⚠️ .why `CI` stays here and the apt half does not
 #         `CI` answers corepack and pnpm, which `grove.pkg.sh` never speaks to,
 #         so it has no belt to derive from and no list to drift against.
+#
+# 🛑 .why `COREPACK_DEFAULT_TO_LATEST=0` sits beside it
+#         corepack MOVES ITS OWN GLOBAL DEFAULT as a side effect of a download,
+#         and no flag on the call suppresses it. measured 2026-09-26 in
+#         corepack's own source, inside the download path rather than beside it:
+#
+#           if (… process.env.COREPACK_DEFAULT_TO_LATEST !== `0`) {
+#             if (currentDefault.major === downloaded.major && lt(currentDefault, downloaded))
+#               await activatePackageManager(lastKnownGood, locator);
+#           }
+#
+#         ⇒ so ANY fetch of a same-major, strictly-greater version silently
+#           repoints the default — `--cache-only` included, since that flag is
+#           checked one level out, after this has already fired.
+#
+#         that is a direct attack on `rule.require.pinned-versions`: this repo
+#         declares its pnpm in `packageManager` and `5.1.node` pins corepack's
+#         default to it, so an auto-bump makes a repo's pnpm and the box's pnpm
+#         disagree — the "TWO pnpms" state `5.1.node`'s own provision.verify
+#         halts on (.refs = gotcha.5-1-node.demo=pnpm-shim-dir-split).
+#
+#         ⚠️ it is HERE and not at the one call that cache-warms, because the
+#         hazard belongs to every corepack fetch this repo makes, and a guard
+#         placed at one call site is the second list the block above forbids.
 ######################################################################
 export CI=1                             # corepack/pnpm: assume yes, never ask
+export COREPACK_DEFAULT_TO_LATEST=0     # corepack: never move the pinned default
 
 ######################################################################
 # input
 ######################################################################
-FOR="" MODE="apply" WHAT=() INCLUDE=()
+FOR="" MODE="apply" ORG="" WHAT=() INCLUDE=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --for)  FOR="$2"; shift 2 ;;
     --what) WHAT+=("$2"); shift 2 ;;
     --mode) MODE="$2"; shift 2 ;;
+    ##################################################################
+    # `--org` — whose grove this is, and therefore which rows it gets
+    #
+    # .why a flag with a DEFAULT, never a prompt
+    #      it defaults to the `org:` this checkout's `.agent/keyrack.yml`
+    #      declares, which is right nearly always: one checkout is pushed per
+    #      grove, per org. the flag is what lets a human PLAN another org's
+    #      view from this laptop with no swap of that line
+    #
+    # 🛑 an org with no declared table gets ZERO rows, never another org's
+    #      (`rule.require.a-grove-reaches-its-own-org-only`)
+    ##################################################################
+    --org)  ORG="$2"; shift 2 ;;
     ##################################################################
     # `--include` — opt into an app the tree OFFERS but installs for nobody
     #
@@ -182,6 +220,8 @@ while [[ $# -gt 0 ]]; do
             exit 2 ;;
     *) echo "✋ unknown arg: $1" >&2
        echo "   fix: one of --for cloud|local, --mode plan|apply," >&2
+       echo "        --org <org> (whose grove this is; defaults to the" >&2
+       echo "          org this checkout's .agent/keyrack.yml declares)," >&2
        echo "        --what <slug> (a slug names its whole subtree)," >&2
        echo "        or --include <app> (opt into an app the tree offers)" >&2
        exit 2 ;;
@@ -244,7 +284,7 @@ export GROVE_SRC="$SRC"
 #   bundle tree has a defect.
 #
 # .why it SOURCES ~/.zshenv's declaration rather than restate it
-#    `src/zshenv.sh` is where this repo declares the PATH a PROGRAM must read —
+#    `src/grove.provision/2.shell/2.5.zsh/zshenv.sh` is where this repo declares the PATH a PROGRAM must read —
 #    every dir, in one canonical order, with the measurements behind each. to
 #    list them again here would be a second writer on one claim, and the day the
 #    two disagree is the day a run measures a PATH no shell on the box serves
@@ -312,6 +352,25 @@ fi
 # the mode travels BESIDE the machine, never inside it: plan|apply is a property
 # of THIS RUN, not of the box
 export GROVE_MODE="$MODE"
+
+######################################################################
+# the ORG — derived ONCE, then read by every table that names an account,
+# a role, a rack slug, or a vendor key
+#
+# 🛑 it sits BESIDE the machine for the same reason the mode does: whose work
+#    a box does is a property of the CHECKOUT pushed to it, never of its
+#    hardware. `grove_env_derive` answers "what kind of box is this?"; this
+#    answers "whose grove is it?", and the two are different questions
+#
+# ⚠️ an EMPTY answer is legitimate and SAFE, never a halt
+#    a checkout pushed with `--from src` carries no `.agent/` at all, so a
+#    real box can reach here with no declaration to read. clause 3 is what
+#    makes that safe: no org, no rows — and each table says so loudly rather
+#    than fall back to whichever org's table happens to be written
+#    (`rule.require.a-grove-reaches-its-own-org-only`)
+######################################################################
+source "$HERE/grove.org.sh"
+grove_org_derive "$ORG"
 
 ######################################################################
 # 🛑 a CONTRADICTED `--for` is a LENS, and a lens may not write
@@ -577,4 +636,7 @@ if [[ "$BUNDLE_FAILED" -ne 0 ]]; then
   echo "✋ grove.provision finished with failures — each is named above, with its fix" >&2
   exit 1
 fi
-echo "🌲 grove.provision done — $(grove_env_report)"
+# ⚠️ the ORG rides the done line beside the machine, because it is the one input
+#    that decides WHICH ROWS this run wired — and an empty one is the state a
+#    reader most needs to see (`rule.require.a-grove-reaches-its-own-org-only`)
+echo "🌲 grove.provision done — $(grove_env_report) · org ${GROVE_ORG:-<none>} (${GROVE_ORG_FROM})"

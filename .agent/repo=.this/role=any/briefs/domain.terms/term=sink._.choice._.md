@@ -43,7 +43,7 @@ the audio sense and greps `term=sink*` first.
 
 ## .refs
 
-- `src/ductwork.sh` — `__duct_strip_escapes`, the sink itself
+- `src/grove.provision/2.shell/2.7.aliases/ductwork.sh` — `__duct_strip_escapes`, the sink itself
 - `.agent/repo=.this/role=any/skills/git.grove.push.sh` — `STALE` is stripped at capture
 - `.agent/repo=.this/role=any/skills/aws.ec2.get.sh` — the whole render is piped, not a field list
 - `src/grove.provision/2.shell/2.7.aliases/configure.verify.sh` — RUNS the sink and reads its hex back

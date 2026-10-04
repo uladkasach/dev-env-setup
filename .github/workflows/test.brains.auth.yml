@@ -8,7 +8,7 @@
 #   was the same person who wrote the gap. a gate no one has to remember is the fix.
 #
 # .note = the exact clamp count is NOT repeated here. `header.count-matches-the-suite` asserts
-#   it against `src/brains.auth.sh`'s own preamble, so that line is the single copy; a second
+#   it against `src/grove.provision/2.shell/2.7.aliases/brains.auth.sh`'s own preamble, so that line is the single copy; a second
 #   hand-kept figure in this header would be one more number free to drift, which is the very
 #   defect that assertion was added to close.
 #
@@ -31,7 +31,7 @@
 #   `set -u`, so a top-level reference to a variable the runner does not set would have aborted
 #   the run. it does not. that surface was once far larger — the suite used to source the whole
 #   4,300-line `bash_aliases.sh` monolith and inherit every unrelated alias's environment
-#   assumptions — and the extraction to `src/brains.auth.sh` cut it to self-contained lines that
+#   assumptions — and the extraction to `src/grove.provision/2.shell/2.7.aliases/brains.auth.sh` cut it to self-contained lines that
 #   reference only `$HOME`, which every runner sets.
 name: test.brains.auth
 
@@ -73,14 +73,14 @@ jobs:
       - name: assert jq
         run: jq --version
 
-      # ⚠️ the suite reads `src/brains.auth.sh` and every `.snap` baseline from the checkout,
+      # ⚠️ the suite reads `src/grove.provision/2.shell/2.7.aliases/brains.auth.sh` and every `.snap` baseline from the checkout,
       #   so this step fails loudly if either is absent from the index. that is the intent: a
       #   suite that exists only in someone's worktree is not coverage, and this is what says so.
       # ⚠️ the bootstrap is on this list because the HARNESS sources it — it is not merely a
       #   proxy concern. absent from the index, the suite dies on a `source: no such file`
       #   before its first case, which reads as a broken harness rather than an unstaged one.
       # ⚠️ the list is EVERY file the sentence above names, and the three proxies besides. an
-      #   earlier version of this step named `src/brains.auth.sh` in its comment and checked
+      #   earlier version of this step named `src/grove.provision/2.shell/2.7.aliases/brains.auth.sh` in its comment and checked
       #   only three other paths — the comment claimed a guarantee the code did not provide.
       #   the file under test is the single worst one to omit: absent, the bootstrap's own
       #   landmark walk does eventually catch it, but from a later step and with a message

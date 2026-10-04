@@ -105,12 +105,45 @@ if [[ -z "$ROOT" ]]; then
   exit 2
 fi
 
+REACH="$ROOT/src/grove.provision/5.devtools/5.13.reach/_.sh"
+RACK="$ROOT/src/grove.provision/5.devtools/5.12.rack/_.sh"
+
 # shellcheck source=/dev/null
-source "$ROOT/src/grove.provision/5.devtools/5.13.reach/_.sh"
+source "$ROOT/src/grove.org.sh"
 # shellcheck source=/dev/null
-source "$ROOT/src/grove.provision/5.devtools/5.12.rack/_.sh"
+source "$REACH"
+# shellcheck source=/dev/null
+source "$RACK"
 
 fails=0
+
+####################################################################
+# 🔴 the table is PER-ORG as of 2026-09-24, so this play WALKS the orgs
+#
+# 📜 .what the axis cost this play, measured the hour it landed
+#   - `_envs` reads `GROVE_ORG`, and a play run carries none. so the loop
+#     below ran ZERO times, every claim went unasked, `fails` stayed 0, and
+#     this clamp printed `🌲 prove.reach-envs-are-declared ✔`
+#   - ⇒ the clamp was correct, unchanged, and blind. its subject grew an axis
+#     it did not walk, and a table it cannot open reports no rows — which
+#     reads exactly like a table with no defects
+#   - (`gotcha.a-check-that-cries-wolf-gets-silenced`, q11)
+#
+# 🛑 an EMPTY derivation is `exit 2`, never a pass. that is the whole repair:
+#    "I read every row and found none wrong" and "I read no row" are two
+#    facts, and only the first is good news
+####################################################################
+ORGS="$(grove_org_tabled "$REACH" grove_provision_5_13_reach_envs 2>/dev/null | grep -v '^$' | sort -u)"
+
+if [[ -z "$ORGS" ]]; then
+  echo "   🌙 5.13.reach declares no org arm this reader could see" >&2
+  echo "      ⇒ two causes, and neither is a pass: the table carries no arms," >&2
+  echo "        or they moved to a shape grove_org_tabled cannot read" >&2
+  echo "      ⇒ read the case arms in 5.13.reach/_.sh, then grove_org_tabled" >&2
+  exit 2
+fi
+
+_org_before="${GROVE_ORG:-}"
 
 ####################################################################
 # 🛑 the declaration is read PER ROW's org, never once for the table
@@ -153,14 +186,18 @@ declared_cache=""
 #   - ⇒ one gate over one file would grade an `arnconst` row against a block it
 #     never reads: 🌙 where the answer is in hand, or ✋ where it is not
 ####################################################################
-rolesrc="$(grove_provision_5_13_reach_rolesrc)"
-arnsrc="$(grove_provision_5_13_reach_arnsrc)"
+# 🔴 both gates are PER ORG, because both source paths are: `_rolesrc` and
+#    `_arnsrc` derive their org off `_srcorg`. one hoisted read would grade
+#    every org's rows against whichever org's clone happened to be in hand
+_gate_for_org() {
+  rolesrc="$(grove_provision_5_13_reach_rolesrc 2>/dev/null)"
+  arnsrc="$(grove_provision_5_13_reach_arnsrc 2>/dev/null)"
 
-readable_declmap="no"
-if [[ -f "$rolesrc" ]] &&
-   grep 'export const GROVE_ROLE_NAME' "$rolesrc" >/dev/null 2>&1; then
-  readable_declmap="yes"
-fi
+  readable_declmap="no"
+  if [[ -n "$rolesrc" && -f "$rolesrc" ]] &&
+     grep 'export const GROVE_ROLE_NAME' "$rolesrc" >/dev/null 2>&1; then
+    readable_declmap="yes"
+  fi
 
 ####################################################################
 # 🛑 `arnconst` has NO BLOCK to anchor on, so its gate is derived
@@ -185,19 +222,23 @@ fi
 #   - ⇒ a hardcoded anchor here would be a SECOND holder of `_envs`'s own
 #     fact, free to drift the day a third arnconst row lands (m.9)
 ####################################################################
-readable_arnconst="no"
-if [[ -f "$arnsrc" ]]; then
-  for _probe in $(grove_provision_5_13_reach_envs); do
-    _prest="${_probe#*:}"; _prest="${_prest#*:}"      # drop org, drop env
-    [[ "${_prest%%:*}" == "arnconst" ]] || continue
-    _prest="${_prest#*:}"                              # drop reader
-    for _pkey in "${_prest%%:*}" "${_prest##*:}"; do
-      [[ -n "$(grove_provision_5_13_reach_tsconst "$arnsrc" "$_pkey")" ]] || continue
-      readable_arnconst="yes"
-      break 2
+  readable_arnconst="no"
+  if [[ -n "$arnsrc" && -f "$arnsrc" ]]; then
+    for _probe in $(grove_provision_5_13_reach_envs); do
+      _prest="${_probe#*:}"; _prest="${_prest#*:}"      # drop org, drop env
+      [[ "${_prest%%:*}" == "arnconst" ]] || continue
+      _prest="${_prest#*:}"                              # drop reader
+      for _pkey in "${_prest%%:*}" "${_prest##*:}"; do
+        [[ -n "$(grove_provision_5_13_reach_tsconst "$arnsrc" "$_pkey")" ]] || continue
+        readable_arnconst="yes"
+        break 2
+      done
     done
-  done
-fi
+  fi
+
+  srcpaths="$srcpaths$rolesrc"$'\n'"$arnsrc"$'\n'
+}
+srcpaths=""
 
 # .what = is THIS row's declaration source readable on this box?
 # 🛑 an unknown reader answers "no", and the row's own 1c arm ✋s it — so an
@@ -206,6 +247,9 @@ _readable_for() {
   case "${1:-}" in
     declmap)  [[ "$readable_declmap"  == "yes" ]] ;;
     arnconst) [[ "$readable_arnconst" == "yes" ]] ;;
+    # `arnmap` reads its ROLE out of the same `GROVE_ROLE_NAME` block as `declmap`,
+    #   and 1c grades only the role — so it shares `declmap`'s gate
+    arnmap)   [[ "$readable_declmap"  == "yes" ]] ;;
     *) return 1 ;;
   esac
 }
@@ -218,92 +262,121 @@ _reader_is_known() {
 }
 
 ####################################################################
-# 1. every row: well formed, declared, and (where readable) role-backed
+# 1. every row of every org: well formed, declared, role-backed where readable
+#
+# ⚠️ `boxorg` is the org whose TABLE is under read; `org` is the row's own
+#    TARGET org. they differ on ahbode's two ehmpathy rows, and the split is
+#    the same one `_srcorg` draws one level down
 ####################################################################
 seen_roles=""
 proven_any="no"
-for pair in $(grove_provision_5_13_reach_envs); do
-  # 1a. the row must carry all five fields
-  if [[ "$pair" != *:*:*:*:* ]]; then
-    echo "   ✋ '${pair}': the row is malformed"
-    echo "      ⇒ a row is '<org>:<env>:<reader>:<accountKey>:<roleKey>'"
-    fails=$((fails + 1))
-    continue
-  fi
-  org="${pair%%:*}"
-  rest="${pair#*:}"
-  env="${rest%%:*}"
-  rest="${rest#*:}"
-  reader="${rest%%:*}"
-  rest="${rest#*:}"
-  akey="${rest%%:*}"
-  rkey="${rest##*:}"
+rows_total=0
 
-  ####################################################################
-  # 1a'. the reader must be one the bundle DISPATCHES
-  #
-  # 🛑 this is graded BEFORE the readability gate, and the order is the claim
-  #   - an unknown reader makes `_readable_for` answer "no", exactly as an
-  #     absent clone does — so a readability-first read would report a TYPO as
-  #     🌙 "unproven here" and pass the table
-  #   - ⇒ a typo'd reader must be a ✋ on EVERY box, clone or no clone
-  ####################################################################
-  if ! _reader_is_known "$reader"; then
-    echo "   ✋ '${pair}': reader '${reader}' is not one 5.13.reach dispatches"
-    # ⚠️ single quotes: a backtick inside "…" is a COMMAND SUBSTITUTION, so
-    #    `_role` would run the function and print its refusal instead of its name
-    echo '      ⇒ _role and _account REFUSE it, so both reads come back'
-    echo "        empty — which reads as 'the clone is absent', on every box"
-    echo '      ⇒ the readers are declared in 5.13.reach/_.sh, in _declsrc'
-    fails=$((fails + 1))
-    continue
-  fi
+for boxorg in $ORGS; do
+  export GROVE_ORG="$boxorg"
+  _gate_for_org
 
-  # 1b. the env must be a legal rack name FOR ITS OWN ORG, or its set is refused
-  declared="$(_declared_for "$org")"
-  if [[ -z "$declared" ]]; then
-    ##################################################################
-    # 🛑 an org 5.12.rack does not know is a READER fault, not a row fault
-    #   - `_declared` returns 1 on an unknown org, so an empty read here is
-    #     either a renamed reader or an org nobody declared
-    #   - ⇒ to fall through would print "NOT declared" against every env of
-    #     that org — a specific, plausible ✋ that names the wrong file
-    #   - 📜 the same shape once fired on three correct rows after
-    #     `_awsprofile_envs_declared` became `_declared <org>`
-    #   - (`gotcha.a-check-that-cries-wolf-gets-silenced`, the false-✋ half)
-    ##################################################################
-    decl="✋ 5.12.rack declares NO envs for org '$org'"
-    fails=$((fails + 1))
-  elif [[ " $declared " == *" $env "* ]]; then
-    decl="✔ declared"
-  else
-    decl="✋ NOT declared by 5.12.rack"
-    fails=$((fails + 1))
-  fi
+  for pair in $(grove_provision_5_13_reach_envs); do
+    rows_total=$((rows_total + 1))
 
-  # 1c. the role key must name a real role, in THIS row's reader's own source
-  if _readable_for "$reader"; then
-    proven_any="yes"
-    role="$(grove_provision_5_13_reach_role "$reader" "$rkey")"
-    if [[ -z "$role" ]]; then
-      rolesay="✋ ${reader} declares no role for '${rkey}'"
+    # 1a. the row must carry all five fields
+    if [[ "$pair" != *:*:*:*:* ]]; then
+      echo "   ✋ '${pair}': the row is malformed"
+      echo "      ⇒ a row is '<org>:<env>:<reader>:<accountKey>:<roleKey>'"
       fails=$((fails + 1))
-    elif [[ "$role" != *"-for-grove" ]]; then
-      # every grove reach target carries the `-for-grove` slot; an OIDC role
-      # does not. a name without it means the read took the wrong block
-      rolesay="✋ read '$role' — not a grove reach role (the OIDC block?)"
-      fails=$((fails + 1))
-    else
-      rolesay="✔ $role"
-      seen_roles="$seen_roles$rkey=$role"$'\n'
+      continue
     fi
-  else
-    rolesay="🌙 unproven (${reader}'s source is not readable here)"
-  fi
+    org="${pair%%:*}"
+    rest="${pair#*:}"
+    env="${rest%%:*}"
+    rest="${rest#*:}"
+    reader="${rest%%:*}"
+    rest="${rest#*:}"
+    akey="${rest%%:*}"
+    rkey="${rest##*:}"
 
-  printf '   %-9s %-5s  %-9s akey=%-19s rkey=%-21s %s  role: %s\n' \
-    "$org" "$env" "$reader" "$akey" "$rkey" "$decl" "$rolesay"
+    ####################################################################
+    # 1a'. the reader must be one the bundle DISPATCHES
+    #
+    # 🛑 this is graded BEFORE the readability gate, and the order is the claim
+    #   - an unknown reader makes `_readable_for` answer "no", exactly as an
+    #     absent clone does — so a readability-first read would report a TYPO as
+    #     🌙 "unproven here" and pass the table
+    #   - ⇒ a typo'd reader must be a ✋ on EVERY box, clone or no clone
+    ####################################################################
+    if ! _reader_is_known "$reader"; then
+      echo "   ✋ '${pair}': reader '${reader}' is not one 5.13.reach dispatches"
+      # ⚠️ single quotes: a backtick inside "…" is a COMMAND SUBSTITUTION, so
+      #    `_role` would run the function and print its refusal instead of its name
+      echo '      ⇒ _role and _account REFUSE it, so both reads come back'
+      echo "        empty — which reads as 'the clone is absent', on every box"
+      echo '      ⇒ the readers are declared in 5.13.reach/_.sh, in _declsrc'
+      fails=$((fails + 1))
+      continue
+    fi
+
+    # 1b. the env must be a legal rack name FOR ITS OWN ORG, or its set is refused
+    declared="$(_declared_for "$org")"
+    if [[ -z "$declared" ]]; then
+      ##################################################################
+      # 🛑 an org 5.12.rack does not know is a READER fault, not a row fault
+      #   - `_declared` returns 1 on an unknown org, so an empty read here is
+      #     either a renamed reader or an org nobody declared
+      #   - ⇒ to fall through would print "NOT declared" against every env of
+      #     that org — a specific, plausible ✋ that names the wrong file
+      #   - 📜 the same shape once fired on three correct rows after
+      #     `_awsprofile_envs_declared` became `_declared <org>`
+      #   - (`gotcha.a-check-that-cries-wolf-gets-silenced`, the false-✋ half)
+      ##################################################################
+      decl="✋ 5.12.rack declares NO envs for org '$org'"
+      fails=$((fails + 1))
+    elif [[ " $declared " == *" $env "* ]]; then
+      decl="✔ declared"
+    else
+      decl="✋ NOT declared by 5.12.rack"
+      fails=$((fails + 1))
+    fi
+
+    # 1c. the role key must name a real role, in THIS row's reader's own source
+    if _readable_for "$reader"; then
+      proven_any="yes"
+      role="$(grove_provision_5_13_reach_role "$reader" "$rkey")"
+      if [[ -z "$role" ]]; then
+        rolesay="✋ ${reader} declares no role for '${rkey}'"
+        fails=$((fails + 1))
+      elif [[ "$role" != *"-for-grove" ]]; then
+        # every grove reach target carries the `-for-grove` slot; an OIDC role
+        # does not. a name without it means the read took the wrong block
+        rolesay="✋ read '$role' — not a grove reach role (the OIDC block?)"
+        fails=$((fails + 1))
+      else
+        rolesay="✔ $role"
+        seen_roles="$seen_roles$rkey=$role"$'\n'
+      fi
+    else
+      rolesay="🌙 unproven (${reader}'s source is not readable here)"
+    fi
+
+    printf '   %-9s %-9s %-5s  %-9s akey=%-19s rkey=%-21s %s  role: %s\n' \
+      "$boxorg" "$org" "$env" "$reader" "$akey" "$rkey" "$decl" "$rolesay"
+  done
 done
+
+if [[ -n "$_org_before" ]]; then export GROVE_ORG="$_org_before"; else unset GROVE_ORG; fi
+
+####################################################################
+# 🛑 zero rows across every arm is `exit 2`, never a pass
+#   - the ORGS guard above catches a table this reader cannot PARSE; this one
+#     catches arms it parsed and that yielded no row
+#   - ⇒ "I read every row and found none wrong" and "I read no row" are two
+#     facts, and a clean ✔ may only ever mean the first
+####################################################################
+if [[ $rows_total -eq 0 ]]; then
+  echo "" >&2
+  echo "   🌙 every org arm yielded ZERO rows, so no claim below was asked" >&2
+  echo "      ⇒ the arms are empty, or this play walked the wrong reader" >&2
+  exit 2
+fi
 
 ####################################################################
 # 2. a role read with NO key must REFUSE, never fall back
@@ -379,9 +452,8 @@ else
   echo "   🌙 the per-tier split is unproven — NO row's source was readable here"
   echo "      ⇒ the clone is absent, or present and behind. both read the same"
   echo "        way to this play, and neither is a defect in THIS repo"
-  echo "      ⇒ read it on a box whose clone carries both:"
-  echo "        $rolesrc"
-  echo "        $arnsrc"
+  echo "      ⇒ read it on a box whose clone carries these:"
+  printf '%s\n' "$srcpaths" | grep -v '^$' | sort -u | sed 's/^/        /'
   echo "      ⇒ compare the two without a direct read of that checkout:"
   echo "        rhx git.repo.get lines --in ahbode/infrastructure \\"
   echo "          --paths 'provision/aws.auth/resources.role-names.ts' \\"

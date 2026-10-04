@@ -9,18 +9,9 @@
 #
 # .why this list, not the directory digits, IS the dispatch order
 #   - a number is a stable NAME, never a position — `5.11.usql` runs before
-#     `5.10.repos` below
-#   - three bundles are numbered for their SUBJECT while the real dependency
-#     is a tool or credential that lands later — `5.14.treesitter` (needs
-#     cargo, from `5.2.rust`), `5.4.gh` (needs a credential, from
-#     `5.3.brains`), `5.15.identity` (needs a github login, from `5.4.gh`)
-#   - `5.12.rack` sits between aws and gh: it writes the keyrack entry gh
-#     reads, and reads its own value out of ssm through the aws cli
-#   - `5.10.repos` and `5.13.reach` run last: both need clones only
-#     `5.10.repos` provides
-#   - `5.17.yq` runs FIRST despite the highest digit — it depends on no bundle
-#     in this section at all. its only need is `curl`, which `2.1.toolkit`
-#     already put down a whole section earlier
+#     `5.10.repos` below, and `5.17.yq` runs before them both
+#   - several bundles are numbered for their SUBJECT while the real dependency
+#     is a tool or credential that lands later, so the swap is the correct read
 #   - `5.19.op` runs SECOND: `5.12.rack` and `6.apps` both read what it places
 #   - .refs = howdoes.5-devtools-dispatch-order.md — the full trace, per swap
 #

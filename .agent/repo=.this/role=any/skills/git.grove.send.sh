@@ -147,10 +147,14 @@ for _fn in "${GROVE_SEND_BORROWS[@]}"; do
   #
   # ⚠️ `--from tree`, NOT `--from main`. this gate fires when the installed copy
   #    is BEHIND, so the fix must name a copy that is AHEAD. measured 2026-09-01:
-  #    `origin/main:src/ductwork.sh` is the 137-line version and declares no
+  #    📜 `origin/main:src/ductwork.sh` is the 137-line version and declares no
   #    `__duct_strip_escapes` at all, so a `--from main` apply converges the box
   #    and leaves this gate red — a fix text that names a fix which cannot work
   #    (`rule.require.errors-name-the-fix`).
+  #
+  #    ⚠️ that ref carries the path it held ON THAT DATE; the file has since moved
+  #       into `2.shell/2.7.aliases/`. a git ref resolves against a commit, so to
+  #       modernize its path would name a ref the measurement never took.
   exit 2
 done
 
@@ -265,7 +269,7 @@ fi
 #      |                           | the far shell runs | run it IS the contract    |
 #
 #    ⇒ on the duct path the escape is already closed at cause, in
-#      `src/ductwork.sh`. on the `--bare` family there is none to close — a
+#      `src/grove.provision/2.shell/2.7.aliases/ductwork.sh`. on the `--bare` family there is none to close — a
 #      caller who passes a backtick asked for a backtick, on a box they already
 #      hold a key to. this guard changes neither; it keeps one send readable,
 #      repeatable, and diffable, and keeps each step visible to the pretooluse
@@ -401,7 +405,7 @@ if [[ -n "$PLAY" ]]; then
   #
   #    ⇒ a terminal OBEYS what it is handed. an OSC 52 from either stream
   #      rewrites the human's clipboard. the sink and its full reason live in
-  #      `src/ductwork.sh`; the measurement lives at the `--bare` branch below.
+  #      `src/grove.provision/2.shell/2.7.aliases/ductwork.sh`; the measurement lives at the `--bare` branch below.
   #
   # 📜 .measured 2026-09-02 — a sweep that named four carriers and missed this
   #    the 2026-08-31 pass listed the ssh carriers at
@@ -586,7 +590,7 @@ if [[ "$BARE" == "true" ]]; then
   echo ""
   ####################################################################
   # 🛑 `__duct_strip_escapes` — grove-chosen bytes, on their way to a terminal
-  #    that OBEYS them. the sink and its full reason live in `src/ductwork.sh`
+  #    that OBEYS them. the sink and its full reason live in `src/grove.provision/2.shell/2.7.aliases/ductwork.sh`
   #
   # ⚠️ the EXIT CODE still comes from ssh, not from the sink. `pipefail` is set
   #    at the top of this file, and the sink returns 0 on every input it can
@@ -982,7 +986,7 @@ if [[ "$REPLY_WANTED" == "true" ]]; then
   #
   # ⚠️ .why the SEND is redirected too, and not only these echoes
   #    `git_alias_grove send` → `duct.send` ends with `echo "🔧 $uri sent"` on
-  #    STDOUT (`src/ductwork.sh:1159`). so a redirect of this skill's own lines
+  #    STDOUT (`src/grove.provision/2.shell/2.7.aliases/ductwork.sh:1159`). so a redirect of this skill's own lines
   #    alone leaves one banner line behind and reads as complete — the whole
   #    class of defect this repo files under a partial sweep.
   #
@@ -1050,7 +1054,7 @@ if [[ "$REPLY_WANTED" == "true" ]]; then
   #    grove-chosen bytes to a terminal verbatim, and a terminal OBEYS them.
   #    with `set-clipboard on` an OSC 52 in this stream writes the human's
   #    clipboard, so the next paste is text the grove chose. the sink and its
-  #    full reason live in `src/ductwork.sh`, sourced above via ~/.bash_aliases
+  #    full reason live in `src/grove.provision/2.shell/2.7.aliases/ductwork.sh`, sourced above via ~/.bash_aliases
   ####################################################################
   ssh -o BatchMode=yes "$GROVE" "cat \"$REPLY_OUT\"" 2>/dev/null | __duct_strip_escapes
   REPLY_CODE="$(ssh -o BatchMode=yes "$GROVE" "cat \"$REPLY_RC\"" 2>/dev/null | tr -d '[:space:]')"

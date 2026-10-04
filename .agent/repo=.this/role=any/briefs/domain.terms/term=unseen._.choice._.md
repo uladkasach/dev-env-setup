@@ -48,9 +48,9 @@ action.
 
 **the contracts:**
 
-- `src/install_env.pt1.system.performance.sh` — `machine_resource_procs_find_orphan` splits
-  `ORPHAN_INFO` (kernel-attested ` (deleted)` suffix) from `UNSEEN_INFO`; the unseen set prints as
-  `🫥` below the strays and is never offered for kill
+- `src/machine/machine_resource_procs_find_orphan` — it splits `ORPHAN_INFO` (kernel-attested
+  ` (deleted)` suffix) from `UNSEEN_INFO`; the unseen set prints as `🫥` below the strays and is
+  never offered for kill. deployed by `1.system/1.6.procs/1.6.1.finders`
 
 **the origin:**
 

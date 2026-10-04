@@ -15,13 +15,13 @@ migration is refused. so the nags get suppressed rather than obeyed.
 
 | noise | fix | where |
 |-------|-----|-------|
-| `✗ Auto-update failed · Try claude doctor …` | `DISABLE_AUTOUPDATER=1` + `DISABLE_UPDATES=1` | shell export (`src/zshrc.sh`) |
-| `Claude Code has switched from npm to native installer. Run claude install …` | `DISABLE_INSTALLATION_CHECKS=1` | shell export (`src/zshrc.sh`) |
+| `✗ Auto-update failed · Try claude doctor …` | `DISABLE_AUTOUPDATER=1` + `DISABLE_UPDATES=1` | settings.json `env` (`5.3.brains`) |
+| `Claude Code has switched from npm to native installer. Run claude install …` | `DISABLE_INSTALLATION_CHECKS=1` | settings.json `env` (`5.3.brains`) |
 | `N claude.ai connectors need auth · /mcp` | disconnect in claude.ai web UI (settings key needs ≥2.1.182) | claude.ai account |
 | grey ghost text in the prompt box (**prompt suggestions**) | `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false` | settings.json `env` (`5.3.brains`) |
 
-note the last one is not a *startup* nag — it renders mid-session, which is why it takes a
-different shelf. see below.
+every flag lives on ONE shelf, settings.json `env`, merged by `5.3.brains`. see below for why
+the shell-export shelf was retired.
 
 ## .prompt suggestions — the one that is not a startup nag
 
@@ -36,12 +36,6 @@ and they survive.
 // ~/.claude/settings.json — merged by 5.3.brains's configure.upsert
 { "env": { "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false" } }
 ```
-
-### why the settings.json shelf, not a shell export
-
-the other three flags are shell exports because their checks run at **boot**, before settings load.
-this one is read as `process.env.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` **mid-session**, long after
-settings load — so the `env` block reaches it fine. verified present in the 2.1.87 bundle.
 
 ### ⚠️ the polarity trap
 
@@ -60,21 +54,27 @@ if grey text survives a restart: try `"0"`, then unset-and-invert.
 opt-out shipped in claude **2.0.71** (anthropics/claude-code#13878). we run 2.1.87, so no upgrade
 is needed.
 
-## .key gotcha: which shelf does a flag belong on?
+## .key gotcha: the shell-export shelf was a GUESS, retired 2026-09-25
 
-**the rule is about WHEN the flag is read, not about the flag's shape.**
+this brief once split the flags across two shelves — boot-time checks as shell exports in
+`~/.zshrc`, mid-session reads in settings.json — on the claim that *"the settings.json env block
+is read too late"*. that claim cited no READ SITE, and it was false: claude's `zd()` assigns the
+settings `env` block into `process.env` at startup, unfiltered, before any of these reads:
 
-| when claude reads it | shelf | examples |
-|----------------------|-------|----------|
-| at **boot**, before settings load | shell export (`src/zshrc.sh`) | `DISABLE_AUTOUPDATER`, `DISABLE_UPDATES`, `DISABLE_INSTALLATION_CHECKS`, `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` |
-| **mid-session**, after settings load | settings.json `env` | `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` |
+| flag | read site (cli 2.1.87) |
+|---|---|
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | `et6()`, per turn |
+| `DISABLE_AUTOUPDATER` | `j96()` off `process.env` — claude's own `RtK()` writes it INTO settings |
+| `DISABLE_UPDATES` | 🔴 0 refs in 2.1.87 — kept for a later cli |
+| `DISABLE_INSTALLATION_CHECKS` | `$w6()`/`kFz()`, behind a react effect |
 
-the update/install checks fire before the `settings.json` `env` block is applied, so a value there
-is ignored — they must be real shell exports in `~/.zshrc`.
+⇒ every claude flag now has ONE home, `5.3.brains`'s settings patch, and `~/.zshrc` exports
+none. the guess bought a two-writers split across three bundles. a shelf claim with no read site
+beside it is a guess — when you add a flag, find its read site first.
 
-⚠️ **do not over-generalize that into "claude env flags always need a shell export."** the
-prompt-suggestion flag is read mid-session and works fine from the `env` block. when you add a new
-flag, ask *when* it is read before you pick the shelf.
+⚠️ the 2026-09-25 move removed the zshrc exports and left two flags in NO home —
+`DISABLE_INSTALLATION_CHECKS` and `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` reached the patch on
+2026-10-01. a move is a delete AND an add, and only the delete was checked.
 
 the connectors patch (`disableClaudeAiConnectors: true`) lives in `settings.json`, merged by
 `5.3.brains`'s configure.upsert. ⚠️ it needs claude **≥2.1.182**; at 2.1.87 it is inert, so
@@ -114,22 +114,55 @@ process\.env\.<FLAG>              # confirms it is read from the environment
 both `DISABLE_INSTALLATION_CHECKS` and `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` are confirmed present
 in the 2.1.87 bundle, so both work without an upgrade.
 
+## .the other keys `5.3.brains` declares, and why
+
+### 🛑 `cleanupPeriodDays` governs the TRANSCRIPTS, and its default DELETES them
+
+- claude keeps a session's transcript for N days past its last activity, then removes it.
+  the default N is 30, and it applies whether or not the key appears — so an ABSENT key is
+  not "no prune", it IS the 30-day prune, chosen by default and never stated
+- ⇒ every `/resume`, every post-compaction re-read of a session `.jsonl`, and every
+  archaeology run against a prior session dies on its 31st day
+- ⚠️ the loss is UNRECOVERABLE and UNREPORTED — a human learns of it from a `/resume` that
+  finds naught. a failhide in the tool, so the key is declared (`rule.forbid.failhide`)
+- ⇒ 36500 days is a hundred years: `never`, said in the one unit the option accepts. claude
+  declares no sentinel for never, so a grep for that word finds none — not a gap
+
+### `permissions.deny=["Agent"]` bans SUBAGENTS outright
+
+- a BARE tool name (no parens, no args) removes the tool from claude's own context, so it
+  never sees it — not a prompt-at-call-time gate. it takes effect on the next tool call,
+  mid-session, with no restart
+- the cost is real and chosen: research a subagent would hold in its own context lands in
+  the main one, and `/batch` (which fans out across worktree agents) no longer runs
+
+### `permissions.defaultMode=acceptEdits`
+
+every session starts with file edits applied without a prompt; shift+tab still cycles modes.
+
+### 🛑 `jq '. * $patch'` merges objects and REPLACES arrays
+
+- the merge, never an overwrite: `~/.claude/settings.json` is a file a HUMAN also edits —
+  hooks, model, permissions — and the deep merge leaves every undeclared key as found
+- ⇒ but a `deny` list a human adds to the live file by hand is DESTROYED by the next apply,
+  silently, since the patch declares that same key. a deny entry belongs in the patch
+- (the live file held no `deny` array when this landed, so the first apply destroyed no
+  entry — a fact about that day, never a guarantee)
+- an absent jq is a hard STOP: the only ways forward are overwrite (destroys hooks) or skip
+  (a failhide). the fix names `5.3.brains` itself, since jq is that bundle's own declared
+  dependency (`rule.require.bundles-own-their-dependencies`)
+
 ## .apply
 
 ```sh
-grove.provision --what 2.5.zsh     --mode apply   # the shell exports (boot-time flags)
-grove.provision --what 5.3.brains  --mode apply   # the settings.json patch (mid-session flags)
+grove.provision --what 5.3.brains  --mode apply   # the settings.json patch — every flag
 ```
 
-⚠️ the split above is not tidiness — it is the same "when is it read" line the table draws.
-`2.5.zsh` owns every flag claude reads at BOOT; `5.3.brains` owns every flag it reads
-MID-SESSION. a flag put in the wrong bundle is inert and reports ✔.
-
-then **fully restart the claude cli** from a fresh shell (so it inherits the exports).
+then **fully restart the claude cli**, since settings load at startup.
 
 verify:
 
-- exports → `echo $DISABLE_INSTALLATION_CHECKS` → `1`
+- the patch → `jq .env ~/.claude/settings.json` holds every flag above
 - prompt suggestions → **check the behavior, not the file**: type a partial prompt and confirm no
   grey ghost text appears. a key present in `settings.json` proves nothing about how it parsed
 

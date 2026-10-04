@@ -269,7 +269,7 @@ __grove_play_pids() {
   #    so `$pattern` is CODE on the far side. the single quotes around it are
   #    closed by one single quote in a play name. base64's alphabet is
   #    `[A-Za-z0-9+/=]` and holds no shell metacharacter, so they cannot be
-  #    (`src/ductwork.sh`'s `__duct_ssh_tmux` carries the reason in full).
+  #    (`src/grove.provision/2.shell/2.7.aliases/ductwork.sh`'s `__duct_ssh_tmux` carries the reason in full).
   #
   #    ⇒ a play name is local argv today, so this is the cheap half of the
   #      class rather than a live hole. the seam is retired anyway: a guarantee
@@ -345,7 +345,7 @@ while [[ "$WAITED" -lt "$WITHIN" ]]; do
   # ⚠️ an EMPTY answer is not idle. tmux could not be asked — the tunnel is down,
   #    the session is gone — and to read that as "finished" would report a play
   #    complete that never ran (rule.forbid.failhide). ductwork's own read makes
-  #    the same distinction at src/ductwork.sh:533
+  #    the same distinction at src/grove.provision/2.shell/2.7.aliases/ductwork.sh:533
   if [[ -z "$RUNNING" ]]; then
     echo "   ✋ tmux did not answer, so the pane's state is unknown" >&2
     echo "      ⇒ the tunnel may be down, or the session gone" >&2

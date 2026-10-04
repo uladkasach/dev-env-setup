@@ -173,8 +173,8 @@ two sites reach a registry from outside the bundle tree, and neither can source
 
 | site | what it does | why it is the sharper one |
 |---|---|---|
-| `src/zshrc.sh:236` | `npm install -g pnpm`, when pnpm is absent after an fnm switch | runs on shell START and after every `cd`. a duct pane IS a shell |
-| `src/bash_aliases.sh:1575` | `pnpm install` after `git tree set --init` | backgrounded and disowned, so it leaks an orphan rather than wedge a shell |
+| `src/grove.provision/2.shell/2.5.zsh/zshrc.sh:236` | `npm install -g pnpm`, when pnpm is absent after an fnm switch | runs on shell START and after every `cd`. a duct pane IS a shell |
+| `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh:1575` | `pnpm install` after `git tree set --init` | backgrounded and disowned, so it leaks an orphan rather than wedge a shell |
 
 the first is the sharpest unbounded call this repo has held: a stall there does not fail one
 phase, it holds the PANE, and every command sent down that duct afterward queues behind it.

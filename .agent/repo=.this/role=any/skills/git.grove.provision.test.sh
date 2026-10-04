@@ -9,8 +9,13 @@
 #    a second entrypoint to it.
 #
 # .what = THE ACCEPTANCE GATE for a grove. it drives one real job end to end —
-#         ahbode/svc-chat's integration suite, at latest origin/main — and
+#         its ORG'S service integration suite, at latest origin/main — and
 #         reports whether the box completed it.
+#
+# 🛑 .the target tree is PER-ORG, and it is DERIVED, never assumed
+#         the box declares its org in its own checkout; `_target_repo_for_org`
+#         maps that to the tree. an org with no arm halts, and never inherits
+#         another org's service (`rule.require.a-grove-reaches-its-own-org-only`)
 #
 #           0. box      — git.grove.ready.verify rungs 1..5 (registry→creds)
 #           1. tree     — the repo is cloned, and synced to latest origin/main
@@ -45,21 +50,26 @@
 #         ITSELF is absent this refuses to clone it and halts naming
 #         `5.10.repos`, because the clone IS bundle-owned. see step 1.
 #
-# .why LATEST main, and not a pinned sha = svc-chat's main is green by
+# .why LATEST main, and not a pinned sha = a target's main is green by
 #         invariant — cicd gates it. so `latest main` is a fixed point that
 #         needs no keeper, where a pin goes stale and needs one.
 #
 #         ⚠️ the invariant is INHERITED, so read a failure with it in mind: if
-#         main ever ships red, this gate blames the box for svc-chat's defect.
+#         main ever ships red, this gate blames the box for the target's defect.
 #         that is the known cost of the choice. step 4 says so in its halt.
+#
+#         ⚠️ it is also a BAR on what may be declared a target: a tree whose
+#         main is not cicd-gated green makes this gate report on that tree
+#         rather than on the box.
 #
 # usage:
 #   rhx git.grove.provision test <name>
-#   rhx git.grove.provision test <name> --of ahbode/svc-chat
+#   rhx git.grove.provision test <name> --of <org>/<repo>
 #   rhx git.grove.provision test <name> --from 4        # re-run just the suite
 #
 # options:
-#   --of      org/name of the tree to exercise; default ahbode/svc-chat
+#   --of      org/name of the tree to exercise; default = the arm this grove's
+#             own declared org carries in `_target_repo_for_org`
 #             (NOT `--repo` — rhachet injects that one into every skill it runs)
 #   --from    first step to run; default 0
 #
@@ -93,12 +103,15 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo ""
   echo "it ESTABLISHES each precondition rather than assume it, so the same"
   echo "command on the same box always answers the same question."
+  echo ""
+  echo "the TARGET is per-org: the box declares its org in its own checkout,"
+  echo "and an org with no declared arm halts rather than borrow another's."
   echo "exit 0 = acceptance-grade | 3 = a step failed | 2 = bad input"
   exit 0
 fi
 
 GROVE=""
-REPO="ahbode/svc-chat"
+REPO=""
 FROM=0
 
 ######################################################################
@@ -156,21 +169,11 @@ fi
 # (`rule.forbid.two-writers-on-one-artifact`)
 source "$(dirname "${BASH_SOURCE[0]}")/git.grove.operations.sh"
 
-REPO_NAME="${REPO##*/}"
-TREE_DIR="git/$REPO"
-
 # ⚠️ NOT /tmp. a log left there outlives every memory of why it was written.
 #    the state dir is where a per-machine artifact belongs, and it is where
 #    `git.grove.wake` already keeps its tunnel log.
 LOGDIR="${XDG_STATE_HOME:-$HOME/.local/state}/git.grove.provision.test/$GROVE"
 mkdir -p "$LOGDIR"
-
-echo "🐢 heres the wave..."
-echo ""
-echo "💨 git.grove.provision test $GROVE"
-echo "   ├─ repo:  $REPO @ latest origin/main"
-echo "   ├─ steps: $FROM..4"
-echo "   └─ run"
 
 ######################################################################
 # halt — name the step, why it did not hold, and the command that repairs it
@@ -328,6 +331,262 @@ _drive() {
 }
 
 ######################################################################
+# .what = the tree this gate exercises, for the org THIS GROVE declares
+#
+# 🔴 .it is PER-ORG — 2026-09-24
+#   - `REPO` was the scalar `ahbode/svc-chat`, with no org axis at all
+#   - ⇒ an AETHER grove was gated on AHBODE's service: it cloned that tree,
+#     installed its deps, stood up its testdb, and ran its suite — and the
+#     verdict it printed was about ahbode's code on aether's box
+#   - the sixth instance of one shape, after `5.13.reach`, `5.12.rack`,
+#     `5.16.keys`, and `5.10.repos`. a gate is the worst place for it: every
+#     other table wires a capability, and this one decides what PASSING MEANS
+#   - (`rule.require.a-grove-reaches-its-own-org-only`)
+#
+# 🛑 an org with no arm gets NO TARGET, never another org's. it halts and names
+#      the file to declare in — clause 3
+#
+# 🛑 .the BAR a tree must clear to be declared here — or the gate reports on
+#      the TREE rather than on the box:
+#
+#        1. `5.10.repos` clones it for that org — the clone is bundle-owned,
+#           and step 1 refuses to make one
+#        2. its `main` is cicd-gated green — the inherited invariant above
+#        3. it declares `test:integration`, which `git.repo.test` drives
+#        4. IF it needs a database, it declares `use.testdb` at
+#           `repo=.this role=any`, which supplies both `CONFIG` and `ACCESS`
+#           (step 3 says why a hand-roll is wrong). a target with no database
+#           declares no such skill, and step 3 then claims none
+#
+# ⚠️ every measurement quoted in the steps below was taken against
+#    `ahbode/svc-chat`. each one states a property of the CLASS above, never of
+#    that one repo — a target that clears the bar behaves the same way
+######################################################################
+# 🛑 the KEY is `GROVE_ORG` (the keyrack's org) and the VALUE is a GITHUB path.
+#    the two namespaces differ — `aether` keys a repo under `aether-auctions`
+#    — so this is a MAP and never an identity (`5.10.repos/_.sh` says why)
+_target_repo_for_org() {
+  case "${1:-}" in
+    ahbode) printf 'ahbode/svc-chat' ;;
+    aether) printf 'aether-auctions/svc-aether-auctions' ;;
+    *)      return 0 ;;
+  esac
+}
+
+######################################################################
+# .what = the org this grove DECLARES, read off the box's own checkout
+#
+# 🛑 .why the box's manifest, and not the grove's NAME
+#   - `rule.require.a-grove-reaches-its-own-org-only`: "a grove's org read from
+#     any source other than its own declaration — inferred from a repo name, a
+#     checkout, or the table that happens to be there = blocker"
+#   - `grove-aether-v20260921` parses to `aether` today and is a naming
+#     convention, never a declaration. a grove renamed tomorrow would silently
+#     change what this gate tests
+#   - ⇒ the box's `.agent/keyrack.yml` is the SAME line `grove.provision` reads
+#     to settle `GROVE_ORG` (`src/grove.org.sh`), so there is one holder
+#
+# ⚠️ ONE command, no pipe and no `&&` — the send's guard refuses a chain, and
+#    `--what` takes one step (`gotcha.the-duct-returns-the-send-not-the-answer`)
+#
+# 🛑 the sed EXPRESSION is single-quoted, and `$HOME` deliberately is not
+#   - a duct's pane runs an INTERACTIVE zsh, which globs an unquoted
+#     `[[:space:]]` and dies with `no matches found` before sed is reached
+#   - 📜 measured 2026-09-24, on this very reader's first roll. it swallowed
+#     that error and returned empty, so a box that declares `aether` was
+#     reported as a box that declares no org — a false ✋ with a fix-text that
+#     told a human to push a checkout already present
+#     (`gotcha.a-check-that-cries-wolf-gets-silenced`)
+#   - ⇒ so the three states are told apart BELOW, and never collapsed
+######################################################################
+_ORG_MANIFEST='$HOME/git/more/dev-env-setup/.agent/keyrack.yml'
+
+######################################################################
+# 🔴 .the PUSHED manifest is NOT the grove's declaration — it is THIS repo's
+#
+# the block above reasons that the box's `.agent/keyrack.yml` is where a grove
+# declares its org, so a read of it honors
+# `rule.require.a-grove-reaches-its-own-org-only`. the premise is false, and
+# the rule's own enforcement names it:
+#
+#   > a grove's org read from any source other than its own declaration —
+#   > inferred from a repo name, A CHECKOUT, or the table that happens to be
+#   > there = blocker
+#
+# ⚠️ that manifest arrives by `git.grove.push --from .agent`, a straight copy of
+#    THIS repo's `.agent/`. this repo declares `org: ahbode`. so the file says
+#    `ahbode` on every grove ever pushed to, whatever org the box belongs to —
+#    it is "the table that happens to be there", and it cannot answer otherwise.
+#
+# .measured 2026-09-28 on `grove-aether-v20260921`, both seats converged clean
+#  under `--org aether`:
+#
+#     ├─ repo:  ahbode/svc-chat @ latest origin/main  (org ahbode, declared)
+#
+#  the word `declared` is the whole defect. an AETHER box was about to stand up
+#  ahbode's testdb, run ahbode's suite, and print a verdict about ahbode's code
+#  — which that same rule calls the WORST place for a hardcoded org, because
+#  this table decides what a PASS MEANS.
+#
+# ⇒ the grove's own declaration is its REGISTRY ENTRY: a human writes it per
+#   grove, beside `account` and `env` (`rhx git.grove.set <g> --org <org>`). it
+#   is per-box by construction, so it is the one holder that CAN contradict this
+#   repo's manifest — and to contradict it is exactly its job.
+#
+# ⚠️ the manifest read stays as the FALLBACK, and its source is named out loud.
+#    it is right for an ahbode box and cannot be right for any other, so a run
+#    that leans on it says so rather than print `declared`.
+######################################################################
+BOX_ORG=""
+ORG_FROM=""
+
+if [[ -z "$REPO" ]]; then
+  REG_ORG=$(jq -r '.org // ""' \
+    "${GIT_FOREST_DIR:-$HOME/.git.forest}/groves/$GROVE.json" 2>/dev/null) || REG_ORG=""
+  [[ "$REG_ORG" == "null" ]] && REG_ORG=""
+
+  if [[ -n "$REG_ORG" ]]; then
+    # 🛑 a LIVE clamp — this reaches a `case` key and a remote path
+    if [[ "$REG_ORG" == *[!A-Za-z0-9._@-]* ]]; then
+      echo "      └─ ✋ the registry's org holds a character this gate cannot carry: '$REG_ORG'"
+      echo ""
+      echo "  want: [A-Za-z0-9._@-]"
+      echo "  fix:  rhx git.grove.set $GROVE --org <org>"
+      exit 2
+    fi
+    BOX_ORG="$REG_ORG"
+    ORG_FROM="the registry, declared"
+  fi
+fi
+
+if [[ -z "$REPO" && -z "$BOX_ORG" ]]; then
+  ####################################################################
+  # 🛑 THREE states, three verdicts — an absent manifest, an absent line, and
+  #    a read that broke are different facts with different repairs
+  ####################################################################
+  if ! _drive "test -f $_ORG_MANIFEST" >/dev/null 2>&1; then
+    echo "      └─ ✋ this box carries no keyrack manifest, so it declares no org"
+    echo ""
+    echo "  why: the gate's target is PER-ORG, this grove's registry entry names"
+    echo "       no org, and the pushed manifest is absent too — so there is no"
+    echo "       source left, and to guess from the grove's NAME is the very"
+    echo "       inference rule.require.a-grove-reaches-its-own-org-only forbids."
+    echo "  fix: declare it, once, where it belongs to the BOX —"
+    echo "    rhx git.grove.set $GROVE --org <org>"
+    echo "  ⚠️ the fallback below reads the box's pushed .agent/keyrack.yml, which"
+    echo "     is a COPY of this repo's and says 'ahbode' on every grove. it can"
+    echo "     be right only for an ahbode box, so the registry is the real fix."
+    echo "  or name the tree outright, for this run only —"
+    echo "    rhx git.grove.provision test $GROVE --of <org>/<repo>"
+    exit 3
+  fi
+
+  ORG_RC=0
+  ORG_RAW="$(_drive "sed -n 's/^org:[[:space:]]*//p' $_ORG_MANIFEST")" || ORG_RC=$?
+  BOX_ORG="$(printf '%s' "$ORG_RAW" | tr -d '\r' | grep -m1 -E '^[a-z][a-z0-9._-]*$' || true)"
+
+  if [[ "$ORG_RC" -ne 0 ]]; then
+    echo "      └─ ✋ the org read did not complete, so no org was observed"
+    echo ""
+    echo "  why: the manifest is there and the read of it exited $ORG_RC. that is"
+    echo "       a fact about the READ, never about the box's declaration — to"
+    echo "       report it as 'no org' would name the wrong subject, and send a"
+    echo "       human to repair a checkout that is already correct."
+    echo "  what it tried —"
+    echo "    sed -n 's/^org:[[:space:]]*//p' $_ORG_MANIFEST"
+    echo "  read it by hand —"
+    echo "    rhx git.grove.send $GROVE --reply --within 60 --what 'cat $_ORG_MANIFEST'"
+    exit 3
+  fi
+
+  if [[ -z "$BOX_ORG" ]]; then
+    echo "      └─ ✋ this grove declares no org — the registry is silent, and so is"
+    echo "         the manifest"
+    echo ""
+    echo "  why: neither source names one, so an aether box and an ahbode box are"
+    echo "       indistinguishable from here. to guess would hand one org's"
+    echo "       verdict to the other."
+    echo "  fix: declare it where it belongs to the BOX —"
+    echo "    rhx git.grove.set $GROVE --org <org>"
+    echo "  or name the tree outright, for this run only —"
+    echo "    rhx git.grove.provision test $GROVE --of <org>/<repo>"
+    exit 3
+  fi
+
+  # ⚠️ named for what it IS. the fallback can only ever answer this repo's own
+  #    org, so a run that leans on it must not print `declared`
+  ORG_FROM="the pushed manifest — a COPY of this repo's, so ahbode on every box"
+fi
+
+if [[ -z "$REPO" ]]; then
+  REPO="$(_target_repo_for_org "$BOX_ORG")"
+
+  if [[ -z "$REPO" ]]; then
+    echo "      └─ ✋ org '$BOX_ORG' declares no acceptance target"
+    echo ""
+    echo "  why: an org with no declared table gets ZERO rows, never another"
+    echo "       org's (rule.require.a-grove-reaches-its-own-org-only, clause 3)."
+    echo "       so this gate has no tree to exercise, and it will not borrow one."
+    echo "  fix: declare its arm in _target_repo_for_org, beside its reason —"
+    echo "    .agent/repo=.this/role=any/skills/git.grove.provision.test.sh"
+    echo "  ⇒ and the tree must ALSO sit in 5.10.repos's org set for '$BOX_ORG',"
+    echo "    since the clone is bundle-owned and step 1 refuses to make it."
+    echo "  or name the tree outright, for this run only —"
+    echo "    rhx git.grove.provision test $GROVE --of <org>/<repo>"
+    exit 3
+  fi
+fi
+
+######################################################################
+# 🛑 the DIR under `~/git` is the KEYRACK org, and never github's name
+#   - `5.10.repos` clones `aether-auctions/svc-x` into `~/git/aether/svc-x`,
+#     because every other table in this repo keys on `GROVE_ORG`, and a disk
+#     laid out by github's names is a second namespace to hold in your head
+#   - ⇒ so the tree this gate reads is NOT `git/$REPO`
+#
+# 🛑 it SOURCES the one holder rather than carry a copy of the pair
+#   - `grove_org_clonedir` is pure: it reads its argument and a const, touches
+#     no box and no `GROVE_SRC`, so it is safe to source from this laptop
+#   - an inline copy would be one fact with two holders, and this half fails as
+#     `🌙 the tree is not cloned` on a box that holds it — a false ✋ against
+#     correct code (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.9)
+#
+# ⚠️ the root is resolved off `BASH_SOURCE`, never `git rev-parse`
+#    `rev-parse` answers about the CWD, so it names whatever checkout a human
+#    happens to stand in — `git.grove.auth.keys.set` sets this precedent at the
+#    same depth, and `wire.verify` records why the other form is wrong
+######################################################################
+_SELF_REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+
+if [[ ! -r "$_SELF_REPO_ROOT/src/grove.org.sh" ]]; then
+  echo "✋ this gate cannot read src/grove.org.sh, so it cannot name the tree dir" >&2
+  echo "   ⇒ that file holds the ONE keyrack↔github org pair table, and a clone" >&2
+  echo "     lands under the KEYRACK name — so a join without it reads the wrong" >&2
+  echo "     dir and reports an absent tree on a box that holds one" >&2
+  echo "   looked at: $_SELF_REPO_ROOT/src/grove.org.sh" >&2
+  echo "   fix: run this from a full checkout of dev-env-setup" >&2
+  exit 3
+fi
+
+# shellcheck source=/dev/null
+. "$_SELF_REPO_ROOT/src/grove.org.sh"
+
+REPO_NAME="${REPO##*/}"
+TREE_DIR="git/$(grove_org_clonedir "${REPO%%/*}")/$REPO_NAME"
+
+echo "🐢 heres the wave..."
+echo ""
+echo "💨 git.grove.provision test $GROVE"
+# ⚠️ the report names its SOURCE, never a bare `declared`. this table decides
+#    what a PASS means, so a reader must see whether the org came from the box's
+#    own registry entry or from a manifest that says ahbode on every grove
+echo "   ├─ repo:  $REPO @ latest origin/main${BOX_ORG:+  (org $BOX_ORG)}"
+[[ -n "$ORG_FROM" ]] && echo "   │         └─ org from: $ORG_FROM"
+echo "   ├─ tree:  ~/$TREE_DIR"
+echo "   ├─ steps: $FROM..4"
+echo "   └─ run"
+
+######################################################################
 # step 0 — box
 #
 # the whole read-only ladder, up to creds. every step below assumes a box that
@@ -440,16 +699,83 @@ if _in_range 1; then
   #    measurement disproves — and a wrong name inside a correct guard is the
   #    hardest kind to catch, because the guard's behavior gives no hint
   #    (`gotcha.a-check-that-cries-wolf-gets-silenced`, measurement 4).
-  SELF_REGENERATED='\.claude/settings\.json$'
+  ####################################################################
+  # 🛑 .a SECOND regenerated path, and it is a CONVENTION rather than an instance
+  #
+  # .measured 2026-09-28, `grove-aether-v20260921`, this gate's step 1:
+  #
+  #     D  .agent/.cache/repo=bhrain/role=learner/skill=learn.domain.terms/progress.md
+  #      M .claude/settings.json
+  #
+  #   the second was excluded and the first was not, so the gate halted with
+  #   `1 uncommitted change(s) that no tool regenerates` over a **cache file**.
+  #
+  # ⇒ `.agent/.cache/` is a cache dir by DECLARED convention, and this repo's own
+  #   ignore list is the citation — `.gitignore:14` reads `.agent/.cache/`. so its
+  #   contents are tool output by definition, which is the identical ground the
+  #   `.claude/settings.json` exclusion above stands on.
+  #
+  # ⚠️ the target repo still TRACKS that one file, which is why git did not ignore
+  #    it there — a commit that predates the convention. the exclusion is about
+  #    what the path IS, never about whether one repo's index caught up.
+  #
+  # 🟡 .a DIRECTORY, deliberately — the alternative goes stale in silence
+  #    a per-file entry would have to grow a row per cache artifact any role ever
+  #    writes, and each absent row reads as a real claim about a human's work. one
+  #    row over the convention covers every artifact under it, extant and future
+  #    (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.12 — a hand-written list
+  #    reports only what its author could see).
+  #
+  # ⚠️ .it is STILL a hand-written list, and that hazard is not retired
+  #    a third tool-owned path that matches neither row will halt this gate the
+  #    same way. what changes is the grain: a convention row ages far slower than
+  #    an instance row, so the list is cheaper to keep true.
+  ####################################################################
+  ####################################################################
+  # 🛑 .a THIRD row — the `.claude` SYMLINK, the same writer as the first row
+  #
+  # .measured 2026-10-01, `grove-aether-v20260921`, step 1 after a step-2 install:
+  #
+  #      M .agent/.actors/actor.via.slug=.default/brain/.claude/settings.json
+  #      D .claude/settings.json
+  #     ?? .claude
+  #
+  #   the repo's `prepare` (rhachet) MOVED its settings into the actor's brain dir
+  #   and left `.claude` as a symlink to it. the first two lines already match the
+  #   first row; the symlink did not, so the gate halted on rhachet's own output.
+  #   this repo's own tree carries the identical migration (`.claude` → a symlink)
+  #
+  # ⚠️ anchored on the WHOLE path `.claude`, so a human's file UNDER `.claude/`
+  #    still halts unless it is the settings file the first row names
+  ####################################################################
+  SELF_REGENERATED='\.claude/settings\.json$|\.agent/\.cache/| \.claude$'
   _drive "git -C \$HOME/$TREE_DIR status --porcelain" >"$LOGDIR/dirty.log" 2>&1
   DIRTY=$(grep -E '^.[MADRCU?] |^[MADRCU?]. ' "$LOGDIR/dirty.log" 2>/dev/null \
     | grep -cvE "$SELF_REGENERATED" || true)
   if [[ "${DIRTY:-0}" -gt 0 ]]; then
+    ##################################################################
+    # ⚠️ the why says what a reset DOES, per entry — it used to assert one verb
+    #
+    # the old text read `a sync to origin/main would destroy them`, and for a
+    # DELETION that is simply untrue: a reset RESTORES a tracked file the box
+    # removed. so one sentence named the wrong mechanism for half its own
+    # subject (`…cries-wolf`, m.4 — a verdict whose reason names another act).
+    #
+    # ⇒ both are still worth a halt, because both are a human's act this gate
+    #   would undo. what differs is which act, so the text now names both and
+    #   asserts neither of the other.
+    ##################################################################
     halt 1 tree \
-      "the tree has ${DIRTY} uncommitted change(s) that no tool regenerates, and a sync to origin/main would destroy them. an acceptance gate must never discard a human's work" \
+      "the tree has ${DIRTY} uncommitted change(s) that no tool regenerates — a sync to origin/main would discard content the box holds, and restore any file the box removed. an acceptance gate must never undo a human's work" \
+      "read them —" \
       "cat $LOGDIR/dirty.log" \
       "" \
-      "  commit or stash them on the box, then run this again."
+      "  commit or stash them on the box, then run this again." \
+      "" \
+      "  ⚠️ if a listed path is TOOL OUTPUT rather than a human's work, the fix" \
+      "     is this gate's own exclusion list, never a commit on the box —" \
+      "     see the 🛑 block beside \`SELF_REGENERATED\` for the two extant rows" \
+      "     and the evidence each stands on."
   fi
 
   _drive "git -C \$HOME/$TREE_DIR fetch origin main" >"$LOGDIR/tree.log" 2>&1
@@ -468,13 +794,61 @@ fi
 # ⚠️ `pnpm install`, never `--frozen-lockfile`. the tree was just reset to
 #    origin/main, so its lockfile IS the declared one; a frozen install would
 #    add a second opinion about that and fail on a lockfile the repo ships.
+#
+# 🛑 .the HALT READS THE LOG IT JUST WROTE — it does not guess the cause
+#
+#    this halt used to assert ONE hypothesis, unconditionally:
+#
+#      a private dep needs the rack's github token, which step 0 proved —
+#      so suspect the lockfile or the registry before the box.
+#
+#    📜 .measured 2026-09-29 on `grove-aether-v20260921`. the install failed,
+#    that text printed, and the log the very same call had written said:
+#
+#      ✋ ConstraintError: brain-cli 'claude' is 2.1.87 at
+#         /home/camper/.local/share/pnpm/claude, below the floor 2.1.277
+#
+#    ⇒ the verdict was right and its stated SUBJECT was wrong. the failure was
+#    a `prepare` lifecycle's version FLOOR, and the fix-text sent the reader to
+#    inspect a lockfile and a registry that were both correct
+#    (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4).
+#
+#    ⚠️ and the cost is not one confused read. `pnpm install` runs a target
+#    repo's `prepare`, so this step's failure surface is EVERY assertion that
+#    lifecycle makes — a version floor, an absent credential, a peer check. one
+#    named hypothesis cannot cover an open set, and a reader who believes the
+#    named one stops before the log.
+#
+#    ⇒ the repair is not a longer hypothesis list. the step already HOLDS the
+#    log — it opened it, wrote it, and read its exit code — so it prints the
+#    refusal itself and names the guess only when it found none
+#    (`gotcha.a-check-withholds-what-it-already-holds`, face 2).
 ######################################################################
 if _in_range 2; then
   echo "      ├─ 2. deps"
   if ! _drive "env -C \$HOME/$TREE_DIR pnpm install" >"$LOGDIR/deps.log" 2>&1; then
+    # the refusal the log already carries — a `✋`, a *Error:, or a pnpm ERR_
+    DEPS_WHY=$(grep -Eo '(✋ [^"]*|[A-Za-z]*Error: .*|ERR_PNPM_[A-Z_]+ .*)' "$LOGDIR/deps.log" 2>/dev/null \
+                 | sed -E 's/^[[:space:]]+//' | tail -3 || true)
+    if [[ -n "$DEPS_WHY" ]]; then
+      HALT_WHY=("pnpm install failed — see $LOGDIR/deps.log" "tail -40 $LOGDIR/deps.log" "")
+      HALT_WHY+=("  what the log says —")
+      while IFS= read -r LINE; do
+        [[ -n "$LINE" ]] && HALT_WHY+=("    $LINE")
+      done <<<"$DEPS_WHY"
+      HALT_WHY+=("")
+      HALT_WHY+=("  ⚠️ \`pnpm install\` runs the target repo's \`prepare\`, so a refusal above")
+      HALT_WHY+=("     may be that lifecycle's and not the install's. read WHICH before you act:")
+      HALT_WHY+=("     a version FLOOR is a pin decision, a credential is the rack, and a")
+      HALT_WHY+=("     resolution error is the lockfile or the registry.")
+      halt 2 deps "${HALT_WHY[@]}"
+    fi
     halt 2 deps \
       "pnpm install failed — see $LOGDIR/deps.log" \
       "tail -40 $LOGDIR/deps.log" \
+      "" \
+      "  ⚠️ no refusal line was found in the log, so the cause is UNREAD — the" \
+      "     guesses below are guesses, never a diagnosis." \
       "" \
       "  a private dep needs the rack's github token, which step 0 proved —" \
       "  so suspect the lockfile or the registry before the box."
@@ -525,9 +899,31 @@ fi
 #    supplies the tier, and `.this` is the repo's own declaration of its own
 #    fixture — an inherited role's copy is a neighbour's opinion of it.
 ######################################################################
+######################################################################
+# 🛑 .a target that declares NO fixture owes none — and the probe is a FILE
+#
+# not every service holds a database. `aether/svc-aether-auctions` declares no
+# `use.testdb` at all, and its suite needs one no more than it needs a docker
+# daemon. to halt such a target here would gate it on a precondition its own
+# repo says it does not have.
+#
+# ⚠️ the discriminator is the target's OWN DECLARATION, read as a file on the
+#    box — never the exit code of the drive. `rhx use.testdb` exits non-zero
+#    for an ABSENT skill and for a DEAD docker alike, so a skip keyed on the
+#    code would swallow the second (`rule.forbid.failhide`).
+#
+# ⇒ declared and it fails → ✋, with docker named. undeclared → 🌙, and the
+#   step's claim is simply not owed.
+######################################################################
+FIXTURE_SKILL="\$HOME/$TREE_DIR/.agent/repo=.this/role=any/skills/use.testdb.sh"
+
 if _in_range 3; then
   echo "      ├─ 3. fixture"
-  if ! _drive "env -C \$HOME/$TREE_DIR rhx use.testdb --repo .this --role any" >"$LOGDIR/fixture.log" 2>&1; then
+
+  if ! _drive "test -f $FIXTURE_SKILL" >/dev/null 2>&1; then
+    echo "      │  └─ 🌙 $REPO_NAME declares no use.testdb — no fixture is owed"
+    echo "      │     ⇒ this judges no database; the target says it has none"
+  elif ! _drive "env -C \$HOME/$TREE_DIR rhx use.testdb --repo .this --role any" >"$LOGDIR/fixture.log" 2>&1; then
     halt 3 fixture \
       "the testdb did not come up — see $LOGDIR/fixture.log. without it every suite fails for a reason that has no bearing on the code" \
       "tail -40 $LOGDIR/fixture.log" \
@@ -535,15 +931,16 @@ if _in_range 3; then
       "  docker is the usual culprit; the camper runs a ROOTLESS daemon —" \
       "rhx git.grove.send $GROVE --bare --why 'read the docker endpoint' \\" \
       "  --what 'docker context inspect --format {{.Endpoints.docker.Host}}'"
+  else
+    echo "      │  └─ ✔ testdb up, schema applied"
   fi
-  echo "      │  └─ ✔ testdb up, schema applied"
 fi
 
 ######################################################################
 # step 4 — suite
 #
 # the payoff. every step above exists so that a failure HERE is a fact about
-# svc-chat's code rather than a fact about the box.
+# the TARGET's code rather than a fact about the box.
 #
 # ⚠️ `--thorough` IS LOAD-BEARING. `git.repo.test` scopes to files changed since
 #    `origin/main` by default, and step 1 just reset the tree TO origin/main —

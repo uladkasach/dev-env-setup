@@ -122,7 +122,7 @@ grove_provision_2_5_zsh_configure_verify() {
   # .why both emitters put a DIRECTORY NAME inside an OSC string, and a linux dir
   #   name may hold any byte but `/` and NUL — BEL ENDS an OSC string, so a dir named
   #   `x<BEL><ESC>]52;c;<b64><BEL>` hands the terminal a fresh OSC 52, and with
-  #   `set-clipboard on` in `src/tmux.conf` that WRITES THIS HUMAN'S CLIPBOARD
+  #   `set-clipboard on` in `src/grove.provision/2.shell/2.8.tmux/tmux.conf` that WRITES THIS HUMAN'S CLIPBOARD
   # .why the tree is REACHABLE with no other step — `git.grove.pull` writes a tree
   #   the GROVE named, and `_osc7_cwd` fires on every `cd`
   # .why the strip is RUN rather than grepped for, and every emit site is READ

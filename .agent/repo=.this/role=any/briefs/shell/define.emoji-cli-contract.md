@@ -9,9 +9,9 @@ split is deliberate and load-bear.
 
 | file | kind | reached by |
 |------|------|-----------|
-| `src/emoji.zsh` | **implementation** — widget + `emoji` cmd | sourced by `~/.zshrc` |
-| `src/emoji.index.build.sh` | **implementation** — the index transform | `2.9.emoji`'s provision phases |
-| `src/emoji.test.zsh` | **tests** — collocated with what it tests | `2.9.emoji`'s configure verify |
+| `src/grove.provision/2.shell/2.9.emoji/emoji.zsh` | **implementation** — widget + `emoji` cmd | sourced by `~/.zshrc` |
+| `src/grove.provision/2.shell/2.9.emoji/emoji.index.build.sh` | **implementation** — the index transform | `2.9.emoji`'s provision phases |
+| `src/grove.provision/2.shell/2.9.emoji/emoji.test.zsh` | **tests** — collocated with what it tests | `2.9.emoji`'s configure verify |
 | `.agent/…/skills/emoji.get.sh` | sources the widget, calls `_emoji_lookup` | `rhx emoji.get` |
 
 everything real lives in `src/`, per `rule.require.repo-as-source-of-truth`.
@@ -32,7 +32,7 @@ neither survives this repo's rules:
 
 ⇒ the one command that builds the index is
 `grove.provision --what 2.9.emoji --mode apply`, and the suite is run by that
-bundle's configure verify (or by hand, `zsh src/emoji.test.zsh`).
+bundle's configure verify (or by hand, `zsh src/grove.provision/2.shell/2.9.emoji/emoji.test.zsh`).
 
 ⚠️ `emoji.get` is exempt from the first row because it only **reads** the
 index. it converges no state, so it is not an entrypoint.
@@ -138,7 +138,7 @@ and compare its live sha256 against the pin recorded here — a
 
 ## .the rank contract
 
-**one implementation, in `src/emoji.zsh` as `_emoji_lookup`.** `emoji.get`
+**one implementation, in `src/grove.provision/2.shell/2.9.emoji/emoji.zsh` as `_emoji_lookup`.** `emoji.get`
 sources that file and calls it; the ranks are not restated anywhere.
 
 ⚠️ **a second copy plus "keep them in sync" is not a fix.** drift would mean TAB
@@ -312,7 +312,7 @@ index.
 check a live index by hand:
 
 ```sh
-bash src/emoji.index.build.sh --check ~/.local/share/emoji/emoji.tsv
+bash src/grove.provision/2.shell/2.9.emoji/emoji.index.build.sh --check ~/.local/share/emoji/emoji.tsv
 ```
 
 ---
@@ -331,7 +331,7 @@ fail for different reasons and are fixed by different moves:
 | phase pair | artifact | reaches the wire? |
 |------------|----------|-------------------|
 | provision | `~/.local/share/emoji/emoji.tsv` + its `.pins` stamp | yes, at two pinned urls |
-| configure | `~/.zshrc.emoji.sh`, a copy of `src/emoji.zsh` | never |
+| configure | `~/.zshrc.emoji.sh`, a copy of `src/grove.provision/2.shell/2.9.emoji/emoji.zsh` | never |
 
 **it proves itself.** the configure verify runs the 20-case suite and fails the
 phase if any gesture regressed — a bundle that rebinds TAB should not claim
@@ -388,7 +388,7 @@ every shell start, with no run left to fix it.
 ### ⚠️ it must not live in `~/.bash_aliases`
 
 that is the obvious home for shell additions in this repo, and it is wrong
-here. `src/zshrc.sh` exports `BASH_ENV=~/.bash_aliases`, so **bash** sources
+here. `src/grove.provision/2.shell/2.5.zsh/zshrc.sh` exports `BASH_ENV=~/.bash_aliases`, so **bash** sources
 that file for every non-interactive shell. the widget calls `zle` and
 `bindkey`, which bash has none of — every command, git alias, and makefile
 would emit errors.
@@ -406,13 +406,13 @@ interactive block:
 - after fzf's `key-bindings.zsh` — so our TAB bind takes precedence
 
 this is the same order discipline the up/down binds already document in
-`src/zshrc.sh` ("after fzf so these take precedence").
+`src/grove.provision/2.shell/2.5.zsh/zshrc.sh` ("after fzf so these take precedence").
 
 ## .see also
 
-- `src/emoji.zsh` — the widget, and the one home of the rank logic
-- `src/emoji.test.zsh` — the 20 gesture + safety cases
-- `src/emoji.index.build.sh` — the transform, and why it reaches no network
+- `src/grove.provision/2.shell/2.9.emoji/emoji.zsh` — the widget, and the one home of the rank logic
+- `src/grove.provision/2.shell/2.9.emoji/emoji.test.zsh` — the 20 gesture + safety cases
+- `src/grove.provision/2.shell/2.9.emoji/emoji.index.build.sh` — the transform, and why it reaches no network
 - `define.emoji-cli-contract.demo=build-hazards.md` — the four hazards found in the build
 - `rule.forbid.surprises` — why the index filter is a correctness matter, not polish
 - `rule.require.grove-provision-as-the-only-entrypoint` — why no `emoji.index.set` exists

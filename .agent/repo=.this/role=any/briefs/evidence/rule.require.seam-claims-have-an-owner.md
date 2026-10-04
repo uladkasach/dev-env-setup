@@ -30,7 +30,7 @@ looks unchecked.
 git config --global alias.tree '!bash -c "source ~/.bash_aliases && git_alias_tree \"\$@\"" --'
 ```
 ```sh
-# src/bash_aliases.sh — the BODY, installed by 2.7.aliases
+# src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh — the BODY, installed by 2.7.aliases
 git_alias_tree() { ... }
 ```
 

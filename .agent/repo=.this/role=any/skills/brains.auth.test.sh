@@ -25,7 +25,7 @@
 #   it is normalized to `in <rel>` before the diff. all else is compared byte
 #   for byte.
 # .note = it lives beside the two other brains.auth skills rather than in src/,
-#   because src/ holds files that are COPIED to ~/ by sync.devenv — a test does
+#   because src/ holds files a bundle's configure phase COPIES to ~/ — a test does
 #   not belong in a human's home dir. as a skill it is also runnable the same
 #   way as every other command in this repo: `rhx <name>`.
 # .note = tools it needs, beyond bash: jq, and the four below that the clamps
@@ -57,7 +57,7 @@ unset _tool
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SNAPS="$SKILL_DIR/brains.auth.test.snap"
 
-# locate + source src/brains.auth.sh, and strip the rhx `--skill` token into ${ARGS[@]}
+# locate + source src/grove.provision/2.shell/2.7.aliases/brains.auth.sh, and strip the rhx `--skill` token into ${ARGS[@]}
 #
 # 🛑 no LOCAL copy of that preamble, whatever the one flag seems to argue
 #   the case for a copy is that this file takes a flag the proxies do not

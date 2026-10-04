@@ -163,10 +163,11 @@ GONE=0
 #    anchored at `bash|/sh| sh`, leaves two holes in opposite directions. the
 #    emoji bundle walked into both:
 #
-#      src/emoji.zsh        `.zsh`, and `#!/usr/bin/env zsh` ends in "zsh",
-#      src/emoji.test.zsh   which the regex does NOT match. so two of this
-#                           bundle's three implementation files were parsed by
-#                           NOBODY, behind a green tally
+#      src/grove.provision/2.shell/2.9.emoji/emoji.zsh
+#      src/grove.provision/2.shell/2.9.emoji/emoji.test.zsh
+#        → `.zsh`, and `#!/usr/bin/env zsh` ends in "zsh", which the regex does
+#          NOT match. so two of this bundle's three implementation files were
+#          parsed by NOBODY, behind a green tally
 #
 #      …/skills/emoji.get.sh  a ZSH file with a `.sh` extension, so it was
 #                             parsed by BASH. it holds `${${(f)HITS}%%…}`,

@@ -99,7 +99,7 @@ the box was never at fault:
 | `--reply` | `git.grove.send.sh:838` | **0** | the banner, and an empty payload |
 
 both pipe the payload through `__duct_strip_escapes`, which an installed
-`~/.bash_aliases.ductwork.sh` had lost while `src/ductwork.sh:229` still declared it. an
+`~/.bash_aliases.ductwork.sh` had lost while `src/grove.provision/2.shell/2.7.aliases/ductwork.sh:229` still declared it. an
 absent function empties the pipe, `pipefail` does not carry its rc out of the `$( )`, and
 `rhx` DROPS a skill's stderr on a zero exit (`term=swallow`) — so the one line that named
 the cause never reached a reader.

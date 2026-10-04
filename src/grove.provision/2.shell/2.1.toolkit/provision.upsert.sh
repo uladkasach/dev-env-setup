@@ -3,54 +3,23 @@
 # .why the list splits ESSENTIAL vs COMFORT — an absent essential costs a
 #   CAPABILITY and must fail loud; an absent comfort costs a nicety, and a
 #   box that lacks one is still converged
-#
-#   ⚠️ the axis is "is the absence ACCEPTABLE", never "does a bundle break".
-#   most essentials here gate a later bundle, so the two readings agree —
-#   `age` parts them: it gates no bundle and its absence still costs a
-#   capability a human reached for
-# .why `unzip` is essential, though no bundle names it in a body — three
-#   later steps unpack a zip and nobody declared the dependency
-#   .refs = gotcha.2-1-toolkit.demo=unzip-cascade-and-per-machine-gates, m1
-# .why `curl` is essential — fourteen later bundles fetch over https, and
-#   with no base-tool bundle the fetch rests on one unrelated side effect
-#   (rule.require.bundle-as-sole-declaration)
-# .why `gnupg` is not guarded at its three call sites instead — a guard at
-#   each is three writers on one fact (rule.forbid.two-writers-on-one-artifact)
-# .why `pv` is essential — `git backup` hard fail-fasts with no `pv`, so an
-#   absent `pv` blocks a disaster-recovery tool, never a mere nicety
-#   .refs = uladkasach/dev-env-setup#121
-# .why `age` is essential though no bundle names it — its caller is a HUMAN,
-#   so it announces no part of its own absence
-#   - ⚠️ it is NOT keyrack's dependency. the rack encrypts with the
-#     `age-encryption` NPM library that `5.3.brains` installs, so a reader who
-#     files this under `5.12.rack` puts it behind a bundle that does not need
-#     it (`rule.require.bundles-own-their-dependencies`)
-#   - ✔ apt serves it on both box classes — jammy `1.0.0-1ubuntu0.1`, measured
-#     on grove-ahbode-v20260901 2026-09-24 — so it clears the bar `yq` could not
-#
-# 🛑 .why `yq` is NOT here, and is its own bundle (`5.17.yq`)
-#   - apt cannot serve it on every box class, so it cannot sit on this list
-#   - measured 2026-09-11: jammy (a grove) offers NO candidate at all — not in
-#     universe, not in backports — while noble (a laptop) offers 3.1.0-3
-#   - ⇒ a name on this list is an apt name, and an apt name that resolves on one
-#     box class and not the other is a bundle that cannot meet
-#     `rule.require.identical-bundle-composition`
-#   - so it moved to a bundle that fetches ONE pinned static binary, which is
-#     the same artifact on every box (`5.17.yq`)
-# .why `xclip` installs on a HEADLESS box — a per-machine list is a second
-#   list to keep, and every prior "has a screen" gate confused EFFECT with HOLD
-#   .refs = gotcha.2-1-toolkit.demo=unzip-cascade-and-per-machine-gates, m2
+# .why `unzip`, `curl`, `gnupg`, `pv` are essential — each gates a later bundle
+#   (fnm, 14 fetches, 3 dearmors, `git backup`) whose failure reads as unrelated
+# .why `age` is essential though it gates no bundle — its caller is a HUMAN.
+#   ⚠️ it is NOT keyrack's: the rack uses the `age-encryption` npm library
+#   (`5.3.brains`). apt serves it on both box classes (jammy 1.0.0, 2026-09-24)
+# .why 🛑 `yq` is NOT here: apt serves it on noble and not on jammy, so it is
+#   its own bundle (`5.17.yq`) with one pinned binary
+# .why `xclip` installs on a HEADLESS box — a per-machine list is a second list
+# .refs = gotcha.2-1-toolkit.demo=unzip-cascade-and-per-machine-gates, m1-m3
 # guarantee:
 #   - idempotent: apt reports a present package and returns 0
 
 grove_provision_2_1_toolkit_provision_upsert() {
   # 1. the essentials: jq/tree/ripgrep (json, dir view, search), unzip
   #   (fnm, nerd fonts, aws cli v2), curl (14 later fetches), gnupg (3 dearmor
-  #   sites), pv (git backup's progress/archive pipe), age (file encryption,
-  #   reached by a human)
-  #
-  # ⚠️ every name here must name a package EVERY box class carries. `yq` does
-  #   not, which is why it is a bundle of its own rather than a name on this line
+  #   sites), pv (git backup's progress/archive pipe), age (a human's file
+  #   encryption). ⚠️ EVERY box class must carry each
   if ! pkg_install jq tree unzip ripgrep curl gnupg pv age; then
     echo "   ✋ an essential toolkit package did not install" >&2
     echo "      ⇒ these are not niceties: unzip alone gates fnm, the nerd fonts," >&2

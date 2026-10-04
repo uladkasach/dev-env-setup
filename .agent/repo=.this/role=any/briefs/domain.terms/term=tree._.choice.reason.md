@@ -28,7 +28,7 @@ values (`this` vs `tree`), which touches this term.
 
 ## .evidence
 - built precedent: `git tree get|set|del|status` already exists (`git_alias_tree` in
-  `src/bash_aliases.sh`), trees rooted at `@gitroot/../_worktrees/$reponame.$branch/`
+  `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`), trees rooted at `@gitroot/../_worktrees/$reponame.$branch/`
 - narrative: a developer runs `git tree set feat/auth`, which carves a worktree and a
   session; that unit is the tree. many trees sit on one machine
 - decomposition: the where-does-work-happen axis has three orthogonal levels — branch

@@ -30,7 +30,7 @@ announce is a poor witness, which is why one channel (`vim.notify`) was not enou
 
 ## .the distribution that confirms the split
 
-`src/init.lua` now holds two observer subsystems within ~200 lines. walked on two axes:
+`src/grove.provision/4.terminal/4.5.nvim/init.lua` now holds two observer subsystems within ~200 lines. walked on two axes:
 
 | | witnesses growth | witnesses errors |
 |---|---|---|
@@ -63,7 +63,7 @@ matter. that axis is checkable, which is what makes the pair durable rather than
 
 ### dispute: watchdog  —  raised 2026-08-11  —  status: RESOLVED (keep both, distinct senses)
 - raised.by  = mechanic
-- claim      = `src/init.lua` already calls its observer a "self-watchdog". a second observer in
+- claim      = `src/grove.provision/4.terminal/4.5.nvim/init.lua` already calls its observer a "self-watchdog". a second observer in
                the same file should reuse the extant word rather than add one.
 - counter    = the extant watchdog **trips a breaker** — it disables minimap and treesitter, and
                notifies. the scribe deliberately never intervenes. one word over both would

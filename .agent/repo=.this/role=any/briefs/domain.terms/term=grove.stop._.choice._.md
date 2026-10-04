@@ -29,7 +29,7 @@ it survives either mode, so it proves the disk and says none of the ram.
 ## .refs
 where the term is declared / used:
 - .agent/repo=.this/role=any/skills/git.grove.stop.sh   # the portable stop
-- src/bash_aliases.sh                                   # `git grove stop` dispatch
+- src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh                                   # `git grove stop` dispatch
 
 ⚠️ a `hibernate.probe.before` / `hibernate.probe.after` pair (capture boot_id + btime + uptime,
 then re-read them and judge resume vs boot) is named for the **mode**, not the operation, so

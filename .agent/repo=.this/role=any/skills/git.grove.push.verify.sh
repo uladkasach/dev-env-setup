@@ -139,7 +139,7 @@ if [[ ! "$REMOTE_TMP" =~ $REMOTE_TMP_GRAMMAR ]]; then
   # `command not found` on the one path that reports a refusal
   #
   # 🛑 .this expansion is NOT a full escape guard, and the bound is measured
-  #    `[[:cntrl:]]` in bash does NOT reach C1 — `src/zshrc.sh:90-107` records
+  #    `[[:cntrl:]]` in bash does NOT reach C1 — `src/grove.provision/2.shell/2.5.zsh/zshrc.sh:90-107` records
   #    the run: bash 5.2 cut neither `c2 9b` nor a bare `9b`. so a payload
   #    spelled `c2 9d` `52;c;<b64>` `c2 9c` is a complete OSC 52 that carries
   #    no ESC and no C0 byte at all, and this line would pass it whole.
