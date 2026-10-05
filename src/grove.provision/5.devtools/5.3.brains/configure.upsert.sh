@@ -185,10 +185,52 @@ _grove_provision_5_3_brains_config_upsert() {
   echo "   • claude global config merged → $config (diff panel shut at start)"
 }
 
-# .why both halves run — a `&&` would hide the second verdict (`rule.forbid.failhide`)
+####################################################################
+# .what = the KEYBINDINGS half — `~/.claude/keybindings.json`
+#
+# .why ctrl+enter is the one send-now key, in every window (`rule.require.ctrl-enter-sends-now`)
+#   - claude binds `chat:sendNow` to BOTH ctrl+enter and `ctrl+x ctrl+s`, and its hint picks the
+#     chord whenever $TMUX is set. on this repo's kitty the chord cannot even be typed: kitty
+#     maps ctrl+x to ^C, so the hint advertises a key that interrupts instead
+#   - unbind the chord, and ctrl+enter is the one key left bound — so the hint names it in tmux too
+#   - the key itself reaches claude through tmux via the kitty map + tmux marker (4.3.2.emulator,
+#     2.8.tmux); this half fixes only what the hint SAYS
+#
+# ⚠️ merged, never overwritten — a human may hold their own keymaps here. the one entry is
+#   upserted into the `Chat` block; every other block and key is left as found
+# ⚠️ an ENROLLED clone reads `$CLAUDE_CONFIG_DIR/keybindings.json` (the actor dir), not this
+#   file, until rhachet links it there the way it links `.credentials.json` (ehmpathy/rhachet#579)
+####################################################################
+_grove_provision_5_3_brains_keybindings_upsert() {
+  local file="$HOME/.claude/keybindings.json" tmp
+  local add='{"ctrl+x ctrl+s": null}'
+  mkdir -p "$HOME/.claude" || { echo "   ✋ could not create $HOME/.claude" >&2; return 1; }
+  [[ -f "$file" ]] || echo '{"bindings": []}' > "$file" || {
+    echo "   ✋ could not write $file" >&2; return 1; }
+  command -v jq >/dev/null 2>&1 || {
+    echo "   ✋ jq is absent, so $file cannot be merged — refused rather than overwrite" >&2
+    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 1
+  }
+  tmp="$(mktemp)" || return 1
+  if ! jq --argjson add "$add" '
+      .bindings = ((.bindings // []) as $b
+        | if any($b[]; .context == "Chat")
+          then [ $b[] | if .context == "Chat" then .bindings = ((.bindings // {}) + $add) else . end ]
+          else $b + [ {context: "Chat", bindings: $add} ]
+          end)' "$file" > "$tmp"; then
+    echo "   ✋ jq could not merge into $file — not valid json, left untouched" >&2
+    rm -f "$tmp"; return 1
+  fi
+  mv "$tmp" "$file" || { echo "   ✋ could not write $file" >&2; rm -f "$tmp"; return 1; }
+  echo "   • claude keybindings merged → $file (ctrl+enter is the one send-now key)"
+}
+
+# .why every half runs — a `&&` would hide the later verdicts (`rule.forbid.failhide`)
 grove_provision_5_3_brains_configure_upsert() {
   local failed=0
   _grove_provision_5_3_brains_settings_upsert || failed=1
   _grove_provision_5_3_brains_config_upsert || failed=1
+  _grove_provision_5_3_brains_keybindings_upsert || failed=1
   return $failed
 }

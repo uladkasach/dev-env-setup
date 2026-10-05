@@ -30,7 +30,8 @@
 #   way as every other command in this repo: `rhx <name>`.
 # .note = tools it needs, beyond bash: jq, and the four below that the clamps
 #   lean on — `timeout` + `setsid` (the hang guards and the no-tty probe),
-#   `cmp` (the backup-integrity clamp), `stat` (the file-mode clamps). the
+#   `cmp` (the backup-integrity clamp), `stat` (the file-mode clamps), and
+#   `flock` (the keyrack lock the parallel sweep takes, util-linux). the
 #   first three are util-linux/coreutils and are NOT guaranteed on a minimal
 #   host, so the preflight below HALTS on an absent one by name. without it, an
 #   absent `setsid` turned the whole notty.* section into a wall of
@@ -44,7 +45,7 @@ export TZ=UTC
 
 # ⚠️ fail fast, and name the tool. one clear line beats N reds that blame the
 #   wrong thing. see the dependency .note above for why each is needed.
-for _tool in jq timeout setsid cmp stat; do
+for _tool in jq timeout setsid cmp stat flock; do
   command -v "$_tool" >/dev/null 2>&1 || {
     echo "💥 brains.auth.test needs '${_tool}', which is not on PATH" >&2
     echo "   the suite is hermetic (no network, no credentials) but it does lean on" >&2
@@ -71,6 +72,13 @@ SNAPS="$SKILL_DIR/brains.auth.test.snap"
 source "$SKILL_DIR/brains.auth.bootstrap.sh"
 
 ALIASES="$BRAINS_AUTH_SRC"
+
+# the parallel sweep's two knobs, pinned hermetic: no random head start (a suite that sleeps
+# 1-3s per gather is slow and nondeterministic), and a keyrack lock in the suite's own temp
+# dir rather than the real runtime dir. the stagger and the lock each get their own clamp below.
+export BRAINS_AUTH_STAGGER_MS=0
+_LOCKDIR="$(mktemp -d)"
+export BRAINS_AUTH_KEYRACK_LOCK="$_LOCKDIR/keyrack.lock"
 
 # the one flag the proxies do not take. read from ${ARGS[@]}, which the bootstrap already
 # stripped the --skill token out of.
@@ -205,6 +213,24 @@ _snap 'render.opus-row' \
 # a failed account must NOT abort the sweep — the healthy rows still render
 _snap 'render.partial-failure' \
   "$(_brains_auth_render "$FIXTURE_MIXED" | _normalize)"
+
+# the reset line, one fixture per state — shapes taken from a live read on 2026-10-04.
+# ⚠️ `surface` must read UNKNOWN, never "none": the endpoint reports "wrong client", and
+#   a "none saved" there would be a confident lie about an account that holds a reset
+_RESET_CASES='[
+  {"case":"saved-usable","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":1,"usable_now":true,"ends_at":"2026-10-22T16:00:00+00:00"}]},"juniper_tide":{"eligible":false,"ineligible_reason":"not_at_wall","available":false,"resets_per_week":1}}},
+  {"case":"saved-at-limit","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":1,"usable_now":false,"ends_at":"2026-10-22T16:00:00+00:00"}]},"juniper_tide":null}},
+  {"case":"used","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":0,"usable_now":false,"ends_at":"2026-10-22T16:00:00+00:00"}]},"juniper_tide":{"eligible":false,"ineligible_reason":"not_at_wall","available":false,"resets_per_week":1}}},
+  {"case":"never-granted","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[]},"juniper_tide":{"eligible":true,"ineligible_reason":null,"available":true,"resets_per_week":1}}},
+  {"case":"session-later","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[]},"juniper_tide":{"eligible":false,"ineligible_reason":"weekly_limit","available":false,"next_available_at":"2026-10-09T00:00:00+00:00"}}},
+  {"case":"wrong-client","node":{"cedar_ember":{"eligible":false,"ineligible_reason":"surface","grants":[]},"juniper_tide":{"eligible":false,"ineligible_reason":"surface","available":false}}},
+  {"case":"not-asked","node":{"cedar_ember":null,"juniper_tide":null}}
+]'
+_snap 'reset.cases' "$(
+  jq -c '.[]' <<< "$_RESET_CASES" | while IFS= read -r _row; do
+    printf '%s -> %s\n' "$(jq -r '.case' <<< "$_row")" "$(_brains_auth_reset_line "$(jq -c '.node' <<< "$_row")")"
+  done
+)"
 
 _snap 'render.all-failed' \
   "$(_brains_auth_render "$FIXTURE_ALL_DEAD" | _normalize)"
@@ -2348,8 +2374,8 @@ _pipefail_after_refresh() {
     curl() { return 0; }
     _brains_auth_refresh_reply 'ua/1' 'tok' >/dev/null 2>&1
     # $SHELLOPTS is a colon-list of the `set -o` options currently ON — bash-native, so this
-    # clamp adds no dependency at all, on top of the five the header .note declares and the
-    # preflight enforces (jq, timeout, setsid, cmp, stat).
+    # clamp adds no dependency at all, on top of the six the header .note declares and the
+    # preflight enforces (jq, timeout, setsid, cmp, stat, flock).
     case ":${SHELLOPTS}:" in *:pipefail:*) echo 'LEAKED' ;; *) echo 'off' ;; esac )
 }
 _is 'callleaf.refresh-pipefail-stays-inside' 'off' "$(_pipefail_after_refresh)"
@@ -2591,11 +2617,12 @@ _is 'bakverify.short-copy-names-the-cause' 'named' \
 #   reds that read as failures of the CODE, not of the host — the misattributed cause
 #   `rule.require.errors-name-the-fix` forbids. the preflight names the tool instead.
 _SELF="$SKILL_DIR/brains.auth.test.sh"
-_is 'preflight.declares-five-tools' 'jq timeout setsid cmp stat' \
-  "$(sed -n 's/^for _tool in \(.*\); do$/\1/p' "$_SELF" | head -1)"
-# every declared tool is genuinely on this host, so no clamp below is silently skipped
+_pf_tools="$(sed -n 's/^for _tool in \(.*\); do$/\1/p' "$_SELF" | head -1)"
+_is 'preflight.declares-six-tools' 'jq timeout setsid cmp stat flock' "$_pf_tools"
+# every declared tool is genuinely on this host, so no clamp below is silently skipped. it reads
+# the SAME list the preflight loops over, so a tool added there cannot dodge this check
 _is 'preflight.every-tool-present' '' \
-  "$(for _t in jq timeout setsid cmp stat; do command -v "$_t" >/dev/null 2>&1 || printf '%s ' "$_t"; done)"
+  "$(for _t in $_pf_tools; do command -v "$_t" >/dev/null 2>&1 || printf '%s ' "$_t"; done)"
 # and the pipefail clamp's comment names the whole set rather than a subset of it.
 # ⚠️ SCOPED TO THAT FUNCTION'S BODY, not to the file. a whole-file scan counts the clamp's own
 #   search string as a second hit, because the clamp has to spell out the very text it looks
@@ -2604,7 +2631,7 @@ _is 'preflight.every-tool-present' '' \
 #   one. a scoped read is what escapes both.
 _pf_body="$(sed -n '/^_pipefail_after_refresh() {$/,/^}$/p' "$_SELF")"
 _is 'preflight.pipefail-comment-names-the-set' '1' \
-  "$(printf '%s' "$_pf_body" | grep -c 'jq, timeout, setsid, cmp, stat')"
+  "$(printf '%s' "$_pf_body" | grep -c 'jq, timeout, setsid, cmp, stat, flock')"
 
 # ---------------------------------------------------------------- no orphaned baselines
 # ⚠️ a `.snap` file with no case that reads it is a baseline nobody checks. it costs a reviewer
@@ -2633,6 +2660,53 @@ _is 'snap.orphan-scan-found-baselines' 'found' \
   "$(compgen -G "$SNAPS/*.snap" >/dev/null && echo found || echo 'NO BASELINES — the check above is blind')"
 _is 'snap.orphan-roster-is-populated' 'found' \
   "$([[ -n "$_SNAP_ASKED" ]] && echo found || echo 'EMPTY ROSTER — every baseline would read as an orphan')"
+
+# ---------------------------------------------------------------- the parallel sweep
+# 🛑 the property the lock exists for: a rotated token saved in a PARALLEL sweep is never lost.
+#   the stub keyrack below rewrites one manifest file whole — read, pause, write — which is the
+#   shape that drops an entry when two writers overlap. five write-backs fire at once; every one
+#   must survive. without the lock, the pause lets each writer read the same manifest and the
+#   last write wins, so this reads 1 rather than 5.
+_par_manifest="$_LOCKDIR/manifest"
+_par_survivors="$(
+  : > "$_par_manifest"
+  eval 'rhx() {
+    local r="" prior
+    [[ "$2" == set ]] || return 0
+    while [[ $# -gt 0 ]]; do [[ "$1" == --reach ]] && r="$2"; shift; done
+    prior="$(cat "'"$_par_manifest"'")"
+    sleep 0.2
+    printf "%s\n%s\n" "$prior" "$r" | grep -v "^$" > "'"$_par_manifest"'"
+  }'
+  _pids=()
+  for _i in 1 2 3 4 5; do
+    _brains_auth_set_token "kai${_i}@example.com" "sk-ant-ort01-x${_i}" &
+    _pids+=("$!")
+  done
+  for _p in "${_pids[@]}"; do wait "$_p"; done
+  grep -c '@example.com' "$_par_manifest"
+)"
+_is 'parallel.every-rotated-token-survives' '5' "$_par_survivors"
+
+# the network legs DO run side by side: four fetches that each take 1s finish well under the
+# 4s a sequential sweep would take, and the fold keeps every account, in reach order
+_par_out="$(
+  eval '_brains_auth_node_for_reach() { sleep 1; jq -nc --arg r "$2" "{five_hour:{utilization:1},seven_day:{utilization:1},who:\$r}"; }'
+  _t0=$SECONDS
+  _c="$(_brains_auth_gather 'ua' $'a@example.com\nb@example.com\nc@example.com\nd@example.com' '' 0)"
+  printf '%s|%s' "$(( SECONDS - _t0 ))" "$(jq -r '[.[] | .who] | join(",")' <<< "$_c")"
+)"
+_is 'parallel.fetches-overlap' 'fast' "$( (( ${_par_out%%|*} < 3 )) && echo fast || echo "slow (${_par_out%%|*}s)")"
+_is 'parallel.fold-keeps-every-account' 'a@example.com,b@example.com,c@example.com,d@example.com' "${_par_out#*|}"
+
+# the head start: the first account fires at once, the rest wait 1-3s, and 0 turns it off
+_is 'stagger.first-fires-at-once' '0' "$(BRAINS_AUTH_STAGGER_MS=3000 _brains_auth_stagger_secs 1)"
+_is 'stagger.rest-wait-one-to-three' 'within' "$(
+  _s="$(BRAINS_AUTH_STAGGER_MS=3000 _brains_auth_stagger_secs 2)"
+  _ms=$(( 10#${_s%.*} * 1000 + 10#${_s#*.} ))
+  (( _ms >= 1000 && _ms <= 3000 )) && echo within || echo "outside (${_s}s)"
+)"
+_is 'stagger.zero-turns-it-off' '0' "$(BRAINS_AUTH_STAGGER_MS=0 _brains_auth_stagger_secs 5)"
 
 # ---------------------------------------------------------------- the header count cannot lie
 # 🛑 `brains.auth.sh`'s own preamble advertises this suite's size, so the number is ASSERTED

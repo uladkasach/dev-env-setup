@@ -55,6 +55,37 @@ simultaneous failure across every account, with a 4xx that is not 401, is the si
    exit codes, or any of the 123 clamps. that isolation is the real hedge; the unbuilt
    fallback is not.
 
+## 🛑 .the reset fields are OPT-IN, and the user-agent gates them
+
+the same endpoint reports whether an account holds a usage reset, but only when asked the
+way the cli asks. measured 2026-10-04 against cli 2.1.280:
+
+```
+GET /api/oauth/usage?cedar_ember=1&at_wall=1
+User-Agent: claude-cli/<version> (external, cli)
+```
+
+| field | what it holds |
+|---|---|
+| `cedar_ember.grants[]` | saved reset grants: `resets_left`, `usable_now`, `ends_at` |
+| `juniper_tide` | the weekly session reset: `available`, `resets_per_week`, `next_available_at`, `ineligible_reason` |
+
+three traps, each a false read rather than an error:
+
+| the read | what you see | what it means |
+|---|---|---|
+| no query flags | both fields `null` | the server was never asked. NOT "no reset" |
+| any other user-agent | `ineligible_reason: "surface"` | the server did not see the cli. NOT "no reset" |
+| `juniper_tide.ineligible_reason: "not_at_wall"` | `available: false` | it is offered only once a limit is hit |
+
+⇒ `_brains_auth_reset_line` renders a `surface` read as `?`, never as "none" — that would be a
+confident lie about an account that may hold a reset. it names only a reset that EXISTS, so an
+account with none shows no reset row at all; that includes absent fields, so if the flags ever
+stop to take effect, the reset rows go quiet on every account at once — read that as the signature.
+
+⇒ the field names are internal codenames and will change with no notice. to rediscover
+them, read what the installed cli asks for: `rhx brains.claude.strings --pattern 'cedar_ember|juniper_tide'`.
+
 ## .what to do if it dies
 
 in preference order:

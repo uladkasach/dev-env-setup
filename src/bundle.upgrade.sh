@@ -366,11 +366,16 @@ bundle.root.declines() {
   # ⚠️ on a laptop the seat with root IS its human — there is no ground seat whose
   #    apply sets it. so "no step is owed" was FALSE there: measured 2026-09-28, it
   #    printed over an /etc/hosts that blocked every db read, and the fix went
-  #    unasked. an agent shell has no terminal for sudo, so the human owes one run
+  #    unasked
+  # 🛑 and the bare re-run is NOT the fix: `rhx` hands a skill a stdin that is no
+  #    tty, so `pkg_can_sudo`'s `-t 0` reads false even at a human's keyboard —
+  #    measured 2026-09-29, a human ran the bare command and got this decline again.
+  #    a credential warmed in the SAME terminal passes `sudo -n`, since sudo caches
+  #    per tty; so the warm and the run are one chained command
   if [[ "${GROVE_ENV_SERVER:-}" == local@unix ]]; then
-    echo "      ⇒ on a laptop the seat with root is its human, and this shell has no"
-    echo "        terminal for sudo to ask on — so ONE run from a terminal is owed:"
-    echo "        rhx grove.provision --what <this bundle> --mode apply"
+    echo "      ⇒ on a laptop the seat with root is its human, and \`rhx\` gives this run"
+    echo "        no tty for sudo to ask on — so warm sudo and run in ONE terminal:"
+    echo "        sudo -v && rhx grove.provision --what <this bundle> --mode apply"
     return 0
   fi
 

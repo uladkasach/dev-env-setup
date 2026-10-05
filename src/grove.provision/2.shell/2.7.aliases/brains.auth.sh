@@ -22,7 +22,7 @@
 #   one, and you must add all three: the file, the source line, and the cp in the phase.
 #
 # vision: .behavior/v2026_07_28.brain-budget-utilization/1.vision.yield.md
-# tests:  rhx brains.auth.test   (323 cases, hermetic, no network, no real ~/.claude)
+# tests:  rhx brains.auth.test   (330 cases, hermetic, no network, no real ~/.claude)
 #         ⚠️ this number is ASSERTED, not maintained by hand — `header.count-matches-the-suite`
 #           reads it back out of this very line and compares it to the suite's own total. it
 #           drifted ~100 cases wrong once, when it was only a promise. now a case added
@@ -77,7 +77,9 @@ _BRAINS_AUTH_KEY='BRAINS_AUTH__OF__CLAUDE_CODE_OAUTH_TOKEN'
 _BRAINS_AUTH_KEYRACK_OWNER='ehmpath'
 _BRAINS_AUTH_KEYRACK_ENV='prep'
 _BRAINS_AUTH_SLUG="@all.${_BRAINS_AUTH_KEYRACK_ENV}.${_BRAINS_AUTH_KEY}"
-_BRAINS_AUTH_USAGE_URL='https://api.anthropic.com/api/oauth/usage'
+# .why the two flags: they are how the cli itself asks for the reset fields (`cedar_ember`,
+#   `juniper_tide`); without them both read null. see `_brains_auth_reset_line`
+_BRAINS_AUTH_USAGE_URL='https://api.anthropic.com/api/oauth/usage?cedar_ember=1&at_wall=1'
 # the usage endpoint rejects the long-lived token; it accepts only a short-lived access
 # token, minted fresh from the stored oauth refresh token at read time. these two feed
 # that mint (see hazard.claude-oauth-refresh-rotation.md for why + the rotation caveat).
@@ -92,7 +94,14 @@ _BRAINS_AUTH_CLIENT_ID='9d1c250a-e61b-44d9-88ed-5944d1962f5e'
 #   so we PIN a UA value known to be accepted, rather than derive it from `claude
 #   --version` (which drifts to a value the endpoint may not accept).
 #   override with BRAINS_AUTH_UA if a future claude-code version is required.
-_BRAINS_AUTH_UA_PINNED='claude-code/2.0.1'
+# 🛑 .why the REAL cli's UA, and not `claude-code/2.0.1` — the usage read gates the RESET
+#   fields on the client. measured 2026-10-04: under `claude-code/2.0.1` both reset fields
+#   answered `ineligible_reason:"surface"` on every account; under the string the pinned cli
+#   sends itself (`claude-cli/<v> (external, cli)`, read out of the binary by
+#   `rhx brains.claude.strings`), the same read answered `surface:"claude_code_cli"` with the
+#   real grant list, and the refresh minted 200. note the FAMILY differs — `claude-cli/`, not
+#   the `claude-code/` the 429 measurement above was about
+_BRAINS_AUTH_UA_PINNED='claude-cli/2.1.280 (external, cli)'
 _brains_auth_ua() {
   echo "${BRAINS_AUTH_UA:-$_BRAINS_AUTH_UA_PINNED}"
 }
@@ -789,6 +798,31 @@ _brains_auth_reaches() {
   return 0
 }
 
+# .what = run one keyrack command under a per-user lock, so no two run at once ($@=the command)
+# .why  = the sweep fetches accounts in PARALLEL, and each parked account rotates its refresh
+#   token and writes the new one back. the server retires the old token at the rotation, so a
+#   lost write-back is a dead account — and keyrack's host manifest is one file, rewritten
+#   whole on each set. two writes at once can each read the same manifest and the second can
+#   drop the first's entry. so every keyrack call this file makes (unlock, get, set, del) waits
+#   its turn here, and only the network legs of the sweep run side by side.
+# .note = the lock lives on an fd in THIS shell (`{ …; } 9>file`), never as `flock file cmd`:
+#   that form execs a binary, which would skip the shell-function stubs the suite installs.
+#   flock drops the lock when the fd closes, so a killed run leaves no stale lock to wedge on.
+# .note = bounded: a holder that never lets go fails this call loudly after the wait, rather
+#   than hang the sweep (rule.require.bounded-probes-in-verifies).
+_BRAINS_AUTH_KEYRACK_LOCK_WAIT=120
+_brains_auth_keyrack_serial() {
+  local lock="${BRAINS_AUTH_KEYRACK_LOCK:-${XDG_RUNTIME_DIR:-$HOME/.cache}/brains.auth.keyrack.lock}"
+  mkdir -p "${lock%/*}" 2>/dev/null
+  {
+    flock -w "$_BRAINS_AUTH_KEYRACK_LOCK_WAIT" 9 || {
+      echo "💥 MalfunctionError: the keyrack lock stayed held for ${_BRAINS_AUTH_KEYRACK_LOCK_WAIT}s (${lock})" >&2
+      return 1
+    }
+    "$@"
+  } 9>"$lock"
+}
+
 # .what = write one account's refresh token into the global keyrack at its reach
 #   ($1=reach, $2=token)
 # .why  = every write goes through one place, so the address a token lands at cannot drift
@@ -799,7 +833,7 @@ _brains_auth_reaches() {
 _brains_auth_set_token() {
   local reach="$1" token="$2"
   [[ -z "$reach" || -z "$token" ]] && return 1
-  printf '%s' "$token" | rhx keyrack set \
+  printf '%s' "$token" | _brains_auth_keyrack_serial rhx keyrack set \
     --owner "$_BRAINS_AUTH_KEYRACK_OWNER" --org @all --env "$_BRAINS_AUTH_KEYRACK_ENV" \
     --key "$_BRAINS_AUTH_KEY" --reach "$reach" \
     --vault os.secure --mech PERMANENT_VIA_REPLICA >/dev/null
@@ -855,8 +889,8 @@ _brains_auth_unlock_once() {
     *"|${reach}|"*) _brains_auth_debug "unlock reach=${reach} SKIPPED (already this run)"; return 0 ;;
   esac
   _brains_auth_debug "unlock reach=${reach}"
-  rhx keyrack unlock --owner "$_BRAINS_AUTH_KEYRACK_OWNER" --env "$_BRAINS_AUTH_KEYRACK_ENV" \
-    --key "$_BRAINS_AUTH_KEY" --reach "$reach" >/dev/null
+  _brains_auth_keyrack_serial rhx keyrack unlock --owner "$_BRAINS_AUTH_KEYRACK_OWNER" \
+    --env "$_BRAINS_AUTH_KEYRACK_ENV" --key "$_BRAINS_AUTH_KEY" --reach "$reach" >/dev/null
   # recorded even on a failed unlock, deliberately: a second attempt in the same command would
   # fail the same way, and the read below already turns that into a named `keyrack_unreadable`
   # whose hint is the unlock command itself. a retry loop here would only multiply the cost
@@ -891,7 +925,7 @@ _brains_auth_get_token() {
   [[ -z "$reach" ]] && return 1
   _brains_auth_unlock_once "$reach"
   errfile="$(mktemp)" || return 1
-  token="$(rhx keyrack get \
+  token="$(_brains_auth_keyrack_serial rhx keyrack get \
     --owner "$_BRAINS_AUTH_KEYRACK_OWNER" --org @all --env "$_BRAINS_AUTH_KEYRACK_ENV" \
     --key "$_BRAINS_AUTH_KEY" --reach "$reach" --value 2>"$errfile")"
   grc=$?
@@ -1284,6 +1318,78 @@ _brains_auth_set() {
   echo "🐢 shell yeah — stored ${reach} in the global keyrack"
 }
 alias brains.auth.set='_brains_auth_set'
+
+# .what = drop one account's stored token from the global keyrack ($1.. = flags)
+# .why  = the sweep reads every stored reach, so an account abandoned or dead forever renders a
+#   ✋ row on every run with no way to retire it short of a raw `keyrack del` call. this is the
+#   write twin of `set`, cut at the same address, so the two cannot drift apart.
+# .note = PLAN by default, `--mode apply` to delete. a parked account's ONLY copy of its token
+#   lives here — no other holder has it — so a slip on a live account costs a browser sign-in.
+#   the bare call previews; the destructive act is a deliberate extra flag.
+# .note = it touches the KEYRACK copy only. a reach that is signed in right now keeps its live
+#   login in ~/.claude, and the sweep still shows it — so del cannot sign anyone out.
+_brains_auth_del() {
+  local reach='' mode='plan' krc
+  _brains_auth_unlock_reset
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --reach)
+        reach="$(_brains_auth_reach_from_flag "$@")" || return 2
+        shift 2 ;;
+      --mode)
+        mode="${2:-}"; shift 2 ;;
+      -h|--help)
+        echo "🐢 brains.auth.del — drop a stored subscription from the global keyrack"
+        echo ""
+        echo "  usage: brains.auth.del --reach <email> [--mode plan|apply]"
+        echo ""
+        echo "    --reach <email>  the account to drop"
+        echo "    --mode plan      (default) show what would be dropped, change naught"
+        echo "    --mode apply     drop it"
+        echo ""
+        echo "  example: brains.auth.del --reach kai@example.com --mode apply"
+        echo ""
+        echo "  only the keyrack copy goes. a login live in ~/.claude stays signed in."
+        echo "  to get the account back later: brains.auth.set --reach <email>"
+        return 0 ;;
+      *) _brains_auth_say_unknown_arg "$1"; return $? ;;
+    esac
+  done
+
+  # refuse a call that names no account, or a mode we do not know
+  [[ -z "$reach" ]] && { echo "✋ ConstraintError: --reach <email> is required" >&2; return 2; }
+  [[ "$mode" == plan || "$mode" == apply ]] \
+    || { echo "✋ ConstraintError: --mode must be plan or apply, got '${mode}'" >&2; return 2; }
+
+  # an account never stored has naught to drop — idempotent, so a re-run is a no-op
+  _brains_auth_get_token "$reach" >/dev/null 2>&1; krc=$?
+  if [[ "$krc" -eq 2 ]]; then
+    echo "🐢 ${reach} is not stored — naught to drop"
+    return 0
+  fi
+
+  # preview by default
+  if [[ "$mode" == plan ]]; then
+    echo "🐢 heres the wave — this WOULD drop ${reach} from the global keyrack"
+    echo "   run with --mode apply to drop it"
+    return 0
+  fi
+
+  # drop it, then read back to prove it left — a del that printed success is not proof
+  _brains_auth_keyrack_serial rhx keyrack del --owner "$_BRAINS_AUTH_KEYRACK_OWNER" --org @all \
+    --env "$_BRAINS_AUTH_KEYRACK_ENV" --key "$_BRAINS_AUTH_KEY" --reach "$reach" >/dev/null || {
+    echo "💥 MalfunctionError: keyrack del failed for ${reach}" >&2
+    return 1
+  }
+  _brains_auth_unlock_reset
+  _brains_auth_get_token "$reach" >/dev/null 2>&1; krc=$?
+  if [[ "$krc" -ne 2 ]]; then
+    echo "💥 MalfunctionError: ${reach} still reads back from the keyrack after the del" >&2
+    return 1
+  fi
+  echo "🐢 dropped ${reach} from the global keyrack"
+}
+alias brains.auth.del='_brains_auth_del'
 
 # ══ §8. credential-file i/o — ~/.claude, the one live-token holder ═══════════
 # .what = whatever refresh token ~/.claude holds RIGHT NOW, or empty when no login is there
@@ -2311,12 +2417,10 @@ _brains_auth_fold_node() {
   jq --arg s "$reach" '. + {($s): {error:"parse_failure"}}' <<< "$combined"
 }
 
-# .what = tell a watchful human which account the sweep is on ($1=reach, $2=n, $3=of)
-# .why  = the sweep is SEQUENTIAL by design — the accounts share one rate-limited endpoint, and
-#   each fetch is a refresh round-trip — so a human with several subscriptions on a slow link
-#   waits multiple seconds at a blank cursor. silence there is ambiguous in the worst way: it
-#   reads the same as a hang, so the honest response is to kill it and retry, which spends more
-#   of the rate limit that made it slow (`rule.require.status-feedback`).
+# .what = tell a watchful human how far the sweep has got ($1=label, $2=n, $3=of)
+# .why  = each fetch is a refresh round-trip plus a staggered start, so a human with several
+#   subscriptions waits seconds at a blank cursor. silence there reads the same as a hang, and
+#   the honest response to a hang is to kill it and retry (`rule.require.status-feedback`).
 # .note = it writes to stderr and ONLY when stderr is a terminal. that is what keeps it out of
 #   `--json` pipelines, out of every snapshot, and out of any log a cron keeps — progress is
 #   for a human who watches, never part of the contract. the line is erased as it goes (`\r`
@@ -2344,19 +2448,62 @@ _brains_auth_reaches_oneline() {
   printf '%s' "${1//$'\n'/,}"
 }
 
+# .what = the random head start one parallel fetch waits before it fires, in seconds ($1=n)
+# .why  = the accounts are separate tokens, so a burst is unlikely to trip a limit — but every
+#   request leaves from one ip, and a spread of 1-3s costs a human ~2s to keep the sweep off a
+#   stampede shape. the first account fires at once, so a single-account read pays no delay.
+#   `BRAINS_AUTH_STAGGER_MS` sets the top of the spread; 0 turns it off.
+_brains_auth_stagger_secs() {
+  local n="$1" max="${BRAINS_AUTH_STAGGER_MS:-3000}" min=1000 ms
+  (( n <= 1 || max <= 0 )) && { printf '0'; return; }
+  (( min > max )) && min="$max"
+  ms=$(( min + RANDOM % (max - min + 1) ))
+  printf '%d.%03d' $(( ms / 1000 )) $(( ms % 1000 ))
+}
+
 # .what = fetch usage json per account into one object keyed by reach ($1=ua, $2=reaches)
-# .why  = compose the per-account leaf into one combined object (a thin fold, no i/o here)
+# .why  = the accounts are fetched in PARALLEL — each is its own token on its own window, and a
+#   sequential sweep made a human wait one refresh round-trip per account. the parallel part is
+#   the NETWORK only: every keyrack read and write inside a fetch takes the shared lock
+#   (`_brains_auth_keyrack_serial`), so a rotated token is always saved one at a time.
+# .note = each fetch writes to its own file, and the fold runs after, in reach order, on one
+#   thread — so the combined object is built exactly as the sequential sweep built it.
+# .note = it waits on each pid BY NAME, never a bare `wait`, which would also join any other
+#   background job of the caller's shell.
 _brains_auth_gather() {
   local ua="$1" reaches="$2" active="${3:-}" active_rc="${4:-0}" combined='{}'
-  local reach node n=0 total
+  local reach n=0 total dir pid done_n=0
+  local -a pids=() order=()
   total="$(_brains_auth_count_reaches "$reaches")"
+  dir="$(mktemp -d)" || { printf '%s' "$combined"; return 1; }
+
+  # fire one fetch per account, each after its own random head start
   while IFS= read -r reach; do
     [[ -z "$reach" ]] && continue
     n=$(( n + 1 ))
-    _brains_auth_say_progress "$reach" "$n" "$total"
-    node="$(_brains_auth_node_for_reach "$ua" "$reach" "$active" "$active_rc")"
-    combined="$(_brains_auth_fold_node "$combined" "$reach" "$node")"
+    order+=("$reach")
+    (
+      sleep "$(_brains_auth_stagger_secs "$n")"
+      _brains_auth_node_for_reach "$ua" "$reach" "$active" "$active_rc" > "$dir/$n"
+    ) &
+    pids+=("$!")
   done <<< "$reaches"
+
+  # join each fetch by its pid, and tell a watchful human how many have landed
+  for pid in "${pids[@]}"; do
+    wait "$pid"
+    done_n=$(( done_n + 1 ))
+    _brains_auth_say_progress "fetched" "$done_n" "$total"
+  done
+
+  # fold in reach order, on one thread
+  n=0
+  for reach in "${order[@]}"; do
+    n=$(( n + 1 ))
+    combined="$(_brains_auth_fold_node "$combined" "$reach" "$(cat "$dir/$n" 2>/dev/null)")"
+  done
+  rm -rf "$dir"
+
   # erase the progress line so the render opens on a clean row
   [[ -t 2 ]] && printf '\r\033[K' >&2
   printf '%s' "$combined"
@@ -2513,13 +2660,45 @@ _brains_auth_exit_for() {
   return 2
 }
 
+# .what = one line that says whether this account holds a usage-limit RESET ($1=account node)
+# .why  = anthropic hands out resets two ways, and the usage read reports both — but ONLY
+#   when asked with `?cedar_ember=1&at_wall=1` AND under the real cli's user-agent. measured
+#   2026-10-04 by `rhx brains.claude.strings` against the pinned cli, then on a live account:
+#     · `cedar_ember`  = SAVED resets: `grants[]`, each with `resets_left`, `usable_now`,
+#                        `ends_at`, and the windows it `clears` (a promo, e.g. a launch grant)
+#     · `juniper_tide` = the WEEKLY "reset your session limit now": `available`, and
+#                        `ineligible_reason` — `not_at_wall` until the account hits its limit
+#   asked as any other client, both answer `eligible:false, ineligible_reason:"surface"` — a
+#   confident NO that is really "wrong client". so a `surface` reason renders as UNKNOWN,
+#   never as "none" (rule.forbid.failhide)
+# .note = it names ONLY a reset that exists — a saved grant with resets left, or a session reset
+#   available now. an account with none prints an EMPTY line, and the render then drops the row:
+#   "none saved", "offered at your limit", and "again on <date>" are all absences, and a row per
+#   absence buries the one account that holds a reset. the `surface` misread is the exception
+#   and still prints, since it is a read we could not trust rather than a reset that is absent.
+_brains_auth_reset_line() {
+  local node="$1"
+  jq -r '
+    def day: if . == null then "?" else (.[0:10]) end;
+    (.cedar_ember) as $ce | (.juniper_tide) as $jt |
+    if (($ce.ineligible_reason // "") == "surface" or ($jt.ineligible_reason // "") == "surface") then
+      "? unknown — the endpoint did not see the claude cli (user-agent)"
+    else
+      [ ( ($ce.grants // [])[] | select((.resets_left // 0) > 0) |
+          "🎁 \(.resets_left) saved · \(if .usable_now then "usable now" else "usable at your limit" end) · until \(.ends_at | day)" ),
+        ( select($jt.available == true) | "🎁 session reset available now" )
+      ] | join(" · ")
+    end
+  ' <<< "$node" 2>/dev/null || printf '? could not read the reset fields'
+}
+
 # ══ §12. render — the tree a human reads ═════════════════════════════════════
 # .what = render the combined usage json as a turtle-headed tree ($1=combined json)
 # .why  = keep the display logic out of the i/o + orchestration layers
 _brains_auth_render() {
   local combined="$1" active="${2:-}"
   local reach node err s_used w_used o_used s_reset w_reset s_pct w_pct
-  local mark
+  local mark reset_txt week_glyph
   # `active` is detected once by the caller and passed in — every account line flags whether
   # it is the one claude is signed in as, the most useful fact when you juggle accounts
   #
@@ -2575,9 +2754,14 @@ _brains_auth_render() {
     # opus rides just after session (same 5h window) only when the account has one
     [[ -n "$o_used" ]] && printf '   │  ├─ opus     %s %3d%% used\n' \
       "$(_brains_auth_bar "$(_brains_auth_round "$o_used")")" "$(_brains_auth_round "$o_used")"
-    printf '   │  └─ week     %s %3d%% used  ·  resets at %s, in %s\n' \
+    # the reset row shows only when a reset exists, so the week row closes the block otherwise
+    reset_txt="$(_brains_auth_reset_line "$node")"
+    week_glyph='└─'
+    [[ -n "$reset_txt" ]] && week_glyph='├─'
+    printf '   │  %s week     %s %3d%% used  ·  resets at %s, in %s\n' "$week_glyph" \
       "$(_brains_auth_bar "$w_pct")" "$w_pct" \
       "$(_brains_auth_when "$w_reset")" "$(_brains_auth_until "$w_reset")"
+    [[ -n "$reset_txt" ]] && printf '   │  └─ reset    %s\n' "$reset_txt"
   done < <(jq -r 'keys[]' <<< "$combined")
   echo "   └─"
   echo ""

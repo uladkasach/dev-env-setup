@@ -618,8 +618,9 @@ nvim() {
 #         must clear the peak or the cgroup oom killer reaps the session
 #         mid-turn. 8G leaves headroom above the worst observed peak.
 #         set the aggregate cap via: claude.memory.cap.set
-# 🛑 .`claude` RESOLVES TO `rhx enroll claude` — every session is an enrolled,
-#    addressable clone, never a bare cli
+# 🛑 .`claude` RESOLVES TO `rhx enroll claude` IN A LINKED REPO — every session
+#    there is an enrolled, addressable clone. outside one (no `.agent/` at the
+#    git root, or no git root at all) it is the bare cli, since enroll refuses
 #    .why = an unenrolled session holds no clone address and no managed reach
 #           socket, so no caller can name it or speak to it later. enrollment
 #           is the default because the bare cli is the exception
@@ -640,6 +641,18 @@ claude() {
   local -a cmd=()
   local rhx_bin
   rhx_bin=$(command -v rhx 2>/dev/null)
+
+  # 🛑 enroll ONLY where roles are linked — rhachet looks for `.agent/` at the
+  #    GIT ROOT of the cwd, and refuses with "no .agent/ found in this repo"
+  #    anywhere else. measured 2026-10-01: `claude` typed in ~ (itself a git
+  #    repo, so the gitroot was $HOME) opened no session at all
+  #    ⇒ outside a linked repo, the bare cli is the session, so it runs instead
+  local gitroot
+  gitroot=$(git rev-parse --show-toplevel 2>/dev/null)
+  if [[ -z "$gitroot" || ! -d "$gitroot/.agent" ]]; then
+    rhx_bin=""
+  fi
+
   if [[ -n "$rhx_bin" ]]; then
     cmd=( "$rhx_bin" enroll claude "$@" )
   elif [[ -n "$bin" ]]; then
