@@ -74,6 +74,26 @@ grove_provision_5_3_brains_configure_verify() {
   done
 
   ####################################################################
+  # .the KEYBINDINGS half — `~/.claude/keybindings.json`
+  #
+  # the claim: `ctrl+x ctrl+s` is UNBOUND in the Chat block, so ctrl+enter is the one
+  #   send-now key claude has, and its hint names ctrl+enter even inside tmux
+  #   (`rule.require.ctrl-enter-sends-now`). an explicit `null` is the unbind; a key that
+  #   is merely ABSENT leaves claude's default chord bound, so absent is a ✋
+  ####################################################################
+  local keys="$HOME/.claude/keybindings.json"
+  live="$(jq -c '[.bindings[]? | select(.context == "Chat") | .bindings | has("ctrl+x ctrl+s") and .["ctrl+x ctrl+s"] == null] | any' "$keys" 2>/dev/null)"
+  if [[ "$live" == "true" ]]; then
+    echo "   • ctrl+enter is the one send-now key (the ctrl+x ctrl+s chord is unbound) ✔"
+  else
+    echo "   ✋ the ctrl+x ctrl+s chord is still bound to send-now in $keys" >&2
+    echo "      ⇒ inside tmux claude's hint names that chord, and kitty maps ctrl+x to ^C," >&2
+    echo "        so the hint advertises a key that interrupts the turn instead" >&2
+    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+    failed=1
+  fi
+
+  ####################################################################
   # .the GLOBAL CONFIG half — `~/.claude.json`, the `/config` panel's toggles
   #
   # ⚠️ this is a SECOND FILE, not a second key in the one above. claude reads
