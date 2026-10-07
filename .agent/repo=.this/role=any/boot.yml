@@ -203,6 +203,7 @@ always:
       - briefs/desktop/nvim/howto.diagnose-nvim-hang.md
       - briefs/desktop/system/howto.diagnose-wayland-client-death.md
       - briefs/desktop/system/howto.fix-apple-magic-device-bluetooth.md
+      - briefs/desktop/system/howto.allowlist-a-wifi-driver-for-powersave-off.md
       - briefs/desktop/term/howto.headless-terminal-streams.md
       - briefs/desktop/term/howto.terminal-window-management.md
       - briefs/desktop/term/howto.termwork-roundtrip.md

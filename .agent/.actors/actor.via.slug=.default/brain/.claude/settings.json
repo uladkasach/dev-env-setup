@@ -195,11 +195,8 @@
   },
   "permissions": {
     "allow": [
-      "Write(.agent/.notes/**)",
       "Edit(.agent/.notes/**)",
-      "Write(.route/**)",
       "Edit(.route/**)",
-      "Write(**/.test/**)",
       "Edit(**/.test/**)",
       "mcp__ide__getDiagnostics",
       "WebSearch",
@@ -498,10 +495,7 @@
       "Edit(.branch/.bind/*)",
       "Edit(.meter/*)",
       "EnterPlanMode",
-      "Read(.quarantine/*)",
-      "Write(*/**/.route/**)",
-      "Write(.branch/.bind/*)",
-      "Write(.meter/*)"
+      "Read(.quarantine/*)"
     ],
     "ask": [
       "Bash(bash:*)",
