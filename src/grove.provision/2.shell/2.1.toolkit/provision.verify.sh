@@ -57,12 +57,12 @@ grove_provision_2_1_toolkit_provision_verify() {
   # 2. the comforts — reported, never asserted
   ####################################################################
   local comfort_absent=()
-  for tool in xclip fzf; do
+  for tool in xclip fzf iw; do
     command -v "$tool" >/dev/null 2>&1 || comfort_absent+=("$tool")
   done
 
   if [[ "${#comfort_absent[@]}" -eq 0 ]]; then
-    echo "   • toolkit comforts resolve — xclip, fzf ✔"
+    echo "   • toolkit comforts resolve — xclip, fzf, iw ✔"
   else
     echo "   🌙 a toolkit comfort does not resolve: ${comfort_absent[*]}"
     echo "      capability is unaffected; only convenience is"

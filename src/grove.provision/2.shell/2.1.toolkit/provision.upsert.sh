@@ -60,13 +60,15 @@ grove_provision_2_1_toolkit_provision_upsert() {
     return 1
   fi
 
-  # 2. the comforts — xclip, fzf. tolerates its own failure: a box that
-  #   lacks either is still converged (rule.forbid.failhide, other side)
-  if pkg_install xclip fzf; then
-    echo "   • toolkit installed — jq, tree, unzip, ripgrep, curl, gnupg, pv, age, xclip, fzf"
+  # 2. the comforts — xclip, fzf, iw. tolerates its own failure: a box that
+  #   lacks one is still converged (rule.forbid.failhide, other side)
+  #   - iw reads the radio's live power-save state for `network.wifi.probe`;
+  #     without it the probe reports that rung unread, and no capability is lost
+  if pkg_install xclip fzf iw; then
+    echo "   • toolkit installed — jq, tree, unzip, ripgrep, curl, gnupg, pv, age, xclip, fzf, iw"
   else
     echo "   • toolkit installed — jq, tree, unzip, ripgrep, curl, gnupg, pv, age"
-    echo "   🌙 xclip and/or fzf are absent from this box's repos (see above)"
+    echo "   🌙 xclip, fzf, and/or iw are absent from this box's repos (see above)"
     echo "      these are comforts, so the run continues; capability is unaffected"
   fi
 }
