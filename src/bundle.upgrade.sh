@@ -366,16 +366,27 @@ bundle.root.declines() {
   # ⚠️ on a laptop the seat with root IS its human — there is no ground seat whose
   #    apply sets it. so "no step is owed" was FALSE there: measured 2026-09-28, it
   #    printed over an /etc/hosts that blocked every db read, and the fix went
-  #    unasked
-  # 🛑 and the bare re-run is NOT the fix: `rhx` hands a skill a stdin that is no
-  #    tty, so `pkg_can_sudo`'s `-t 0` reads false even at a human's keyboard —
-  #    measured 2026-09-29, a human ran the bare command and got this decline again.
-  #    a credential warmed in the SAME terminal passes `sudo -n`, since sudo caches
-  #    per tty; so the warm and the run are one chained command
+  #    unasked. an agent shell has no terminal for sudo, so the human owes one run
+  #
+  # 🛑 the fix is `sudo -v && rhx …`, NEVER a bare `rhx …`
+  #    measured 2026-09-29 and again 2026-10-07 (on a branch cut before the first
+  #    repair): the bare form was printed here, the human ran it AT a
+  #    terminal, and it declined again — `rhx` hands the skill a piped stdin, so
+  #    `pkg_can_sudo`'s tty read is false under rhx at any keyboard. a fix-text
+  #    that cannot pass the gate it reports is a loop with no exit.
+  #    ⇒ warm the credential first, in the same terminal: sudo caches it per
+  #      terminal, the rhx child shares that terminal, so `sudo -n true` passes
+  #
+  # .why `$slug` resolves here: bash `local` is dynamically scoped, so this reads
+  #    the innermost `bundle.upgrade`'s slug — the PHASE. strip the phase name
+  #    to hand the human the bundle
   if [[ "${GROVE_ENV_SERVER:-}" == local@unix ]]; then
-    echo "      ⇒ on a laptop the seat with root is its human, and \`rhx\` gives this run"
-    echo "        no tty for sudo to ask on — so warm sudo and run in ONE terminal:"
-    echo "        sudo -v && rhx grove.provision --what <this bundle> --mode apply"
+    local bundle="${slug:-<this bundle>}"
+    bundle="${bundle%.provision.upsert}"; bundle="${bundle%.provision.verify}"
+    bundle="${bundle%.configure.upsert}"; bundle="${bundle%.configure.verify}"
+    echo "      ⇒ on a laptop the seat with root is its human. run this ONCE, from a"
+    echo "        terminal — the sudo -v is what lets the rhx run below reach root:"
+    echo "        sudo -v && rhx grove.provision --what $bundle --mode apply"
     return 0
   fi
 

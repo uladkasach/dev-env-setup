@@ -23,11 +23,15 @@ grove_provision_5_18_openhours_provision_verify() {
   ####################################################################
   # 0. the OPT-OUT claim — a torn-down box is CONVERGED, not broken
   #
-  # ⚠️ the claim inverts with the flag. an opted-out box that still carries a
-  #   live timer is the defect this reads for: the tree says no gate, and a
+  # ⚠️ the claim inverts with the marker. an opted-out box that still carries a
+  #   live timer is the defect this reads for: this box elected no gate, and a
   #   timer that blocks commits anyway is a state no declaration holds
+  #
+  # ⚠️ it reads the SHARED reader, never `-f` on the marker directly. two readers
+  #   of one fact is how the upsert installs and the verify calls it absent
+  #   (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.9)
   ####################################################################
-  if [[ "$GROVE_OPENHOURS_ENABLED" != "true" ]]; then
+  if [[ "$(grove_provision_5_18_openhours_optin_state)" != "in" ]]; then
     local residue=0 state_out
     state_out="$(systemctl --user is-active machine_openhours_reconcile.timer 2>/dev/null)"
     [[ "$state_out" == "active" ]] && residue=1
@@ -36,7 +40,8 @@ grove_provision_5_18_openhours_provision_verify() {
 
     if [[ "$residue" -eq 0 ]]; then
       echo "   • openhours is opted out, and no gate is installed ✔"
-      echo "     opt in: set GROVE_OPENHOURS_ENABLED=true in this bundle's _.sh"
+      echo "     this box placed no marker at $GROVE_OPENHOURS_OPTIN"
+      echo "     opt in: howto.opt-into-openhours — then re-apply this bundle"
       return 0
     fi
 

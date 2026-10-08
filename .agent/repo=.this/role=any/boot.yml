@@ -62,6 +62,11 @@ always:
       # symptom rather than a PATH. a robot who has not read this first will
       # "fix" it with a FIFTH PATH declaration
       - briefs/shell/gotcha.a-tool-found-by-path-answers-only-a-human.md
+      # ⚠️ say-level because every root step on a laptop owes it, and the bare
+      # `rhx …` form reads correct and cannot work: rhx pipes stdin, so the sudo
+      # gate declines at any keyboard. on 2026-10-07 a decline told the human to
+      # run the bare form, they did, and it declined again
+      - briefs/shell/gotcha.rhx-runs-a-skill-with-no-tty.md
       # ⚠️ say-level because a reader who meets it AFTER the fact reproduces it in
       # the very edit that repairs it. that is measured, not feared: on 2026-08-11
       # the repair for instance 1 WAS instance 2, written by an author who had just
@@ -201,6 +206,8 @@ always:
       - briefs/desktop/system/system.runaway_monitor.spec.md
       # diagnostic + setup howtos
       - briefs/desktop/nvim/howto.diagnose-nvim-hang.md
+      - briefs/desktop/nvim/howto.tune-nvim-at-scale.md
+      - briefs/desktop/nvim/gotcha.git-status-wakes-its-own-watcher.md
       - briefs/desktop/system/howto.diagnose-wayland-client-death.md
       - briefs/desktop/system/howto.fix-apple-magic-device-bluetooth.md
       - briefs/desktop/system/howto.allowlist-a-wifi-driver-for-powersave-off.md

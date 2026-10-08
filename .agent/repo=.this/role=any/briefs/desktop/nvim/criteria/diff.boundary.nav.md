@@ -44,6 +44,31 @@ given('buffer is a codediff pane')
   when('user presses ctrl+d j/k')
     then('navigation uses extmarks for chunk detection')
 
+### usecase.5 = directory edges in the codediff explorer tree
+
+given('cursor is on a row inside a directory in the codediff explorer')
+  when('user presses ctrl+d j')
+    then('cursor moves to the bottom row of the current directory')
+  when('user presses ctrl+d k')
+    then('cursor moves to the top row of the current directory')
+
+given('cursor is at the bottom row of a directory')
+  when('user presses ctrl+d j')
+    then('cursor moves to the top row of the next directory')
+
+given('cursor is at the top row of a directory')
+  when('user presses ctrl+d k')
+    then('cursor moves to the bottom row of the previous directory')
+
+given('cursor is in the last directory, at its bottom row')
+  when('user presses ctrl+d j')
+    then('cursor wraps to the top row of the first directory')
+
+- a directory's rows = a maximal run of consecutive rows that share one parent node
+- a group header (no parent) belongs to no directory
+- same navigator as the diff panes, so edge, next, and wrap behave identically
+- clamp: `prove.codediff-explorer-dir-nav`
+
 ## .why
 
 standard `]c`/`[c` jumps to top of next chunk. problem: if chunk is 50 lines, you land at line 1 and must scroll to see the rest.

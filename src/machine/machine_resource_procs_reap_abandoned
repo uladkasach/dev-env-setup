@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+######################################################################
+# machine_resource_procs_reap_abandoned — kill and report every process that
+# has been ABANDONED for over 24h
+#
+# .what = a process is ABANDONED when all four hold:
+#           1. it is ours (uid = the caller's)
+#           2. its spawner died — it was reparented to our `systemd --user`
+#              (the session's subreaper), or to pid 1 while that manager is down
+#           3. it is NOT the oldest process in its own cgroup. the oldest is the
+#              cgroup's OWNER — kitty, an app, a service's main process — and an
+#              owner is reparented by design, never abandoned
+#           4. it is older than --min-age (default 24h)
+#
+# .why  = on 2026-10-07 ~254 abandoned processes (nearly all node) accrued under
+#         the user manager across a 35-day session, to 27.4G RAM + 45G swap.
+#         earlyoom kills ONE process at a time by score, so a POPULATION of
+#         medium orphans never outranked a 4 MiB session daemon, and it killed
+#         the session bus instead (gotcha.earlyoom-kills-the-session-not-the-hog).
+#         no reader defined "abandoned", so none watched for it
+#
+# 🛑 .why rule 3 is what makes this safe to run unattended
+#   a reparent alone is not abandonment: every app a desktop launches is a child
+#   of the user manager. cgroup membership is set at fork and SURVIVES reparent,
+#   so an orphan still sits in its spawner's scope, younger than that scope's
+#   owner. the age order inside the cgroup is what parts the two
+#
+# usage:
+#   machine_resource_procs_reap_abandoned                    # plan: report only
+#   machine_resource_procs_reap_abandoned --mode apply       # kill, then report
+#   machine_resource_procs_reap_abandoned --min-age 3600     # threshold, seconds
+#   machine_resource_procs_reap_abandoned --pid 123 --pid 456   # only these pids
+#   machine_resource_procs_reap_abandoned --report <file>    # where kills are logged
+#
+# guarantee:
+#   - plan mode is the default, and signals no process
+#   - apply sends SIGTERM, waits 5s, then SIGKILLs only the survivors it chose
+#   - every kill appends one line to the report log: when, pid, comm, age, rss,
+#     cgroup, and the head of its argv
+#   - exit 0 = the pass completed, whatever it found; exit 2 = bad args
+######################################################################
+set -uo pipefail
+
+MODE="plan"
+MIN_AGE=86400
+REPORT="${XDG_STATE_HOME:-$HOME/.local/state}/grove/abandoned.reaped.log"
+ONLY_PIDS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --mode)    MODE="$2"; shift 2 ;;
+    --min-age) MIN_AGE="$2"; shift 2 ;;
+    --pid)     ONLY_PIDS+=("$2"); shift 2 ;;
+    --report)  REPORT="$2"; shift 2 ;;
+    -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "✋ unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+[[ "$MODE" == plan || "$MODE" == apply ]] || { echo "✋ --mode must be plan or apply" >&2; exit 2; }
+[[ "$MIN_AGE" =~ ^[0-9]+$ ]] || { echo "✋ --min-age must be whole seconds" >&2; exit 2; }
+
+MY_UID="$(id -u)"
+TICKS="$(getconf CLK_TCK)"
+UPTIME_S="$(cut -d' ' -f1 /proc/uptime)"; UPTIME_S="${UPTIME_S%.*}"
+
+# .what = the pid of OUR user manager, or empty when it is down
+user_manager_pid() {
+  local pid
+  pid="$(systemctl --user show -p MainPID --value 2>/dev/null)"
+  [[ -n "$pid" && "$pid" != 0 ]] && printf '%s' "$pid"
+}
+UM_PID="$(user_manager_pid)"
+
+# .what = fields of /proc/<pid>/stat after the comm, which may hold spaces
+# .why  = the comm is wrapped in parens and may contain ") ", so cut at the LAST ")"
+stat_rest() {
+  local raw
+  raw="$(cat "/proc/$1/stat" 2>/dev/null)" || return 1
+  printf '%s' "${raw##*) }"
+}
+
+# rest fields: 1=state 2=ppid … 20=starttime
+ppid_of()      { local r; r="$(stat_rest "$1")" || return 1; set -- $r; printf '%s' "$2"; }
+starttime_of() { local r; r="$(stat_rest "$1")" || return 1; set -- $r; printf '%s' "${20}"; }
+age_of()       { local st; st="$(starttime_of "$1")" || return 1; printf '%s' $(( UPTIME_S - st / TICKS )); }
+cgroup_of()    { sed -n 's/^0:://p' "/proc/$1/cgroup" 2>/dev/null; }
+rss_kb_of()    { awk '/^VmRSS:/ {print $2}' "/proc/$1/status" 2>/dev/null; }
+uid_of()       { awk '/^Uid:/ {print $2}' "/proc/$1/status" 2>/dev/null; }
+
+# .what = is this pid the oldest process in its cgroup — the cgroup's owner?
+is_cgroup_owner() {
+  local pid="$1" cg procs p my_st st
+  cg="$(cgroup_of "$pid")"
+  procs="/sys/fs/cgroup${cg}/cgroup.procs"
+  [[ -r "$procs" ]] || return 0   # unreadable cgroup: never guess, treat as owner
+  my_st="$(starttime_of "$pid")" || return 0
+  while read -r p; do
+    [[ "$p" == "$pid" ]] && continue
+    st="$(starttime_of "$p")" || continue
+    (( st < my_st )) && return 1
+  done < "$procs"
+  return 0
+}
+
+# .what = does this pid meet all four rules?
+is_abandoned() {
+  local pid="$1" ppid age
+  [[ "$(uid_of "$pid")" == "$MY_UID" ]] || return 1
+  ppid="$(ppid_of "$pid")" || return 1
+  [[ "$ppid" == 1 || ( -n "$UM_PID" && "$ppid" == "$UM_PID" ) ]] || return 1
+  [[ "$pid" == "$UM_PID" ]] && return 1
+  age="$(age_of "$pid")" || return 1
+  (( age >= MIN_AGE )) || return 1
+  is_cgroup_owner "$pid" && return 1
+  return 0
+}
+
+# gather the candidates
+if (( ${#ONLY_PIDS[@]} )); then
+  CANDIDATES=("${ONLY_PIDS[@]}")
+else
+  mapfile -t CANDIDATES < <(ls /proc | grep -E '^[0-9]+$')
+fi
+
+FOUND=()
+for pid in "${CANDIDATES[@]}"; do
+  [[ "$pid" == "$$" ]] && continue
+  is_abandoned "$pid" && FOUND+=("$pid")
+done
+
+echo "🐈 lets prowl for the abandoned..."
+echo "└─🌕 abandoned — spawner dead, not its scope's owner, older than ${MIN_AGE}s (mode: $MODE)"
+if (( ${#FOUND[@]} == 0 )); then
+  echo "  └─✨ none found"
+  exit 0
+fi
+
+TOTAL_KB=0
+for pid in "${FOUND[@]}"; do
+  rss="$(rss_kb_of "$pid")"; rss="${rss:-0}"
+  TOTAL_KB=$(( TOTAL_KB + rss ))
+  printf '  ├─🪲 %s (%s) age %sh rss %sM — %s\n' \
+    "$pid" "$(cat "/proc/$pid/comm" 2>/dev/null)" "$(( $(age_of "$pid") / 3600 ))" \
+    "$(( rss / 1024 ))" "$(cgroup_of "$pid")"
+done
+echo "  ├─ total: ${#FOUND[@]} processes, $(( TOTAL_KB / 1024 ))M resident"
+
+if [[ "$MODE" == plan ]]; then
+  echo "  └─🪄 to reap them:  machine_resource_procs_reap_abandoned --mode apply"
+  exit 0
+fi
+
+# apply: record each victim BEFORE the signal, while /proc still holds its facts
+mkdir -p "$(dirname "$REPORT")"
+NOW="$(date -Is)"
+for pid in "${FOUND[@]}"; do
+  printf '%s pid=%s comm=%s age_s=%s rss_kb=%s cgroup=%s argv=%s\n' \
+    "$NOW" "$pid" "$(cat "/proc/$pid/comm" 2>/dev/null)" "$(age_of "$pid")" \
+    "$(rss_kb_of "$pid")" "$(cgroup_of "$pid")" \
+    "$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | head -c 300)" >> "$REPORT"
+done
+
+kill -TERM "${FOUND[@]}" 2>/dev/null
+for _ in 1 2 3 4 5; do
+  alive=0
+  for pid in "${FOUND[@]}"; do kill -0 "$pid" 2>/dev/null && alive=1; done
+  (( alive )) || break
+  sleep 1
+done
+SURVIVORS=()
+for pid in "${FOUND[@]}"; do kill -0 "$pid" 2>/dev/null && SURVIVORS+=("$pid"); done
+(( ${#SURVIVORS[@]} )) && kill -KILL "${SURVIVORS[@]}" 2>/dev/null
+
+echo "  ├─ reaped ${#FOUND[@]} (${#SURVIVORS[@]} needed SIGKILL), freed ~$(( TOTAL_KB / 1024 ))M"
+echo "  └─ report: $REPORT"
+
+# a human on a desktop hears about it; a headless box has the journal
+if [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && command -v notify-send >/dev/null 2>&1; then
+  notify-send -a grove "reaped ${#FOUND[@]} abandoned processes" \
+    "~$(( TOTAL_KB / 1024 ))M freed — see $REPORT" 2>/dev/null || true
+fi
+exit 0

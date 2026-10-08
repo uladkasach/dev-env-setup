@@ -10,6 +10,20 @@ end
 --        collapsed to a flat fallback. pin it so it never depends on autodetect.
 vim.o.termguicolors = true
 
+-- every git this editor spawns skips git's OPTIONAL locks.
+-- .why = a background `git status` takes `.git/index.lock` to refresh its stat
+--        cache. codediff watches `.git/` and re-runs `git status` on any event
+--        there, so each status woke the watcher for the next one: a self-fed
+--        refresh every ~540ms, each a full tree rebuild + render.
+--        measured, 1000 changed files, 20s idle: 36 refreshes and 9.5s of
+--        render with the lock; 0 refreshes and 0.6s without it (headless probe, 2026-10-07).
+-- .note = git documents this var for exactly this caller — a background process
+--         that runs status on the user's behalf. it skips only the stat-cache
+--         refresh; every lock a commit, stage, or checkout needs still applies.
+--         a :terminal inherits it, so its `git status` re-stats rather than
+--         reads the refreshed cache — slower on a huge tree, never wrong.
+vim.env.GIT_OPTIONAL_LOCKS = '0'
+
 --------------------------------------------------------------------
 -- 🛑 a FILE may not configure the editor that opens it
 --
@@ -880,6 +894,42 @@ local function navigate_diff_boundary(direction, get_chunks, fallback)
   end
 end
 
+-- .what = the codediff explorer's DIRECTORY chunks, in the shape
+--         navigate_diff_boundary reads: { { start, fin }, ... } by line
+--
+-- .why  = ctrl+d j/k in a diff pane jumps chunk edge → chunk edge. in the explorer
+--         tree the same chord walks DIRECTORY edges: the top and bottom row of the
+--         current directory, then the next directory's top. one navigator, two
+--         chunk readers — so the edge/wrap behavior cannot drift between them
+--         (criteria: diff.boundary.nav, usecase.5)
+--
+-- .how  = each row is keyed by the directory it belongs to: a directory row by
+--         ITSELF (it is the top of its own block), a file row by its parent. a
+--         chunk is a maximal run of consecutive rows with one key. a group header
+--         belongs to no directory, so it breaks a run and joins none
+local function get_explorer_dir_chunks()
+  local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
+  if not lc_ok then return {} end
+  local explorer = lifecycle.get_explorer(vim.api.nvim_get_current_tabpage())
+  if not (explorer and explorer.tree) then return {} end
+  local chunks, cur = {}, nil
+  for line = 1, vim.api.nvim_buf_line_count(0) do
+    local node = explorer.tree:get_node(line)
+    local kind = node and node.data and node.data.type
+    local parent = nil
+    if kind == 'directory' then parent = node._id
+    elseif node and kind ~= 'group' then parent = node._parent_id end
+    if parent and cur and cur.parent == parent and cur.fin == line - 1 then
+      cur.fin = line
+    else
+      if cur then chunks[#chunks + 1] = { start = cur.start, fin = cur.fin } end
+      cur = parent and { parent = parent, start = line, fin = line } or nil
+    end
+  end
+  if cur then chunks[#chunks + 1] = { start = cur.start, fin = cur.fin } end
+  return chunks
+end
+
 -- get file path from codediff explorer node data (no git subprocess needed)
 local function get_codediff_explorer_file()
   local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
@@ -892,6 +942,41 @@ local function get_codediff_explorer_file()
     return node.data.path
   end
   return nil
+end
+
+-- .what = the ABSOLUTE path of the file a codediff buffer stands for, or nil when
+--         the current buffer is no codediff buffer (the caller then reads `%`)
+--
+-- .why  = a codediff buffer's own NAME is never the file: the explorer is
+--         `CodeDiff Explorer [N]`, a revision pane is `codediff:N/<rel>`. so a copy
+--         of `%` handed back the buffer label — measured 2026-10-08, ctrl+alt+r over
+--         a file in the tree copied "CodeDiff Explorer [2]" (criteria:
+--         codediff.copy-path)
+--
+-- .how  = explorer → the row under the cursor (a file's path, or a directory's
+--         dir_path), joined onto the explorer's git root; a revision pane → its
+--         own URL's root + path, via codediff's parse_url
+local function get_codediff_abspath()
+  local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
+  local explorer = lc_ok and lifecycle.get_explorer and lifecycle.get_explorer(vim.api.nvim_get_current_tabpage())
+  local root = ((explorer and explorer.git_root) or vim.fn.getcwd()):gsub('/+$', '')
+  local rel
+  if vim.bo.filetype == 'codediff-explorer' then
+    local node = explorer and explorer.tree and explorer.tree:get_node()
+    local d = node and node.data or {}
+    rel = d.path or d.dir_path
+  else
+    -- a revision pane is `codediff:///<root>///<rev>/<path>` — parsed by codediff's
+    -- OWN reader (core/virtual_file.lua parse_url), never a second pattern here.
+    -- measured: a hand pattern copied `<sha>/aa/a1.txt`, the rev glued to the path
+    local vf_ok, vf = pcall(require, 'codediff.core.virtual_file')
+    local url_root, _, filepath
+    if vf_ok and vf.parse_url then url_root, _, filepath = vf.parse_url(vim.api.nvim_buf_get_name(0)) end
+    if not filepath then return nil end
+    return (url_root or root):gsub('/+$', '') .. '/' .. filepath:gsub('^/+', '')
+  end
+  if not rel then return nil end
+  return root .. '/' .. rel:gsub('^/+', '')
 end
 
 -- image extensions that image.nvim renders via kitty graphics.
@@ -1958,6 +2043,156 @@ local PLUGIN_SPEC = {
         end
       end
 
+      -- render only the explorer rows that changed.
+      -- .why = codediff's Tree:render rebuilds and rewrites EVERY row on every call, and
+      --        it is called on each file select (only to move the highlight), each
+      --        expand/collapse, each refresh, and each explorer resize. at 1000 files
+      --        one call cost ~100-200ms, so a file select froze the editor.
+      -- .how = each row's text + highlights are a pure function of (node, width,
+      --        expanded, selected) — memoized in prepare_node below. this diffs the new
+      --        rows against what the buffer holds and rewrites only the rows that differ:
+      --        a select writes 2 rows, a refresh with no change writes 0.
+      -- .note = same row contract as upstream tree.lua: one line per visible node,
+      --         one highlight span per highlighted segment (painted at draw time, see
+      --         `provide`), _line / _line_to_node kept in sync for every row so
+      --         get_node() still answers. todo: send upstream.
+      -- display widths of non-ASCII strings, per render (see sdw_fast below)
+      local cd_width_memo = {}
+
+      local function row_of(node, line_obj)
+        if not (line_obj and line_obj._segments) then
+          return { text = node.text or '' }
+        end
+        local row = line_obj.__cd_row
+        if row then return row end
+        local hls, col = nil, 0
+        for _, seg in ipairs(line_obj._segments) do
+          local n = #seg.text
+          if n > 0 and seg.hl and seg.hl ~= '' then
+            hls = hls or {}
+            hls[#hls + 1] = { col, col + n, seg.hl }
+          end
+          col = col + n
+        end
+        row = { text = line_obj:content(), hls = hls }
+        line_obj.__cd_row = row
+        return row
+      end
+
+      -- a row's identity for the diff: text + every highlight span.
+      -- .why lazy = a cold render has no prior rows to compare against, so it asks for
+      --   no sig at all; a memoized row is the SAME table, so `==` settles it first
+      local function sig_of(row)
+        local s = row.sig
+        if s then return s end
+        s = row.text
+        if row.hls then
+          local parts = {}
+          for k, e in ipairs(row.hls) do parts[k] = e[3] .. '@' .. e[1] .. '-' .. e[2] end
+          s = s .. '\0' .. table.concat(parts, ',')
+        end
+        row.sig = s
+        return s
+      end
+      local function same_row(a, b) return a == b or sig_of(a) == sig_of(b) end
+
+      -- paint each row's highlights at DRAW time, for the lines on screen only.
+      -- .why = a static extmark per highlighted segment was ~6 per file row: ~40k
+      --   `nvim_buf_set_extmark` calls on a 7,099-row cold render, the largest share
+      --   of its cost (profile: ~26-46%). the screen shows ~50 rows, so the provider
+      --   sets ~300 ephemeral marks per redraw; same spans, same groups, same priority
+      -- .note = it reads `__cd_rows`, which render_rows writes in the same step as the
+      --   buffer lines, so a drawn line and its spans cannot disagree
+      local provided = {}
+      local function provide(tree)
+        local ns = tree._ns_id
+        if provided[ns] then return end
+        provided[ns] = true
+        local held = setmetatable({ tree = tree }, { __mode = 'v' })
+        vim.api.nvim_set_decoration_provider(ns, {
+          on_win = function(_, _, bufnr)
+            local t = held.tree
+            return t ~= nil and bufnr == t._bufnr and t.__cd_rows ~= nil
+          end,
+          on_line = function(_, _, bufnr, row)
+            local t = held.tree
+            local r = t and t.__cd_rows and t.__cd_rows[row + 1]
+            if not (r and r.hls) then return end
+            for _, e in ipairs(r.hls) do
+              pcall(vim.api.nvim_buf_set_extmark, bufnr, ns, row, e[1], { end_col = e[2], hl_group = e[3], ephemeral = true })
+            end
+          end,
+        })
+      end
+
+      local function render_rows(self)
+        local buf = self._bufnr
+        if not buf or not vim.api.nvim_buf_is_valid(buf) then return end
+        cd_width_memo = {}
+
+        -- visible nodes, depth first — same walk as upstream
+        local visible = {}
+        local function collect(list)
+          for _, node in ipairs(list) do
+            visible[#visible + 1] = node
+            if node._expanded and #node._children > 0 then collect(node._children) end
+          end
+        end
+        collect(self._nodes)
+
+        for _, node in pairs(self._nodes_by_id) do node._line = nil end
+        self._line_to_node = {}
+        local rows = {}
+        for i, node in ipairs(visible) do
+          node._line = i
+          self._line_to_node[i] = node
+          rows[i] = row_of(node, self._prepare_node and self._prepare_node(node) or nil)
+        end
+
+        -- find the spans to rewrite: [old_start, old_end) → rows[new_start..new_end]
+        local prev = self.__cd_rows
+        local spans = {}
+        if not prev or vim.api.nvim_buf_line_count(buf) ~= math.max(#prev, 1) then
+          spans[1] = { 0, -1, 1, #rows }
+        elseif #prev == #rows then
+          -- same shape: one span per contiguous run of changed rows
+          local i = 1
+          while i <= #rows do
+            if not same_row(prev[i], rows[i]) then
+              local j = i
+              while j + 1 <= #rows and not same_row(prev[j + 1], rows[j + 1]) do j = j + 1 end
+              spans[#spans + 1] = { i - 1, j, i, j }
+              i = j + 1
+            else
+              i = i + 1
+            end
+          end
+        else
+          -- shape changed (expand/collapse, files added or gone): common prefix + suffix
+          local p = 0
+          while p < #prev and p < #rows and same_row(prev[p + 1], rows[p + 1]) do p = p + 1 end
+          local s = 0
+          while s < #prev - p and s < #rows - p and same_row(prev[#prev - s], rows[#rows - s]) do s = s + 1 end
+          spans[1] = { p, #prev - s, p + 1, #rows - s }
+        end
+        provide(self)
+        self.__cd_rows = rows
+        if #spans == 0 then return end
+
+        local was_readonly = vim.bo[buf].readonly
+        vim.bo[buf].readonly = false
+        vim.bo[buf].modifiable = true
+        -- write bottom-up so an earlier span's row numbers stay valid
+        for k = #spans, 1, -1 do
+          local old_start, old_end, new_start, new_end = unpack(spans[k])
+          local texts = {}
+          for i = new_start, new_end do texts[#texts + 1] = rows[i].text end
+          vim.api.nvim_buf_set_lines(buf, old_start, old_end, false, texts)
+        end
+        vim.bo[buf].modifiable = false
+        vim.bo[buf].readonly = was_readonly
+      end
+
       vim.defer_fn(function()
         local ok, Tree = pcall(require, 'codediff.ui.lib.tree')
         if not ok then return end
@@ -2029,41 +2264,130 @@ local PLUGIN_SPEC = {
           -- track which tabs need restore after refresh
           _G.codediff_pending_restore = _G.codediff_pending_restore or {}
 
-          -- replace refresh to use our collect/restore (original has bugs)
+          -- a refresh whose git answer matches what the tree was BUILT from builds naught.
+          -- .why = codediff refreshes on BufEnter of the explorer (500ms debounce), so the
+          --   focus move right after an open re-ran the whole pipeline for an unchanged
+          --   file list. 6,475 files, measured: git.get_status 41ms, then create_tree_data
+          --   160ms + Tree.render 123ms, a ~300ms hitch ~2s after the explorer was usable.
+          -- .how = each tree root list carries the signature of the inputs it was built
+          --   from (status lists, base revision, visible groups, view config). the refresh
+          --   asks git itself; an equal answer only refreshes `explorer.status_result`.
+          --   a changed answer goes to the shipped refresh, whose git call is answered
+          --   from the result already in hand, so git still runs once per refresh
+          -- .kept = the shipped refresh's one other effect, re-select by root `data.path`,
+          --   is dead: root nodes are groups with no path, and Tree:set_node is a no-op
+          -- .note = the signature is keyed on each tree's OWN root list, so two explorers
+          --   in two tabs never compare against, nor share, the other's nodes
+          -- clamp: prove.codediff-refresh-stays-quiet, row `builds_per_noop_refresh`
+          local tree_module = require('codediff.ui.explorer.tree')
+          local built_sig = setmetatable({}, { __mode = 'k' })
+          local function tree_sig(status_result, git_root, base_revision, is_dir_mode, visible_groups)
+            local ec = require('codediff.config').options.explorer or {}
+            local vg = visible_groups or ec.visible_groups or {}
+            local ignore = (ec.file_filter or {}).ignore or {}
+            local parts = {
+              git_root or '', base_revision or '', is_dir_mode and 'dir' or 'git',
+              ec.view_mode or 'list', ec.flatten_dirs == false and 'flat-off' or 'flat-on',
+              vg.conflicts ~= false and 'C' or '-', vg.unstaged ~= false and 'U' or '-', vg.staged ~= false and 'S' or '-',
+              table.concat(ignore, '\2'),
+            }
+            for _, group in ipairs({ 'conflicts', 'unstaged', 'staged' }) do
+              parts[#parts + 1] = '#' .. group
+              for _, f in ipairs(status_result[group] or {}) do
+                parts[#parts + 1] = (f.path or '') .. '\2' .. (f.status or '') .. '\2' .. (f.old_path or '') .. '\2' .. (f.conflict_type or '')
+              end
+            end
+            return table.concat(parts, '\1')
+          end
+          local shipped_create_tree_data = tree_module.create_tree_data
+          tree_module.create_tree_data = function(status_result, git_root, base_revision, is_dir_mode, visible_groups)
+            local roots = shipped_create_tree_data(status_result, git_root, base_revision, is_dir_mode, visible_groups)
+            if type(roots) == 'table' and type(status_result) == 'table' then
+              built_sig[roots] = tree_sig(status_result, git_root, base_revision, is_dir_mode, visible_groups)
+            end
+            return roots
+          end
+          -- the clamp's old-* arm sets this false, to read the full rebuild it replaces
+          if _G.codediff_skip_noop_refresh == nil then _G.codediff_skip_noop_refresh = true end
+
+          -- the git call the shipped refresh would make, as (name, args, n)
+          local function git_call_of(explorer)
+            if explorer.base_revision and explorer.target_revision and explorer.target_revision ~= 'WORKING' then
+              return 'get_diff_revisions', { explorer.base_revision, explorer.target_revision, explorer.git_root }, 3
+            elseif explorer.base_revision then
+              return 'get_diff_revision', { explorer.base_revision, explorer.git_root }, 2
+            end
+            return 'get_status', { explorer.git_root }, 1
+          end
+
+          -- the shipped refresh, with our collect/restore around it (its own restore has bugs)
           local original_refresh = refresh_mod.refresh
+          local function full_refresh(explorer)
+            local tab = explorer.tabpage
+            _G.codediff_collapsed_state[tab] = collect_state(explorer.tree)
+            _G.codediff_pending_restore[tab] = true
+            return original_refresh(explorer)
+          end
+          local function settled(explorer)
+            explorer.__cd_refresh_seq = (explorer.__cd_refresh_seq or 0) + 1
+          end
+
           refresh_mod.refresh = function(explorer)
             if explorer.is_hidden or not vim.api.nvim_win_is_valid(explorer.winid) then
               return
             end
-            -- collect state BEFORE refresh rebuilds tree
-            local tab = explorer.tabpage
-            _G.codediff_collapsed_state[tab] = collect_state(explorer.tree)
-            _G.codediff_pending_restore[tab] = true
-            -- call original (its restore is buggy, we fix after)
-            return original_refresh(explorer)
+            -- dir mode scans in-process with no git to share; it keeps the shipped path
+            if not explorer.git_root or _G.codediff_skip_noop_refresh == false then
+              full_refresh(explorer)
+              return vim.schedule(function() settled(explorer) end)
+            end
+            local git = require('codediff.core.git')
+            local name, args, n = git_call_of(explorer)
+            -- read at call time, so a wrapper installed after ours still sees the call
+            local ask = git[name]
+            args[n + 1] = function(err, status_result)
+              -- the callback runs in a libuv fast context
+              vim.schedule(function()
+                if explorer.is_hidden or not vim.api.nvim_win_is_valid(explorer.winid) then return end
+                local roots = explorer.tree and explorer.tree:get_nodes()
+                if not err and type(status_result) == 'table' and roots and built_sig[roots]
+                  and built_sig[roots] == tree_sig(status_result, explorer.git_root, explorer.base_revision, false, explorer.visible_groups) then
+                  explorer.status_result = status_result
+                  return settled(explorer)
+                end
+                -- hand the result in hand to the shipped refresh, in place of a second git run
+                local live = git[name]
+                git[name] = function(...)
+                  local cb = select(select('#', ...), ...)
+                  return cb(err, status_result)
+                end
+                local ok, e = pcall(full_refresh, explorer)
+                git[name] = live
+                if not ok then error(e, 0) end
+                -- the shipped refresh renders in its own vim.schedule, queued ahead of this
+                vim.schedule(function() settled(explorer) end)
+              end)
+            end
+            return ask(unpack(args, 1, n + 1))
           end
 
-          -- patch Tree:render to apply our restore AFTER original render (only after refresh)
-          local original_render = Tree.render
+          -- patch Tree:render to restore collapsed state BEFORE the render, only after a refresh.
+          -- .why = refresh rebuilds the nodes before it renders, so the restore can land first
+          --        and the tree renders ONCE. a render costs ~150-200ms at 1000 files; restore
+          --        after it meant two renders per refresh.
           Tree.render = function(self)
-            -- render first
-            local result = original_render(self)
-            -- only restore if we just did a refresh (not on manual toggle)
             local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
-            if lc_ok then
+            if lc_ok and next(_G.codediff_pending_restore) then
               for tab, _ in pairs(_G.codediff_pending_restore) do
                 local exp = lifecycle.get_explorer and lifecycle.get_explorer(tab)
                 if exp and exp.tree == self then
-                  local collapsed = _G.codediff_collapsed_state[tab] or { groups = {}, dirs = {} }
-                  restore_state(self, collapsed)
+                  restore_state(self, _G.codediff_collapsed_state[tab] or { groups = {}, dirs = {} })
                   _G.codediff_pending_restore[tab] = nil
-                  -- re-render to show correct collapsed state
-                  original_render(self)
                   break
                 end
               end
             end
-            return result
+            return render_rows(self)
           end
         end
 
@@ -2074,6 +2398,209 @@ local PLUGIN_SPEC = {
 
         local config_ok, cfg = pcall(require, 'codediff.config')
         if not config_ok then return end
+
+        -- memoize a row's Line on every input prepare_node reads, so a render rebuilds
+        -- only rows whose inputs moved (see render_rows above).
+        -- .why the key is the row's CONTENT, not the node object: a refresh builds new
+        --      node tables for the same files, and a 7k-row worktree paid ~0.5s of
+        --      prepare per rebuild when the cache keyed on the object
+        -- .the inputs, read off upstream prepare_node: node.text, data.{type,name,path,
+        --      group,icon,icon_color,status_symbol,status_color,indent_state}, the
+        --      node's depth (list mode), expanded (folder icon), width, selected
+        local shipped_prepare = nodes_mod.prepare_node
+
+        -- upstream sizes each file row with ~4-6 `vim.fn.strdisplaywidth` calls, each a
+        -- trip through vimscript eval. so while the shipped prepare runs, printable ASCII
+        -- answers `#s` (one cell per byte, by definition), and any other string (indent
+        -- markers, icons, tabs, wide chars) asks vim ONCE per render: a tree has few
+        -- distinct indents and icons, and render_rows clears the memo each render, so a
+        -- `setcellwidths` or `ambiwidth` change reaches the next render
+        local sdw_real
+        local function sdw_fast(s, col)
+          if col ~= nil then return sdw_real(s, col) end
+          if type(s) ~= 'string' then return sdw_real(s) end
+          if not s:find('[^\32-\126]') then return #s end
+          local w = cd_width_memo[s]
+          if not w then
+            w = sdw_real(s)
+            cd_width_memo[s] = w
+          end
+          return w
+        end
+        local function shipped_prepare_fast(node, max_width, selected_path, selected_group)
+          sdw_real = vim.fn.strdisplaywidth
+          vim.fn.strdisplaywidth = sdw_fast
+          local ok, line = pcall(shipped_prepare, node, max_width, selected_path, selected_group)
+          vim.fn.strdisplaywidth = sdw_real
+          if not ok then error(line, 0) end
+          return line
+        end
+
+        -- in TREE view a file row prints only its basename, yet upstream finds it with
+        -- `full_path:match("([^/]+)$")`, which rescans from every byte: 68% of a cold
+        -- 7k-row build on 100+ char paths (~1.3s). so hand upstream a view of the node
+        -- whose data.path IS the basename, and decide `selected` here on the real path.
+        -- list view prints the directory too, so it keeps the real path.
+        -- clamp: prove.codediff-refresh-stays-quiet, row `rows_match_upstream`
+        local function prepare_fast(node, max_width, selected, selected_group)
+          local d = node.data or {}
+          local view_mode = (cfg.options.explorer or {}).view_mode or 'list'
+          if view_mode ~= 'tree' or d.type == 'group' or d.type == 'directory' or not d.path then
+            return shipped_prepare_fast(node, max_width, selected and d.path or nil, selected and selected_group or nil)
+          end
+          local base = d.path:match('.*/(.*)$')
+          if not base or base == '' then base = d.path end
+          local view_data = setmetatable({ path = base }, { __index = d })
+          local view = setmetatable({ data = view_data }, { __index = node })
+          return shipped_prepare_fast(view, max_width, selected and base or nil, selected and selected_group or nil)
+        end
+
+        local row_memo, row_memo_size = {}, 0
+        local node_memo = setmetatable({}, { __mode = 'k' })
+        -- siblings share their indent table (see build_nodes), so its sig is built once
+        -- per table, never once per row. safe: no reader writes an indent_state
+        local indent_sig_memo = setmetatable({}, { __mode = 'k' })
+        nodes_mod.prepare_node = function(node, max_width, selected_path, selected_group)
+          local d = node.data or {}
+          local selected = d.path ~= nil and d.path == selected_path and d.group == selected_group
+          -- fast path: the same node, same width / expansion / selection → same row.
+          -- a select re-asks every row, so this is what keeps a select at 2 real builds
+          local fast = max_width .. (node._expanded and '+' or '-') .. (selected and '*' or '.')
+          local nh = node_memo[node]
+          if nh and nh.k == fast then return nh.line end
+          local indent = d.indent_state
+          local indent_sig = ''
+          if indent then
+            indent_sig = indent_sig_memo[indent]
+            if not indent_sig then
+              local bits = {}
+              for i = 1, #indent do bits[i] = indent[i] and '1' or '0' end
+              indent_sig = table.concat(bits)
+              indent_sig_memo[indent] = indent_sig
+            end
+          end
+          -- one concat expression, never a table + table.concat: a cold render builds a
+          -- key per row, and the throwaway table was most of the key's cost
+          local key = max_width .. '\1' .. (node._expanded and '+' or '-') .. '\1' .. (selected and '*' or '.')
+            .. '\1' .. (node._depth or 0) .. '\1' .. (d.type or '') .. '\1' .. (node.text or '')
+            .. '\1' .. (d.name or '') .. '\1' .. (d.path or '') .. '\1' .. (d.group or '')
+            .. '\1' .. (d.icon or '') .. '\1' .. (d.icon_color or '') .. '\1' .. (d.status_symbol or '')
+            .. '\1' .. (d.status_color or '') .. '\1' .. indent_sig
+          local line = row_memo[key]
+          if not line then
+            line = prepare_fast(node, max_width, selected, selected_group)
+            -- bound the cache: a clear costs one cold render, an unbounded table costs memory forever
+            if row_memo_size > 60000 then row_memo, row_memo_size = {}, 0 end
+            row_memo[key] = line
+            row_memo_size = row_memo_size + 1
+          end
+          node_memo[node] = { k = fast, line = line }
+          return line
+        end
+        -- exposed for the clamp, which compares every row against upstream
+        _G.codediff_prepare_upstream = shipped_prepare
+        -- a selected row bakes its highlight from the live colorscheme; a new scheme invalidates all
+        vim.api.nvim_create_autocmd('ColorScheme', {
+          callback = function()
+            row_memo, row_memo_size = {}, 0
+            node_memo = setmetatable({}, { __mode = 'k' })
+          end,
+        })
+
+        -- codediff's file filter compiled every ignore glob once per FILE, and found each
+        -- basename with `([^/]+)$`, which rescans from every byte. 6.4k files: ~18% of an open.
+        -- same matches as upstream filter.lua (gitignore-style: a `/` at the front anchors to
+        -- the root, a `/` anywhere else matches the full path, else the basename); the
+        -- compile is cached
+        local filter_ok, filter_mod = pcall(require, 'codediff.ui.explorer.filter')
+        if filter_ok and type(filter_mod.glob_to_pattern) == 'function' then
+          local shipped_glob = filter_mod.glob_to_pattern
+          local compiled = {}
+          filter_mod.glob_to_pattern = function(glob)
+            local hit = compiled[glob]
+            if hit then return hit end
+            hit = shipped_glob(glob)
+            compiled[glob] = hit
+            return hit
+          end
+          local rules_memo = setmetatable({}, { __mode = 'k' })
+          local function rules_for(patterns)
+            local rules = rules_memo[patterns]
+            if rules then return rules end
+            rules = {}
+            for i, glob in ipairs(patterns) do
+              if glob:sub(1, 1) == '/' then
+                rules[i] = { full = true, pat = filter_mod.glob_to_pattern(glob:sub(2)) }
+              else
+                rules[i] = { full = glob:find('/') ~= nil, pat = filter_mod.glob_to_pattern(glob) }
+              end
+            end
+            rules_memo[patterns] = rules
+            return rules
+          end
+          -- the basename per path, kept: a build asks it once per file per group, and a
+          -- refresh asks it again for the same paths (13% of a build, profiled)
+          local base_memo, base_memo_n = {}, 0
+          filter_mod.matches_any_pattern = function(path, patterns)
+            if not patterns or #patterns == 0 then return false end
+            local basename = base_memo[path]
+            if not basename then
+              basename = path:match('.*/(.*)$')
+              if not basename or basename == '' then basename = path end -- upstream: no basename → the path
+              if base_memo_n >= 60000 then base_memo, base_memo_n = {}, 0 end
+              base_memo[path] = basename
+              base_memo_n = base_memo_n + 1
+            end
+            for _, rule in ipairs(rules_for(patterns)) do
+              if (rule.full and path or basename):match(rule.pat) then return true end
+            end
+            return false
+          end
+        end
+
+        -- .why = a refresh rebuilds the tree for mostly the same files, and an open
+        --   builds it several times. profiled over 6,464 real paths (554–810ms per
+        --   build): ~31% was the devicons lookup per file, ~17% the gmatch split per
+        --   file, plus a STATUS_SYMBOLS literal allocated per file. so the status
+        --   table is built once, and icon + split results are kept per FULL path
+        --   (devicons is asked with the full path, so a basename key could differ).
+        --   both caches clear past 60000 entries, so a long session cannot grow them
+        local TREE_CACHE_MAX = 60000
+        local STATUS_SYMBOLS = {
+          M = { symbol = 'M', color = 'CodeDiffStatusModified' },
+          A = { symbol = 'A', color = 'CodeDiffStatusAdded' },
+          D = { symbol = 'D', color = 'CodeDiffStatusDeleted' },
+          ['??'] = { symbol = '??', color = 'CodeDiffStatusUntracked' },
+          ['!'] = { symbol = '!', color = 'CodeDiffStatusConflict' },
+        }
+        local icon_memo, icon_memo_n = {}, 0
+        local function icon_for(path)
+          local hit = icon_memo[path]
+          if hit then return hit[1], hit[2] end
+          local icon, color = nodes_mod.get_file_icon(path)
+          -- .why = an empty icon means devicons was absent at that moment; keep it
+          --   uncached, so the real icon shows once devicons loads
+          if icon ~= '' then
+            if icon_memo_n >= TREE_CACHE_MAX then icon_memo, icon_memo_n = {}, 0 end
+            icon_memo[path] = { icon, color }
+            icon_memo_n = icon_memo_n + 1
+          end
+          return icon, color
+        end
+        -- .note = callers only read `parts`, so one table per path is safe to share
+        local parts_memo, parts_memo_n = {}, 0
+        local function parts_for(path)
+          local parts = parts_memo[path]
+          if parts then return parts end
+          parts = {}
+          for part in path:gmatch('[^/]+') do
+            parts[#parts + 1] = part
+          end
+          if parts_memo_n >= TREE_CACHE_MAX then parts_memo, parts_memo_n = {}, 0 end
+          parts_memo[path] = parts
+          parts_memo_n = parts_memo_n + 1
+          return parts
+        end
 
         -- replace create_tree_file_nodes with sorted flatten version
         nodes_mod.create_tree_file_nodes = function(files, git_root, group_name)
@@ -2091,10 +2618,7 @@ local PLUGIN_SPEC = {
           local function as_file_key(name) return name .. ' (file)' end
           local dir_tree = {}
           for _, file in ipairs(files) do
-            local parts = {}
-            for part in file.path:gmatch('[^/]+') do
-              parts[#parts + 1] = part
-            end
+            local parts = parts_for(file.path)
             local current = dir_tree
             for i = 1, #parts - 1 do
               local dir_name = parts[i]
@@ -2161,14 +2685,33 @@ local PLUGIN_SPEC = {
               return a < b
             end)
 
+            -- a sibling's indent is its parent's plus one flag, and the flag is only
+            -- "last" or "not last", so a level holds at most TWO indent tables, shared.
+            -- .why = a fresh copy per node was 53% of a 6.4k-file build (profile: one
+            --   table + one copy loop per node, `depth` items each)
+            -- .note = sound because no reader writes an indent_state: upstream
+            --   nodes.lua only reads it, and so does the prepare memo above
             local total = #sorted_keys
+            local depth = #indent_state
+            local indent_mid, indent_last
             for idx, key in ipairs(sorted_keys) do
               local item = subtree[key]
               local full_path = parent_path ~= '' and (parent_path .. '/' .. key) or key
               local is_last = (idx == total)
-              local node_indent = {}
-              for i, v in ipairs(indent_state) do node_indent[i] = v end
-              node_indent[#node_indent + 1] = is_last
+              local node_indent
+              if is_last then
+                if not indent_last then
+                  indent_last = { unpack(indent_state, 1, depth) }
+                  indent_last[depth + 1] = true
+                end
+                node_indent = indent_last
+              else
+                if not indent_mid then
+                  indent_mid = { unpack(indent_state, 1, depth) }
+                  indent_mid[depth + 1] = false
+                end
+                node_indent = indent_mid
+              end
 
               if item._is_dir then
                 local children = build_nodes(item._children, full_path, node_indent)
@@ -2185,14 +2728,7 @@ local PLUGIN_SPEC = {
                 }, children)
               else
                 local file = item._file
-                local icon, icon_color = nodes_mod.get_file_icon(file.path)
-                local STATUS_SYMBOLS = {
-                  M = { symbol = 'M', color = 'CodeDiffStatusModified' },
-                  A = { symbol = 'A', color = 'CodeDiffStatusAdded' },
-                  D = { symbol = 'D', color = 'CodeDiffStatusDeleted' },
-                  ['??'] = { symbol = '??', color = 'CodeDiffStatusUntracked' },
-                  ['!'] = { symbol = '!', color = 'CodeDiffStatusConflict' },
-                }
+                local icon, icon_color = icon_for(file.path)
                 local status_info = STATUS_SYMBOLS[file.status] or { symbol = file.status, color = 'Normal' }
                 nodes_list[#nodes_list + 1] = Tree.Node({
                   text = key,
@@ -2320,6 +2856,116 @@ local PLUGIN_SPEC = {
         end
       end)()
 
+      -- .what = before codediff shows a ONE-pane file (deleted, added, untracked),
+      --         put both diff panes back, so the pane it then closes is never the last
+      --
+      -- .why  = measured 2026-10-07: one deleted file after an untracked one (or the
+      --         reverse) and the diff view vanished, and no later select opened any
+      --         diff. the chain, in codediff 2.41.1:
+      --           - show_single_file (ui/view/side_by_side.lua:717-727) closes the
+      --             side it does not keep. a deleted file keeps the ORIGINAL pane;
+      --             an untracked or added one keeps the MODIFIED pane
+      --           - after one single-pane select, the other side is already gone.
+      --             so the next select of the OPPOSITE kind finds its keep-side dead
+      --             and closes the one live pane left
+      --           - the WinClosed hook (ui/lifecycle/cleanup.lua:144-170) counts zero
+      --             diff windows and tears the session down
+      --           - every later select returns at `if not session then return`
+      --             (side_by_side.lua:398-401, 694-697), and no caller reads that
+      --             return — a silent dead end
+      --         ⇒ restore the pair first, with the one restore codediff's own
+      --           update uses (get_codediff_diff_wins). the close then always
+      --           leaves the kept pane alive
+      --
+      -- .what = re-render the explorer ONCE after a resize burst, never once per step
+      --
+      -- .why  = measured 2026-10-07 at 1000 changed files: codediff hooks WinResized
+      --         (ui/explorer/render.lua:472-483) and calls tree:render() on every
+      --         step of an alt+h/alt+l resize — 1101 rows rebuilt, 40-100ms each,
+      --         and 0 rows changed. a held key queues one full render per step, so
+      --         the pane lagged far behind the keypress
+      --         ⇒ the step itself (smart-splits) costs ~3ms; the render is owed once,
+      --           at the final width, so it trails the last step by RESIZE_MS
+      --
+      -- .how  = after codediff builds an explorer, its own WinResized hook is
+      --         swapped for one that reads the explorer's WIDTH (never v:event, so
+      --         the clamp can drive it headless) and debounces the render
+      --
+      -- clamp: prove.codediff-resize-renders-once (`_G.codediff_resize_debounce_ms
+      --        = 0` restores upstream's render-per-step, for the clamp's old arm)
+      ;(function()
+        local ok, render_mod = pcall(require, 'codediff.ui.explorer.render')
+        if not ok or type(render_mod.create) ~= 'function' then return end
+        if _G.codediff_resize_debounce_ms == nil then _G.codediff_resize_debounce_ms = 80 end
+        local shipped_create = render_mod.create
+        render_mod.create = function(...)
+          -- the upstream hook is anonymous, so tell it apart by WHEN it was made
+          local before = {}
+          for _, a in ipairs(vim.api.nvim_get_autocmds({ event = 'WinResized' })) do before[a.id] = true end
+          local explorer = shipped_create(...)
+          if not explorer then return explorer end
+          for _, a in ipairs(vim.api.nvim_get_autocmds({ event = 'WinResized' })) do
+            local src = a.callback and debug.getinfo(a.callback, 'S').source or ''
+            if not before[a.id] and src:find('codediff/ui/explorer/render%.lua') then
+              pcall(vim.api.nvim_del_autocmd, a.id)
+            end
+          end
+
+          local timer = vim.uv.new_timer()
+          local function render_if_resized()
+            local win = explorer.winid
+            if not (win and vim.api.nvim_win_is_valid(win)) then return end
+            local w = vim.api.nvim_win_get_width(win)
+            if w == explorer.__cd_width then return end
+            explorer.__cd_width = w
+            explorer.tree:render()
+          end
+          explorer.__cd_width = explorer.winid and vim.api.nvim_win_is_valid(explorer.winid)
+            and vim.api.nvim_win_get_width(explorer.winid) or nil
+          local au
+          au = vim.api.nvim_create_autocmd('WinResized', {
+            desc = 'codediff explorer: re-render once after a resize burst',
+            callback = function()
+              if not (explorer.winid and vim.api.nvim_win_is_valid(explorer.winid)) then
+                pcall(vim.api.nvim_del_autocmd, au)
+                if not timer:is_closing() then timer:close() end
+                return
+              end
+              local ms = _G.codediff_resize_debounce_ms or 0
+              if ms <= 0 then return render_if_resized() end
+              timer:stop()
+              timer:start(ms, 0, vim.schedule_wrap(render_if_resized))
+            end,
+          })
+          return explorer
+        end
+        -- ⚠️ the public module COPIES the function at require time
+        --    (ui/explorer/init.lua:11 `M.create = render.create`), and that copy is
+        --    what callers reach. a patch on render alone changes no explorer —
+        --    measured: the clamp read 0 renders in both arms until this line
+        local ex_ok, explorer_mod = pcall(require, 'codediff.ui.explorer')
+        if ex_ok then explorer_mod.create = render_mod.create end
+      end)()
+
+      -- clamp: prove.codediff-single-pane-keeps-the-view
+      ;(function()
+        local ok, side_by_side = pcall(require, 'codediff.ui.view.side_by_side')
+        if not ok then return end
+        local names = { 'show_untracked_file', 'show_deleted_file', 'show_added_virtual_file', 'show_deleted_virtual_file' }
+        -- the shipped functions, exposed so the clamp can re-break the fix
+        _G.codediff_single_pane_upstream = _G.codediff_single_pane_upstream or {}
+        for _, name in ipairs(names) do
+          local shipped = side_by_side[name]
+          if type(shipped) == 'function' and not _G.codediff_single_pane_upstream[name] then
+            _G.codediff_single_pane_upstream[name] = shipped
+            side_by_side[name] = function(tabpage, ...)
+              pcall(get_codediff_diff_wins, tabpage)
+              return shipped(tabpage, ...)
+            end
+          end
+        end
+      end)()
+
 
       -- codediff buffer keymaps
       vim.api.nvim_create_autocmd('BufEnter', {
@@ -2342,15 +2988,20 @@ local PLUGIN_SPEC = {
             end
           end
           if not is_codediff then return end
-          -- ctrl+d j/k for diff boundary navigation
+          -- ctrl+d j/k for boundary navigation: diff chunks in a diff pane,
+          -- DIRECTORY edges in the explorer tree (get_explorer_dir_chunks)
+          -- `_G.codediff_explorer_dir_nav = false` restores the old chunk reader, for
+          -- the clamp's old arm (prove.codediff-explorer-dir-nav)
+          local in_explorer = ft == 'codediff-explorer' and _G.codediff_explorer_dir_nav ~= false
+          local get_chunks = in_explorer and get_explorer_dir_chunks or get_diff_hl_chunks
           local function boundary_down()
-            navigate_diff_boundary('down', get_diff_hl_chunks, function()
-              vim.cmd('normal! ]c')
+            navigate_diff_boundary('down', get_chunks, function()
+              if not in_explorer then vim.cmd('normal! ]c') end
             end)
           end
           local function boundary_up()
-            navigate_diff_boundary('up', get_diff_hl_chunks, function()
-              vim.cmd('normal! [c')
+            navigate_diff_boundary('up', get_chunks, function()
+              if not in_explorer then vim.cmd('normal! [c') end
             end)
           end
           -- ctrl-HELD chords arm the repeat (form 3); ctrl-lifted ones do not.
@@ -2385,11 +3036,9 @@ local PLUGIN_SPEC = {
               if vim.fn.filereadable(bufname) == 1 then
                 path = bufname
               elseif bufname:match('codediff:') then
-                -- extract relative path from virtual buffer name
-                local relpath = bufname:match(':%d/(.+)$')
-                if relpath then
-                  path = relpath
-                end
+                -- the one resolver (criteria: codediff.copy-path); the old `:%d/`
+                -- pattern never matched `codediff:///<root>///<rev>/<path>`
+                path = get_codediff_abspath()
               end
             end
             if path then
@@ -2466,8 +3115,10 @@ local PLUGIN_SPEC = {
             end
             -- codediff file pane: extract relative path
             if bufname:match('codediff:') then
-              local relpath = bufname:match(':%d/(.+)$')
-              if relpath then return relpath end
+              -- the one resolver ctrl+r uses (criteria: codediff.copy-path); the
+              -- old `:%d/` pattern never matched `codediff:///<root>///<rev>/<path>`
+              local abs = get_codediff_abspath()
+              if abs then return vim.fn.fnamemodify(abs, ':.') end
               -- can't determine path, show ???/filename
               local filename = bufname:match('([^/]+)$')
               return filename and ('???/' .. filename) or 'diff'
@@ -2949,8 +3600,14 @@ vim.keymap.set('i', '<C-S-z>', '<Esc><C-r>i', { noremap = true })
 -- also bind the ctrl+alt+r and ctrl+super+r variants: with the kitty keyboard
 -- protocol on, those held-modifier combos reach nvim as distinct keycodes
 -- (<C-A-r> / <C-D-r>), so point all three at the same copy so muscle memory works.
+--
+-- ⚠️ in a codediff buffer `%` is a buffer LABEL, never the file — the explorer is
+--    `CodeDiff Explorer [N]`. get_codediff_abspath names the file instead
+--    (clamp: prove.codediff-copy-path)
 local function copy_relpath()
-  local path = vim.fn.expand('%:.')
+  -- `_G.codediff_copy_path = false` restores the old `%` read, for the clamp's old arm
+  local abs = _G.codediff_copy_path ~= false and get_codediff_abspath() or nil
+  local path = abs and vim.fn.fnamemodify(abs, ':.') or vim.fn.expand('%:.')
   vim.fn.setreg('+', path)
   print('copied: ' .. path)
 end
