@@ -208,6 +208,7 @@ per-thread **wchan + cpu-secs**. a thread in state `R` whose wchan reads
 
 ## .see also
 
+- howto.tune-nvim-at-scale — a slowdown that grows with item count, rather than a runaway
 - system.runaway_monitor.spec.md — general runaway process detection
 - nvim.neominimap.custom-handler.md — vdiff handler with proper cache
 - src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh — the `nvim()` memory-cap wrapper (layer 1)

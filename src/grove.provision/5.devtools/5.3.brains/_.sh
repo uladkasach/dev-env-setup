@@ -76,16 +76,25 @@ if [ ! -x "\$bin" ]; then
   exit 1
 fi
 
-# cap only in a real user session with systemd; else run bare — the same two
-# branches the \`claude\` shell function takes in 2.7.aliases/bash_aliases.sh
-if command -v systemd-run >/dev/null 2>&1 && [ -n "\$XDG_RUNTIME_DIR" ]; then
-  exec systemd-run --user --scope --quiet --collect \\
-    --slice=claude.slice \\
-    -p MemoryMax=$GROVE_BRAIN_CLAUDE_LATEST_MEMMAX \\
-    "\$bin" "\$@"
-fi
+# one path: the capped launch — the same one the \`claude\` shell function takes
+# in 2.7.aliases/bash_aliases.sh. wait out a revive in flight (bundle
+# 1.6.5.usermanager restarts a dead manager in ~2s); a manager that stays mute
+# is a defect, so say so and stop rather than run uncapped
+i=0
+until systemctl --user show-environment >/dev/null 2>&1; do
+  i=\$((i + 1))
+  if [ "\$i" -ge 10 ]; then
+    echo "✋ your user systemd manager does not answer on \\\$XDG_RUNTIME_DIR/bus" >&2
+    echo "   fix: sudo -v && rhx grove.provision --what 1.6.5.usermanager --mode apply" >&2
+    exit 1
+  fi
+  sleep 0.5
+done
 
-exec "\$bin" "\$@"
+exec systemd-run --user --scope --quiet --collect \\
+  --slice=claude.slice \\
+  -p MemoryMax=$GROVE_BRAIN_CLAUDE_LATEST_MEMMAX \\
+  "\$bin" "\$@"
 EOF
 }
 

@@ -1,0 +1,29 @@
+# /etc/default/earlyoom — declared by dev-env-setup, bundle 1.6.3.earlyoom
+# an edit here is overwritten by the next apply; edit the bundle's copy instead
+#
+# .what = which process earlyoom ranks first to kill, and which it ranks last
+#
+# ⚠️ .why "ranks", never "never kills"
+#   in earlyoom v1.7, --avoid and --prefer are WEIGHTS: a match moves the score
+#   by 300, down or up. they are not exclusions. so the policy holds because of
+#   the real gap: a session daemon scores 800 → 500, an orphan node 666+ → 966+.
+#   proven against the real binary by `prove.earlyoom-spares-the-session`
+#
+# .why --avoid: the session's own infrastructure is never a valid victim
+#   earlyoom ranks victims by the kernel's oom_score, and systemd's user manager
+#   raises the score of every tiny session daemon it starts. so under pressure
+#   earlyoom killed the 4-7 MiB session daemons first and the 27 GiB hog never:
+#     gvfs-goa-volume → gcr-ssh-agent → dbus-broker-lau (the session bus)
+#     → systemd (the user manager itself) → every terminal and app died with it
+#   measured 2026-10-07 (machine.journal.read --scope system --unit earlyoom.service)
+#
+# .why --prefer: the population that actually leaks
+#   orphaned node runtimes (tool calls, skills, test runs) accrue under the user
+#   manager for weeks. those are the processes whose death frees memory
+#
+# ⚠️ .why no quotes INSIDE the value and no spaces inside a regex
+#   systemd expands $EARLYOOM_ARGS by whitespace split and honors no inner
+#   quotes, so a quoted regex reaches earlyoom with the quotes still on it.
+#   a comm is at most 15 bytes, so each name below is its truncated form
+#   (dbus-broker-lau, gnome-keyring-d); `.` stands for the space in "tmux: server"
+EARLYOOM_ARGS='-r 3600 --avoid ^(systemd|dbus-broker|dbus-broker-lau|dbus-daemon|cosmic-.*|Xwayland|Xorg|kitty|sshd|tmux:.server|pipewire|pipewire-pulse|wireplumber|gnome-keyring-d|gcr-ssh-agent|polkitd|earlyoom)$ --prefer ^(node|claude|claude.exe|bun|jest)$'

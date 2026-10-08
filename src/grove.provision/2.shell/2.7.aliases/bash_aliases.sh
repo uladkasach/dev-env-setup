@@ -585,19 +585,36 @@ npx_real() { command npx "$@"; }
 #        and refuse to grow past MemoryMax, so it cannot hog the box.
 #        the in-nvim self-watchdog (init.lua) trips first, below these
 #        limits, to self-heal without a kill — this scope is the backstop.
+
+# .what = wait for the user systemd manager to ANSWER, or say why it cannot
+# .why  = a dead manager leaves /run/user/$UID/bus on disk and refuses every
+#         connection, so `systemd-run --user` fails "Failed to connect to bus".
+#         bundle 1.6.5.usermanager makes systemd revive a dead manager in ~2s,
+#         so the wait rides out a revive in flight. there is ONE path: the
+#         capped launch. a manager that stays mute is a defect to repair, and
+#         the message names the repair — never a quiet uncapped run
+_user_systemd_await() {
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    systemctl --user show-environment >/dev/null 2>&1 && return 0
+    sleep 0.5
+  done
+  echo "✋ your user systemd manager does not answer on \$XDG_RUNTIME_DIR/bus" >&2
+  echo "   ⇒ systemd-run --user cannot start the capped scope" >&2
+  echo "   read why: rhx machine.journal.read --scope system --unit user@$(id -u).service --since today" >&2
+  echo "   fix:      sudo -v && rhx grove.provision --what 1.6.5.usermanager --mode apply" >&2
+  return 1
+}
+
 nvim() {
   # find the real nvim binary, bypass this function (works in bash + zsh)
   local bin
   bin=$( unset -f nvim 2>/dev/null; command -v nvim )
-  # cap only in a real user session with systemd; else run bare
-  if [[ -n "$bin" ]] && command -v systemd-run >/dev/null 2>&1 && [[ -n "$XDG_RUNTIME_DIR" ]]; then
-    systemd-run --user --scope --quiet --collect \
-      -p MemoryHigh=1500M \
-      -p MemoryMax=2G \
-      "$bin" "$@"
-  else
-    command nvim "$@"
-  fi
+  _user_systemd_await || return 1
+  systemd-run --user --scope --quiet --collect \
+    -p MemoryHigh=1500M \
+    -p MemoryMax=2G \
+    "$bin" "$@"
 }
 
 # cap claude memory so the fleet of sessions cannot hog the machine.
@@ -663,17 +680,14 @@ claude() {
     return 127
   fi
 
-  # cap only in a real user session with systemd; else run bare.
   # the scope wraps the OUTER call, and claude inherits the cgroup — so the
-  # slice still bounds the session however it was launched
-  if command -v systemd-run >/dev/null 2>&1 && [[ -n "$XDG_RUNTIME_DIR" ]]; then
-    systemd-run --user --scope --quiet --collect \
-      --slice=claude.slice \
-      -p MemoryMax=8G \
-      "${cmd[@]}"
-  else
+  # slice still bounds the session however it was launched. one path: the
+  # capped launch, after the manager answers (see _user_systemd_await)
+  _user_systemd_await || return 1
+  systemd-run --user --scope --quiet --collect \
+    --slice=claude.slice \
+    -p MemoryMax=8G \
     "${cmd[@]}"
-  fi
 }
 
 # set the aggregate memory cap across ALL claude sessions.

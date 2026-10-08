@@ -48,7 +48,7 @@ grove_provision_5_18_openhours_provision_upsert() {
   # 🛑 it opens NO gate. a human may have closed one by hand, and the safe
   #   direction on an unreconciled gate is closed
   ####################################################################
-  if [[ "$GROVE_OPENHOURS_ENABLED" != "true" ]]; then
+  if [[ "$(grove_provision_5_18_openhours_optin_state)" != "in" ]]; then
     if [[ -f "$unit_dir/machine_openhours_reconcile.timer" ]]; then
       systemctl --user disable --now machine_openhours_reconcile.timer 2>/dev/null
       rm -f "$bin_dir/machine_openhours_reconcile" \
@@ -61,7 +61,21 @@ grove_provision_5_18_openhours_provision_upsert() {
     else
       echo "   🌙 openhours is opted out — no gate installed"
     fi
-    echo "      opt in: set GROVE_OPENHOURS_ENABLED=true in this bundle's _.sh"
+    ##################################################################
+    # ⚠️ the fix names the SKILL, never a hand-rolled `mkdir` + redirect. this
+    #   bundle must not write the marker (see the reader's note), so a human
+    #   places it — and the family that wraps that write is the one surface they
+    #   should reach for (`rule.require.reach-for-the-skill-before-adhoc-shell`).
+    #
+    #   📜 this hint DID spell the two raw commands until 2026-10-01, and the
+    #     path they aimed at is the half nobody recalls: a redirect one character
+    #     off writes a marker this bundle never reads, so the next apply tears
+    #     the gate down and reports success
+    ##################################################################
+    echo "      this box has not elected the gate; the default is off"
+    echo "      opt in: rhx machine.openhours.optin.set --mode apply"
+    echo "              rhx grove.provision --what 5.18.openhours --mode apply"
+    echo "      read it: rhx machine.openhours.optin.get"
     return 0
   fi
 

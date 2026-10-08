@@ -29,7 +29,21 @@
 #   rhx grove.provision --what 1.6.3.earlyoom --mode apply
 ######################################################################
 
+# .what = does the LIVE earlyoom process carry the declared --avoid policy?
+# .why  = shared by configure.upsert (to skip a needless restart) and
+#         configure.verify (to judge the claim) — one reader, one cut of the set.
+#         /etc/default/earlyoom is read once at start, so only the process's own
+#         argv says whether the policy is in force
+grove_provision_1_6_3_earlyoom_daemon_runs_policy() {
+  local pid
+  pid="$(systemctl show -p MainPID --value earlyoom 2>/dev/null)"
+  [[ -n "$pid" && "$pid" != "0" && -r "/proc/$pid/cmdline" ]] || return 1
+  tr '\0' ' ' < "/proc/$pid/cmdline" | grep -q -- '--avoid ^(systemd|'
+}
+
 grove_provision_1_6_3_earlyoom() {
   bundle.upgrade 1.6.3.earlyoom.provision.upsert
   bundle.upgrade 1.6.3.earlyoom.provision.verify
+  bundle.upgrade 1.6.3.earlyoom.configure.upsert
+  bundle.upgrade 1.6.3.earlyoom.configure.verify
 }
