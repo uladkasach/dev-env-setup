@@ -46,16 +46,15 @@ function nimg {
   pqiv "$@"
 }
 
-# yubikey-agent's ssh socket — see 5.9.yubikey, which installs the agent
+# 🛑 SSH_AUTH_SOCK is NOT set here — a shell keeps the desktop's agent
 #
-# .why declared here rather than appended by an installer: an installer that
-#      APPENDS this line to this very file writes from a machine step into the
-#      repo (rule.require.repo-as-source-of-truth), at a hardcoded main-checkout
-#      path. and an undriven installer exports on no box at all, so the agent is
-#      unreachable everywhere it is installed.
-if [[ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/yubikey-agent/yubikey-agent.sock" ]]; then
-  export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/yubikey-agent/yubikey-agent.sock"
-fi
+# .why: ssh speaks to ONE agent, the one SSH_AUTH_SOCK names. yubikey-agent
+#       serves only the key on the YubiKey and refuses file keys, so a shell
+#       pointed at it decrypts ~/.ssh/id_ed25519 from disk on every connection
+#       and asks for its passphrase every time. the desktop agent unlocks a file
+#       key once per login. a host that wants the YubiKey names its socket per
+#       call: SSH_AUTH_SOCK=<5.9.yubikey's socket> ssh <host>, or IdentityAgent
+#       (2.7.aliases.configure.verify fails on a shell-wide pin)
 
 # 🛑 .NO CLAUDE CONFIG VALUE IS SET HERE — `5.3.brains` declares every knob in
 #    `~/.claude/settings.json`, and is the SOLE writer

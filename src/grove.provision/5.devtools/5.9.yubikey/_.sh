@@ -6,15 +6,16 @@
 # ⚠️ this bundle recovers DEAD CODE, the worst instance found
 #   - yubikey-agent's install was a function no driver reached, so it ran nowhere
 #   - `util.yubikey.ssh.sh` told a human to call that function FIRST, by hand
-#   - 📜 confirmed 2026-07-30: `SSH_AUTH_SOCK` is declared in NO file of this repo
-#   - ⇒ the agent could be installed and ssh would still not talk to it
 #
 # 🛑 a phase may NEVER append an export to `2.7.aliases`'s `bash_aliases.sh`
 #   - that writes machine → repo, where it must be repo → machine
 #   - its path is a hardcoded main checkout, so a WORKTREE run edits main's file
-#   - ⇒ `SSH_AUTH_SOCK` is DECLARED content there, installed by `2.7.aliases`
-#   - ⇒ this bundle installs the AGENT and that one declares its SOCKET
 #   - (`rule.require.repo-as-source-of-truth`)
+#
+# ⚠️ the agent is NOT a shell's default. SSH_AUTH_SOCK keeps the desktop agent,
+#    which holds file keys; yubikey-agent refuses them, so as the default it made
+#    every file-key connection ask for a passphrase. a host that wants the
+#    YubiKey names this agent's socket per call (`2.7.aliases` states why)
 #
 # .it applies ONLY where a human is
 #   - a YubiKey is a physical object a human touches to authorize

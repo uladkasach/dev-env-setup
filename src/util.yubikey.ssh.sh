@@ -14,6 +14,12 @@
 ## ref: https://developers.yubico.com/PIV/Guides/SSH_with_PIV_and_PKCS11.html
 #########################
 
+# yubikey-agent's socket, named directly — a shell's SSH_AUTH_SOCK names the
+# desktop agent, so a bare `ssh-add -L` would list ITS keys as the yubikey's
+_yubikey_agent_sock() {
+  echo "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/yubikey-agent/yubikey-agent.sock"
+}
+
 get_sshkey_from_yubikey() {
   set -euo pipefail
 
@@ -40,15 +46,17 @@ get_sshkey_from_yubikey() {
   done
 
   # check yubikey-agent is available
-  if [[ -z "${SSH_AUTH_SOCK:-}" ]] || [[ ! -S "${SSH_AUTH_SOCK}" ]]; then
-    echo "error: SSH_AUTH_SOCK not set or not a socket"
+  local sock
+  sock="$(_yubikey_agent_sock)"
+  if [[ ! -S "$sock" ]]; then
+    echo "error: no yubikey-agent socket at $sock"
     echo "ensure yubikey-agent is active: systemctl --user status yubikey-agent"
     return 1
   fi
 
   # get public key
   local pubkey
-  pubkey=$(ssh-add -L 2>/dev/null | head -n1)
+  pubkey=$(SSH_AUTH_SOCK="$sock" ssh-add -L 2>/dev/null | head -n1)
 
   if [[ -z "$pubkey" ]]; then
     echo "error: no SSH key found on YubiKey"
@@ -230,7 +238,7 @@ set_sshkey_into_yubikey() {
 
   echo ""
   echo "done. public key:"
-  ssh-add -L
+  SSH_AUTH_SOCK="$(_yubikey_agent_sock)" ssh-add -L
 
   echo ""
   echo "add this public key to GitHub, servers, etc."

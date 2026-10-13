@@ -127,9 +127,16 @@ main() {
     -g 'CTRL-EVENT-DISCONNECTED|reason=|state change|deauth|beacon|connectivity|disassoc|supplicant connection state' --case-sensitive=false
 
   echo ""
-  echo "🌲 probe done — read rungs 2, 4, 5 together: the cause is where they agree"
-  echo "   a silent link with power-save on, and no deauth or beacon loss?"
+  echo "── 6. silent stalls the watchdog caught (since $SINCE)"
+  __wifi_read 'journal watchdog' journalctl -u wifi-link-watchdog.service --since "$SINCE" --no-pager -o short-iso \
+    -g 'wifi-watchdog: (STALL|RESTORED|NOT RESTORED)'
+
+  echo ""
+  echo "🌲 probe done — read rungs 2, 4, 5, 6 together: the cause is where they agree"
+  echo "   a silent link with power-save ON, and no deauth or beacon loss?"
   echo "   ⇒ allowlist this driver: howto.allowlist-a-wifi-driver-for-powersave-off"
+  echo "   a silent link with power-save OFF — a dhcp renewal that never came?"
+  echo "   ⇒ the stall the watchdog catches: rhx network.wifi.watchdog.get"
   return 0
 }
 
