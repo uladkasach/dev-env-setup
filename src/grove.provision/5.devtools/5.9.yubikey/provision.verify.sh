@@ -1,13 +1,7 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = prove the agent and ykman are installed, and that the SOCKET a shell
-#         points at is the one the agent serves
-#
-# ⚠️ the SOCKET claim is the one that matters
-#   - an installed, active agent that no shell points at is invisible to ssh
-#   - 📜 that was the REAL state of every box this repo set up, since the export
-#     was appended by a function nobody ever drove
-#   - ⇒ the claim is "a shell can reach it", never "the agent is up"
+# .what = prove the agent and ykman are installed, and that the agent serves
+#         its SOCKET — the address a caller names to reach the YubiKey key
 #
 # guarantee:
 #   - READ-ONLY. it observes; it mutates no state
@@ -54,19 +48,9 @@ grove_provision_5_9_yubikey_provision_verify() {
     failed=1
   fi
 
-  ####################################################################
-  # 4. and that SSH_AUTH_SOCK names it
-  #   - the socket can exist unread while a shell points at the desktop's agent
-  #   - ⇒ that one answers, and offers other keys
-  ####################################################################
-  if [[ "${SSH_AUTH_SOCK:-}" == "$want" ]]; then
-    echo "   • SSH_AUTH_SOCK names the yubikey agent ✔"
-  else
-    echo "   🌙 SSH_AUTH_SOCK is '${SSH_AUTH_SOCK:-unset}', not the yubikey socket."
-    echo "      this run is a non-interactive bash, which reads no aliases file,"
-    echo "      so that is expected here. to check a real shell:"
-    echo "        zsh -ic 'echo \$SSH_AUTH_SOCK'"
-  fi
+  # ⚠️ no claim on SSH_AUTH_SOCK. a shell keeps the desktop agent, which holds
+  #    file keys; a host that wants the YubiKey names this socket per call
+  #    (2.7.aliases states why)
 
   return $failed
 }

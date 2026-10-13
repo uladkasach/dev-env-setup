@@ -13,7 +13,7 @@
           {
             "type": "command",
             "command": "./node_modules/.bin/rhx route.drive --when hook.onBoot",
-            "timeout": 5,
+            "timeout": 25,
             "author": "repo=bhrain/role=driver"
           },
           {
@@ -186,8 +186,20 @@
           {
             "type": "command",
             "command": "./node_modules/.bin/rhx route.drive --when hook.onStop",
-            "timeout": 5,
+            "timeout": 25,
             "author": "repo=bhrain/role=driver"
+          },
+          {
+            "type": "command",
+            "command": "node -e \"import('rhachet-roles-bhuild').then(m => m.cli.radioTaskHeld())\" -- --when hook.onStop",
+            "timeout": 10,
+            "author": "repo=bhuild/role=dispatcher"
+          },
+          {
+            "type": "command",
+            "command": "./node_modules/.bin/rhachet roles cost --all --when hook.onStop",
+            "timeout": 60,
+            "author": "repo=.this/role=any"
           }
         ]
       }
@@ -328,6 +340,10 @@
       "Bash(npx rhachet run --skill get.package.docs:*)",
       "Bash(npx rhachet run --skill get.package.docs readme --of iso-price)",
       "Bash(npx rhachet run --skill get.package.docs filetree --of iso-price)",
+      "Bash(npx rhachet run --skill permissions.get:*)",
+      "Bash(rhx permissions.get:*)",
+      "Bash(rhx permissions.get --head git)",
+      "Bash(rhx permissions.get --for 'ls src')",
       "Bash(npx rhachet run --skill condense:*)",
       "Bash(npx rhachet run --skill condense --from briefs/rule.md)",
       "Bash(npx rhachet run --skill condense --from briefs/rule.md --mode plan)",

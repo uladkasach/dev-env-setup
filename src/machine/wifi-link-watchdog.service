@@ -1,0 +1,19 @@
+# owned by dev-env-setup `1.11.wifi` — edits here are lost on the next apply
+#
+# watch each connected wifi link for a silent stall (associated, gateway
+# silent); record the link, driver, and firmware state, then reconnect.
+# records: journalctl -u wifi-link-watchdog.service -g 'wifi-watchdog:'
+[Unit]
+Description=wifi link watchdog — record and reconnect a silent wifi stall
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/libexec/dev-env-setup/machine_wifi_link_watchdog --mode apply
+Restart=always
+RestartSec=10
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

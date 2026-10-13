@@ -1,0 +1,217 @@
+#!/usr/bin/env bash
+######################################################################
+# .what = watch each connected wifi link for a SILENT STALL — associated, yet
+#         the gateway goes silent — and when one is seen:
+#           1. write the link, driver, and firmware state to the journal
+#           2. reconnect that connection, so the human never has to
+#
+# .why
+#   - a QCA6390 (`ath11k_pci`) stalls with power-save OFF: it stays associated,
+#     NetworkManager reads "connected", and no kernel line marks the moment.
+#     measured 2026-10-12, twice in three hours: the DHCPv6 renewal stopped, no
+#     deauth, no beacon loss, and a manual reconnect restored traffic in 2s
+#   - the evidence that would name the cause is only readable DURING the stall,
+#     and every stall so far ended with a human reconnect before anyone read it
+#   - ⇒ this records first, then reconnects. the record is the point; the
+#     reconnect is what keeps the human out of the loop meanwhile
+#
+# .why "stall" needs a gateway that HAS answered on this association
+#   - a router that drops icmp never answers, and to read that as a stall would
+#     reconnect forever. a gateway is only held to account once it has replied
+#     since the link came up (`gotcha.a-check-that-cries-wolf-gets-silenced`)
+#
+# .why strikes and a cooldown
+#   - a resume from suspend, a roam, or a dhcp renew can lose a probe or two
+#   - ⇒ `--strikes` misses in a row before a stall is declared, and at most one
+#     reconnect per `--cooldown`, so a real outage upstream cannot loop it
+#
+# usage:
+#   machine_wifi_link_watchdog                          # watch forever, reconnect on a stall
+#   machine_wifi_link_watchdog --mode plan              # watch forever, record only
+#   machine_wifi_link_watchdog --once --mode plan       # one probe pass, print the verdict
+#   machine_wifi_link_watchdog --once --mode plan --gateway 192.0.2.1   # a planted stall
+#
+# exit (--once):
+#   0 = every connected wifi link answers, or none is connected
+#   3 = a stall was seen (and, under --mode apply, a reconnect was attempted)
+#   2 = bad input
+#
+# guarantee:
+#   - every external call is bounded by a timeout
+#   - records go to stdout, which journald files under this unit
+#   - it reconnects only the connection that is ACTIVE on the stalled device
+######################################################################
+
+set -uo pipefail
+
+MODE=apply
+ONCE=0
+INTERVAL=15
+STRIKES=4
+COOLDOWN=300
+GATEWAY_OVERRIDE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --mode) MODE="${2:-}"; shift 2 ;;
+    --once) ONCE=1; shift ;;
+    --interval) INTERVAL="${2:-}"; shift 2 ;;
+    --strikes) STRIKES="${2:-}"; shift 2 ;;
+    --cooldown) COOLDOWN="${2:-}"; shift 2 ;;
+    --gateway) GATEWAY_OVERRIDE="${2:-}"; shift 2 ;;
+    --help|-h) sed -n '2,45p' "$0"; exit 0 ;;
+    *) echo "✋ ConstraintError: unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+[[ "$MODE" == apply || "$MODE" == plan ]] || { echo "✋ ConstraintError: --mode must be apply or plan" >&2; exit 2; }
+for n in "$INTERVAL" "$STRIKES" "$COOLDOWN"; do
+  [[ "$n" =~ ^[0-9]+$ && "$n" -gt 0 ]] || { echo "✋ ConstraintError: --interval, --strikes, --cooldown take a positive integer" >&2; exit 2; }
+done
+
+# .what = one record line, tagged so a journal grep finds every one
+say() { echo "wifi-watchdog: $*"; }
+
+# .what = the wifi devices NetworkManager calls connected, one per line
+connected_wifi_devices() {
+  timeout 5 nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null \
+    | awk -F: '$2 == "wifi" && $3 == "connected" { print $1 }'
+}
+
+# .what = the ipv4 default gateway behind one device, or empty
+gateway_of() {
+  [[ -n "$GATEWAY_OVERRIDE" ]] && { echo "$GATEWAY_OVERRIDE"; return 0; }
+  timeout 5 ip -4 route show default dev "$1" 2>/dev/null | awk '{ print $3; exit }'
+}
+
+# .what = the bssid a device is associated with, or empty — a new one means a new association
+bssid_of() {
+  timeout 5 iw dev "$1" link 2>/dev/null | awk '/^Connected to/ { print $3; exit }'
+}
+
+# .what = does the gateway answer one probe over this device?
+gateway_answers() {
+  timeout 5 ping -n -q -c 1 -W 3 -I "$1" "$2" >/dev/null 2>&1
+}
+
+# .what = the state that names a stall's cause, written to the journal BEFORE any reconnect
+record_evidence() {
+  local dev="$1" gw="$2" misses="$3"
+  say "STALL dev=$dev gateway=$gw misses=$misses — associated, and the gateway is silent"
+  {
+    echo "── nmcli device"
+    timeout 5 nmcli -f GENERAL.STATE,GENERAL.CONNECTION,IP4.ADDRESS,IP4.GATEWAY device show "$dev"
+    echo "── iw link"
+    timeout 5 iw dev "$dev" link
+    echo "── iw station dump (tx retries / failed, beacon loss, last ack)"
+    timeout 5 iw dev "$dev" station dump
+    echo "── iw power_save"
+    timeout 5 iw dev "$dev" get power_save
+    echo "── ip -s link (rx/tx counters, drops, errors)"
+    timeout 5 ip -s link show dev "$dev"
+    echo "── neighbour entry for the gateway"
+    timeout 5 ip neigh show "$gw" dev "$dev"
+    echo "── driver + firmware"
+    echo "driver: $(basename "$(readlink "/sys/class/net/$dev/device/driver" 2>/dev/null)" 2>/dev/null)"
+    timeout 10 journalctl -k -b 0 --no-pager -o cat 2>/dev/null | grep -m 3 -E "^$(basename "$(readlink "/sys/class/net/$dev/device/driver" 2>/dev/null)" 2>/dev/null).*(fw_version|fw_build|firmware|board)"
+    echo "── kernel, last 10 minutes, for this radio"
+    timeout 10 journalctl -k --since -10min --no-pager -o short-iso 2>/dev/null | grep -E "ath1[01]k|$dev|wlan|wifi" | tail -n 30
+  } 2>&1 | sed 's/^/wifi-watchdog:   /'
+}
+
+# .what = reconnect the connection active on one device, then report whether traffic came back
+reconnect() {
+  local dev="$1" uuid
+  uuid="$(timeout 5 nmcli -g GENERAL.CON-UUID device show "$dev" 2>/dev/null)"
+  if [[ -z "$uuid" ]]; then
+    say "RECONNECT skipped dev=$dev — no active connection uuid to raise again"
+    return 1
+  fi
+  say "RECONNECT dev=$dev connection=$uuid"
+  if ! timeout 60 nmcli connection up uuid "$uuid" ifname "$dev" >/dev/null 2>&1; then
+    say "RECONNECT failed dev=$dev — nmcli could not raise the connection"
+    return 1
+  fi
+
+  # did the reconnect restore traffic? the answer separates a stuck radio from an outage upstream
+  local i newgw
+  for i in 1 2 3 4 5 6; do
+    newgw="$(gateway_of "$dev")"
+    if [[ -n "$newgw" ]] && gateway_answers "$dev" "$newgw"; then
+      say "RESTORED dev=$dev gateway=$newgw bssid=$(bssid_of "$dev") — traffic flows again"
+      return 0
+    fi
+    sleep 5
+  done
+  say "NOT RESTORED dev=$dev — the gateway is still silent after a reconnect; the fault may be upstream"
+  return 1
+}
+
+declare -A misses=() answered=() last_bssid=() last_reconnect=()
+
+# .what = one probe of one device; returns 3 when a stall was declared
+probe_one() {
+  local dev="$1" gw bssid now
+  gw="$(gateway_of "$dev")"
+  bssid="$(bssid_of "$dev")"
+  [[ -n "$gw" ]] || return 0
+
+  # a new association resets what this device has proven
+  if [[ "${last_bssid[$dev]:-}" != "$bssid" ]]; then
+    misses[$dev]=0; answered[$dev]=0; last_bssid[$dev]="$bssid"
+  fi
+
+  if gateway_answers "$dev" "$gw"; then
+    misses[$dev]=0; answered[$dev]=1
+    [[ "$ONCE" -eq 1 ]] && say "ok dev=$dev gateway=$gw bssid=$bssid"
+    return 0
+  fi
+
+  misses[$dev]=$(( ${misses[$dev]:-0} + 1 ))
+  [[ "$ONCE" -eq 1 ]] && say "miss dev=$dev gateway=$gw bssid=$bssid"
+
+  # a watch needs a gateway that has answered before, and STRIKES misses in a row;
+  # a single --once pass has no history, so its one miss is the verdict
+  if [[ "$ONCE" -eq 0 ]]; then
+    [[ "${answered[$dev]:-0}" -eq 1 ]] || return 0
+    [[ "${misses[$dev]}" -ge "$STRIKES" ]] || return 0
+  fi
+
+  record_evidence "$dev" "$gw" "${misses[$dev]}"
+  if [[ "$MODE" == plan ]]; then
+    say "PLAN dev=$dev — would reconnect; --mode plan records only"
+    return 3
+  fi
+
+  now="$(date +%s)"
+  if (( now - ${last_reconnect[$dev]:-0} < COOLDOWN )); then
+    say "COOLDOWN dev=$dev — reconnected under ${COOLDOWN}s ago; holds off"
+    return 3
+  fi
+  last_reconnect[$dev]="$now"
+  reconnect "$dev"
+  misses[$dev]=0; answered[$dev]=0; last_bssid[$dev]=""
+  return 3
+}
+
+# .what = one pass over every connected wifi device; 3 if any stalled
+probe_all() {
+  local dev rc=0 seen=0
+  while IFS= read -r dev; do
+    [[ -n "$dev" ]] || continue
+    seen=1
+    probe_one "$dev" || rc=$?
+  done < <(connected_wifi_devices)
+  [[ "$ONCE" -eq 1 && "$seen" -eq 0 ]] && say "no connected wifi device"
+  return "$rc"
+}
+
+if [[ "$ONCE" -eq 1 ]]; then
+  probe_all
+  exit $?
+fi
+
+say "watch begins mode=$MODE interval=${INTERVAL}s strikes=$STRIKES cooldown=${COOLDOWN}s"
+while true; do
+  probe_all || true
+  sleep "$INTERVAL"
+done

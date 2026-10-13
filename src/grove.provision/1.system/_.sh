@@ -22,6 +22,7 @@
 #     1.9.audio      the mic capture chain (pw-record, pactl, notify-send)
 #     1.10.hosts     the ssm-proxy db tunnel aliases (/etc/hosts)
 #     1.11.wifi      wifi power-save off (NetworkManager conf.d + live radio)
+#                    + a stall watchdog that records, then reconnects (system unit)
 #
 # .why nearly all apply to EVERY box
 #   - a screen-gate reads "no EFFECT here" as "cannot be HELD here"; a
