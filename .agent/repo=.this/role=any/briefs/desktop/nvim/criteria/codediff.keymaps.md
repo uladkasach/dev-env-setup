@@ -13,6 +13,18 @@ given('user is in any buffer')
     then('codediff tab opens if not open')
     then('focus moves to codediff tab if open but not focused')
     then('focus returns to previous tab if codediff is focused')
+    then('the tab shows staged + unstaged + untracked changes')
+
+given('user is in any buffer')
+  when('user presses ctrl+shift+g')
+    then('a since-main codediff tab opens, toggles, and focuses the same way')
+    then('the tab shows every change since merge-base(origin/main, HEAD): our commits + staged + unstaged + untracked')
+    then('commits on origin/main that we are behind on do not show')
+
+given('user is in one scope\'s codediff tab')
+  when('user presses the other scope\'s key')
+    then('the other scope\'s tab opens or focuses')
+    then('the current scope\'s tab stays open')
 
 ### usecase.2 = open file from explorer
 
@@ -51,7 +63,8 @@ given('user is in codediff tab')
 
 ## boundaries
 
-- ctrl+g: toggle/focus codediff tab
+- ctrl+g: toggle/focus codediff tab (staged + unstaged)
+- ctrl+shift+g: toggle/focus codediff tab (all changes since origin/main)
 - Enter: load diff (explorer) or default action (panes)
 - o: open file (new tab from pane, close from explorer)
 - ctrl+d [s|a|u|x]: git operations
