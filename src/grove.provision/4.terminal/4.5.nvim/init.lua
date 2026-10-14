@@ -1888,56 +1888,91 @@ local PLUGIN_SPEC = {
     'esmuellert/codediff.nvim',
     event = 'VeryLazy',  -- preload on startup so ctrl+g is instant
     keys = {
-      { '<C-g>', function()
-        local codediff_loaded, codediff = pcall(require, 'codediff')
-        -- check if in codediff buffer
-        local bufname = vim.api.nvim_buf_get_name(0)
-        local ft = vim.bo.filetype
-        local in_codediff = bufname:match('codediff://') or ft:match('^codediff')
-        if in_codediff then
-          -- in codediff: go to last file tab or previous tab
+      { '<C-g>', function() _G.codediff_toggle_scope('status') end,
+        desc = 'Toggle diff view: staged + unstaged' },
+      { '<C-S-g>', function() _G.codediff_toggle_scope('since-main') end,
+        desc = 'Toggle diff view: all changes since origin/main (our commits + staged + unstaged)' },
+    },
+    init = function()
+      -- .what = the two diff scopes a toggle key can open
+      -- .why  = `status` is the work in flight; `since-main` is the whole branch as a
+      --         review would see it. `origin/main...` diffs merge-base(origin/main, HEAD)
+      --         against the work tree, so it holds every commit we added plus staged,
+      --         unstaged, and untracked work — and none of the commits we are behind on
+      local scopes = {
+        ['status'] = { cmd = 'CodeDiff' },
+        ['since-main'] = { cmd = 'CodeDiff origin/main...' },
+      }
+
+      -- .what = the scope a tab's codediff explorer shows, or nil if it holds none
+      -- .why  = each key must find ITS OWN tab. the explorer's base_revision tells them
+      --         apart: nil in status mode, the merge-base hash in since-main mode
+      local function get_tab_scope(tab)
+        local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
+        if not lc_ok then return nil end
+        local explorer = lifecycle.get_explorer and lifecycle.get_explorer(tab)
+        if not explorer then return nil end
+        return explorer.base_revision and 'since-main' or 'status'
+      end
+
+      -- .what = focus the explorer tree pane once codediff has built it
+      -- .why  = `:CodeDiff` builds its tab async (git status, merge-base), so a single
+      --         fixed delay can fire before the tree exists; poll briefly instead
+      local function focus_explorer(tries)
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+          local buf = vim.api.nvim_win_get_buf(win)
+          if vim.bo[buf].filetype == 'codediff-explorer' then
+            vim.api.nvim_set_current_win(win)
+            return
+          end
+        end
+        if tries > 0 then vim.defer_fn(function() focus_explorer(tries - 1) end, 50) end
+      end
+
+      -- .what = toggle between the file tab and the diff tab of one scope
+      -- .why  = ctrl+g and ctrl+shift+g share one flow; only the scope differs
+      _G.codediff_toggle_scope = function(scope)
+        local current = vim.api.nvim_get_current_tabpage()
+        local current_scope = get_tab_scope(current)
+
+        -- on this scope's diff tab: go back to the file tab
+        if current_scope == scope then
+          if _G.last_file_tab and vim.api.nvim_tabpage_is_valid(_G.last_file_tab) then
+            vim.api.nvim_set_current_tabpage(_G.last_file_tab)
+            return
+          end
+          vim.cmd('tabprevious')
+          return
+        end
+
+        -- on a file tab: remember it, so the toggle can return here
+        local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
+        local in_session = lc_ok and lifecycle.get_session(current) ~= nil
+        if not in_session then _G.last_file_tab = current end
+
+        -- reuse this scope's diff tab if one is open
+        for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+          if get_tab_scope(tab) == scope then
+            vim.api.nvim_set_current_tabpage(tab)
+            focus_explorer(0)
+            return
+          end
+        end
+
+        -- else open it — from a tab with no session, since `:CodeDiff` run inside a
+        -- session tab CLOSES that tab rather than open a new one
+        if in_session then
           if _G.last_file_tab and vim.api.nvim_tabpage_is_valid(_G.last_file_tab) then
             vim.api.nvim_set_current_tabpage(_G.last_file_tab)
           else
-            vim.cmd('tabprevious')
+            vim.cmd('tabnew')
+            _G.last_file_tab = vim.api.nvim_get_current_tabpage()
           end
-        else
-          -- not in codediff: save current tab, find or open codediff
-          _G.last_file_tab = vim.api.nvim_get_current_tabpage()
-          -- find codediff tab
-          local found_tab = nil
-          for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
-            local wins = vim.api.nvim_tabpage_list_wins(tab)
-            for _, win in ipairs(wins) do
-              local buf = vim.api.nvim_win_get_buf(win)
-              local name = vim.api.nvim_buf_get_name(buf)
-              local bft = vim.api.nvim_get_option_value('filetype', { buf = buf })
-              if name:match('codediff://') or bft:match('^codediff') then
-                found_tab = tab
-                break
-              end
-            end
-            if found_tab then break end
-          end
-          if found_tab then
-            vim.api.nvim_set_current_tabpage(found_tab)
-          else
-            vim.cmd('CodeDiff')
-          end
-          -- focus the tree pane
-          vim.defer_fn(function()
-            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-              local buf = vim.api.nvim_win_get_buf(win)
-              local bft = vim.api.nvim_get_option_value('filetype', { buf = buf })
-              if bft == 'codediff-explorer' then
-                vim.api.nvim_set_current_win(win)
-                break
-              end
-            end
-          end, 50)
         end
-      end, desc = 'Toggle diff view' },
-    },
+        vim.cmd(scopes[scope].cmd)
+        focus_explorer(40)
+      end
+    end,
     cmd = 'CodeDiff',
     config = function()
       local explorer_width = 30
