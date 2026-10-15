@@ -2,18 +2,24 @@
 ######################################################################
 # .what = prove the remap is DECLARED as this bundle declares it
 #
-# .why the conf's PRESENCE is not the claim
+# .why the confs are compared WHOLE against the renderer
 #   - `[[ -f default.conf ]]` passes on every broken keyd config ever written
-#   - so this asserts the two lines that carry the value: capslock, and the vimarrows layer
-#   - plus `overload_tap_timeout`, which only matters when it is absent
-#   - 📜 its absence surfaces months later as a stray escape on a slow ctrl+click
-#   - ⇒ and it reads as an nvim bug
+#   - `_.sh`'s `keybinds_keyd_conf` is the one source both phases read
+#   - ⇒ a byte compare catches every drift: capslock, the tap timeout, the
+#     vimarrows layer, the apple ids, and the per-board alt/super swap
+#   - 📜 an absent `overload_tap_timeout` surfaces months later as a stray escape
+#     on a slow ctrl+click — and it reads as an nvim bug
 #
-# .why the dir is asserted to hold exactly ONE conf
-#   - keyd reads every `.conf` in `/etc/keyd/`, and two `[ids] *` files fight by read order
-#   - a second file is not a syntax error, so keyd reports no complaint
-#   - the remap simply becomes whichever file won
-#   - ⇒ that is invisible from a read of this repo, so it is asserted here
+# .why the dir is asserted to hold exactly TWO confs
+#   - keyd reads every `.conf` in `/etc/keyd/`
+#   - `default.conf` (every board but apple) and `apple.conf` (apple only) partition
+#     the devices, so they never fight
+#   - a THIRD file that also matches `*` would fight `default.conf` by read order
+#   - that is not a syntax error, so keyd reports no complaint
+#
+# .why cosmic's xkb swap is asserted ABSENT
+#   - `altwin:swap_lalt_lwin` applies to every keyboard, and stacks on keyd's swap
+#   - stacked, the builtin double-swaps back to stock and the apple board swaps
 #
 # .why the effective remap is UNVERIFIED here
 #   - to observe capslock now sends ctrl you must read a key event
@@ -23,93 +29,89 @@
 #   - (rule.forbid.failhide)
 #
 # guarantee:
-#   - READ-ONLY. it reads /etc/keyd and queries systemd; repairs no state
+#   - READ-ONLY. it reads /etc/keyd, the xkb config, and systemd; repairs no state
 #
 # exit:
 #   0 = the declaration holds, as far as it can be observed from here
-#   1 = a declared line is ABSENT, or a second conf is present to fight it
+#   1 = a conf is absent or drifted, a third conf is present, or the xkb swap stacks
 ######################################################################
 
 grove_provision_1_1_keybinds_configure_verify() {
-  local conf="/etc/keyd/default.conf"
   local failed=0
+  local fix="sudo -v && rhx grove.provision --what 1.1.keybinds --mode apply"
 
   ####################################################################
-  # 1. the conf exists
+  # 1. each conf matches its rendered declaration
   ####################################################################
-  if [[ ! -f "$conf" ]]; then
-    echo "   ✋ no keyd config at $conf" >&2
-    echo "      ⇒ configure.upsert did not take, so capslock is still capslock" >&2
-    echo "      fix: rhx grove.provision --what 1.1.keybinds --mode apply" >&2
-    return 1
-  fi
+  local board file want live
+  for board in builtin apple; do
+    file="/etc/keyd/default.conf"
+    [[ "$board" == "apple" ]] && file="/etc/keyd/apple.conf"
+    want="$(keybinds_keyd_conf --for "$board")" || return 1
+    live="$(cat "$file" 2>/dev/null || true)"
+
+    if [[ -z "$live" ]]; then
+      echo "   ✋ no keyd conf at $file" >&2
+      echo "      ⇒ the $board boards get no remap: capslock is capslock, and" >&2
+      echo "        the alt/super position is whatever the board ships with" >&2
+      echo "      fix: $fix" >&2
+      failed=$(( failed + 1 ))
+    elif [[ "$live" == "$want" ]]; then
+      echo "   • $file matches its declaration ($board boards) ✔"
+    else
+      echo "   ✋ $file has DRIFTED from its declaration ($board boards)" >&2
+      diff <(printf '%s\n' "$want") <(printf '%s\n' "$live") | sed 's/^/        /' >&2
+      echo "      fix: $fix" >&2
+      failed=$(( failed + 1 ))
+    fi
+  done
 
   ####################################################################
-  # 2. exactly one conf — a second would fight this one by read order
+  # 2. exactly two confs — a third `*` match would fight default.conf
   ####################################################################
   local count; count="$(find /etc/keyd -maxdepth 1 -name '*.conf' 2>/dev/null | wc -l)"
-  if [[ "$count" -eq 1 ]]; then
-    echo "   • exactly one keyd conf ✔"
+  if [[ "$count" -eq 2 ]]; then
+    echo "   • exactly two keyd confs (default + apple) ✔"
   else
-    echo "   ✋ /etc/keyd holds $count .conf files, not 1" >&2
-    echo "      ⇒ keyd reads them ALL, and two that each match '[ids] *' fight;" >&2
-    echo "        the winner depends on read order, and keyd reports no complaint" >&2
+    echo "   ✋ /etc/keyd holds $count .conf files, not 2" >&2
+    echo "      ⇒ keyd reads them ALL; a stray one that matches '*' fights" >&2
+    echo "        default.conf, and read order picks the winner with no complaint" >&2
     find /etc/keyd -maxdepth 1 -name '*.conf' 2>/dev/null | sed 's/^/        /' >&2
     failed=$(( failed + 1 ))
   fi
 
   ####################################################################
-  # 3. capslock — the load-bear line
+  # 3. no global xkb swap stacked on keyd's per-board one
   ####################################################################
-  if grep -Eq '^[[:space:]]*capslock[[:space:]]*=[[:space:]]*overload\(control,[[:space:]]*esc\)' "$conf"; then
-    echo "   • capslock = overload(control, esc) declared ✔"
-  else
-    echo "   ✋ capslock is NOT declared as overload(control, esc)" >&2
-    echo "      ⇒ every tmux, nvim, and kitty keybind this repo declares assumes" >&2
-    echo "        ctrl is under the left pinky. without this they are contortions" >&2
+  local xkb="$HOME/.config/cosmic/com.system76.CosmicComp/v1/xkb_config"
+  if [[ -f "$xkb" ]] && grep -q 'altwin:swap_lalt_lwin' "$xkb"; then
+    echo "   ✋ cosmic's xkb options still carry altwin:swap_lalt_lwin" >&2
+    echo "      ⇒ it applies to every board and stacks on keyd's swap: the builtin" >&2
+    echo "        swaps back to stock, and the apple board swaps the wrong way" >&2
+    echo "      fix: $fix" >&2
     failed=$(( failed + 1 ))
+  else
+    echo "   • no global xkb alt/super swap ✔"
   fi
 
   ####################################################################
-  # 4. the tap timeout — the line whose absence hides for months
-  ####################################################################
-  if grep -Eq '^[[:space:]]*overload_tap_timeout[[:space:]]*=' "$conf"; then
-    echo "   • overload_tap_timeout declared ✔"
-  else
-    echo "   ✋ overload_tap_timeout is NOT declared" >&2
-    echo "      ⇒ a slow ctrl+click emits a stray escape on release, which nvim" >&2
-    echo "        reads as a mode change mid-gesture — and it reads as an nvim bug" >&2
-    failed=$(( failed + 1 ))
-  fi
-
-  ####################################################################
-  # 5. the vim arrow layer
-  ####################################################################
-  if grep -q '^\[vimarrows\]' "$conf"; then
-    echo "   • the vimarrows layer is declared ✔"
-  else
-    echo "   ✋ the [vimarrows] layer is ABSENT from the conf" >&2
-    failed=$(( failed + 1 ))
-  fi
-
-  ####################################################################
-  # 6. the daemon read it — a restart is what makes a conf edit live
+  # 4. the daemon read it — a restart is what makes a conf edit live
   ####################################################################
   if systemctl is-active --quiet keyd; then
-    echo "   • keyd daemon is active, so the conf above is the live one ✔"
+    echo "   • keyd daemon is active, so the confs above are the live ones ✔"
   else
     echo "   ✋ the keyd daemon is not active, so NO conf is in effect" >&2
     failed=$(( failed + 1 ))
   fi
 
   ####################################################################
-  # 7. whether the kernel honors it — not observable from here
+  # 5. whether the kernel honors it — not observable from here
   ####################################################################
-  echo "   🌙 unverified — whether a capslock press now DELIVERS ctrl needs a key"
-  echo "      event, so it needs an interactive tty and a human hand. this run has"
-  echo "      neither. the declaration and the live daemon above did hold"
-  echo "      to check by hand: hold capslock and press c in a shell — it should"
-  echo "      interrupt, not type C"
+  echo "   🌙 unverified — whether a press now DELIVERS the remap needs a key event,"
+  echo "      so it needs an interactive tty and a human hand. this run has neither"
+  echo "      to check by hand, on EACH board: hold capslock + c in a shell (interrupts),"
+  echo "      and the key beside the spacebar + a letter should act as super"
+  echo "      to see which board a key came from: sudo keyd monitor"
 
   [[ "$failed" -eq 0 ]] || return 1
 }

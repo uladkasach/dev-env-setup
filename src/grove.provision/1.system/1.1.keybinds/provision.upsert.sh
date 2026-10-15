@@ -45,20 +45,28 @@ grove_provision_1_1_keybinds_provision_upsert() {
   #   - all four reads below are FREE: dpkg, readlink, and systemctl's query verbs need no root
   #   - `pkg_install` uses this same order, and this is that order for a DIRECT sudo
   ####################################################################
+  #
+  # 🛑 the skip check reads the TRUST ANCHOR too — the verify asserts it
+  #   - a skip check narrower than its verify is a loop with no exit
+  #   - 📜 2026-10-14: this read only "installed + daemon up", so a box whose ppa was
+  #     added by `add-apt-repository` skipped here and failed the verify on every apply
+  #   - the anchor reads (`keybinds_keyd_anchor_holds`, in `_.sh`) are free too
+  ####################################################################
   local keyd_link; keyd_link="$(readlink -f /usr/bin/keyd 2>/dev/null || true)"
   if pkg_present keyd \
     && pkg_present keynav \
     && [[ "$keyd_link" == "/usr/bin/keyd.rvaiya" ]] \
     && systemctl is-enabled keyd >/dev/null 2>&1 \
-    && systemctl is-active keyd >/dev/null 2>&1; then
-    echo "   • keyd + keynav installed, linked, and the daemon is up ✔"
+    && systemctl is-active keyd >/dev/null 2>&1 \
+    && keybinds_keyd_anchor_holds; then
+    echo "   • keyd + keynav installed, linked, daemon up, and its ppa pinned ✔"
     return 0
   fi
 
   # it does not hold, and this seat cannot set it — ground owns every write below
   if ! pkg_can_sudo; then
     bundle.root.declines "the keyd remap" \
-      "keyd=$(pkg_present keyd && echo present || echo absent), link=${keyd_link:-（none）}, unit=$(systemctl is-active keyd 2>/dev/null || echo inactive)"
+      "keyd=$(pkg_present keyd && echo present || echo absent), link=${keyd_link:-（none）}, unit=$(systemctl is-active keyd 2>/dev/null || echo inactive), anchor=$(keybinds_keyd_anchor_holds && echo pinned || echo unpinned)"
     return 0
   fi
 
@@ -79,7 +87,7 @@ grove_provision_1_1_keybinds_provision_upsert() {
   #   - ⇒ a bundle that leans on it passes on LUCK (`rule.require.bundles-own-their-dependencies`)
   #   - `4.5.nvim` is its ONE consumer, and it installs it itself
   ####################################################################
-  local keydst="/usr/share/keyrings/keyd-team-ppa.asc"
+  local keydst="$KEYBINDS_KEYD_KEY_PATH"
   local keytmp
   keytmp="$(web_tempdir keydkey)" || return 1
 
@@ -128,8 +136,22 @@ grove_provision_1_1_keybinds_provision_upsert() {
   arch="$(dpkg --print-architecture)"
   codename="$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")"
 
+  # retire every legacy keyd source and blanket key FIRST — see `_.sh` for why a
+  # legacy source beside the pinned one fails `apt update` for the whole box
+  local legacy
+  while IFS= read -r legacy; do
+    [[ -n "$legacy" ]] || continue
+    sudo rm -f "$legacy" || return 1
+    echo "   • retired legacy keyd apt source: $legacy"
+  done < <(keybinds_keyd_sources_legacy)
+  while IFS= read -r legacy; do
+    [[ -n "$legacy" ]] || continue
+    sudo rm -f "$legacy" || return 1
+    echo "   • retired blanket keyd key (trusted for every source): $legacy"
+  done < <(keybinds_keyd_keys_legacy)
+
   if ! echo "deb [arch=$arch signed-by=$keydst] https://ppa.launchpadcontent.net/keyd-team/ppa/ubuntu $codename main" \
-    | sudo tee /etc/apt/sources.list.d/keyd-team-ppa.list >/dev/null; then
+    | sudo tee "$KEYBINDS_KEYD_LIST_PATH" >/dev/null; then
     echo "   ✋ could not declare the keyd apt source" >&2
     echo "      ⇒ ubuntu's archive has NO keyd, so without this source the install" >&2
     echo "        below cannot find the package at all" >&2

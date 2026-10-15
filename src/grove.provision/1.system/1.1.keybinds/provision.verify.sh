@@ -35,9 +35,10 @@ grove_provision_1_1_keybinds_provision_verify() {
   #   - the blanket copy in `/etc/apt/trusted.gpg.d/` is trusted for EVERY repo
   #   - ⇒ it is the one that matters, since it is live until it is deleted
   ####################################################################
-  local keydst="/usr/share/keyrings/keyd-team-ppa.asc"
+  local keydst="$KEYBINDS_KEYD_KEY_PATH"
+  local fix="sudo -v && rhx grove.provision --what 1.1.keybinds --mode apply"
   local legacy
-  legacy="$(grep -rls 'Launchpad PPA for keyd' /etc/apt/trusted.gpg.d/ 2>/dev/null | sort -u | head -1 || true)"
+  legacy="$(keybinds_keyd_keys_legacy | head -1)"
   if [[ -n "$legacy" ]]; then
     echo "   ✋ the keyd ppa key still sits in /etc/apt/trusted.gpg.d/" >&2
     echo "      at: $legacy" >&2
@@ -45,7 +46,18 @@ grove_provision_1_1_keybinds_provision_verify() {
     echo "        can vouch for a package that names ANY origin — a replacement" >&2
     echo "        openssh-server included. that is the blast radius signed-by=" >&2
     echo "        exists to bound, and it is unbounded while this file lives" >&2
-    echo "      fix: sudo rm '$legacy' && rhx grove.provision --what 1.1.keybinds --mode apply" >&2
+    echo "      fix: $fix    # the upsert retires it" >&2
+    failed=$(( failed + 1 ))
+  fi
+
+  legacy="$(keybinds_keyd_sources_legacy | head -1)"
+  if [[ -n "$legacy" ]]; then
+    echo "   ✋ a legacy keyd apt source sits beside the pinned one" >&2
+    echo "      at: $legacy" >&2
+    echo "      ⇒ it is not the source this bundle pins, and beside the pinned" >&2
+    echo "        one apt sees two Signed-By values for one uri and refuses" >&2
+    echo "        \`apt update\` for every source on the box" >&2
+    echo "      fix: $fix    # the upsert retires it" >&2
     failed=$(( failed + 1 ))
   fi
 
@@ -53,7 +65,7 @@ grove_provision_1_1_keybinds_provision_verify() {
     echo "   ✋ no pinned keyd ppa key at $keydst" >&2
     echo "      ⇒ apt has no anchor for the keyd source, so its update reports" >&2
     echo "        NO_PUBKEY and no fix keyd's maintainer ships ever reaches here" >&2
-    echo "      fix: rhx grove.provision --what 1.1.keybinds --mode apply" >&2
+    echo "      fix: $fix" >&2
     failed=$(( failed + 1 ))
   elif ! web_verify_gpg_fingerprints --file "$keydst" \
     --fpr "$KEYBINDS_KEYD_PPA_FPR" >/dev/null 2>&1; then

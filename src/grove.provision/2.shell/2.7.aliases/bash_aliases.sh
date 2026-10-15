@@ -123,24 +123,10 @@ alias use.terraform.caching='mkdir -p $HOME/.terraform.d/plugin-cache && export 
 # networking utilities
 alias use.mtu.1400='sudo ifconfig wlp113s0 mtu 1400' # for when you're on older infra networks; https://serverfault.com/a/670081/276221; https://www.cloudflare.com/learning/network-layer/what-is-mtu/
 
-# make it easy to manually update the keymappings, in case they drop off for some reason
-# swap left-alt and left-super via cosmic xkb config (e.g., for external mac keyboards)
-# cosmic-config watches the file via inotify, so changes apply instantly
-XKB_CONFIG="$HOME/.config/cosmic/com.system76.CosmicComp/v1/xkb_config"
-use_keymap_altswap() {
-  if grep -q 'altwin:swap_lalt_lwin' "$XKB_CONFIG" 2>/dev/null; then
-    echo "• alt/super already swapped"
-    return 0
-  fi
-  sed -i 's/options: Some("\(.*\)")/options: Some("\1,altwin:swap_lalt_lwin")/' "$XKB_CONFIG"
-  echo "• alt/super swapped"
-}
-use_keymap_altboot() {
-  sed -i 's/,altwin:swap_lalt_lwin//;s/altwin:swap_lalt_lwin,\?//' "$XKB_CONFIG"
-  echo "• alt/super reset"
-}
-alias use.keymap.altswap='use_keymap_altswap'
-alias use.keymap.altboot='use_keymap_altboot'
+# 🛑 .there is no `use.keymap.altswap` / `altboot`, and they must not come back
+#      they toggled cosmic's GLOBAL xkb swap, which is right for one board and
+#      backwards for the other. `1.1.keybinds` swaps alt/super per board in keyd
+#      (criteria `keyboard.alt-super-per-board`)
 
 # make signing into onepass easier
 alias op.signin='eval $(op signin)'
