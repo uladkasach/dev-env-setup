@@ -230,6 +230,31 @@ grove_provision_2_7_aliases_configure_verify() {
       "fix: capture via _git_commit_line, or pipe through __duct_strip_escapes" \
       "read why: grep -nE '$subject_pat' $aliases"
   fi
+  # .why `juniper_tide.available` alone is NOT a session-reset offer: the field is an A/B experiment, and the
+  #   cli offers only where `arm == "reset"` too. a reader that took `available` alone printed a 🎁 on an
+  #   account outside the experiment, which its usage page showed held no reset. this row RUNS the reader on both shapes
+  local brains="$HOME/.bash_aliases.brains.auth.sh"
+  if [[ -f "$brains" ]] && _verify_has_fn "$brains" "_brains_auth_reset_line" "~/.bash_aliases.brains.auth.sh" \
+       "the reader that names a usage-limit reset is gone"; then
+    local reset_out reset_off reset_on
+    reset_out="$(
+      # shellcheck disable=SC1090
+      source "$brains" >/dev/null 2>&1
+      _brains_auth_reset_line '{"juniper_tide":{"eligible":true,"in_experiment":false,"arm":null,"available":true}}'
+      printf '\x1f'
+      _brains_auth_reset_line '{"juniper_tide":{"eligible":true,"in_experiment":true,"arm":"reset","available":true}}'
+    )" || reset_out=""
+    # an absent reset prints a blank line, which the render drops — so whitespace counts as "none"
+    reset_off="${reset_out%%$'\x1f'*}"; reset_off="${reset_off//$'\n'/}"
+    reset_on="${reset_out#*$'\x1f'}"
+    [[ -z "${reset_off//[[:space:]]/}" ]] || _verify_fail \
+      "_brains_auth_reset_line names a reset for an account OUTSIDE the experiment: '$reset_off'" \
+      "⇒ brains.auth.usage shows a 🎁 the account does not hold" \
+      'fix: gate juniper_tide on arm == "reset" AND available, as the cli does'
+    [[ "$reset_on" == *"session reset available now"* ]] || _verify_fail \
+      "_brains_auth_reset_line names no reset for a real offer (arm reset, available): '$reset_on'" \
+      "⇒ a session reset the account DOES hold goes unseen"
+  fi
   # .why ssh speaks to ONE agent, the one SSH_AUTH_SOCK names. a shell file that pins it to yubikey-agent,
   #   which refuses file keys, made every id_ed25519 connection ask for its passphrase. a per-call prefix
   #   (`SSH_AUTH_SOCK=<sock> ssh-add`) is legal; only a shell-wide export or bare assignment is caught
@@ -259,6 +284,7 @@ grove_provision_2_7_aliases_configure_verify() {
     && echo "   • the duct reaches tmux through one encoded seam ✔" \
     && echo "   • a registry path is built by one owner, and grove bytes are stripped ✔" \
     && echo "   • termwork holds one pid-path owner, one ssh seam, one jq record ✔" \
-    && echo "   • every commit subject is captured through the strip sink ✔"
+    && echo "   • every commit subject is captured through the strip sink ✔" \
+    && echo "   • a session reset is named only where the cli would offer it ✔"
   [[ "$failed" -eq 0 ]] || return 1
 }

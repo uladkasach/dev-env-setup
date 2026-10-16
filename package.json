@@ -3,7 +3,7 @@
   "type": "module",
   "packageManager": "pnpm@10.24.0",
   "devDependencies": {
-    "rhachet": "1.49.1",
+    "rhachet": "1.49.2",
     "rhachet-brains-anthropic": "^0.4.3",
     "rhachet-brains-fireworksai": "^0.2.3",
     "rhachet-brains-xai": "^0.3.3",

@@ -221,7 +221,8 @@ _RESET_CASES='[
   {"case":"saved-usable","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":1,"usable_now":true,"ends_at":"2026-10-22T16:00:00+00:00"}]},"juniper_tide":{"eligible":false,"ineligible_reason":"not_at_wall","available":false,"resets_per_week":1}}},
   {"case":"saved-at-limit","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":1,"usable_now":false,"ends_at":"2026-10-22T16:00:00+00:00"}]},"juniper_tide":null}},
   {"case":"used","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":0,"usable_now":false,"ends_at":"2026-10-22T16:00:00+00:00"}]},"juniper_tide":{"eligible":false,"ineligible_reason":"not_at_wall","available":false,"resets_per_week":1}}},
-  {"case":"never-granted","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[]},"juniper_tide":{"eligible":true,"ineligible_reason":null,"available":true,"resets_per_week":1}}},
+  {"case":"never-granted","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[]},"juniper_tide":{"eligible":true,"ineligible_reason":null,"in_experiment":true,"arm":"reset","available":true,"resets_per_week":1}}},
+  {"case":"outside-experiment","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[]},"juniper_tide":{"eligible":true,"ineligible_reason":null,"in_experiment":false,"arm":null,"available":true,"resets_per_week":1}}},
   {"case":"session-later","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[]},"juniper_tide":{"eligible":false,"ineligible_reason":"weekly_limit","available":false,"next_available_at":"2026-10-09T00:00:00+00:00"}}},
   {"case":"wrong-client","node":{"cedar_ember":{"eligible":false,"ineligible_reason":"surface","grants":[]},"juniper_tide":{"eligible":false,"ineligible_reason":"surface","available":false}}},
   {"case":"not-asked","node":{"cedar_ember":null,"juniper_tide":null}}
