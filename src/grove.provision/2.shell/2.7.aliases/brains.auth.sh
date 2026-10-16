@@ -2671,6 +2671,12 @@ _brains_auth_exit_for() {
 #   asked as any other client, both answer `eligible:false, ineligible_reason:"surface"` — a
 #   confident NO that is really "wrong client". so a `surface` reason renders as UNKNOWN,
 #   never as "none" (rule.forbid.failhide)
+# 🛑 `juniper_tide` is an A/B EXPERIMENT, and `available` alone is NOT an offer. the cli offers
+#   the reset only when `arm == "reset"` AND `available` (its offer predicate, read 2026-10-14 via
+#   `rhx brains.claude.strings --pattern 'arm==="reset"'` against claude 2.1.280). an account
+#   outside the experiment answers `in_experiment:false, arm:null, available:true` — and the
+#   account's usage page on claude.ai shows no reset. to read `available` alone printed a 🎁
+#   that did not exist.
 # .note = it names ONLY a reset that exists — a saved grant with resets left, or a session reset
 #   available now. an account with none prints an EMPTY line, and the render then drops the row:
 #   "none saved", "offered at your limit", and "again on <date>" are all absences, and a row per
@@ -2686,7 +2692,7 @@ _brains_auth_reset_line() {
     else
       [ ( ($ce.grants // [])[] | select((.resets_left // 0) > 0) |
           "🎁 \(.resets_left) saved · \(if .usable_now then "usable now" else "usable at your limit" end) · until \(.ends_at | day)" ),
-        ( select($jt.available == true) | "🎁 session reset available now" )
+        ( select($jt.arm == "reset" and $jt.available == true) | "🎁 session reset available now" )
       ] | join(" · ")
     end
   ' <<< "$node" 2>/dev/null || printf '? could not read the reset fields'

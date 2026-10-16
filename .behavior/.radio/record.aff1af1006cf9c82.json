@@ -1,0 +1,19 @@
+{
+  "key": "aff1af1006cf9c82",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet"
+  },
+  "exid": null,
+  "title": "fix(enroll): settings.local.json is an arrow to settings.of.repo.json; no machine-local settings committed",
+  "description": "## .what\n\nin the repo actor brain dir (`.agent/.actors/actor.via.repo=ambient/brain/.claude/`), make `settings.local.json` a relative symlink to `settings.of.repo.json`, the way `settings.json -> settings.of.grove.json` is an arrow today. findsert it in `setBrainDirSettingsLayout`.\n\n## .why\n\n- today `setRepoActorBrainDir.ts` allowlists `!/settings.local.json`, so a human's real `settings.local.json` gets committed. that file is claude's per-machine \"yes, don't ask again\" log: absolute `/home/<user>/...` paths, commands for files long deleted. in a public repo that is dox, and it is noise everywhere else\n- `define.brain-dir-layout-is-one-for-every-actor` already says `settings.local.json` \"is not part of the layout; no clone reads it\", and the earlier `.default` layout ignored `*.local.json` (`setRepoBrainDirSymlink.integration.test.ts:206`). the allowlist line contradicts both\n- an arrow gives the name ONE answer, rhachet's: whatever reads claude's project-local layer meets the role-derived repo settings, never a stale personal log\n\n## .owed decisions\n\n1. **a write through the arrow.** claude writes `settings.local.json` when a human picks \"don't ask again\". if it writes THROUGH the link, a personal approval lands in the tracked `settings.of.repo.json` and is wiped at the next derive; if it renames over the link, the arrow becomes a real file again. measure which claude does, then converge: the layout findsert replaces a real file at an arrow name, as it already does for `settings.json` (one answer, rhachet's)\n2. **an extant real file.** a human's current `settings.local.json` is replaced by the arrow, never merged (same rule as the grove arrows). say so in the stdout\n3. **precedence.** claude ranks the local layer above the project layer; with both `--settings settings.of.repo.json` and the arrow, the repo settings load twice. confirm that is benign (arrays merge, no hook fires twice)\n\n## .also — the grove arrow is committed with an absolute target\n\n`settings.of.grove.json -> ~/.claude/settings.json` is allowlisted too, and its target is the EXPANDED home path (`/home/<user>/.claude/settings.json`). committed, that names the user and dangles or misroutes on every other box. rhachet re-findserts it at each enroll, so a commit of it buys naught: drop `!/settings.of.grove.json` from the allowlist (and `!/settings.json`, which only points at it), and keep `settings.of.repo.json` as the one committed settings file.\n\n## .criteria\n\n- `settings.local.json` is an arrow to `settings.of.repo.json` after any `rhx init` / `rhx enroll`; idempotent\n- a real file at that name is replaced by the arrow\n- `git status` in a fresh repo shows no settings file with an absolute path or a username\n- update `setRepoActorBrainDir.integration.test.ts`, `setBrainDirSettingsLayout.integration.test.ts` [case7], and the `upgrade.default-actor-migration` acceptance snapshot that pins `!/settings.local.json`\n\nfirst seen in `uladkasach/dev-env-setup` on main, 2026-10-15, when a staged release carried the actor dir's `settings.local.json` and `settings.of.grove.json`.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": null,
+  "heldSeq": 1,
+  "recordStatus": "QUEUED",
+  "reason": "radio.uses:blocked — global",
+  "deliveredExid": null
+}
