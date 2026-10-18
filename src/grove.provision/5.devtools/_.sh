@@ -44,6 +44,7 @@ grove_provision_5_devtools() {
   bundle.upgrade 5.10.repos
   bundle.upgrade 5.13.reach
   bundle.upgrade 5.20.xvfb
+  bundle.upgrade 5.22.waypipe
 
   # 🛑 LAST, and the order is load-bear — it asks the rack for keys addressed
   #   through the profiles `5.12.rack` names and `5.13.reach` fills in. asked
