@@ -38,6 +38,7 @@ grove_provision_5_devtools() {
   bundle.upgrade 5.15.identity
   bundle.upgrade 5.7.terraform
   bundle.upgrade 5.8.docker
+  bundle.upgrade 5.21.playwright
   bundle.upgrade 5.9.yubikey
   bundle.upgrade 5.11.usql
   bundle.upgrade 5.10.repos
