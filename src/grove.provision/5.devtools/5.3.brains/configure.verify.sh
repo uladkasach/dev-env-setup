@@ -51,7 +51,7 @@ grove_provision_5_3_brains_configure_verify() {
     '(.permissions.deny // []) | index("Agent"):null:the subagent tool, never denied' \
     '.model:"claude-opus-5-5[1m]":the default model' \
     '.env.ANTHROPIC_MODEL:"claude-opus-5-5[1m]":the default model env override' \
-    '.env.CLAUDE_CODE_SUBAGENT_MODEL:"claude-sonnet-5[1m]":the subagent model' \
+    '.env.CLAUDE_CODE_SUBAGENT_MODEL:"claude-sonnet-5-5[1m]":the subagent model' \
     '.effortLevel:"medium":the default effort level' \
     '[.modelSettings[]?.effortLevel | select(. != null)] | length:0:the default effort, unshadowed by a per-model override' \
     '.skipAutoPermissionPrompt:true:the auto-permission prompt skip' \
