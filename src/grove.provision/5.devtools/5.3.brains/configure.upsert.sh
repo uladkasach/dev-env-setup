@@ -69,11 +69,21 @@ _grove_provision_5_3_brains_settings_upsert() {
   #   - keys are named EXPLICITLY, once proven dead in the pinned cli (define.5-3-brains.declared-keys)
   #   - ⚠️ ONE `del`, since an empty list would render a jq syntax error
   #   - ⚠️ the `Agent` strip removes ONE entry; a list it empties is dropped
+  #   - 🛑 a `modelSettings.<model>.effortLevel` SHADOWS the declared `effortLevel`
+  #     - the cli writes one when a human picks an effort per model, and it wins over the top level
+  #     - a deep merge keeps it, so the declared default never reaches that model
+  #     - ⇒ the strip removes the effort key alone; an entry it empties is dropped
   ####################################################################
   local reap='del(.env.DISABLE_UPDATES, .env.CLAUDE_CODE_SKIP_UPDATE_CHECK)
     | if (.permissions.deny | type) == "array"
       then .permissions.deny -= ["Agent"]
         | if .permissions.deny == [] then del(.permissions.deny) else . end
+      else . end
+    | if (.modelSettings | type) == "object"
+      then .modelSettings |= with_entries(
+          .value |= (if type == "object" then del(.effortLevel) else . end)
+          | select(.value != {}))
+        | if .modelSettings == {} then del(.modelSettings) else . end
       else . end'
 
   local tmp
