@@ -29,7 +29,7 @@ header's own, moved verbatim on 2026-10-04; the code cites each section by its h
     `Ls(config, (v, k) => S(v) !== S(Rx[k]))`, and `Rx.verbose` is `false`.
     measured: `verbose: false` was written, verified ✔, and read absent
     seconds later. a settings key is never rewritten that way
-  - ⇒ the declared `verbose: true` holds however the global config drifts,
+  - ⇒ the declared `verbose: false` holds however the global config drifts,
     since `yo` reads the settings value before the global config is asked
 
 ## `diffSidebarOpen` — why the global config half exists

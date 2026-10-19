@@ -53,9 +53,10 @@ grove_provision_5_3_brains_configure_verify() {
     '.env.ANTHROPIC_MODEL:"claude-opus-5-5[1m]":the default model env override' \
     '.env.CLAUDE_CODE_SUBAGENT_MODEL:"claude-sonnet-5[1m]":the subagent model' \
     '.effortLevel:"medium":the default effort level' \
+    '[.modelSettings[]?.effortLevel | select(. != null)] | length:0:the default effort, unshadowed by a per-model override' \
     '.skipAutoPermissionPrompt:true:the auto-permission prompt skip' \
     '.tui:"fullscreen":the fullscreen tui' \
-    '.verbose:true:the verbose output default' \
+    '.verbose:false:the verbose output default' \
     '.feedbackDrafts:"off":the claude-drafted feedback queue' \
     '.cleanupPeriodDays:36500:the never-prune transcript retention'; do
     path="${pair%%:*}"
