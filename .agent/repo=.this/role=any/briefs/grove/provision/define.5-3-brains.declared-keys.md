@@ -29,8 +29,11 @@ header's own, moved verbatim on 2026-10-04; the code cites each section by its h
     `Ls(config, (v, k) => S(v) !== S(Rx[k]))`, and `Rx.verbose` is `false`.
     measured: `verbose: false` was written, verified ✔, and read absent
     seconds later. a settings key is never rewritten that way
-  - ⇒ the declared `verbose: true` holds however the global config drifts,
+  - ⇒ the declared `verbose: false` holds however the global config drifts,
     since `yo` reads the settings value before the global config is asked
+  - ✔ a settings value EQUAL to claude's default is still declared, on purpose:
+    the settings file is never filtered against `Rx`, so `false` here survives
+    every save, and a stale `true` in any lower source is outranked
 
 ## `diffSidebarOpen` — why the global config half exists
 
@@ -70,7 +73,7 @@ header's own, moved verbatim on 2026-10-04; the code cites each section by its h
   | `DISABLE_AUTOUPDATER` | the ONE update kill-switch — cli AND plugins (`ED6()`) | `j96()` |
   | `DISABLE_INSTALLATION_CHECKS` | the npm→native migration nag (#23683) | `$w6()`, `kFz()` |
   | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | auto-compact at 50%, not ~83% — cuts ITPM spikes | `et6()` |
-  | `CLAUDE_CODE_SUBAGENT_MODEL` | subagents on sonnet, never the session's opus | `Ik6()` |
+  | `CLAUDE_CODE_SUBAGENT_MODEL` | subagents on `claude-sonnet-5-5[1m]`, never the session's opus | `Ik6()` |
   - the subagent tool is ALLOWED (see `.subagents` below), so this value is live
 .refs = gotcha.5-3-brains.demo=one-home-consolidation.md — the three-bundle split,
   the silent model drift, what `gk6` gates, the reap, and why `DISABLE_UPDATES` is no knob (m7)
