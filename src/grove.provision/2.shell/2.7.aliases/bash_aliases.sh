@@ -566,10 +566,15 @@ npx_real() { command npx "$@"; }
 # .why = neovim 0.11+ runs the editor core as its own `nvim --embed`
 #        process. a runaway plugin (treesitter/minimap/diff) can leak
 #        it to multi-GB and thrash swap until the whole machine freezes.
-#        a systemd user scope makes the kernel throttle it at MemoryHigh
-#        and refuse to grow past MemoryMax, so it cannot hog the box.
-#        the in-nvim self-watchdog (init.lua) trips first, below these
-#        limits, to self-heal without a kill — this scope is the backstop.
+#        a systemd user scope makes the kernel refuse growth past MemoryMax:
+#        a core that crosses it is OOM-killed, so it cannot hog the box.
+#        the in-nvim self-watchdog (init.lua) trips first, below this
+#        limit, to self-heal without a kill — this scope is the backstop.
+# .note = NO MemoryHigh, on purpose. a box with no swap cannot reclaim anon
+#         memory, so a core over MemoryHigh is throttled forever in an
+#         uninterruptible sleep: unkillable by the human's own :q, holds its
+#         ram for days (grove-ahbode-v20260901, pid 2096015, 2026-10-19).
+#         MemorySwapMax=0 makes the box with swap behave the same way.
 
 # .what = wait for the user systemd manager to ANSWER, or say why it cannot
 # .why  = a dead manager leaves /run/user/$UID/bus on disk and refuses every
@@ -597,8 +602,8 @@ nvim() {
   bin=$( unset -f nvim 2>/dev/null; command -v nvim )
   _user_systemd_await || return 1
   systemd-run --user --scope --quiet --collect \
-    -p MemoryHigh=1500M \
     -p MemoryMax=2G \
+    -p MemorySwapMax=0 \
     "$bin" "$@"
 }
 
