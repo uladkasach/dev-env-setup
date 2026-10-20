@@ -28,12 +28,14 @@ grove_provision_3_3_desktop_configure_verify() {
   # 1. the custom keybinds hold the launcher entry
   ####################################################################
   if [[ -r "$shortcuts_dir/custom" ]] \
-    && grep -F 'System(Launcher)' "$shortcuts_dir/custom" >/dev/null; then
-    echo "   • the custom keybinds are declared ✔"
+    && grep -F 'System(Launcher)' "$shortcuts_dir/custom" >/dev/null \
+    && grep -F '(modifiers: [Super]): Disable' "$shortcuts_dir/custom" >/dev/null \
+    && grep -F '(modifiers: [Super], key: "Escape"): Disable' "$shortcuts_dir/custom" >/dev/null; then
+    echo "   • the custom keybinds are declared — super and super+escape inert ✔"
   else
     echo "   ✋ the custom keybinds are ABSENT or incomplete" >&2
-    echo "      ⇒ super+/ opens no launcher and super opens no overview, so the" >&2
-    echo "        two gestures used most on this desktop do no work" >&2
+    echo "      ⇒ cosmic's defaults return: a stray super opens the launcher and a" >&2
+    echo "        stray super+escape locks the screen, and super+/ may open naught" >&2
     echo "      fix: rhx grove.provision --what 3.3.desktop --mode apply" >&2
     failed=1
   fi
@@ -73,7 +75,8 @@ grove_provision_3_3_desktop_configure_verify() {
     else
       echo "   ✋ COSMIC's LockScreen action is NOT armed" >&2
       echo "      ⇒ the idle timers are off by design, so a deliberate lock is the" >&2
-      echo "        ONLY lock this box has — and this is one of its two routes" >&2
+      echo "        ONLY lock this box has — the panel's power applet and machine.lock" >&2
+      echo "        both reach it" >&2
       echo "      ⇒ do NOT 'fix' this by a disarm to match PowerOff/Suspend/LogOut:" >&2
       echo "        those end a session, this costs a password. the argument that" >&2
       echo "        disarms them does not reach this one" >&2
@@ -195,6 +198,20 @@ grove_provision_3_3_desktop_configure_verify() {
       echo "      fix: rhx grove.provision --what 3.3.desktop --mode apply" >&2
       failed=1
     fi
+  fi
+
+  ####################################################################
+  # 7. touchpad scroll is natural
+  ####################################################################
+  local touchpad="$HOME/.config/cosmic/com.system76.CosmicComp/v1/input_touchpad"
+  if [[ -r "$touchpad" ]] && grep -F 'natural_scroll:Some(true)' "$touchpad" >/dev/null; then
+    echo "   • touchpad scroll is natural ✔"
+  else
+    echo "   ✋ touchpad scroll is not declared natural" >&2
+    echo "      ⇒ cosmic defers to libinput, whose traditional scroll runs" >&2
+    echo "        backwards on a magic trackpad" >&2
+    echo "      fix: rhx grove.provision --what 3.3.desktop --mode apply" >&2
+    failed=1
   fi
 
   return $failed

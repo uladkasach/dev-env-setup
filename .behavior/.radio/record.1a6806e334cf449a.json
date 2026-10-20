@@ -1,0 +1,19 @@
+{
+  "key": "1a6806e334cf449a",
+  "kind": "create",
+  "repo": {
+    "owner": "uladkasach",
+    "name": "dev-env-setup"
+  },
+  "exid": null,
+  "title": "termwork: one kitty process for every terminal, not one per terminal",
+  "description": "## .what\n\ntermwork launches one kitty PROCESS per terminal (`termwork.sh`, the per-terminal launch with\n`allow_remote_control=socket-only` and its own `listen_on`). move to one kitty process that holds\nevery termwork window — `kitty --single-instance`, or one kitty driven by remote control.\n\n## .why\n\nmeasured on a laptop docked to a 4k monitor at 150%, where every frame is drawn by an Iris Xe iGPU:\n\n- ~57 kitty processes live at once\n- each one holds its own gpu context, glyph cache and repaint loop\n- one process shares all three across every window\n\nthe load picture and the trials already settled live in `gotcha.a-docked-4k-monitor-taxes-the-igpu`\n(desktop/system). this task is the \"fewer kitty processes\" lever it ranks third.\n\n## .the shape of the fix\n\n1. find what in termwork depends on one process per terminal — the per-window socket, the\n   `listen_on` template, kill/stop by pid\n2. pick the carrier: `--single-instance` with a shared socket, or `kitty @ launch --type=os-window`\n   against one long-lived kitty\n3. keep every termwork contract (`term.open/list/read/send/stop`) unchanged for callers\n4. measure before and after: kitty process count, kitty rss sum, iGPU busy under the same workload\n\n## .bounds\n\n- ⚠️ one process is one blast radius: a kitty crash then takes every terminal with it. weigh that,\n  and state the call\n- never kill a live terminal or tmux to test this; prove it on fresh windows\n- consider `repaint_delay` / `input_delay` in the kitty bundle as a separate, smaller lever",
+  "status": null,
+  "via": "gh.issues",
+  "auth": "as-human",
+  "idem": null,
+  "heldSeq": 2,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "165"
+}
