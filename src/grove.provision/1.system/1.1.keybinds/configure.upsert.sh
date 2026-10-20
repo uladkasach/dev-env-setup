@@ -118,10 +118,22 @@ grove_provision_1_1_keybinds_configure_upsert() {
   printf '%s\n' "$conf_apple_want" | sudo tee /etc/keyd/apple.conf >/dev/null
 
   ####################################################################
-  # a restart is what makes a conf edit LIVE — keyd reads its config at start only
+  # make the conf edit LIVE — a reload on a live daemon, a start only on a dead one
+  #
+  # 🛑 never `systemctl restart` a live keyd
+  #   - at START, keyd waits for every key on every connected board to read released
+  #   - a magic keyboard reports BTN_0 (0x100) as held, always
+  #   - ⇒ a start with that board connected spins at 100% cpu forever, grabs no
+  #     board at all, and caps is plain caps on every keyboard
+  #   - boot never hits it: bluetooth connects AFTER keyd is up, via the hotplug
+  #     path, which skips the wait
+  #   - `keyd reload` re-reads every conf and re-matches every device with no wait
+  #   - 📜 measured 2026-10-19: restart → hung, 66 min of cpu; reload → 0%, both boards matched
   ####################################################################
-  if ! sudo systemctl restart keyd; then
-    echo "   ✋ the confs landed but keyd would not restart to read them" >&2
+  local keyd_live_cmd="sudo keyd reload"
+  systemctl is-active --quiet keyd || keyd_live_cmd="sudo systemctl restart keyd"
+  if ! $keyd_live_cmd; then
+    echo "   ✋ the confs landed but keyd would not load them ($keyd_live_cmd)" >&2
     echo "      ⇒ so the remap in effect is the PREVIOUS one, and this bundle's" >&2
     echo "        declaration sits on disk with no effect" >&2
     echo "      ⇒ a common cause is a syntax error in a conf above: keyd refuses" >&2
@@ -129,7 +141,7 @@ grove_provision_1_1_keybinds_configure_upsert() {
     echo "      read why: systemctl status keyd    # it quotes the line at fault" >&2
     return 1
   fi
-  echo "   • keyd remap declared (default.conf swaps alt/super, apple.conf does not), daemon restarted"
+  echo "   • keyd remap declared (default.conf swaps alt/super, apple.conf does not), daemon loaded it ($keyd_live_cmd)"
 
   grove_provision_1_1_keybinds_xkb_swap_strip
   grove_provision_1_1_keybinds_keynav_autostart

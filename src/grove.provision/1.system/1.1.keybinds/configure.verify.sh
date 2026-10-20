@@ -105,6 +105,35 @@ grove_provision_1_1_keybinds_configure_verify() {
   fi
 
   ####################################################################
+  # 4b. active is not enough — a keyd stuck at start grabs NO board
+  #
+  # .why
+  #   - at start keyd waits for every key on every board to read released
+  #   - a magic keyboard reports BTN_0 as held, always, so that wait never ends
+  #   - ⇒ the unit is `active`, cpu sits at 100%, and caps is plain caps everywhere
+  #   - an idle keyd uses ~0 cpu, so >50% over one second is the stuck loop
+  #   - /proc/<pid>/stat is world-readable, so this needs no root
+  ####################################################################
+  local keyd_pid ticks_before ticks_after hz
+  keyd_pid="$(systemctl show -p MainPID --value keyd 2>/dev/null)"
+  if [[ -n "$keyd_pid" && "$keyd_pid" != "0" && -r "/proc/$keyd_pid/stat" ]]; then
+    hz="$(getconf CLK_TCK)"
+    ticks_before="$(awk '{print $14 + $15}' "/proc/$keyd_pid/stat")"
+    sleep 1
+    ticks_after="$(awk '{print $14 + $15}' "/proc/$keyd_pid/stat" 2>/dev/null || echo "$ticks_before")"
+    if (( (ticks_after - ticks_before) * 2 > hz )); then
+      echo "   ✋ keyd is stuck — it burns a full cpu and has grabbed no keyboard" >&2
+      echo "      ⇒ it was started while a board reports a key held (a magic keyboard's" >&2
+      echo "        BTN_0), and keyd's start waits for all keys released, forever" >&2
+      echo "      fix: turn the magic keyboard off, then: sudo systemctl restart keyd" >&2
+      echo "           then turn the board back on (a hotplug skips the wait)" >&2
+      failed=$(( failed + 1 ))
+    else
+      echo "   • keyd is idle, not stuck in its start-up key wait ✔"
+    fi
+  fi
+
+  ####################################################################
   # 5. whether the kernel honors it — not observable from here
   ####################################################################
   echo "   🌙 unverified — whether a press now DELIVERS the remap needs a key event,"

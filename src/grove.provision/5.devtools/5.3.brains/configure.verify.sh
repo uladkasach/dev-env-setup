@@ -46,6 +46,7 @@ grove_provision_5_3_brains_configure_verify() {
     '.env.CLAUDE_CODE_DISABLE_COMMAND_INJECTION_CHECK:"1":the command injection check' \
     '.env.CLAUDE_CODE_ENABLE_TODO_TOOLS:"1":the todo and task tools' \
     '.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE:"50":the auto-compact threshold' \
+    '.env.CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS:"450000":the idle-compaction floor' \
     '.disableClaudeAiConnectors:true:the claude.ai connector fetch' \
     '.permissions.defaultMode:"auto":the auto default mode' \
     '(.permissions.deny // []) | index("Agent"):null:the subagent tool, never denied' \
