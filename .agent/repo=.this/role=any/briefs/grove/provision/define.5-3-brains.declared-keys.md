@@ -2,298 +2,171 @@
 
 ## .what
 
-the rationale behind every key `5.3.brains/configure.upsert.sh` declares, rehomed from that phase's
-header so the phase stays an outline (`prove.headers-carry-their-weight`). the text is the
-header's own, moved verbatim on 2026-10-04; the code cites each section by its heading.
+the why behind every key `5.3.brains/configure.upsert.sh` declares. the phase cites each section by its `##` title, so the phase stays an outline (`prove.headers-carry-their-weight`).
 
 ## the two files, and which one owns a key
 
-🛑 .claude reads TWO files, and a key belongs to exactly one of them
-  | file | holds | this bundle |
-  |---|---|---|
-  | `~/.claude/settings.json` | the declared settings — env, permissions, model, hooks | merged below |
-  | `~/.claude.json` | the GLOBAL CONFIG — the `/config` panel's own toggles | merged below |
-  ⚠️ they are NOT interchangeable, and the failure is silent. `settings.json`
-  is validated against a zod schema, so a key that schema does not name is
-  accepted, stored, and read by no caller. a verify that greps for the key
-  would find it and report ✔ forever.
-  ⇒ before you add a key, settle WHICH file claude reads it from
+| file | holds |
+|---|---|
+| `~/.claude/settings.json` | declared settings — env, permissions, model, hooks |
+| `~/.claude.json` | global config — the `/config` panel's toggles |
+
+the two are not interchangeable, and a wrong pick fails silent. `settings.json` validates against a zod schema that accepts and stores an unknown key, then no caller reads it. a grep-based verify reports ✔ forever. settle which file claude reads a key from before you add it.
 
 ## `verbose` lives in settings.json
 
-.why `verbose` lives in `settings.json`, and never in `~/.claude.json`
-  - measured, 2.1.280: `yo(key, default)` reads every settings source first,
-    and falls back to the global config only for keys in its `nSe` list
-  - and a global-config value that EQUALS claude's default is dropped when
-    claude saves the file — every save filters through
-    `Ls(config, (v, k) => S(v) !== S(Rx[k]))`, and `Rx.verbose` is `false`.
-    measured: `verbose: false` was written, verified ✔, and read absent
-    seconds later. a settings key is never rewritten that way
-  - ⇒ the declared `verbose: false` holds however the global config drifts,
-    since `yo` reads the settings value before the global config is asked
-  - ✔ a settings value EQUAL to claude's default is still declared, on purpose:
-    the settings file is never filtered against `Rx`, so `false` here survives
-    every save, and a stale `true` in any lower source is outranked
+- `yo(key, default)` reads every settings source first; it falls back to the global config only for keys in `nSe` (2.1.280).
+- claude drops a global-config value equal to its default on every save (`Ls(config, (v, k) => S(v) !== S(Rx[k]))`, `Rx.verbose = false`). measured: `verbose: false` written, verified, read absent seconds later.
+- the settings file is never filtered against `Rx`, so `false` there survives every save and outranks a stale `true` in a lower source.
 
 ## `diffSidebarOpen` — why the global config half exists
 
-.why the global config half exists at all — `diffSidebarOpen`
-  - the fullscreen tui's diff panel auto-opens on a wide terminal while this
-    key is ABSENT (`SWn()`); only an explicit `false` keeps it shut
-  - it is read straight off the global config (`ie()`), never through `yo`,
-    so no settings file can reach it
-  - it has no claude default, so a declared `false` survives claude's saves
-
-.diffSidebarOpen=false keeps the fullscreen tui's diff panel shut at start;
-  `/diff` still opens it on demand for the one session that asks
-⚠️ a key here must have NO claude default — a value equal to the default is
-  dropped on claude's next save (see the header). that is why `verbose` moved
-  to the settings half
+- the fullscreen tui auto-opens its diff panel on a wide terminal while this key is absent (`SWn()`). only an explicit `false` keeps it shut; `/diff` still opens it on demand.
+- claude reads it straight off the global config (`ie()`), never through `yo`, so no settings file reaches it.
+- it has no claude default, so a declared `false` survives claude's saves. a global-config key must have no default, or the next save drops it — the reason `verbose` lives in settings.
 
 ## one home for every brain knob
 
-🛑 .THIS PATCH IS THE SOLE HOME OF EVERY BRAIN KNOB
-  - `rule.require.brain-config-has-one-home`. no peer bundle may declare one
-  - the shelf test is the READ SITE, never a guess: `zd()` assigns this `env`
-    block into `process.env` UNFILTERED at startup, so a flag read after that is
-    reachable from here
-  - ⇒ a flag with NO read site is DEAD, and is deleted rather than rehomed
+this patch is the sole home of every brain knob (`rule.require.brain-config-has-one-home`); no peer bundle declares one.
 
-🛑 .the rule is "match the shelf to WHEN the flag is read" — so FIND THE READ SITE
-  - this file named the wrong shelf TWICE, both times for the installer nag, and
-    neither claim ever cited one. the source contradicts both (.refs m4)
-  - ⇒ a "read too late" comment with no read site beside it is a guess, and these
-    guesses cost a two-writers split across three bundles
+- the shelf test is the read site. `zd()` assigns the `env` block into `process.env` unfiltered at startup, so any flag read after that is reachable from here.
+- a flag with no read site is dead: delete it, never rehome it. the one exception is a flag declared ahead of a pin bump, marked as such in its row.
+- a "read too late" claim with no cited read site is a guess. two such guesses about the installer nag once split one knob across three bundles (.refs m4).
 
 ## the env flags
 
-.the env flags, and what each buys
-  | flag | effect | read at |
-  |---|---|---|
-  | `DISABLE_AUTOUPDATER` | the ONE update kill-switch — cli AND plugins (`ED6()`) | `j96()` |
-  | `DISABLE_INSTALLATION_CHECKS` | the npm→native migration nag (#23683) | `$w6()`, `kFz()` |
-  | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | auto-compact at 50%, not ~83% — cuts ITPM spikes | `et6()` |
-  | `CLAUDE_CODE_SUBAGENT_MODEL` | subagents on `claude-sonnet-5-5[1m]`, never the session's opus | `Ik6()` |
-  - the subagent tool is ALLOWED (see `.subagents` below), so this value is live
-.refs = gotcha.5-3-brains.demo=one-home-consolidation.md — the three-bundle split,
-  the silent model drift, what `gk6` gates, the reap, and why `DISABLE_UPDATES` is no knob (m7)
+| flag | effect | read at |
+|---|---|---|
+| `DISABLE_AUTOUPDATER` | the one update kill-switch, cli and plugins (`ED6()`) | `j96()` |
+| `DISABLE_INSTALLATION_CHECKS` | the npm→native migration nag (#23683) | `$w6()`, `kFz()` |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | auto-compact at 50%, not ~83%; cuts ITPM spikes | `et6()` |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | subagents on `claude-sonnet-5-5[1m]`, never the session's opus | `Ik6()` |
+| `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` | idle compaction fires past 450k tokens, not its 200k default | none in 2.1.280; idle compaction ships in 2.1.299. declared ahead of the pin bump |
+
+the subagent tool is allowed (see `subagents are allowed`), so the subagent model is live.
+
+.refs = `gotcha.5-3-brains.demo=one-home-consolidation` — the three-bundle split, the silent model drift, what `gk6` gates, the reap, why `DISABLE_UPDATES` is no knob (m7)
 
 ## `disableClaudeAiConnectors`
 
-.disableClaudeAiConnectors stops the claude.ai connector auto-fetch
-  - ⇒ it silences "N claude.ai connector needs auth · /mcp" (v2.1.182+)
+stops the claude.ai connector auto-fetch, which silences "N claude.ai connector needs auth · /mcp" (2.1.182+).
 
 ## `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION`
 
-.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION turns off the PROMPT SUGGESTION
-  - that is the grey ghost text claude proposes inside its own input box
-  - the `/`-command menu and `@`-file completion are separate and unaffected
-  - ⇒ the term is `prompt suggestion`, never "autocomplete", which names all three
-  - the opt-out shipped in claude 2.0.71 (anthropics/claude-code#13878)
-  - (`term=prompt-suggestion`)
+turns off the prompt suggestion — the grey ghost text in the input box (opt-out since 2.0.71, anthropics/claude-code#13878). the `/`-command menu and `@`-file completion are separate and unaffected. the term is `prompt suggestion`, never "autocomplete", which names all three (`term=prompt-suggestion`).
 
 ## the model, declared twice
 
-🛑 .the MODEL is declared TWICE, and the two are not redundant
-  the cli picks a model from THREE places, in this order (`Ih()`, 2.1.87):
-    1. the session override — `/model`, or `--model` on the command line
-    2. `env.ANTHROPIC_MODEL`
-    3. `.model`
-  - ⇒ `ANTHROPIC_MODEL` OUTRANKS `.model`, so a box that carries only the
-    second runs whatever a stale env var says, quietly
-  - ⇒ and `.model` is the value the `/model` panel reads and writes, so a box
-    that carries only the env var shows a panel that disagrees with its run
-  - ⇒ both are declared, at ONE value, so neither reader is misled
-  ⚠️ the env var does NOT pin the session. rung 1 still wins, so `/model`
-  switches live exactly as before — this sets the DEFAULT, never an upper bound
-  ✔ `env.ANTHROPIC_MODEL` is a settings key the cli HONORS, not merely an
-    export it happens to read: `zd()` assigns this block into `process.env` at
-    startup, BEFORE the model is picked
-  🛑 this line read "`gk6` is the allowlist of env names a settings file may
-     set". that is FALSE: `zd()` applies the block UNFILTERED, and `gk6` gates a
-     TRUST PROMPT, never permission (.refs m3, `define.claude-code-config`)
-  - ⇒ so it reaches every caller — a tui session, `claude -p`, the sdk, and
-    whatever this repo's `claude` shell function or `claude.latest` shim
-    spawns — with no shell export in any rc file
+the cli picks a model from three places, in order (`Ih()`, 2.1.87):
+
+1. the session override — `/model` or `--model`
+2. `env.ANTHROPIC_MODEL`
+3. `.model`
+
+- `ANTHROPIC_MODEL` outranks `.model`, so a box with only `.model` runs whatever a stale env var says.
+- the `/model` panel reads and writes `.model`, so a box with only the env var shows a panel that disagrees with its run.
+- so both are declared, at one value. rung 1 still wins: this sets the default, never a cap.
+- `zd()` applies the env block into `process.env` before the model is picked, unfiltered. `gk6` gates a trust prompt, never permission (.refs m3, `define.claude-code-config`). so the value reaches every caller — tui, `claude -p`, sdk, the `claude` shell function, the `claude.latest` shim — with no rc export.
 
 ## `effortLevel`
 
-.effortLevel=medium is the default REASONING EFFORT for models that take one
-  - it IS in the settings zod schema — `enum(["low","medium","high"])` — so
-    this key is not the inert-key hazard named at the top of this file
-  - an ABSENT key means `auto`, which the cli picks per model, so the default
-    is a value chosen by no one and free to move under a version bump
-  - `medium` is the cli's own recommended rung, labelled as such in `/effort`
-  - ⚠️ `CLAUDE_CODE_EFFORT_LEVEL` OVERRULES this for a whole session, and the
-    cli says so when it does. this repo exports it from no shelf, so the
-    settings key is the one lever — a box where `/effort` reports an override
-    has that var set by a caller outside this repo
+`medium` is the default effort level.
+
+- the settings zod schema names it (`enum(["low","medium","high"])`), so it is not an inert key.
+- absent means `auto`, which the cli picks per model — a default nobody chose, free to move on a version bump. `medium` is the cli's own recommended rung in `/effort`.
+- `CLAUDE_CODE_EFFORT_LEVEL` overrules it for a whole session, and the cli says so. this repo exports it nowhere, so an override on a box comes from a caller outside the repo.
 
 ## `permissions.defaultMode=auto`
 
-.permissions.defaultMode=auto starts every session in AUTO mode, where the
-  `PermissionRequest` hook decides a suspicious-classified prompt per-segment
-  rather than lift it to the human (shift+tab still cycles modes live)
-  ⚠️ `auto` is an INTERNAL mode: the cli's own tip text for an invalid value
-  lists four modes and omits it, because that tip is written against the
-  EXTERNAL set. the validator takes the internal set, which is the external
-  four plus `dontAsk` and `auto` — so a reader who checks the error message
-  rather than the enum concludes, wrongly, that this value is invalid
+every session starts in auto mode, where the `PermissionRequest` hook decides a suspicious-classified prompt per segment rather than lift it to the human. shift+tab still cycles modes.
+
+`auto` is an internal mode. the cli's tip text for an invalid value lists only the four external modes; the validator accepts those plus `dontAsk` and `auto`. a reader who checks the error message instead of the enum wrongly concludes `auto` is invalid.
 
 ## keys adopted from the live file
 
-🛑 .this key and `.model` were ADOPTED FROM THE LIVE FILE, not chosen here
-  - measured 2026-09-23: the live settings read `auto` and `claude-opus-5-5`
-    where this patch declared `acceptEdits` and `claude-opus-5`
-  - a merge converges a DECLARED key, so the next apply would have reverted
-    both — a human's deliberate choice, undone by a run they asked for a
-    different reason
-  - ⇒ the repo is the source of truth, so the repo learns the live value
-    rather than overwrite it (`rule.require.repo-as-source-of-truth`)
-  - ⚠️ the drift is one-way only for keys this patch DECLARES. `skipAutoPermissionPrompt`,
-    `tui`, and `env.CLAUDE_CODE_DISABLE_COMMAND_INJECTION_CHECK` sat in the live
-    file and in NO bundle: the merge preserved them on this box and a FRESH box
-    got none. ✔ adopted 2026-09-25, at the live values
-  - 🛑 that gap is INVISIBLE to every verify, by construction — a verify reads the
-    rows the repo declares, so a key with no declaration has no row to redden.
-    ⇒ when you touch this patch, diff the LIVE keys against the declared set
+`permissions.defaultMode` and `.model` were adopted from the live file, not chosen here.
+
+- measured 2026-09-23: the live file read `auto` and `claude-opus-5-5` where the patch declared `acceptEdits` and `claude-opus-5`. the next apply would have reverted a human's deliberate choice, so the repo took the live value (`rule.require.repo-as-source-of-truth`).
+- the merge preserves an undeclared key on the box it sits on, and a fresh box never gets it. `skipAutoPermissionPrompt`, `tui`, and `env.CLAUDE_CODE_DISABLE_COMMAND_INJECTION_CHECK` sat that way until adopted 2026-09-25.
+- no verify can see that gap: a verify reads only declared rows. when you touch this patch, diff the live keys against the declared set.
 
 ## `cleanupPeriodDays`
 
-🛑 .cleanupPeriodDays governs the TRANSCRIPTS, and its default DELETES them
-  - claude keeps a session's transcript for N days past its last activity and
-    then removes it. the default N is 30, and it applies whether or not the key
-    appears in the file — so an ABSENT key is not "no prune", it IS the 30-day
-    prune, chosen by default and never stated
-  - ⇒ every `/resume`, every post-compaction re-read of a session `.jsonl`, and
-    every archaeology run against a prior session dies on its 31st day
-  - ⚠️ the loss is UNRECOVERABLE and UNREPORTED. no line says a transcript was
-    pruned, so a human learns of it from a `/resume` that finds naught — which
-    is a failhide in the tool, and the reason this key is declared rather than
-    left to a default nobody sees (`rule.forbid.failhide`)
-  - ⇒ 36500 days is a hundred years, which is `never` said in the one unit the
-    option accepts. claude declares NO sentinel for never, so a reader who
-    greps for that word finds none — and must not read its absence as a gap
+claude deletes a session transcript N days after its last activity. N defaults to 30 whether or not the key is present, so an absent key is a 30-day prune nobody stated.
+
+- every `/resume`, post-compaction re-read, and archaeology run against a session dies on day 31.
+- the loss is unrecoverable and unreported: a human learns of it from a `/resume` that finds none (`rule.forbid.failhide`).
+- 36500 days is a hundred years — "never" in the only unit the option takes. claude declares no sentinel for never.
 
 ## `feedbackDrafts`
 
-.feedbackDrafts="off" stops claude queue its own bug-report drafts (2.1.247+)
-  - on, claude writes a draft to `~/.claude/feedback/drafts/` whenever it judges
-    it erred, and shows a "Bug report drafted" card above the prompt
-  - `off` stops the queue; `quiet` keeps it and hides the card
-  - ⚠️ USER or MANAGED scope only — a project or local file's value is ignored
-  - ⚠️ `CLAUDE_CODE_SEND_FEEDBACK=0` is the env twin, and it is NOT declared: the
-    settings shelf is where `rule.require.brain-config-has-one-home` puts a knob
-  - .ref = https://code.claude.com/docs/en/tools-reference (SendFeedback)
+`off` stops the queue of claude's own bug-report drafts (2.1.247+). when on, claude writes a draft to `~/.claude/feedback/drafts/` whenever it judges it erred, and shows a "Bug report drafted" card; `quiet` keeps the queue and hides the card.
+
+- user or managed scope only; a project or local value is ignored.
+- the env twin `CLAUDE_CODE_SEND_FEEDBACK=0` is not declared — the settings shelf is the one home.
+- .ref = https://code.claude.com/docs/en/tools-reference (SendFeedback)
 
 ## subagents are allowed
 
-🛑 .subagents are ALLOWED — `Agent` is never denied
-  - a subagent holds research in its OWN context, so the main one stays lean,
-    and `/batch` (which fans out across worktree agents) can run
-  - a bare `Agent` in `permissions.deny` removes the tool from claude's context
-    outright, so a leftover one silently re-bans every session
-  - ⇒ this patch declares NO `deny`, and the reap below strips a leftover
-    `"Agent"` entry while it keeps every other deny a human placed
+- a subagent holds research in its own context, so the main one stays lean, and `/batch` can fan out across worktree agents.
+- a bare `Agent` in `permissions.deny` removes the tool outright, so a leftover entry silently re-bans every session.
+- so the patch declares no `deny`, and the reap strips a leftover `"Agent"` while it keeps every other deny.
 
 ## merge, never overwrite — and arrays are replaced
 
-🛑 .`jq '. * $patch'` REPLACES an array; it merges only objects
-  - ⇒ a key this patch declares as an array overwrites the live one whole
-  - ⇒ so `deny` is left UNdeclared: a human's own deny list survives every apply,
-    and a retired entry is removed by name in the reap, never by overwrite
+- a human also edits `settings.json` — hooks, model, permissions. an overwrite destroys all of it, so the phase deep-merges with `jq '. * $patch'` and leaves every undeclared key as found.
+- `jq '. * $patch'` merges objects and replaces arrays whole. so `deny` stays undeclared: a human's deny list survives every apply, and a retired entry leaves by name in the reap.
 
-⚠️ `jq '. * $patch'`, never a plain overwrite
-  - `~/.claude/settings.json` is a file a HUMAN also edits, and it holds hooks,
-    model choice, and permissions
-  - ⇒ an overwrite here would silently destroy all of that
-  - ⇒ the deep merge leaves every key it does not declare as it found them
+## an enrolled claude reads settings.json through a symlink chain
 
-## an enrolled claude does not read settings.json
+measured 2026-10-19, on the laptop:
 
-⚠️ .an ENROLLED claude does not read this file
-  - `rhx enroll claude` spawns the cli with `CLAUDE_CONFIG_DIR` pointed at
-    `<repo>/.agent/.actors/…/brain/.claude`, so its "user" layer is rhachet's
-    generated role file (rhachet `asBrainCliSpawnEnv`, `asBrainCliSpawnArgs`)
-  - measured 2026-09-26: every key below held its declared value here, and an
-    enrolled clone still opened outside auto mode
-  - ⇒ this reaches a bare `command claude` only, until rhachet's enroll layers
-    this file under the role config (as it already symlinks `.credentials.json`)
+```
+<repo>/.claude                                    → .agent/.actors/actor.via.repo=ambient/brain/.claude
+…/brain/.claude/settings.json                     → settings.of.grove.json
+…/brain/.claude/settings.of.grove.json            → ~/.claude/settings.json
+```
+
+- an enrolled claude runs with `CLAUDE_CONFIG_DIR` at the actor dir, and that dir's `settings.json` resolves to this file, so the declared keys reach it.
+- the same chain makes a repo's project settings and the global file one file. a repo-scoped hook init writes its relative-path hooks (`./node_modules/.bin/rhx …`, `bash .agent/…`) into `~/.claude/settings.json`, where they fail in every other cwd.
+- so the reap must never strip hooks by shape: on a box with this chain, the global hooks ARE the repo's guard hooks. the fix belongs to rhachet's link layout.
 
 ## the reap
 
-.the REAP — a merge only ADDS, so a RETIRED key outlives its declaration
-🛑 without this, HISTORY outranks the tree: the box converges to every key the
-  repo has EVER declared, never the set it declares today. and no verify can
-  see it — a verify reads the DECLARED rows, so an undeclared key has no row
-  to redden (`rule.require.brain-config-has-one-home`, shape 11)
-⚠️ it names keys EXPLICITLY, and does NOT reap every undeclared key
-  - the merge's PRESERVE guarantee is load-bear: it lets the repo ADOPT a value
-    a human set by hand rather than revert it, and a blanket reap inverts that
-  - ⇒ a key enters this list only once PROVEN dead — zero read sites in the
-    pinned cli — which is why a delete here can harm no caller
-  - a key that is live but merely MOVED is retired by a change of value
-.refs = gotcha.5-3-brains.demo=one-home-consolidation.md, m5
-⚠️ ONE `del`, never a loop that builds the filter — an empty list would render
-   `del() | …`, which is a jq syntax error, so the shape must not depend on count
-⚠️ the `Agent` strip removes ONE entry by name, never the list — a human's other
-   denies survive; a list emptied by the strip is dropped rather than left `[]`
+a merge only adds, so a retired key outlives its declaration. without the reap the box holds every key the repo ever declared, and no verify can see it — an undeclared key has no row to redden (`rule.require.brain-config-has-one-home`, shape 11).
+
+- the reap names keys explicitly; it never reaps every undeclared key. the merge's preserve guarantee lets the repo adopt a human's hand-set value, and a blanket reap would invert that.
+- a key enters the list only once proven dead — zero read sites in the pinned cli — so a delete harms no caller. a live key that merely moved retires by a change of value.
+- one `del`, never a loop that builds it: an empty list would render `del() | …`, a jq syntax error.
+- the `Agent` strip removes one entry by name and keeps the other denies; a list it empties is dropped, not left `[]`.
+
+.refs = `gotcha.5-3-brains.demo=one-home-consolidation`, m5
 
 ## where the global config lives
 
-.what = where claude's GLOBAL CONFIG lives, as the cli itself resolves it
-.why a resolver and not a literal path — the cli takes TWO branches, and a
-  box that sits on the first one would have the second written beside it,
-  read by no caller, while the verify reported ✔ on the file it just wrote
-transcribed from `cli.js` (2.1.87):
-  aM = () => exists(join(c1(), ".config.json")) ? join(c1(), ".config.json")
-                                                : join($CLAUDE_CONFIG_DIR || homedir(), ".claude.json")
-  c1 = () => $CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude")
-🛑 .why `CLAUDE_CONFIG_DIR` is IGNORED here, where the cli honors it
-  - an apply launched from inside an enrolled claude INHERITS that session's
-    `CLAUDE_CONFIG_DIR` — rhachet points it at `<repo>/.agent/.actors/…/brain/.claude`
-  - measured 2026-09-26: such an apply wrote `diffSidebarOpen` into one
-    actor's `.claude.json` and reported [KEEP], while `~/.claude.json` went
-    unexamined — the result depended on WHO ran the apply, not on the box
-  - ⇒ a seat converges its OWN `$HOME`, so the caller's env is never the subject
+the phase resolves the path the way the cli does, because the cli takes two branches. a literal path would write a second file beside the real one, read by none, while the verify reported ✔ on the file it wrote. from `cli.js` (2.1.87):
+
+```
+aM = () => exists(join(c1(), ".config.json")) ? join(c1(), ".config.json")
+                                              : join($CLAUDE_CONFIG_DIR || homedir(), ".claude.json")
+c1 = () => $CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude")
+```
+
+the phase ignores `CLAUDE_CONFIG_DIR`, where the cli honors it. an apply launched inside an enrolled claude inherits that session's `CLAUDE_CONFIG_DIR`. measured 2026-09-26: such an apply wrote `diffSidebarOpen` into an actor's `.claude.json`, reported [KEEP], and never examined `~/.claude.json`. a seat converges its own `$HOME`; the caller's env is never the subject.
 
 ## the global config holds the oauth session — two guards
 
-🛑 .this file also holds the OAUTH SESSION, so the write is guarded twice
-  claude's own writer carries a refusal for exactly this — `saveConfigWithLock:
-  re-read config is missing auth that cache has; refusing to write to avoid
-  wiping ~/.claude.json. See GH #3117.` — so the hazard is measured upstream,
-  never theorized here.
-  ⇒ guard 1, a SKIP: the value is read first, and a file that already holds
-    the declared value is not opened for write at all. so the steady state —
-    every apply after the first — touches the file not at all, and the race
-    window is closed rather than merely narrowed
-  ⇒ guard 2, an ATOMIC RENAME: the merge lands in a tmp on the same
-    filesystem and is `mv`d over. a claude that reads mid-write sees one whole
-    file or the other, never a half
-  ⚠️ what remains, stated rather than papered over: a claude that holds the
-  file in memory and writes its own copy back AFTER our rename drops our key.
-  that direction is benign — the next apply re-converges it, and the verify
-  reddens meanwhile. the costly direction (our write dropping ITS auth) needs
-  claude to persist auth inside the millisecond between our read and our
-  rename, and guard 1 removes even that on every apply but the first
-.why a MERGE and never an overwrite — the same reason as the settings half,
-  only sharper: this file is ~750KB of a human's per-project state, history,
-  and onboarding flags. it is claude's to own; this bundle declares one key
-  inside it and leaves every other key exactly as it found it
+claude's own writer refuses a write whose re-read config lacks the auth its cache holds (`saveConfigWithLock`, GH #3117). the hazard is measured upstream, so the phase guards its write twice.
 
-🛑 guard 2 — the tmp lands BESIDE the target, so the `mv` is a rename
-  within one filesystem and therefore atomic. `mktemp` alone would put it
-  under /tmp, which is a tmpfs here — a cross-device `mv` is a copy, and a
-  copy has a window in which the file is half written
+1. skip: the phase reads the value first and never opens a file that already holds it. every apply after the first touches none of it, which closes the race window.
+2. atomic rename: the merge lands in a tmp beside the target and is `mv`d over. `mktemp` alone would land in /tmp, a tmpfs here, where a cross-device `mv` is a copy with a half-written window.
 
-⚠️ a merge that yields a smaller file than it read is a jq that dropped
-  state, and this is the one file where that costs a human their session.
-  the patch adds `diffSidebarOpen`, or turns `true` into the longer `false`, so
-  the output can never be shorter than the input
+- what remains: a claude that holds the file in memory and writes it back after our rename drops our key. that is benign — the verify reddens and the next apply re-converges. the costly direction, a write of ours that drops its auth, needs claude to persist auth inside the millisecond between our read and rename, and guard 1 removes even that after the first apply.
+- the file is ~750KB of a human's per-project state, so the phase merges one key and leaves the rest as found.
+- the patch only adds `diffSidebarOpen` or turns `true` into the longer `false`, so the output never shrinks. a smaller result means jq dropped state, and the write is refused.
 
 ## .see also
 
 - `5.3.brains/configure.upsert.sh`, `5.3.brains/configure.verify.sh`
-- `gotcha.5-3-brains.demo=one-home-consolidation` — m1-m7, the measurements behind these keys
+- `gotcha.5-3-brains.demo=one-home-consolidation` — m1–m7, the measurements behind these keys
 - `define.claude-code-config`, `howto.silence-claude-cli-nags`
