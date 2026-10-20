@@ -65,8 +65,9 @@ LogOut: "true",
 
 🛑 **`LockScreen` is absent on purpose — do not add it.** the three above end a
 session, so a stray press costs unsaved work. a lock costs a password, so the
-argument does not reach it. and with the idle timers off (above), the keybind
-and `machine.lock` are the only two locks this box has.
+argument does not reach it. and with the idle timers off (above), the panel's
+power applet and `machine.lock` are the only two locks this box has. the
+super+escape keybind is `Disable`d in `3.3.desktop` — it fired on accident.
 
 ## .apply
 

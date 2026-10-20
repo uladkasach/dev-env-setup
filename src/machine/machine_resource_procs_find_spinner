@@ -54,6 +54,23 @@ done
 
 SPINNER_PIDS=""
 SPINNER_INFO=""
+HOST_INFO=""
+
+# .what = hosts: processes that CONTAIN other work, so a high burn ratio is the
+#         sum of their tenants, never a wedge of their own
+#
+# .why  = this report printed `🪄 kill -9 19210` for the tmux server
+#         (57% over 7.8 days). that server relays every pane's output — 35
+#         claude TUIs redraw through it — and a kill ends every session at
+#         once. machine.diagnose.churn holds hosts out of its blame list for
+#         the identical reason (2026-09-05). a host is reported, never offered
+#         as a kill target, and `--kill` never reaches one
+__is_host() {
+  case "$1" in
+    "tmux: server"|kitty|cosmic-comp|Xwayland|gnome-shell|systemd|pipewire|wireplumber) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 # get user processes with elapsed and cpu time
 while read -r pid etimes cputimes comm; do
@@ -70,20 +87,30 @@ while read -r pid etimes cputimes comm; do
   if [[ "$ratio" -ge "$MIN_RATIO" ]]; then
     elapsed_min=$(( etimes / 60 ))
     cpu_min=$(( cputimes / 60 ))
+    if __is_host "$comm"; then
+      HOST_INFO+="$pid ($comm): ${ratio}% CPU over ${elapsed_min}m (${cpu_min}m CPU time)\n"
+      continue
+    fi
     SPINNER_PIDS+="$pid "
     SPINNER_INFO+="$pid ($comm): ${ratio}% CPU over ${elapsed_min}m (${cpu_min}m CPU time)\n"
   fi
-done < <(ps -u "$USER" -o pid=,etimes=,cputimes=,comm= 2>/dev/null)
+done < <(ps -u "$USER" -o pid=,etimes=,cputimes=,comm=,args= 2>/dev/null | awk '{ c = $4; if ($4 == "tmux:" && $5 == "server") c = "tmux: server"; print $1, $2, $3, c }')
+
+echo "🐈 lets prowl..."
+echo "└─🌕 spinner"
+
+# hosts first, marked, with no kill hint
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  echo "  ├─🏠 $line"
+  echo "  │   ↳ host — its burn is the sum of its tenants; a kill ends them all, not the burn"
+done <<< "$(echo -e "$HOST_INFO")"
 
 if [[ -z "$SPINNER_PIDS" ]]; then
-  echo "🐈 lets prowl..."
-  echo "└─🌕 spinner"
   echo "  └─✨ none caught"
   exit 0
 fi
 
-echo "🐈 lets prowl..."
-echo "└─🌕 spinner"
 # format as tree entries
 while IFS= read -r line; do
   [[ -z "$line" ]] && continue

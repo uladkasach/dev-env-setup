@@ -27,19 +27,29 @@ grove_provision_3_3_desktop_configure_upsert() {
 
   ####################################################################
   # 1. the custom keybinds
+  #
+  # 🛑 bare super and super+escape are DISABLED, never merely omitted
+  #   - an omitted key falls back to cosmic's `defaults`, which binds bare
+  #     super → launcher and super+escape → lock
+  #   - both fire on accident: super is half of every super-chord, and a
+  #     stray lock costs a password mid-thought
+  #   - ⇒ `Disable` is the only value that leaves the key inert
+  #   - the LockScreen ACTION stays armed: `machine.lock` and the panel's
+  #     power applet still lock this box (see section 2)
   ####################################################################
   local shortcuts_dir="$HOME/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1"
   mkdir -p "$shortcuts_dir" || return 1
 
   cat > "$shortcuts_dir/custom" <<'SHORTCUTS'
 {
-    (modifiers: [Super]): System(WorkspaceOverview),
+    (modifiers: [Super]): Disable,
+    (modifiers: [Super], key: "Escape"): Disable,
     (modifiers: [Super], key: "slash"): System(Launcher),
     (modifiers: [], key: "Print"): System(Screenshot),
     (modifiers: [Ctrl, Shift, Alt], key: "p"): System(Screenshot),
 }
 SHORTCUTS
-  echo "   • keybinds: super → overview, super+/ → search, Print → screenshot"
+  echo "   • keybinds: super and super+escape inert, super+/ → search, Print → screenshot"
 
   ####################################################################
   # 2. the system actions — kitty as the terminal, power keys disarmed
@@ -116,4 +126,23 @@ Some(([
 ]))
 WINGS
   echo "   • top panel: status area left, controls right"
+
+  ####################################################################
+  # 7. touchpad scroll — natural (content follows the fingers, as on a mac)
+  #
+  #   - cosmic ships `natural_scroll:None`, which defers to libinput's
+  #     default: traditional scroll, backwards on a magic trackpad
+  #   - DERIVED from the system copy, as the action table above is: only
+  #     that one field changes, so tap and click keep cosmic's own defaults
+  #   - it covers every touchpad, builtin and magic trackpad alike; a mouse
+  #     wheel reads `input_default`, which this leaves alone
+  ####################################################################
+  local touchpad_system="/usr/share/cosmic/com.system76.CosmicComp/v1/input_touchpad"
+  if [[ -f "$touchpad_system" ]] && grep -F 'natural_scroll:None' "$touchpad_system" >/dev/null; then
+    sed 's/natural_scroll:None/natural_scroll:Some(true)/' "$touchpad_system" > "$comp_dir/input_touchpad" || return 1
+    echo "   • touchpad scroll: natural"
+  else
+    echo "   🌙 no system touchpad config with natural_scroll:None at $touchpad_system,"
+    echo "      so the scroll direction was not declared"
+  fi
 }
