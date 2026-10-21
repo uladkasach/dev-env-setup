@@ -76,6 +76,48 @@ grove_provision_5_3_brains_configure_verify() {
   done
 
   ####################################################################
+  # .the LOCK — zero role hooks, and no write bit
+  #
+  # the claims: home holds no hook a role authored (each fires in every session on
+  #   the box), and the file is read-only (else any tree's init writes it through its
+  #   arrow). the readers live in the upsert, so the two cannot disagree on either fact
+  ####################################################################
+  local real="$settings" roles lock_rc
+  [[ -L "$real" ]] && real="$(readlink -f "$real")"
+  if declare -F _grove_provision_5_3_brains_role_hooks_by_author >/dev/null 2>&1; then
+    if ! roles="$(_grove_provision_5_3_brains_role_hooks_by_author "$real")"; then
+      echo "   ✋ jq could not read $real, so its role hooks are uncounted" >&2
+      echo "      read why: jq . $real" >&2
+      failed=1
+    elif [[ -z "$roles" ]]; then
+      echo "   • no role-authored hook in $real ✔"
+    else
+      echo "   ✋ $real holds $(awk '{n += $2} END {print n + 0}' <<< "$roles") role-authored hooks, which fire in every repo" >&2
+      awk '{ a[NR] = $1; n[NR] = $2 }
+        END { for (i = 1; i <= NR; i++) printf "      %s %-28s %3d\n", (i == NR ? "└─" : "├─"), a[i], n[i] }' <<< "$roles" >&2
+      echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+      failed=1
+    fi
+    _grove_provision_5_3_brains_is_writable "$real"; lock_rc=$?
+    if (( lock_rc == 0 )); then
+      echo "   ✋ $real is writable (mode $(stat -c '%a' "$real")), so any tree's init can write it" >&2
+      echo "      ⇒ every tree's .claude/settings.json is an arrow to this file" >&2
+      echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+      failed=1
+    fi
+    if (( lock_rc == 1 )); then
+      echo "   • $real is read-only (mode $(stat -c '%a' "$real")) ✔"
+    fi
+    if (( lock_rc == 2 )); then
+      echo "   ✋ the mode of $real could not be read, so the lock is unproven" >&2
+      echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+      failed=1
+    fi
+  else
+    echo "   🌙 the role hook reader is absent from this run, so the strip and the lock are unproven"
+  fi
+
+  ####################################################################
   # .the KEYBINDINGS half — `~/.claude/keybindings.json`
   #
   # the claim: `ctrl+x ctrl+s` is UNBOUND in the Chat block, so ctrl+enter is the one
