@@ -69,6 +69,7 @@ used to judge its GUARANTEE half, and a check condemned nine correct sites.
 - src/grove.provision/5.devtools/5.4.gh/configure.upsert.sh       # a prompt gate
 - src/grove.provision/5.devtools/5.15.identity/configure.upsert.sh
 - src/grove.provision/2.shell/2.3.ssh/configure.upsert.sh
+- src/grove.provision/5.devtools/5.3.brains/configure.upsert.sh   # the boot gate: the lock stays only if an init survives it
 - .agent/repo=.this/role=any/briefs/grove/provision/rule.require.upgrade-entries-verify-themselves.md
 - .agent/repo=.this/role=any/briefs/evidence/rule.forbid.tty-as-a-proxy-for-a-human.md
 
