@@ -57,7 +57,7 @@ early detection + actionable notification = fix in 5 seconds instead of 5 minute
 
 | not needed | why |
 |------------|-----|
-| auto-kill | too dangerous; user decides what to kill |
+| auto-kill | too dangerous; user decides what to kill — except a grepsafe run older than 2min, whose kill is settled (`1.6.7.grepsafe`) |
 | email alerts | desktop notification sufficient for dev machine |
 | web UI | overkill; notification + log sufficient |
 | process restart | not a server; just need awareness |

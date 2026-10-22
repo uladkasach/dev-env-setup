@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+######################################################################
+# machine_resource_procs_reap_grepsafe — kill and report every grepsafe run
+# older than --min-age (default 120s), together with its search children
+#
+# .what = a grepsafe run is RUNAWAY when both hold:
+#           1. it is ours (pgrep -u the caller's uid)
+#           2. its argv names `claude.tools/grepsafe.sh`, and it is older
+#              than --min-age
+#         the kill takes the run's descendants too (rg / grep), since a
+#         SIGTERM to the bash wrapper alone can leave its search child alive
+#
+# .why  = a grepsafe call is a bounded search that answers in seconds. on
+#         2026-10-20 one ran 8 minutes over a `.agent` dir — 3.3G resident,
+#         58% cpu, the largest memory holder on a box already 29G into swap.
+#         the human's settlement: a runaway grepsafe is ALWAYS killed, no ask.
+#         so this is the one population the runaway monitor auto-kills
+#
+# .why a short clock and pgrep, not the abandoned reaper's /proc sweep
+#   - a runaway grepsafe costs gigabytes per minute, so it runs every minute
+#   - a per-pid /proc walk forks thousands of times per pass; a minute timer
+#     on a box in a spawn storm must not join the storm. pgrep is one fork
+#
+# usage:
+#   machine_resource_procs_reap_grepsafe                    # plan: report only
+#   machine_resource_procs_reap_grepsafe --mode apply       # kill, then report
+#   machine_resource_procs_reap_grepsafe --min-age 300      # threshold, seconds
+#   machine_resource_procs_reap_grepsafe --report <file>    # where kills are logged
+#
+# guarantee:
+#   - plan mode is the default, and signals no process
+#   - apply sends SIGTERM to each run and its descendants, waits 5s, then
+#     SIGKILLs only the survivors it chose
+#   - every kill appends one line to the report log: when, pid, age, rss, argv
+#   - exit 0 = the pass completed, whatever it found; exit 2 = bad args
+######################################################################
+set -uo pipefail
+
+MODE="plan"
+MIN_AGE=120
+REPORT="${XDG_STATE_HOME:-$HOME/.local/state}/grove/grepsafe.reaped.log"
+MATCH='claude\.tools/grepsafe\.sh'
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --mode)    MODE="$2"; shift 2 ;;
+    --min-age) MIN_AGE="$2"; shift 2 ;;
+    --report)  REPORT="$2"; shift 2 ;;
+    -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "✋ ConstraintError: unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+[[ "$MODE" == plan || "$MODE" == apply ]] || { echo "✋ ConstraintError: --mode must be plan or apply" >&2; exit 2; }
+[[ "$MIN_AGE" =~ ^[0-9]+$ ]] || { echo "✋ ConstraintError: --min-age must be whole seconds" >&2; exit 2; }
+
+# .what = seconds since this pid started, or fail when it is gone
+age_of() { local a; a="$(ps -o etimes= -p "$1" 2>/dev/null)" || return 1; printf '%s' "${a// /}"; }
+rss_kb_of() { awk '/^VmRSS:/ {print $2}' "/proc/$1/status" 2>/dev/null; }
+argv_of() { tr '\0' ' ' < "/proc/$1/cmdline" 2>/dev/null | head -c 300; }
+
+# .what = every descendant of a pid, depth-first, one pgrep per level
+descendants_of() {
+  local child
+  for child in $(pgrep -P "$1" 2>/dev/null); do
+    printf '%s\n' "$child"
+    descendants_of "$child"
+  done
+}
+
+# gather the runaway runs
+RUNS=()
+for pid in $(pgrep -u "$(id -u)" -f "$MATCH" 2>/dev/null); do
+  [[ "$pid" == "$$" ]] && continue
+  age="$(age_of "$pid")" || continue
+  (( age >= MIN_AGE )) && RUNS+=("$pid")
+done
+
+echo "🐈 lets prowl for runaway grepsafe..."
+echo "└─🌕 runaway — a grepsafe run older than ${MIN_AGE}s (mode: $MODE)"
+if (( ${#RUNS[@]} == 0 )); then
+  echo "  └─✨ none found"
+  exit 0
+fi
+
+TOTAL_KB=0
+VICTIMS=()
+for pid in "${RUNS[@]}"; do
+  rss="$(rss_kb_of "$pid")"; rss="${rss:-0}"
+  TOTAL_KB=$(( TOTAL_KB + rss ))
+  printf '  ├─🪲 %s age %ss rss %sM — %s\n' "$pid" "$(age_of "$pid")" "$(( rss / 1024 ))" "$(argv_of "$pid" | head -c 160)"
+  VICTIMS+=("$pid")
+  mapfile -t kids < <(descendants_of "$pid")
+  for kid in "${kids[@]}"; do
+    krss="$(rss_kb_of "$kid")"; krss="${krss:-0}"
+    TOTAL_KB=$(( TOTAL_KB + krss ))
+    VICTIMS+=("$kid")
+  done
+done
+echo "  ├─ total: ${#RUNS[@]} runs, ${#VICTIMS[@]} processes, $(( TOTAL_KB / 1024 ))M resident"
+
+if [[ "$MODE" == plan ]]; then
+  echo "  └─🪄 to reap them:  machine_resource_procs_reap_grepsafe --mode apply"
+  exit 0
+fi
+
+# apply: record each run BEFORE the signal, while /proc still holds its facts
+mkdir -p "$(dirname "$REPORT")"
+NOW="$(date -Is)"
+for pid in "${RUNS[@]}"; do
+  printf '%s pid=%s age_s=%s rss_kb=%s argv=%s\n' \
+    "$NOW" "$pid" "$(age_of "$pid")" "$(rss_kb_of "$pid")" "$(argv_of "$pid")" >> "$REPORT"
+done
+
+kill -TERM "${VICTIMS[@]}" 2>/dev/null
+for _ in 1 2 3 4 5; do
+  alive=0
+  for pid in "${VICTIMS[@]}"; do kill -0 "$pid" 2>/dev/null && alive=1; done
+  (( alive )) || break
+  sleep 1
+done
+SURVIVORS=()
+for pid in "${VICTIMS[@]}"; do kill -0 "$pid" 2>/dev/null && SURVIVORS+=("$pid"); done
+(( ${#SURVIVORS[@]} )) && kill -KILL "${SURVIVORS[@]}" 2>/dev/null
+
+echo "  ├─ reaped ${#RUNS[@]} runs (${#SURVIVORS[@]} processes needed SIGKILL), freed ~$(( TOTAL_KB / 1024 ))M"
+echo "  └─ report: $REPORT"
+
+# a human on a desktop hears about it; a headless box has the journal
+if [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && command -v notify-send >/dev/null 2>&1; then
+  notify-send -a grove "reaped ${#RUNS[@]} runaway grepsafe" \
+    "~$(( TOTAL_KB / 1024 ))M freed — see $REPORT" 2>/dev/null || true
+fi
+exit 0

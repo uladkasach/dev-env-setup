@@ -727,6 +727,19 @@ __term_has_tmux_session() {
   tmux has-session -t "$session" 2>/dev/null
 }
 
+# .what = findsert a local tmux session ($1=session, $2=cwd); exit 0 = it now exists
+# .why  = an absent session is not the human's chore. the open asks for a terminal on a
+#         duct, so it makes the duct it was asked for, rather than refuse and hand back
+#         a `tmux new-session` line to copy. `-c` starts it in the asked-for dir.
+# .note = the has-session probe after a failed create covers a concurrent create
+#         (a race where another open made it first) — that is still "it now exists".
+__term_gen_tmux_session() {
+  local session="$1" cwd="$2"
+  __term_has_tmux_session "$session" && return 0
+  tmux new-session -d -s "$session" -c "$cwd" && return 0
+  __term_has_tmux_session "$session"
+}
+
 # .what = close one window by its match selector (exit 0 = closed)
 __term_close_window_matched() {
   local socket="$1"
@@ -930,11 +943,11 @@ term.open() {
       # when the session is a longer unique name.
       local tab_session="${tab_duct:-$tab}"
 
-      # guard: a tab attaches a local tmux session; if it is absent the shell exits
-      # and the tab dies instantly. fail clear before we spawn (matches base-open).
-      if ! __term_has_tmux_session "$tab_session"; then
-        echo "✋ term.open: no tmux session '$tab_session' — create it first (tmux new-session -d -s '$tab_session')" >&2
-        return 2
+      # a tab attaches a local tmux session; if it is absent the shell exits and the
+      # tab dies instantly. so findsert it before we spawn (matches base-open).
+      if ! __term_gen_tmux_session "$tab_session" "${cwd:-$PWD}"; then
+        echo "💥 term.open: could not create tmux session '$tab_session'" >&2
+        return 1
       fi
 
       # wait for the listen socket to answer before we drive it — when a terminal
@@ -1022,13 +1035,13 @@ term.open() {
     base_attach="${tab_duct:-$tab}"
   fi
 
-  # guard: a local duct attaches to a tmux session; if that session is absent the
-  # attach fails, the shell exits, and the kitty dies within ~0.3s (leaving no
-  # window and a confusing dead-socket error). fail clear before we spawn.
+  # a local duct attaches to a tmux session; if that session is absent the attach
+  # fails, the shell exits, and the kitty dies within ~0.3s — no window, and a
+  # dead-socket error that names the wrong cause. so findsert the session first.
   if [[ -n "$duct" && -z "$duct_host" ]]; then
-    if ! __term_has_tmux_session "$base_attach"; then
-      echo "✋ term.open: no tmux session '$base_attach' — create it first (tmux new-session -d -s '$base_attach')" >&2
-      return 2
+    if ! __term_gen_tmux_session "$base_attach" "$cwd"; then
+      echo "💥 term.open: could not create tmux session '$base_attach'" >&2
+      return 1
     fi
   fi
 

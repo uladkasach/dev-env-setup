@@ -147,8 +147,13 @@ grove_provision_2_8_tmux_configure_upsert() {
     [[ -n "$line" ]] && live+=("$line")
   done < <(grove_provision_2_8_tmux_live_sockets)
 
+  # ⚠️ 30s, not 5s: a duct server with ~150 attached clients answers a
+  #    `source-file` in well over 5s, so a 5s bound skipped the ONE server that
+  #    matters and reported it as refused (measured 2026-10-20). a socket with no
+  #    server refuses at connect, so the wider bound costs time only on a live
+  #    server that is slow — which is exactly the one owed the wait
   for name in "${live[@]}"; do
-    if timeout -k 2 5 tmux -L "$name" source-file "$HOME/.tmux.conf" 2>/dev/null; then
+    if timeout -k 5 30 tmux -L "$name" source-file "$HOME/.tmux.conf" 2>/dev/null; then
       sourced=$(( sourced + 1 ))
     else
       refused+=("$name")
