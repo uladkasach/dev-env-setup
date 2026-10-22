@@ -1,0 +1,19 @@
+{
+  "key": "95c59deb51131bfa",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-bhrain"
+  },
+  "exid": null,
+  "title": "perf(route): status line reads a json precomputed by route.drive, never a fresh node per update",
+  "description": "## .what\n\nmake the route status line cheap: it should read a precomputed json, never start a fresh `node` per update. at minimum, debounce its real work to once per minute.\n\n## .why\n\n- the status line installed by `init.claude.status-line` runs `node -e \"import('rhachet-roles-bhrain/cli/route').then(m => m.routeStatusLine())\"` — a fresh node process, plus a module import, on every status update, in every claude session\n- claude code docs (statusline, \"When the status line updates\"): the status line re-runs on session events, and on a `refreshInterval` timer if one is set; if a new update triggers while a slow status command runs, the in-flight run is cancelled. so a slow command is started often, and often thrown away\n- measured on a dev box with ~10 live claude sessions: `node -e import('rhachet-roles-bhrain/cli/route')...routeStatusLine()` shows up repeatedly among the newborn processes in a churn sample, beside a box-wide rate of 600-1300 forks/sec\n\n## .proposed shape — two options, either beats today\n\n1. **precompute (preferred):** `route.drive` (and every route operation that changes the shown state — `route.stone.set`, `route.bind.set`, ...) writes the status-line text to a small json beside the bound route. the status line command becomes a plain file read (`cat` / `jq`, or a shell builtin), with no node start at all\n2. **debounce (floor):** if precompute is not yet in place, cache the rendered line with a timestamp and recompute at most once per minute; every other update serves the cached line\n\n## .acceptance\n\n- a status-line update starts no `node` process when the route state has not changed\n- the shown line still reflects a stone change on the next update after it\n- measured before/after: node births per minute per session from the status line\n\n## .sources\n\n- https://code.claude.com/docs/en/statusline",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 7,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "660"
+}

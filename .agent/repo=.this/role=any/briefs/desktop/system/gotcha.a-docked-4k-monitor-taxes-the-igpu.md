@@ -40,8 +40,15 @@ sharp, cheaper option is 4k @ 100% with per-app font size up — the cosmic shel
 1. **fewer live tenants.** close idle claude sessions and terminal windows you do not watch.
    this cuts memory, swap and fork churn — the largest lever measured. close them yourself; an
    agent must never kill a terminal or a host
-2. **kitty render delays.** `repaint_delay` (default 10ms) and `input_delay` (default 3ms) set
-   each instance's repaint rate; raised values cut per-instance cost at a small latency price
+2. ✋ **kitty render delays showed no gain here.** on 2026-10-21 two fresh kittys streamed the
+   same output (a timestamp every 10ms): `repaint_delay 10` burned ~6.4% of a core,
+   `repaint_delay 500` ~6.9%, and a human saw no visible throttle at 33, 100, 250, or 500ms.
+   kitty's loader confirmed each value was read
+   - ⚠️ the cpu number cannot prove the gpu side: a stream's cpu goes mostly to text parse,
+     which runs at any delay. the repaint cost lands on the iGPU, unread without root
+     (`intel_gpu_top`). so the claim is "no visible or cpu gain", never "no gpu gain"
+   - ⚠️ an open kitty keeps the delays it started with, so a test in an extant window compares
+     10ms against 10ms. only a kitty started after the apply carries the new value
 3. **fewer kitty processes.** one kitty process holds one gpu context and one glyph cache across
    its windows; termwork's process-per-terminal multiplies both. a termwork change, not a config
 4. cosmic transparency (frosted glass) is a known lag source on 4k — **already off** here

@@ -1,0 +1,19 @@
+{
+  "key": "28404e57de8e9199",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-bhuild"
+  },
+  "exid": null,
+  "title": "perf(tmux): replace repeated has-session/list-sessions polls with one control-mode watcher",
+  "description": "## .what\n\nreplace repeated `tmux has-session` / `list-sessions` calls from the duct and crew pollers with ONE long-lived tmux control-mode client that receives changes as events, and serves readers from its state.\n\n## .why\n\n- every `tmux <command>` from a poller forks a fresh tmux client, connects to the server socket, and parses a reply. at scale that is a churn source and a load on a single-threaded server\n- measured on a dev box: one tmux server with ~190 sessions and ~156 attached clients. a 10s churn sample saw **~160 distinct short-lived `tmux` processes**, and a plain read query against the server took a visible fraction of a second to answer\n- tmux control mode (wiki: Control Mode) is built for exactly this:\n  - `tmux -C` starts a text-protocol client; it accepts ordinary commands and also emits async `%`-notifications when a change is made (`%sessions-changed`, `%session-changed`, `%window-add`, ...)\n  - `refresh-client -B` adds a **format subscription**: tmux re-expands the format and sends `%subscription-changed` only when the value changes, **at most once a second**\n  - `refresh-client -f no-output` stops `%output` notifications, so the watcher never pays for pane output\n\n## .proposed shape\n\n- one watcher per box holds the control-mode client and writes a cache (session list, per-session liveness, the formats readers need)\n- readers (`duct.*`, `git.crew.*`, the pollers) read the cache instead of a fork per question\n- the watcher restarts itself if the server restarts; readers fail loud on a stale cache rather than guess\n\n## .acceptance\n\n- a reader's question about session existence forks no tmux client\n- measured before/after: distinct `tmux` processes per 10s sample, at the same session count\n\n## .sources\n\n- https://github.com/tmux/tmux/wiki/Control-Mode\n- https://man7.org/linux/man-pages/man1/tmux.1.html",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 4,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "515"
+}

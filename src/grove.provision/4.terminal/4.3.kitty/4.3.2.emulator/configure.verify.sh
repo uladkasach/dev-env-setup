@@ -132,6 +132,23 @@ print(load_config('$conf').allow_remote_control)
       "  finds no window to talk to"
   fi
 
+  # 2e. the render delays kitty READS — a delay felt as no change can mean either "no
+  #     felt cost" or "never read", and only the loader parts the two
+  local delays=""
+  if command -v kitty >/dev/null 2>&1; then
+    delays="$(timeout -k 5 20 kitty +runpy "
+from kitty.config import load_config
+o = load_config('$conf')
+print(o.repaint_delay, o.input_delay)
+" 2>/dev/null | tail -1)"
+  fi
+  if [[ -z "$delays" ]]; then
+    echo "   🌙 kitty's loader did not answer, so the render delays are UNREAD on this box"
+  else
+    echo "   • render delays read as repaint=${delays% *}ms input=${delays#* }ms ✔ (per kitty's own loader)"
+    echo "     ⚠️ an open kitty keeps the delays it started with; a new one reads these"
+  fi
+
   # 2c. the DECLARED window size wins over `remember_window_size`, per the loader — and
   #     2d. that override is STATED, not defaulted, the same split as 2b (m11)
   local rws=""

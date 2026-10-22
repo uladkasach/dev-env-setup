@@ -1,0 +1,19 @@
+{
+  "key": "2c6a32974186f4c9",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-bhuild"
+  },
+  "exid": null,
+  "title": "perf(hooks): serve role hooks via one resident http daemon, and gate each with an if pattern",
+  "description": "## .what\n\nrun the claude code hooks that roles install through one always-on local server (claude code native `type: \"http\"` hooks), instead of a fresh process chain per hook per tool call.\n\n## .why\n\n- claude code supports http hooks natively (hooks reference: \"HTTP hook fields\"). a hook can POST to a local url instead of run a command\n- measured upstream in anthropics/claude-code#39391: **34.6ms per command hook vs 0.31ms per http call** to a long-lived local server; **3,986ms vs 23ms** across a 120-call session\n- measured on a dev box with ~10 live claude sessions: each tool call fires ~4 hook chains, each `sh -> rhx -> bun -> bash`. the box sustained 600-1300 forks/sec with cpu ~75% idle; the hook chains are a top share of the `sh` / `bash` / `MainThread` births\n\n## .two levers\n\n1. **available today, small:** the hook config accepts an `if` permission-rule pattern (e.g. `\"Bash(git *)\"`, `\"Edit(*.ts)\"`), evaluated on PreToolUse / PostToolUse / PostToolUseFailure / PermissionRequest / PermissionDenied. the hook command runs ONLY when the call matches. a guard that only matters for writes or edits should declare `if`, and stop to run on every call\n2. **structural:** one resident hook daemon per seat (keyrackd is a precedent for a resident daemon) that serves every role hook over http. roles register handlers with it instead of a per-call command\n\n## .scope\n\nthe hooks are installed by the upstream role packages (ehmpathy mechanic, bhrain driver + learner, bhuild behaver) via `rhachet init --hooks`. so the fix spans the hook registration contract, not one repo's `settings.json`\n\n## .acceptance\n\n- an audit: every installed hook, its event, its matcher, and whether it declares `if`\n- every hook that cannot affect a given tool declares `if`, so it never runs there\n- a measured before/after: hook process births per tool call, and wall time per tool call\n\n## .sources\n\n- https://github.com/anthropics/claude-code/issues/39391\n- https://code.claude.com/docs/en/hooks",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 3,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "514"
+}

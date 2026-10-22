@@ -13,6 +13,10 @@ node_modules
 # per-machine by nature and belongs in no commit. same dox exposure as .temp/
 .agent/.cache/
 
+# tool caches — a browser profile, fetched research. per-machine state that
+# carries cookies and session data, so it belongs in no commit
+.cache/
+
 # PLAYS — a play lives in one of exactly two dirs, and only ONE is ignored.
 #
 #   .play/temporary/   IGNORED (below). a probe written to answer one question
