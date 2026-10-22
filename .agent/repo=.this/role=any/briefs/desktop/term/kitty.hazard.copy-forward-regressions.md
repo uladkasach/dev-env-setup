@@ -63,6 +63,7 @@ breaks and a ctrl+c interrupts claude.
 | gate on `_holds_tmux` (tmux anywhere in subtree) | same — interrupts claude | tmux-present ≠ nvim-focused; must detect the *active pane* |
 | swap kitten for builtin `copy_to_clipboard` | toast + nvim-visual copy gone | builtin does neither toast nor forward |
 | break the active-pane detection (tmux `list-clients`/`list-panes`, or `fd/0` tty read) | nvim-through-tmux copy dies (fails closed) | no confirmed nvim focus → no forward. safe (never interrupts) but copy stops |
+| ask a bare `tmux` (no `-S`/`-L`) in the active-pane lookup | **nvim copy dies on every duct socket**, every tmux layer reads green | a client attached to `duct-org-<org>` is invisible to the `default` server, so the lookup finds no client and fails closed. crew ducts run one server per org (`-L duct-org-<org>`), by design. the kitten reads `-L`/`-S` off the client's own `/proc` argv and asks that server ONCE (`display -c <tty>`) — never a walk of every socket. measured 2026-10-21; clamp: `prove.copy-kitten-finds-the-client` (asserts `tmux_calls=1`) |
 | add an app to the allowlist that treats the key as interrupt | that app interrupts on ctrl+c | only add apps that truly *yank* `<C-S-c>` |
 | forward the raw `^C` instead of `CSI 99;6u` | shell SIGINTs on ctrl+c | defeats the "ctrl+c is copy-only" design |
 | remove `extended-keys on` / kitty extkeys from tmux.conf | forwarded key dies in transit | tmux drops the extended key without the relay |
@@ -96,6 +97,12 @@ paths by hand — they fail independently:
 4. **no phantom interrupt**: in a shell, in claude-cli, and in any other TUI,
    `ctrl+c` / `ctrl+shift+c` must NOT interrupt (interrupt is `ctrl+x` only).
    test claude-cli specifically — it is the app that first exposed this.
+
+the automated half: `rhx play.run --play prove.copy-gate-discriminates` (the
+tmux gate) and `--play prove.copy-kitten-finds-the-client` (the kitten's lookup,
+on a non-default socket). each proves its own half only. for the LIVE box,
+`rhx tmux.copy.gate.get` reads the bind, extended-keys, and every nvim pane on
+every socket, and flags one the kitten cannot see.
 
 if a path breaks, instrument the kitten (append `_focused_app(window)` and
 `bool(selection)` to a log under the repo `.temp/`, not `/tmp` — a hook blocks

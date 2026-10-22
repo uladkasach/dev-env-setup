@@ -52,50 +52,78 @@ def _subtree(root: int, kids: dict) -> list:
     return out
 
 
-def _tmux_client_tty(pids: list) -> str:
-    # a tmux client in the subtree owns the kitty pty as its stdin
-    #   - so readlink of fd/0 yields the /dev/pts/N that matches tmux's #{client_tty}
-    for pid in pids:
-        if _comm(pid).startswith('tmux'):
-            try:
-                return os.readlink('/proc/%d/fd/0' % pid)
-            except Exception:
-                pass
-    return ''
-
-
-def _tmux_active_pane(client_tty: str) -> tuple:
-    # ask tmux about the active pane of this client's session
-    #   - returns (command, in_copy_mode)
-    #   - fail closed (return ('', False)) on any error, so the caller forwards none
-    try:
-        clients = subprocess.check_output(
-            ['tmux', 'list-clients', '-F', '#{client_tty}\t#{session_name}'],
-            timeout=1,
-        ).decode()
-    except Exception:
-        return ('', False)
-    session = ''
-    for line in clients.splitlines():
-        parts = line.split('\t')
-        if len(parts) == 2 and parts[0] == client_tty:
-            session = parts[1]
+def _tmux_socket_of(argv: list) -> str:
+    # the server socket a tmux client talks to, read off the client's own argv
+    #
+    # 🛑 a client may attach to ANY server, not only `default`
+    #   - crew ducts run one server per org (`tmux -L duct-org-<org>`), so the
+    #     human's nvim pane lives on a server a bare `tmux …` never asks
+    #   - measured 2026-10-21: nvim on `duct-org-ehmpathy`, the kitten asked
+    #     `default` alone, found no client for the tty, and failed closed
+    #
+    # ⇒ the client's argv NAMES its server (`tmux -L duct-org-ehmpathy attach …`),
+    #   so this costs zero tmux calls — never a walk of every socket
+    #   - `-S <path>` is the path itself; `-L <name>` lives in the socket dir
+    #   - both forms parse, spaced (`-L x`) and joined (`-Lx`)
+    #   - neither flag = the `default` server, tmux's own fallback
+    #   - ⚠️ only the global flags BEFORE the subcommand count: `-t` and kin
+    #     after it belong to the subcommand
+    base = os.path.join(os.environ.get('TMUX_TMPDIR') or '/tmp', 'tmux-%d' % os.getuid())
+    sock = os.path.join(base, 'default')
+    i = 1
+    while i < len(argv):
+        arg = argv[i]
+        if not arg.startswith('-'):
             break
-    if not session:
+        for flag in ('-S', '-L'):
+            if arg == flag or (arg.startswith(flag) and len(arg) > 2):
+                value = argv[i + 1] if arg == flag and i + 1 < len(argv) else arg[2:]
+                if arg == flag:
+                    i += 1
+                sock = value if flag == '-S' else os.path.join(base, value)
+        i += 1
+    return sock
+
+
+def _tmux_client(pids: list) -> tuple:
+    # the tmux client in the window's subtree: (its tty, its server socket)
+    #   - it owns the kitty pty as its stdin, so readlink of fd/0 yields the
+    #     /dev/pts/N tmux knows it by
+    #   - ('', '') when the window runs no tmux client
+    for pid in pids:
+        if not _comm(pid).startswith('tmux'):
+            continue
+        try:
+            tty = os.readlink('/proc/%d/fd/0' % pid)
+            with open('/proc/%d/cmdline' % pid, 'rb') as fh:
+                argv = [a.decode(errors='replace') for a in fh.read().split(b'\0') if a]
+        except Exception:
+            continue
+        return (tty, _tmux_socket_of(argv))
+    return ('', '')
+
+
+def _tmux_active_pane(client: tuple) -> tuple:
+    # ask the client's OWN server what its active pane runs
+    #   - returns (command, in_copy_mode)
+    #   - ONE call: `display -c <tty>` resolves the client's current pane itself,
+    #     so no list-clients scan and no list-panes per session
+    #   - fail closed (return ('', False)) on any error, so the caller forwards none
+    tty, sock = client
+    if not tty:
         return ('', False)
     try:
-        panes = subprocess.check_output(
-            ['tmux', 'list-panes', '-t', session, '-F',
-             '#{pane_active}\t#{pane_in_mode}\t#{pane_current_command}'],
-            timeout=1,
-        ).decode()
+        out = subprocess.check_output(
+            ['tmux', '-S', sock, 'display-message', '-p', '-c', tty,
+             '#{pane_current_command}\t#{pane_in_mode}'],
+            timeout=1, stderr=subprocess.DEVNULL,
+        ).decode().strip()
     except Exception:
         return ('', False)
-    for line in panes.splitlines():
-        parts = line.split('\t')
-        if len(parts) == 3 and parts[0] == '1':
-            return (parts[2].strip(), parts[1].strip() == '1')
-    return ('', False)
+    parts = out.split('\t')
+    if len(parts) != 2:
+        return ('', False)
+    return (parts[0].strip(), parts[1].strip() == '1')
 
 
 def _subtree_has_ssh(pids: list) -> bool:
@@ -138,7 +166,7 @@ def _window_pids(window) -> list:
     return [root] + _subtree(root, _child_map())
 
 
-def _local_tmux_in_copy_mode(pids: list) -> bool:
+def _local_tmux_in_copy_mode(pane: tuple) -> bool:
     # is the active pane of a LOCAL tmux held in copy-mode?
     #
     # 🛑 copy-mode is its own reason to forward, INDEPENDENT of the allowlist
@@ -152,24 +180,20 @@ def _local_tmux_in_copy_mode(pids: list) -> bool:
     #   branch below already delivers unconditionally, so a REMOTE copy-mode
     #   works while the same key on the LAPTOP does not. `pane_current_command`
     #   in copy-mode is still `zsh`, so the allowlist rejects it
-    if not pids:
-        return False
-    client_tty = _tmux_client_tty(pids)
-    if not client_tty:
-        return False
-    return _tmux_active_pane(client_tty)[1]
+    #
+    # `pane` is the ONE read `_is_copy_receiver` made; ('', False) without tmux
+    return pane[1]
 
 
-def _focused_app(window, pids: list) -> str:
+def _focused_app(window, pids: list, client: tuple, pane: tuple) -> str:
     # name the app the human actively drives in this window
-    #   - through tmux that is the active pane's command
+    #   - through tmux that is the active pane's command (`pane`, read once)
     #   - else it is the window's foreground process
     #   - it returns '' when unsure, so the caller stays on the safe path
     if not pids:
         return ''
-    client_tty = _tmux_client_tty(pids)
-    if client_tty:
-        return _tmux_active_pane(client_tty)[0]
+    if client[0]:
+        return pane[0]
     # no tmux: the window's own foreground process
     try:
         for proc in window.child.foreground_processes:
@@ -201,11 +225,13 @@ def _is_copy_receiver(window, pids: list) -> bool:
     # ⚠️ fail closed is the shared discipline: every reader below answers ''
     #   or False when unsure, so an unknown focus is judged NOT a receiver
     #
-    # ⚠️ the order is a COST order, not a correctness one — this is a plain OR.
-    #   the allowlist runs first because the copy-mode read shells out to tmux
-    if _focused_app(window, pids) in FORWARD_ALLOWLIST:
+    # ⚠️ one tmux read feeds both tmux-side reasons: the client's own server,
+    #   asked once (`_tmux_active_pane`). a press costs at most ONE tmux call
+    client = _tmux_client(pids)
+    pane = _tmux_active_pane(client)
+    if _focused_app(window, pids, client, pane) in FORWARD_ALLOWLIST:
         return True
-    if _local_tmux_in_copy_mode(pids):
+    if _local_tmux_in_copy_mode(pane):
         return True
     return _subtree_has_ssh(pids)
 

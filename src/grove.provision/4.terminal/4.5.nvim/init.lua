@@ -2228,6 +2228,336 @@ local PLUGIN_SPEC = {
         vim.bo[buf].readonly = was_readonly
       end
 
+      -- ── the share of each file's lines its diff touched, on the file's row ──
+      -- .what = each file row shows e.g. ` 42% M`: the share of the file's lines the
+      --         diff added or removed
+      -- .math = pct = (added + removed) / (lines now + removed)
+      --         `lines now + removed` counts every line on either side of the diff, so a
+      --         new file and a deleted file both read 100%, and no file can read > 100%
+      -- .cost = all of it runs off the render path, and only for files whose inputs moved:
+      --           added/removed  one async `git diff --numstat` per ask, pathspec = the
+      --                          stale files only
+      --           lines now      the work-tree file, counted on the libuv pool, once per
+      --                          (mtime, size)
+      --         a row reads one table lookup; a changed % re-renders, and the row diff
+      --         (render_rows) rewrites only the rows whose % moved
+      -- .the per-file keys — an unmoved key is never re-asked
+      --   line count  work-tree stat (mtime ns + size)
+      --   unstaged    work-tree stat + that path's staged numstat (a re-stage moves it)
+      --   since-main  work-tree stat + the base revision
+      --   staged      the index file's stat — a stage, unstage, commit, reset or
+      --               checkout rewrites it; GIT_OPTIONAL_LOCKS=0 keeps `git status` from it
+      -- .the index side of a staged file is never read: lines(index) = lines(work tree)
+      --   - added + removed of its UNSTAGED numstat (index → work tree)
+      -- .scope = git mode against the work tree. a revision-vs-revision explorer and a
+      --   conflict row show no %
+      -- .off   = `_G.codediff_line_pct = false` (the refresh-stays-quiet clamp compares
+      --   rows against upstream, which has no %)
+      -- clamp: prove.codediff-line-pct
+      local cd_lp = { roots = {}, max_bytes = 8 * 1024 * 1024 }
+      _G.codediff_line_pct_state = cd_lp
+      local uv = vim.uv or vim.loop
+
+      local function lp_root(root)
+        local st = cd_lp.roots[root]
+        if not st then
+          -- lines: abs → { k, n }   num: scope\1group\1path → { k, a, d, bin }
+          -- pct: scope\1group\1path → '42%'   index_k: the index stat the staged numstat read
+          st = { lines = {}, num = {}, pct = {}, index_k = nil, git_dir = nil, busy = false, queued = {} }
+          cd_lp.roots[root] = st
+        end
+        return st
+      end
+
+      local function lp_stat_key(abs)
+        local s = uv.fs_stat(abs)
+        if not s or s.type ~= 'file' then return '-', nil end
+        return s.mtime.sec .. '.' .. s.mtime.nsec .. ':' .. s.size, s.size
+      end
+
+      -- `git diff --numstat -z`: `a\td\tpath`, or for a rename `a\td\t` then old, new
+      -- as the next two records. `-` for a binary file
+      local function lp_parse_numstat(out)
+        local stats = {}
+        local recs = vim.split(out or '', '\0', { plain = true })
+        for i, rec in ipairs(recs) do
+          local a, d, path = rec:match('^([^\t]+)\t([^\t]+)\t(.*)$')
+          if a then
+            if path == '' then path = recs[i + 2] end
+            if path and path ~= '' then
+              stats[path] = a == '-' and { a = 0, d = 0, bin = true } or { a = tonumber(a) or 0, d = tonumber(d) or 0 }
+            end
+          end
+        end
+        return stats
+      end
+
+      -- cb(stats|nil) on the main loop. literal pathspecs: a path is never a glob
+      local function lp_numstat(root, args, paths, cb)
+        local cmd = { 'git', '--literal-pathspecs', 'diff', '--numstat', '-z', '-M' }
+        vim.list_extend(cmd, args)
+        cmd[#cmd + 1] = '--'
+        if paths then vim.list_extend(cmd, paths) end
+        vim.system(cmd, { cwd = root, text = true }, function(r)
+          vim.schedule(function() cb(r.code == 0 and lp_parse_numstat(r.stdout) or nil) end)
+        end)
+      end
+
+      -- count each file's lines on the libuv pool, 8 at a time. a NUL byte = binary,
+      -- and a binary or unreadable file counts `false`. cb(abs → n|false) on the main loop
+      local function lp_count_lines(jobs, cb)
+        local out, total, done, next_i, inflight = {}, #jobs, 0, 0, 0
+        if total == 0 then return cb(out) end
+        local pump
+        local function finish(abs, n)
+          out[abs] = n
+          done, inflight = done + 1, inflight - 1
+          if done == total then return vim.schedule(function() cb(out) end) end
+          pump()
+        end
+        pump = function()
+          while inflight < 8 and next_i < total do
+            next_i, inflight = next_i + 1, inflight + 1
+            local job = jobs[next_i]
+            uv.fs_open(job.abs, 'r', 438, function(oerr, fd)
+              if oerr or not fd then return finish(job.abs, false) end
+              uv.fs_read(fd, job.size, 0, function(rerr, data)
+                uv.fs_close(fd)
+                if rerr or not data or data:find('\0', 1, true) then return finish(job.abs, false) end
+                local _, nl = data:gsub('\n', '')
+                finish(job.abs, nl + ((#data > 0 and data:sub(-1) ~= '\n') and 1 or 0))
+              end)
+            end)
+          end
+        end
+        pump()
+      end
+
+      -- '42%' from added/removed/lines-now, or nil where there is no share to show
+      local function lp_format(a, d, now)
+        local changed = a + d
+        if changed == 0 then return nil end
+        local den = math.max(now, a) + d
+        local p = math.floor(100 * changed / den + 0.5)
+        if p == 0 then p = 1 end
+        if p == 100 and changed < den then p = 99 end
+        return p .. '%'
+      end
+
+      -- the % a file row shows, or nil. a row's scope is tagged at build (create_tree_data)
+      local function cd_line_pct(d)
+        if _G.codediff_line_pct == false or not d.git_root or not d.cd_scope then return nil end
+        local st = cd_lp.roots[d.git_root]
+        return st and st.pct[d.cd_scope .. '\1' .. (d.group or '') .. '\1' .. d.path] or nil
+      end
+
+      -- re-render every explorer on this root + scope, so a moved % reaches its row
+      local function lp_render(root, scope)
+        local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
+        if not (lc_ok and lifecycle.get_explorer) then return end
+        for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+          local ex = lifecycle.get_explorer(tab)
+          if ex and ex.tree and ex.git_root == root and (ex.base_revision or '') == scope then
+            pcall(ex.tree.render, ex.tree)
+          end
+        end
+      end
+
+      local cd_line_pct_kick
+      -- one pass over one explorer's file list: staged numstat (if the index moved),
+      -- unstaged/since-main numstat (stale files only), line counts (stale files only),
+      -- then the % map. done() on the main loop, always
+      local function lp_pass(explorer, done)
+        local root, scope = explorer.git_root, explorer.base_revision or ''
+        local sr = explorer.status_result or {}
+        local st = lp_root(root)
+        local staged = scope == '' and (sr.staged or {}) or {}
+        local unstaged = sr.unstaged or {}
+        local function nk(group, path) return scope .. '\1' .. group .. '\1' .. path end
+
+        -- work-tree stat of every file the pass reads, once per pass
+        local wt = {}
+        local function wt_of(path)
+          local hit = wt[path]
+          if not hit then
+            local k, size = lp_stat_key(root .. '/' .. path)
+            hit = { k = k, size = size }
+            wt[path] = hit
+          end
+          return hit
+        end
+
+        local function step_lines()
+          -- every file whose line count is stale
+          local jobs, seen = {}, {}
+          local function want(path)
+            if seen[path] then return end
+            seen[path] = true
+            local w, abs = wt_of(path), root .. '/' .. path
+            local have = st.lines[abs]
+            if have and have.k == w.k then return end
+            if not w.size then st.lines[abs] = { k = w.k, n = 0 }; return end
+            if w.size > cd_lp.max_bytes then st.lines[abs] = { k = w.k, n = false }; return end
+            if w.size == 0 then st.lines[abs] = { k = w.k, n = 0 }; return end
+            jobs[#jobs + 1] = { abs = abs, size = w.size, k = w.k }
+          end
+          for _, f in ipairs(unstaged) do want(f.path) end
+          for _, f in ipairs(staged) do want(f.path) end
+          lp_count_lines(jobs, function(counts)
+            for _, job in ipairs(jobs) do st.lines[job.abs] = { k = job.k, n = counts[job.abs] } end
+
+            -- the % map for this scope, rebuilt whole; a render only where a % moved
+            local fresh = {}
+            local function lines_of(path)
+              local l = st.lines[root .. '/' .. path]
+              return l and l.n
+            end
+            for _, f in ipairs(unstaged) do
+              local n = lines_of(f.path)
+              if n then
+                local p
+                if f.status == '??' then
+                  p = lp_format(n, 0, n)
+                else
+                  local s = st.num[nk('unstaged', f.path)]
+                  p = s and not s.bin and lp_format(s.a, s.d, n) or nil
+                end
+                fresh[nk('unstaged', f.path)] = p
+              end
+            end
+            for _, f in ipairs(staged) do
+              local n, s = lines_of(f.path), st.num[nk('staged', f.path)]
+              if n and s and not s.bin then
+                -- the index side, from the work tree and the unstaged numstat
+                local u = st.num[nk('unstaged', f.path)]
+                local now = n - (u and u.a or 0) + (u and u.d or 0)
+                fresh[nk('staged', f.path)] = lp_format(s.a, s.d, math.max(now, 0))
+              end
+            end
+            local moved = false
+            local prefix = scope .. '\1'
+            for k, v in pairs(st.pct) do
+              if k:sub(1, #prefix) == prefix and fresh[k] ~= v then moved = true; st.pct[k] = nil end
+            end
+            for k, v in pairs(fresh) do
+              if st.pct[k] ~= v then moved = true; st.pct[k] = v end
+            end
+            if moved then lp_render(root, scope) end
+            done()
+          end)
+        end
+
+        local function step_unstaged()
+          -- each tracked file's key: its work-tree stat + what the diff is against
+          local stale, paths = {}, {}
+          for _, f in ipairs(unstaged) do
+            if f.status ~= '??' then
+              local against = scope
+              if scope == '' then
+                local s = st.num[nk('staged', f.path)]
+                against = s and (s.a .. '/' .. s.d) or '-'
+              end
+              local k = wt_of(f.path).k .. '\1' .. against
+              local have = st.num[nk('unstaged', f.path)]
+              if not (have and have.k == k) then
+                stale[#stale + 1] = { path = f.path, k = k }
+                paths[#paths + 1] = f.path
+                if f.old_path then paths[#paths + 1] = f.old_path end
+              end
+            end
+          end
+          if #stale == 0 then return step_lines() end
+          -- past a few hundred paths, one whole-tree diff costs less than the argv
+          local args = scope ~= '' and { scope } or {}
+          lp_numstat(root, args, #paths <= 400 and paths or nil, function(stats)
+            if stats then
+              for _, s in ipairs(stale) do
+                local hit = stats[s.path] or { a = 0, d = 0 }
+                st.num[nk('unstaged', s.path)] = { k = s.k, a = hit.a, d = hit.d, bin = hit.bin }
+              end
+            end
+            step_lines()
+          end)
+        end
+
+        local function step_staged()
+          if #staged == 0 then return step_unstaged() end
+          local function with_git_dir()
+            local k = lp_stat_key(st.git_dir .. '/index')
+            if st.index_k == k then return step_unstaged() end
+            lp_numstat(root, { '--cached' }, nil, function(stats)
+              if stats then
+                st.index_k = k
+                for _, f in ipairs(staged) do
+                  local hit = stats[f.path] or { a = 0, d = 0 }
+                  st.num[nk('staged', f.path)] = { k = k, a = hit.a, d = hit.d, bin = hit.bin }
+                end
+              end
+              step_unstaged()
+            end)
+          end
+          if st.git_dir then return with_git_dir() end
+          vim.system({ 'git', 'rev-parse', '--absolute-git-dir' }, { cwd = root, text = true }, function(r)
+            vim.schedule(function()
+              if r.code ~= 0 then return step_unstaged() end
+              st.git_dir = vim.trim(r.stdout or '')
+              with_git_dir()
+            end)
+          end)
+        end
+
+        step_staged()
+      end
+
+      -- ask for a fresh % map for one explorer. one pass per root at a time; a kick
+      -- that lands mid-pass queues its explorer for one more
+      cd_line_pct_kick = function(explorer)
+        if _G.codediff_line_pct == false then return end
+        if not (explorer and explorer.git_root and explorer.status_result) then return end
+        if explorer.base_revision and explorer.target_revision and explorer.target_revision ~= 'WORKING' then return end
+        local st = lp_root(explorer.git_root)
+        if st.busy then st.queued[explorer] = true; return end
+        st.busy = true
+        local ok, err = pcall(lp_pass, explorer, function()
+          st.busy = false
+          local nxt = next(st.queued)
+          if nxt then st.queued[nxt] = nil; cd_line_pct_kick(nxt) end
+        end)
+        if not ok then
+          st.busy = false
+          vim.notify('codediff line %: ' .. tostring(err), vim.log.levels.WARN)
+        end
+      end
+      _G.codediff_line_pct_kick = cd_line_pct_kick
+
+      -- tag each file node with the scope its % is keyed under: the base revision in
+      -- since-main mode, '' in status mode
+      local function lp_tag(roots, base_revision)
+        local scope = base_revision or ''
+        local function walk(list)
+          for _, nd in ipairs(list or {}) do
+            if nd.data and nd.data.path and nd.data.type ~= 'directory' then nd.data.cd_scope = scope end
+            if nd._children then walk(nd._children) end
+          end
+        end
+        walk(roots)
+      end
+
+      -- after a tree build, ask for the % of every explorer that build serves. scheduled,
+      -- so the explorer holds its new status_result by the time the pass reads it
+      local function lp_kick_for(root, base_revision)
+        vim.schedule(function()
+          local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
+          if not (lc_ok and lifecycle.get_explorer) then return end
+          for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+            local ex = lifecycle.get_explorer(tab)
+            if ex and ex.git_root == root and ex.base_revision == base_revision then cd_line_pct_kick(ex) end
+          end
+        end)
+      end
+
+      vim.api.nvim_set_hl(0, 'CodeDiffLinePct', { link = 'Comment', default = true })
+
       vim.defer_fn(function()
         local ok, Tree = pcall(require, 'codediff.ui.lib.tree')
         if not ok then return end
@@ -2340,6 +2670,11 @@ local PLUGIN_SPEC = {
             if type(roots) == 'table' and type(status_result) == 'table' then
               built_sig[roots] = tree_sig(status_result, git_root, base_revision, is_dir_mode, visible_groups)
             end
+            -- the line-change % (see cd_line_pct): tag each file row's scope, then ask
+            if type(roots) == 'table' and git_root and not is_dir_mode then
+              lp_tag(roots, base_revision)
+              lp_kick_for(git_root, base_revision)
+            end
             return roots
           end
           -- the clamp's old-* arm sets this false, to read the full rebuild it replaces
@@ -2388,6 +2723,8 @@ local PLUGIN_SPEC = {
                 if not err and type(status_result) == 'table' and roots and built_sig[roots]
                   and built_sig[roots] == tree_sig(status_result, explorer.git_root, explorer.base_revision, false, explorer.visible_groups) then
                   explorer.status_result = status_result
+                  -- same file list, but a file's content may have moved: re-ask its %
+                  cd_line_pct_kick(explorer)
                   return settled(explorer)
                 end
                 -- hand the result in hand to the shipped refresh, in place of a second git run
@@ -2477,17 +2814,48 @@ local PLUGIN_SPEC = {
         -- whose data.path IS the basename, and decide `selected` here on the real path.
         -- list view prints the directory too, so it keeps the real path.
         -- clamp: prove.codediff-refresh-stays-quiet, row `rows_match_upstream`
-        local function prepare_fast(node, max_width, selected, selected_group)
+        -- the line-change % rides in upstream's right-aligned status slot as `42% M`, so
+        -- upstream reserves its width and truncates the name to fit. then that one
+        -- segment is split: the % dim (CodeDiffLinePct), the status letter in its own hl
+        local function split_pct(line, pct, symbol, selected)
+          local segs = line._segments
+          local combined = pct .. ' ' .. symbol
+          for i = #segs, 1, -1 do
+            if segs[i].text == combined then
+              local pct_hl = 'CodeDiffLinePct'
+              if selected then
+                -- the selected row's bg under the % fg, the way upstream builds its own
+                local fg = vim.api.nvim_get_hl(0, { name = 'CodeDiffLinePct', link = false }).fg
+                local bg = vim.api.nvim_get_hl(0, { name = 'CodeDiffExplorerSelected', link = false }).bg
+                pct_hl = 'CodeDiffExplorerSel_CodeDiffLinePct'
+                vim.api.nvim_set_hl(0, pct_hl, { fg = fg, bg = bg })
+              end
+              table.insert(segs, i, { text = pct .. ' ', hl = pct_hl })
+              segs[i + 1] = { text = symbol, hl = segs[i + 1].hl }
+              return line
+            end
+          end
+          return line
+        end
+
+        local function prepare_fast(node, max_width, selected, selected_group, pct)
           local d = node.data or {}
           local view_mode = (cfg.options.explorer or {}).view_mode or 'list'
-          if view_mode ~= 'tree' or d.type == 'group' or d.type == 'directory' or not d.path then
-            return shipped_prepare_fast(node, max_width, selected and d.path or nil, selected and selected_group or nil)
+          local row_node, row_path = node, d.path
+          if view_mode == 'tree' and d.type ~= 'group' and d.type ~= 'directory' and d.path then
+            local base = d.path:match('.*/(.*)$')
+            if not base or base == '' then base = d.path end
+            row_path = base
+            row_node = setmetatable({ data = setmetatable({ path = base }, { __index = d }) }, { __index = node })
           end
-          local base = d.path:match('.*/(.*)$')
-          if not base or base == '' then base = d.path end
-          local view_data = setmetatable({ path = base }, { __index = d })
-          local view = setmetatable({ data = view_data }, { __index = node })
-          return shipped_prepare_fast(view, max_width, selected and base or nil, selected and selected_group or nil)
+          if pct then
+            local symbol = d.status_symbol or ''
+            local over = setmetatable({ status_symbol = pct .. ' ' .. symbol }, { __index = row_node.data })
+            row_node = setmetatable({ data = over }, { __index = row_node })
+            local line = shipped_prepare_fast(row_node, max_width, selected and row_path or nil, selected and selected_group or nil)
+            return split_pct(line, pct, symbol, selected)
+          end
+          return shipped_prepare_fast(row_node, max_width, selected and row_path or nil, selected and selected_group or nil)
         end
 
         local row_memo, row_memo_size = {}, 0
@@ -2498,9 +2866,10 @@ local PLUGIN_SPEC = {
         nodes_mod.prepare_node = function(node, max_width, selected_path, selected_group)
           local d = node.data or {}
           local selected = d.path ~= nil and d.path == selected_path and d.group == selected_group
-          -- fast path: the same node, same width / expansion / selection → same row.
+          local pct = d.path and d.type ~= 'directory' and cd_line_pct(d) or nil
+          -- fast path: the same node, same width / expansion / selection / % → same row.
           -- a select re-asks every row, so this is what keeps a select at 2 real builds
-          local fast = max_width .. (node._expanded and '+' or '-') .. (selected and '*' or '.')
+          local fast = max_width .. (node._expanded and '+' or '-') .. (selected and '*' or '.') .. (pct or '')
           local nh = node_memo[node]
           if nh and nh.k == fast then return nh.line end
           local indent = d.indent_state
@@ -2520,10 +2889,10 @@ local PLUGIN_SPEC = {
             .. '\1' .. (node._depth or 0) .. '\1' .. (d.type or '') .. '\1' .. (node.text or '')
             .. '\1' .. (d.name or '') .. '\1' .. (d.path or '') .. '\1' .. (d.group or '')
             .. '\1' .. (d.icon or '') .. '\1' .. (d.icon_color or '') .. '\1' .. (d.status_symbol or '')
-            .. '\1' .. (d.status_color or '') .. '\1' .. indent_sig
+            .. '\1' .. (d.status_color or '') .. '\1' .. indent_sig .. '\1' .. (pct or '')
           local line = row_memo[key]
           if not line then
-            line = prepare_fast(node, max_width, selected, selected_group)
+            line = prepare_fast(node, max_width, selected, selected_group, pct)
             -- bound the cache: a clear costs one cold render, an unbounded table costs memory forever
             if row_memo_size > 60000 then row_memo, row_memo_size = {}, 0 end
             row_memo[key] = line
@@ -2539,6 +2908,8 @@ local PLUGIN_SPEC = {
           callback = function()
             row_memo, row_memo_size = {}, 0
             node_memo = setmetatable({}, { __mode = 'k' })
+            -- a new scheme clears every group, the % dim link among them
+            vim.api.nvim_set_hl(0, 'CodeDiffLinePct', { link = 'Comment', default = true })
           end,
         })
 

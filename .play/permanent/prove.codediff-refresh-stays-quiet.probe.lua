@@ -61,7 +61,8 @@
 -- .fact 5's comparison: every node in the tree (groups, dirs, files), at the
 --   explorer's real width, once under the live selection; each file row also
 --   once as selected (its own path + group) and once unselected. content AND
---   the segment list (text + hl per segment) must both agree
+--   the segment list (text + hl per segment) must both agree. the line-change %
+--   is off for it (`_G.codediff_line_pct = false`): upstream draws no %
 
 local out = os.getenv('PROBE_OUT')
 if not out then
@@ -236,7 +237,10 @@ for _, nd in pairs(ex.tree._nodes_by_id) do
 end
 say(('collapsed_after_refresh=%s dir=%s'):format(collapsed == nil and 'absent' or (collapsed and 'true' or 'false'), tpath))
 
--- fact 5: the shipped prepare_node against upstream's, row by row
+-- fact 5: the shipped prepare_node against upstream's, row by row.
+-- the line-change % is a column upstream does not draw, so it is switched off here:
+-- this fact is about the speed path; prove.codediff-line-pct proves the %
+_G.codediff_line_pct = false
 local nodes_mod = require('codediff.ui.explorer.nodes')
 local upstream = _G.codediff_prepare_upstream
 if type(upstream) ~= 'function' then

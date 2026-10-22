@@ -1019,7 +1019,15 @@ _brains_auth_login_isolated() {
     echo "   fix: run it yourself in a terminal — brains.auth.set" >&2
     return 3
   }
-  CLAUDE_CONFIG_DIR="$authdir" script -q -c "claude" /dev/null </dev/tty
+  # 🛑 BOTH vars, always. claude v2.1.280 resolves its credential store from
+  #   CLAUDE_SECURESTORAGE_CONFIG_DIR, and absent that, from ~/.claude — CLAUDE_CONFIG_DIR no
+  #   longer reaches it. with CLAUDE_CONFIG_DIR alone the sign-in is HALF isolated: the account
+  #   record lands in $authdir, the oauth token lands in the GLOBAL ~/.claude/.credentials.json.
+  #   measured 2026-10-20: the extract found no token (it was not in $authdir), and the global
+  #   login had silently become the newly signed-in account while ~/.claude.json still named
+  #   the old one. `rhx brains.auth.creds.get` reports which account a live token truly holds.
+  CLAUDE_CONFIG_DIR="$authdir" CLAUDE_SECURESTORAGE_CONFIG_DIR="$authdir" \
+    script -q -c "claude" /dev/null </dev/tty
 }
 
 # .what = lift the oauth refresh token out of an isolated sign-in dir ($1=authdir)
@@ -1183,10 +1191,13 @@ _brains_auth_set() {
   #   a broad guarantee and delivered a narrow one. a SIGTERM (a killed terminal, a logout, a
   #   parent process reaped) left a LIVE, durable oauth refresh token on disk, world-readable
   #   the moment the 0700 dir's parent is walked by a backup or a temp sweeper. so the trap
-  #   covers TERM and HUP too, and — the part that actually closes the gap — RETURN, so every
-  #   early exit below shreds the dir whether or not its author remembered to.
+  #   covers TERM and HUP too.
+  # 🛑 no `RETURN` arm. this file is sourced by zsh as well as bash, and zsh has no RETURN
+  #   signal: `trap … RETURN` fails as `undefined signal: RETURN` and arms not one signal,
+  #   INT/TERM/HUP included. so every early return between this arm and the shred below must
+  #   `rm -rf` the dir itself; there is exactly one (the no-tty refusal).
   chmod 700 "$authdir"
-  trap 'rm -rf "$authdir"' INT TERM HUP RETURN
+  trap 'rm -rf "$authdir"' INT TERM HUP
 
   echo "🐢 paddle out — a claude sign-in opens"
   echo "   ├─ isolated from your global claude — pick any account"
@@ -1200,11 +1211,30 @@ _brains_auth_set() {
   #   failure to the extract leaf, which can only report an absent token — and the human would
   #   be told to redo a browser approval that was never opened. the leaf has already said the
   #   true cause; we only need to stop rather than overwrite it with a friendlier wrong one.
+  # 🛑 snapshot the GLOBAL login's refresh token before the sign-in, and compare after. the
+  #   isolation rests on env vars whose reach claude has already moved once (see the login
+  #   leaf); when it moves again the sign-in silently swaps the human's global login to another
+  #   account. this compare is what turns that into a loud stop rather than a quiet swap.
+  # ⚠️ a change ALONE is not proof: an open claude session rotates the global token on its own
+  #   clock, and a sign-in can take minutes. a leak shows BOTH symptoms — the global token
+  #   moved AND the private dir holds no credentials file — so both are required to fire.
+  local live_before live_after
+  live_before="$(_brains_auth_creds_field "$_BRAINS_AUTH_LIVE_CREDS" '.claudeAiOauth.refreshToken')"
   local lrc=0
   _brains_auth_login_isolated "$authdir" || lrc=$?
+  live_after="$(_brains_auth_creds_field "$_BRAINS_AUTH_LIVE_CREDS" '.claudeAiOauth.refreshToken')"
+  if [[ "$live_before" != "$live_after" && ! -f "$authdir/.credentials.json" ]]; then
+    rm -rf "$authdir"; trap - INT TERM HUP
+    echo "💥 MalfunctionError: the isolated sign-in wrote into your GLOBAL claude login" >&2
+    echo "   ${_BRAINS_AUTH_LIVE_CREDS} changed while the sign-in ran, so claude no longer" >&2
+    echo "   honors the env vars that aim its credential store at a private dir" >&2
+    echo "   ├─ see which account it now holds: rhx brains.auth.creds.get" >&2
+    echo "   └─ fix: find claude's current credential-dir env var, set it in _brains_auth_login_isolated" >&2
+    return 1
+  fi
   # rc 3 is the no-tty refusal and ONLY that; every other rc is claude's own, and those still
   # fall through to the extract below, which reports what the sign-in did or did not leave.
-  (( lrc == 3 )) && return 2
+  (( lrc == 3 )) && { rm -rf "$authdir"; trap - INT TERM HUP; return 2; }
   local xrc
   refresh="$(_brains_auth_extract_refresh "$authdir")"; xrc=$?
 
@@ -1213,15 +1243,12 @@ _brains_auth_set() {
     echo "🔎 brains.auth.set: no sk-ant-ort refresh token in ${authdir} (files: $(ls -a "$authdir" 2>/dev/null | tr '\n' ' '))" >&2
   fi
 
-  # shred the isolated credentials the moment the refresh token is lifted. the RETURN trap
-  # would also shred them, but this eager shred narrows the window the secret sits on disk
-  # from "until the function ends" to "until we hold it in memory". the trap is the backstop
-  # for the paths that never reach this line — never a licence to leave the file at rest on
-  # the paths that do.
+  # shred the isolated credentials the moment the refresh token is lifted, so the secret
+  # sits on disk only until we hold it in memory. the trap is the backstop for a signal.
   # ⚠️ the disarm must name EVERY signal the arm named. disarm a subset and the rest stay
   #   armed past this point, so the two lines drift apart with no signal that they have.
   rm -rf "$authdir"
-  trap - INT TERM HUP RETURN
+  trap - INT TERM HUP
 
   # ⚠️ the three causes each earn their OWN hint, because each earns a different next move.
   #   this branch used to be a single `[[ -z "$refresh" ]]`, so an unparseable state file and
