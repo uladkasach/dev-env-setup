@@ -32,14 +32,34 @@
 grove_provision_2_8_tmux_provision_verify() {
   local failed=0
 
-  if command -v tmux >/dev/null 2>&1; then
-    echo "   • tmux present ($(tmux -V 2>/dev/null | awk '{print $2}')) ✔"
-  else
+  ####################################################################
+  # the binary — one reader (`_.sh`), so the upsert's skip and this verdict
+  # agree on "converged". a grove owes the PIN; a laptop owes presence
+  ####################################################################
+  local state ver bin
+  state="$(grove_provision_2_8_tmux_binary_state)"
+  ver="$(grove_provision_2_8_tmux_binary_version)"
+  bin="$(grove_provision_2_8_tmux_binary_path)"
+
+  if [[ "$state" == absent ]]; then
     echo "   ✋ tmux is not on PATH" >&2
     echo "      ⇒ a duct IS tmux, so this box cannot be reached over a duct and" >&2
     echo "        every termwork skill fails" >&2
-    echo "      fix: rhx grove.provision --what 2.8.tmux --mode apply" >&2
+    echo "      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply" >&2
     failed=$(( failed + 1 ))
+  fi
+
+  if [[ "$state" == adrift ]] && ! grove_provision_2_8_tmux_binary_meets_owed; then
+    echo "   ✋ tmux on PATH is $ver ($bin), not the pinned $GROVE_UPGRADE_2_8_TMUX_VERSION" >&2
+    echo "      ⇒ every crew on a grove shares one tmux server, and the distro 3.2a" >&2
+    echo "        server segfaults — one crash ends every crew on the box" >&2
+    echo "      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply" >&2
+    echo "           the seat with root builds the pin into $(grove_provision_2_8_tmux_pin_dst)" >&2
+    failed=$(( failed + 1 ))
+  fi
+
+  if grove_provision_2_8_tmux_binary_meets_owed; then
+    echo "   • tmux present ($ver, $bin) ✔"
   fi
 
   ####################################################################
