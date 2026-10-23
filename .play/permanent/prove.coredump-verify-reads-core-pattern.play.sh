@@ -12,6 +12,7 @@
 #   - V2. a pipe to apport                      → ✋ that names apport
 #   - V3. a pipe to systemd-coredump            → ✔
 #   - V4. a laptop (`local@unix`)               → the same ✋ (parity)
+#   - V5. core_pattern unreadable               → ✋ that says `unreadable`
 #   - U1. upsert, the kernel already collects   → ✔, no install
 #   - U2. upsert, the install sets the pattern  → ✔
 #   - U3. upsert, apport keeps the pattern      → ✋ names the other handler
@@ -51,7 +52,7 @@ echo "   └─ root: $_root"
 echo ""
 
 for _f in _.sh provision.verify.sh provision.upsert.sh; do
-  [[ -f "$_dir/$_f" ]] || { echo "   ✋ ConstraintError: no $_dir/$_f — no bundle claims a crash collector" >&2; exit 1; }
+  [[ -f "$_dir/$_f" ]] || { echo "   💥 MalfunctionError: no $_dir/$_f — no bundle claims a crash collector" >&2; exit 1; }
   # shellcheck source=/dev/null
   source "$_dir/$_f" || { echo "   ✋ ConstraintError: could not source $_dir/$_f" >&2; exit 2; }
 done
@@ -118,6 +119,9 @@ _grade "V3. systemd-coredump: ✔" "$rc" 0 "$out" "systemd-coredump ✔" || fail
 _pattern "$P_CORE"; out="$( GROVE_ENV_SERVER=local@unix _verify )"; rc=$?
 _grade "V4. a laptop: the same ✋ (parity)" "$rc" 1 "$out" "core_pattern: core" || failed=$(( failed + 1 ))
 
+rm -f "$GROVE_CORE_PATTERN_PATH"; out="$(_verify)"; rc=$?
+_grade "V5. unreadable: ✋ says so" "$rc" 1 "$out" "core_pattern: unreadable" || failed=$(( failed + 1 ))
+
 ######################################################################
 # U1..U6. the upsert
 ######################################################################
@@ -143,5 +147,5 @@ out="$( bundle.root.owns() { echo "   🌙 no root on this seat"; return 1; }; _
 _grade "U6. no root: decline" "$rc" 0 "$out" "no root" && _uninstalled U6 || failed=$(( failed + 1 ))
 
 echo ""
-[[ "$failed" -eq 0 ]] || { echo "   ✋ ConstraintError: $failed arm(s) failed" >&2; exit 1; }
+[[ "$failed" -eq 0 ]] || { echo "   💥 MalfunctionError: $failed arm(s) failed" >&2; exit 1; }
 echo "   ✔ the coredump bundle reads core_pattern, and passes only systemd-coredump"

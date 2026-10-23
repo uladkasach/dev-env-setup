@@ -62,8 +62,7 @@ grove_provision_2_8_tmux_configure_verify() {
     [[ -n "$answer" ]] || continue
 
     # the server SPOKE. strip the sentinel; what is left is the list, or empty
-    loaded="${answer#A}"
-    loaded="${loaded%Z}"
+    loaded="$(grove_provision_2_8_tmux_sentinel_body "$answer")"
     break
   done < <(grove_provision_2_8_tmux_live_sockets)
 
@@ -90,14 +89,14 @@ grove_provision_2_8_tmux_configure_verify() {
     echo "   🌙 no tmux server answered, so which confs tmux loads cannot be observed"
     echo "      ⇒ either none runs, or each that does did not reply within 5s"
   else
-    # ⚠️ `printf '%s\n'` — its newline keeps the LAST element, the shadow (m5)
+    # ⚠️ the reader ends each element with a newline, so `read` keeps the LAST one, the shadow (m5)
     # a server's list is fixed at its START: a shadow the upsert already moved
     # aside is still NAMED by it, so only one still on disk is a ✋ (m10)
     local one retired=()
     while IFS= read -r one; do
       [[ -n "$one" && "$one" != "$conf_live" ]] || continue
       if [[ -f "$one" ]]; then shadow+=("$one"); else retired+=("$one"); fi
-    done < <(printf '%s\n' "$loaded" | tr ',' '\n')
+    done < <(grove_provision_2_8_tmux_config_files_of "$loaded")
 
     if [[ "${#shadow[@]}" -eq 0 && "${#retired[@]}" -gt 0 ]]; then
       echo "   • ~/.tmux.conf is the only conf on disk ✔ (retired: ${retired[*]})"
@@ -131,15 +130,10 @@ grove_provision_2_8_tmux_configure_verify() {
   fi
 
   local declared=()
-  local line repo
-  while IFS= read -r line; do
-    # pull the quoted `owner/name` out of `set -g @plugin 'owner/name'`
-    repo="${line#*@plugin }"
-    repo="${repo//\'/}"
-    repo="${repo//\"/}"
-    repo="$(echo "$repo" | awk '{print $1}')"
-    [[ -n "$repo" ]] && declared+=("${repo##*/}")
-  done < <(grep -E "^[[:space:]]*set[[:space:]]+-g[[:space:]]+@plugin" "$conf_live" 2>/dev/null || true)
+  local plug
+  while read -r plug; do
+    [[ -n "$plug" ]] && declared+=("$plug")
+  done < <(grove_provision_2_8_tmux_plugin_names_of_conf "$conf_live")
 
   if [[ "${#declared[@]}" -eq 0 ]]; then
     echo "   🌙 the conf names no plugins, so none are owed"
@@ -167,8 +161,7 @@ grove_provision_2_8_tmux_configure_verify() {
   # 5. terminfo HOLDS the entry the conf names as default-terminal; an absent
   #    infocmp is a 🌙, since `4.3.1.terminfo` owns it and runs later (m6)
   local term_declared
-  term_declared="$(grep -E "^[[:space:]]*set[[:space:]]+-g[[:space:]]+default-terminal" "$conf_live" 2>/dev/null \
-    | tail -1 | sed -E "s/.*default-terminal[[:space:]]+//; s/['\"]//g" | awk '{print $1}')"
+  term_declared="$(grove_provision_2_8_tmux_default_terminal_of_conf "$conf_live")"
 
   if [[ -z "$term_declared" ]]; then
     echo "   ✋ ConstraintError: the conf declares no default-terminal" >&2

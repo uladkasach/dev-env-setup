@@ -12,14 +12,15 @@
 #   - B. cloud, `tmux <pin>` → the binary claim must ✔
 #   - C. laptop, `tmux 3.2a` → the binary claim must ✔ (the pin is grove-scoped)
 #   - D. cloud, no tmux on PATH → the verify must ✋ and name the fix
+#   - E. laptop, a tmux mute to `-V` → the verify must ✋, never `present ✔`
 #
 # usage:
 #   rhx play.run --play prove.tmux-verify-refuses-an-unpinned-build
 #
 # exit:
 #   0 = every arm holds
-#   1 = an arm failed, and which is named
-#   2 = the bundle is out of reach
+#   1 = an arm failed, or the bundle declares no pin — each named
+#   2 = no checkout, or the bundle could not be sourced
 ######################################################################
 
 set -uo pipefail
@@ -47,7 +48,7 @@ for _f in _.sh provision.verify.sh; do
 done
 
 [[ -n "${GROVE_UPGRADE_2_8_TMUX_VERSION:-}" ]] || {
-  echo "   ✋ ConstraintError: the bundle declares no GROVE_UPGRADE_2_8_TMUX_VERSION — no pin to grade" >&2
+  echo "   💥 MalfunctionError: the bundle declares no GROVE_UPGRADE_2_8_TMUX_VERSION — no pin to grade" >&2
   exit 1
 }
 
@@ -109,6 +110,19 @@ _grade "D. no tmux on PATH: ✋ says so" "$out" "tmux is not on PATH" \
 _grade "D. no tmux on PATH: ✋ names the fix" "$out" "--what 2.8.tmux --mode apply" \
   || failed=$(( failed + 1 ))
 
+# E. a laptop whose tmux answers `-V` with naught: a file on PATH, not a binary that runs
+printf '#!/usr/bin/env bash\nexit 0\n' > "$FAKE_DIR/tmux"
+chmod +x "$FAKE_DIR/tmux"
+out="$(PATH="$FAKE_DIR:$PATH" GROVE_ENV_SERVER=local@unix grove_provision_2_8_tmux_provision_verify 2>&1)"
+_grade "E. a mute tmux: ✋ says it does not answer" "$out" "does not answer 'tmux -V'" \
+  || failed=$(( failed + 1 ))
+if [[ "$out" == *"tmux present ("* ]]; then
+  echo "   ├─ E. a mute tmux: graded 'present ✔' over a binary that does not run" >&2
+  failed=$(( failed + 1 ))
+else
+  echo "   ├─ E. a mute tmux: no 'present ✔' ✔"
+fi
+
 echo ""
-[[ "$failed" -eq 0 ]] || { echo "   ✋ ConstraintError: $failed arm(s) failed" >&2; exit 1; }
+[[ "$failed" -eq 0 ]] || { echo "   💥 MalfunctionError: $failed arm(s) failed" >&2; exit 1; }
 echo "   ✔ the verify refuses every tmux but the pin, on a grove only"
