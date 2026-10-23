@@ -1,0 +1,19 @@
+{
+  "key": "2fc1392d93c99c6e",
+  "kind": "create",
+  "repo": {
+    "owner": "uladkasach",
+    "name": "nheuron"
+  },
+  "exid": null,
+  "title": "feat(ductwork): one tmux server per crew, born in its own scope",
+  "description": "## wish: one tmux server per crew, so one crash ends one crew\n\n### why\n- every crew on a grove shares the default tmux socket (`DUCTWORK_TMUX_SOCKET` empty → `/tmp/tmux-<uid>/default`). a server segfault ended every crew at once, ~110 times in hours, on the distro tmux 3.2a.\n- dev-env-setup now pins tmux 3.5a on a grove and installs systemd-coredump (bundles `2.8.tmux`, `1.6.8.coredump`), and lingers every seat (`1.6.7.linger`). the server LAYOUT is ductwork's, so it lives here.\n\n### outcome\n- each crew starts its tmux server on its own socket (`tmux -L <crew>`), so a crash ends one crew.\n- the crew server is born in the crew's OWN systemd scope, never inside another crew's pane. dev-env-setup's reaper (`1.6.6.abandoned`) kills a process whose spawner is dead, which is not its cgroup's oldest, and which is older than 24h. a server born in a pane is all three once that pane closes.\n- a pre-swap 3.2a server and a 3.5a client share protocol 8, so an attach still works; a fresh crew server takes the pin.\n\n### clamp\n- a crash of one crew server (`kill -SEGV`) leaves every other crew server alive.\n- a crew server's cgroup is its own scope, never a peer pane's.\n\nfrom: uladkasach/dev-env-setup @ beav/fix-grove-crew-users-linger",
+  "status": null,
+  "via": "gh.issues",
+  "auth": "as-human",
+  "idem": null,
+  "heldSeq": 3,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "44"
+}

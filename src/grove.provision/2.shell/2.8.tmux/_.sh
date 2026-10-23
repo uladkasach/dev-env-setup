@@ -98,6 +98,106 @@ GROVE_UPGRADE_2_8_TMUX_TPM_AT="e261deb1b47614eed3400089ce7197dc68acc4eb"  # mast
 #   it would come back: `tmux.conf`, at its old `@plugin` line
 GROVE_UPGRADE_2_8_TMUX_RESURRECT_AT="cff343cf9e81983d3da0c8562b01616f12e8d548"  # master, 2023-03-06
 
+######################################################################
+# .what = the tmux BUILD a cloud grove runs, declared ONCE
+#
+# 🛑 .why a grove does not take the distro package
+#   - jammy ships `tmux 3.2a-4ubuntu0.2`. on a grove its SERVER segfaulted ~110
+#     times in hours at one offset, and every crew shares a server, so each
+#     segfault ended every crew on the box at once
+#   - tmux 3.3a's CHANGES reads "Do not crash when run-shell produces output
+#     from a config file", and this conf ends with a `run` line
+#     (.refs = prove.tmux-pin-survives-config-run-output)
+#   - ⇒ a grove builds this pinned release into `/usr/local/bin`, which precedes
+#     `/usr/bin` on PATH, so the distro binary may stay installed and is never
+#     the one a crew reaches
+#
+# ⚠️ .why a laptop is out of this pin — a SCOPE call, not a physical one
+#   - the defect was measured on a cloud grove, and the route that added the pin
+#     was scoped to cloud groves by its director; a laptop runs its distro tmux
+#   - ⚠️ no physical fact parts the two: a laptop can build and hold 3.5a, so by
+#     `rule.forbid.divergence-without-a-physical-reason` this divergence is a
+#     miss owed a route of its own, never an approved one
+#
+# ⚠️ .why the digest is pinned from TWO sources
+#   - tmux publishes no signature and github states no digest for this asset
+#   - the value below is homebrew-core's pin for the same url (commit 77313c2,
+#     `bump-tmux-3.5a`), and `prove.tmux-tarball-matches-the-pin` fetches the
+#     bytes through `web_fetch` and checks them against it
+#   - ⇒ two parties, one of them not github, agree on the bytes
+#
+# to bump: change all three together, read the new digest from a second
+#   party, then run `rhx play.run --play prove.tmux-tarball-matches-the-pin`
+######################################################################
+GROVE_UPGRADE_2_8_TMUX_VERSION="3.5a"
+GROVE_UPGRADE_2_8_TMUX_URL="https://github.com/tmux/tmux/releases/download/3.5a/tmux-3.5a.tar.gz"
+GROVE_UPGRADE_2_8_TMUX_SHA256="sha256:16216bd0877170dfcc64157085ba9013610b12b082548c7c9542cc0103198951"
+
+# .what = where the pinned build lives
+grove_provision_2_8_tmux_pin_dst() { printf '/usr/local/bin/tmux'; }
+
+# .what = the tmux on PATH: its path, its version, and which of THREE states
+#   `..._binary_path`    → the path PATH resolves, or empty
+#   `..._binary_version` → what `tmux -V` names, `unreadable`, or empty if absent
+#   `..._binary_state`   → `pinned` | `adrift` | `absent`
+# .why ONE family of readers, asked by both halves — the upsert's skip and the
+#   verify's ✋ must agree on what "converged" means, or a box reads ✔ and rebuilds
+# .why the VERSION decides, never the path — a keepalive build and a provision
+#   build of one release are one state (.refs = 1.vision case 4)
+#
+# guarantee:
+#   - READ-ONLY. `tmux -V` starts no server; bounded, and fed no stdin
+#     (rule.require.bounded-probes-in-verifies)
+grove_provision_2_8_tmux_binary_path() {
+  command -v tmux 2>/dev/null
+}
+
+grove_provision_2_8_tmux_binary_version() {
+  local bin ver
+  bin="$(grove_provision_2_8_tmux_binary_path)" || return 0
+  ver="$(timeout -k 2 5 "$bin" -V </dev/null 2>/dev/null)"
+  ver="${ver#tmux }"
+  printf '%s' "${ver:-unreadable}"
+}
+
+grove_provision_2_8_tmux_binary_state() {
+  local ver; ver="$(grove_provision_2_8_tmux_binary_version)"
+  [[ -z "$ver" ]] && { printf 'absent'; return 0; }
+  [[ "$ver" == "$GROVE_UPGRADE_2_8_TMUX_VERSION" ]] && { printf 'pinned'; return 0; }
+  printf 'adrift'
+}
+
+# .what = which state does THIS tier owe? a grove owes the pin; any other tier
+#   owes a tmux present at all (the pin is grove-scoped, F2 struck)
+grove_provision_2_8_tmux_binary_owed() {
+  [[ "${GROVE_ENV_SERVER:-}" == cloud@* ]] && { printf 'pinned'; return 0; }
+  printf 'present'
+}
+
+# .what = does the tmux on PATH meet what this tier owes?
+grove_provision_2_8_tmux_binary_meets_owed() {
+  local state; state="$(grove_provision_2_8_tmux_binary_state)"
+  [[ "$state" == pinned ]] && return 0
+  [[ "$state" == adrift && "$(grove_provision_2_8_tmux_binary_owed)" == present ]]
+}
+
+# .what = each live server whose OWN build is not the pin, one `<socket>=<version>` per line
+# .why  = a server keeps the binary it started on until it ends (vision case 10);
+#   `#{version}` is the server's answer, never the client's
+# .note = a socket that does not answer is skipped here; the live walk already
+#   counts it as mute, so it is reported, never lost
+grove_provision_2_8_tmux_servers_behind_pin() {
+  local sock_name srv_ver
+  while read -r sock_name; do
+    [[ -n "$sock_name" ]] || continue
+    srv_ver="$(timeout -k 2 5 tmux -L "$sock_name" display-message -p '#{version}' </dev/null 2>/dev/null)" \
+      || continue
+    [[ -n "$srv_ver" ]] || continue
+    [[ "$srv_ver" == "$GROVE_UPGRADE_2_8_TMUX_VERSION" ]] && continue
+    printf '%s=%s\n' "$sock_name" "$srv_ver"
+  done < <(grove_provision_2_8_tmux_live_sockets)
+}
+
 # .what = which of FOUR states is a PINNED plugin dir in?
 #   `..._plugin_state "$HOME/.tmux/plugins/x" "$pin"` → absent|half|adrift|whole
 # .why a STATE reader, not a `-d` test — a presence test lets the pin govern
@@ -192,6 +292,22 @@ grove_provision_2_8_tmux_verify_live_servers() {
     echo "   🌙 $mute socket(s) did not answer — a socket outlives its server, so"
     echo "      these are most likely corpses, and a corpse runs no timer"
   }
+
+  # 🌙 a live server older than the pin swap still runs the build it started on (case 10)
+  #   - `#{version}` is the SERVER's own answer, never the client's
+  #   - a 🌙, never a ✋: the only cure is a restart, and a restart ends that crew's panes —
+  #     a choice for the crew that owns them, never for an apply
+  if [[ "$(grove_provision_2_8_tmux_binary_owed)" == pinned ]]; then
+    local prior=() one
+    while read -r one; do [[ -n "$one" ]] && prior+=("$one"); done \
+      < <(grove_provision_2_8_tmux_servers_behind_pin)
+    [[ ${#prior[@]} -eq 0 ]] || {
+      echo "   🌙 ${#prior[@]} live server(s) still run a build older than the pin"
+      echo "      ⇒ each keeps the binary it started on until it ends; a new server takes the pin"
+      echo "      ⇒ no apply restarts them — a restart ends that crew's panes"
+      echo "      servers: ${prior[*]}"
+    }
+  fi
 
   # 🛑 every live SERVER holds the declared default-terminal — one started before the conf
   #    still holds `screen` (m6)
