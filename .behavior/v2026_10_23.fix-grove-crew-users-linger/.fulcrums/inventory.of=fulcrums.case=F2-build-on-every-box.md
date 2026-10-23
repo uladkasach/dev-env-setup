@@ -11,3 +11,5 @@
   scope. the pin stays `cloud@*` only. this is a SCOPE call, never a physical reason:
   `rule.forbid.divergence-without-a-physical-reason` still calls it a miss, so a laptop
   pin is owed by a later route, not refused for good
+- i002: the director re-ruled on the reviewer's re-raise — the verdict stands, the pin stays
+  grove-only, a scope call by the director. the r1 dispute cites this entry

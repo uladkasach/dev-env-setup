@@ -26,7 +26,7 @@ grove_provision_1_6_7_linger_provision_verify() {
   fi
 
   for seat in "${unlingered[@]}"; do
-    echo "   ✋ $seat does not linger" >&2
+    echo "   ✋ ConstraintError: $seat does not linger" >&2
     echo "      ⇒ its user manager and every crew scope under it end at its last" >&2
     echo "        logout — on a cloud grove, when the duct's last pane closes; on a" >&2
     echo "        laptop, when the desktop session ends" >&2

@@ -48,7 +48,7 @@ _root_of() {
   [[ -f "$PWD/src/grove.provision._.sh" ]] && { printf '%s' "$PWD"; return 0; }
   return 1
 }
-_root="$(_root_of)" || { echo "   ✋ no checkout found" >&2; exit 2; }
+_root="$(_root_of)" || { echo "   ✋ ConstraintError: no checkout found" >&2; exit 2; }
 
 export GROVE_SRC="$_root/src"
 _dir="$GROVE_SRC/grove.provision/2.shell/2.8.tmux"
@@ -58,13 +58,13 @@ echo "   └─ root: $_root"
 echo ""
 
 # shellcheck source=/dev/null
-source "$GROVE_SRC/grove.web.sh" || { echo "   ✋ could not source grove.web.sh" >&2; exit 2; }
+source "$GROVE_SRC/grove.web.sh" || { echo "   ✋ ConstraintError: could not source grove.web.sh" >&2; exit 2; }
 for _f in _.sh provision.upsert.sh; do
   # shellcheck source=/dev/null
-  source "$_dir/$_f" || { echo "   ✋ could not source $_dir/$_f" >&2; exit 2; }
+  source "$_dir/$_f" || { echo "   ✋ ConstraintError: could not source $_dir/$_f" >&2; exit 2; }
 done
 for _fn in grove_provision_2_8_tmux_pin_upsert grove_provision_2_8_tmux_pin_install; do
-  declare -F "$_fn" >/dev/null || { echo "   ✋ no $_fn — the bundle builds no pin" >&2; exit 1; }
+  declare -F "$_fn" >/dev/null || { echo "   ✋ ConstraintError: no $_fn — the bundle builds no pin" >&2; exit 1; }
 done
 
 FIX="$(mktemp -d "${TMPDIR:-/tmp}/prove.tmux-pin-upsert.XXXXXX")"
@@ -236,8 +236,15 @@ _arm_live() {
   install -m 0755 "$(command -v sleep)" "$PRIOR"
   "$PRIOR" 600 &
   BAIT_PID=$!
-  sleep 0.3
-  kill -0 "$BAIT_PID" 2>/dev/null || { echo "   ├─ L: 💥 the bait did not start — no world measured" >&2; return 1; }
+  # the bait must have EXEC'd the prior binary, so it holds the text the swap
+  # meets; a live pid alone proves only the fork. polled, never one fixed sleep
+  local tick
+  for tick in $(seq 1 20); do
+    [[ "$(readlink "/proc/$BAIT_PID/exe" 2>/dev/null)" == "$PRIOR" ]] && break
+    sleep 0.25
+  done
+  [[ "$(readlink "/proc/$BAIT_PID/exe" 2>/dev/null)" == "$PRIOR" ]] \
+    || { echo "   ├─ L: 💥 MalfunctionError: the bait did not exec the prior build within 5s — no world measured" >&2; return 1; }
 
   printf 'the new build\n' > "$FIX/new"
   local out rc
@@ -253,5 +260,5 @@ _arm_live() {
 _arm_live || failed=$(( failed + 1 ))
 
 echo ""
-[[ "$failed" -eq 0 ]] || { echo "   ✋ $failed arm(s) failed" >&2; exit 1; }
+[[ "$failed" -eq 0 ]] || { echo "   ✋ ConstraintError: $failed arm(s) failed" >&2; exit 1; }
 echo "   ✔ the pin upsert converges, declines, or refuses — and a refusal never touches the prior tmux"
