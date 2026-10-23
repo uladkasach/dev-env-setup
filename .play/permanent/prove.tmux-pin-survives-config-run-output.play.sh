@@ -51,12 +51,12 @@ _root_of() {
   [[ -f "$PWD/src/grove.provision._.sh" ]] && { printf '%s' "$PWD"; return 0; }
   return 1
 }
-_root="$(_root_of)" || { echo "   ✋ no checkout found" >&2; exit 2; }
+_root="$(_root_of)" || { echo "   ✋ ConstraintError: no checkout found" >&2; exit 2; }
 # shellcheck source=/dev/null
 source "$_root/src/grove.provision/2.shell/2.8.tmux/_.sh" \
-  || { echo "   ✋ could not source 2.8.tmux/_.sh" >&2; exit 2; }
+  || { echo "   ✋ ConstraintError: could not source 2.8.tmux/_.sh" >&2; exit 2; }
 declare -F grove_provision_2_8_tmux_pin_dst >/dev/null \
-  || { echo "   ✋ the bundle declares no pin — there is no build to prove" >&2; exit 1; }
+  || { echo "   ✋ ConstraintError: the bundle declares no pin — there is no build to prove" >&2; exit 1; }
 
 PIN_BIN="$(grove_provision_2_8_tmux_pin_dst)"
 DISTRO_BIN="/usr/bin/tmux"   # the jammy package path; a reproduction arm, never graded
@@ -67,14 +67,14 @@ echo "   └─ subject: a fresh tmux server, per build, per conf"
 echo ""
 
 [[ -x "$PIN_BIN" ]] || {
-  echo "   ✋ no pinned tmux at $PIN_BIN" >&2
+  echo "   ✋ ConstraintError: no pinned tmux at $PIN_BIN" >&2
   echo "      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply" >&2
   exit 2
 }
 
 # the real conf IS the claim's second arm; without it the pin is half-proven
 [[ -f "$CONF_REAL" ]] || {
-  echo "   ✋ no ~/.tmux.conf, so the arm the crews load cannot run" >&2
+  echo "   ✋ ConstraintError: no ~/.tmux.conf, so the arm the crews load cannot run" >&2
   echo "      fix: rhx grove.provision --what 2.8.tmux --mode apply" >&2
   exit 2
 }
@@ -142,7 +142,7 @@ _probe() {
 #     signal a closed tab sends; `window-size latest` is the crews' own option
 ######################################################################
 _probe_client() {
-  local bin="$1" conf="$2" sock="$3" n
+  local bin="$1" conf="$2" sock="$3" n tick
   timeout -k 2 10 "$bin" -L "$sock" -f "$conf" new-session -d -s probe </dev/null >/dev/null 2>&1 \
     || { echo nostart; return 0; }
   timeout -k 2 5 "$bin" -L "$sock" set -g window-size latest </dev/null >/dev/null 2>&1
@@ -152,9 +152,12 @@ _probe_client() {
   # sends HUP at 1s and KILL at 2s, so no client can outlive its turn
   for n in $(seq 1 10); do
     timeout -s HUP -k 1 1 script -qfec "$bin -L $sock attach -t probe" /dev/null </dev/null >/dev/null 2>&1
-    sleep 0.2
-    timeout -k 2 5 "$bin" -L "$sock" has-session -t probe </dev/null >/dev/null 2>&1 \
-      || { echo "died after $n client(s)"; return 0; }
+    # a death lands as the server reaps the client — polled over 1s, never one fixed sleep
+    for tick in 1 2 3 4; do
+      timeout -k 2 5 "$bin" -L "$sock" has-session -t probe </dev/null >/dev/null 2>&1 \
+        || { echo "died after $n client(s)"; return 0; }
+      sleep 0.25
+    done
   done
 
   echo "alive $(timeout -k 2 5 "$bin" -L "$sock" display-message -p '#{version}' </dev/null 2>/dev/null)"
@@ -171,7 +174,7 @@ _arm() {
 
 # the client arm needs a pty for each client; without `script` it cannot run
 command -v script >/dev/null 2>&1 || {
-  echo "   ✋ no 'script' (util-linux) on this box, so the client arm cannot run" >&2
+  echo "   ✋ ConstraintError: no 'script' (util-linux) on this box, so the client arm cannot run" >&2
   exit 2
 }
 
@@ -194,6 +197,6 @@ for bin in "$PIN_BIN" "$DISTRO_BIN"; do
 done
 
 echo ""
-[[ "$fails" -eq 0 ]] || { echo "   ✋ the pinned build died in $fails arm(s)" >&2; exit 1; }
+[[ "$fails" -eq 0 ]] || { echo "   ✋ ConstraintError: the pinned build died in $fails arm(s)" >&2; exit 1; }
 echo "   ✔ the pinned build survives every arm"
 exit 0

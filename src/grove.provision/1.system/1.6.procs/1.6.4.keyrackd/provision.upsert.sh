@@ -51,7 +51,7 @@ grove_provision_1_6_4_keyrackd_provision_upsert() {
 
   # the timer IS carried by `src/`, so its absence is this checkout's defect
   if [[ ! -f "$timer_src" ]]; then
-    echo "   ✋ no $timer_name at $timer_src" >&2
+    echo "   ✋ ConstraintError: no $timer_name at $timer_src" >&2
     echo "      ⇒ this run's own checkout is incomplete" >&2
     return 1
   fi
@@ -80,7 +80,7 @@ grove_provision_1_6_4_keyrackd_provision_upsert() {
   #    `rhx <skill>` resolves no skill there (rule.forbid.the-driver-by-path,
   #    carve-out 3). a bundle reaches for shell, and its own verify is the check
   grove_provision_1_6_4_keyrackd_service_text > "$unit_dir/$service_name" || {
-    echo "   ✋ could not write $unit_dir/$service_name" >&2
+    echo "   ✋ ConstraintError: could not write $unit_dir/$service_name" >&2
     return 1
   }
   cp "$timer_src" "$unit_dir/$timer_name" || return 1
@@ -90,7 +90,7 @@ grove_provision_1_6_4_keyrackd_provision_upsert() {
   # 3. reload FIRST — a rewrite with no reload does no work
   ####################################################################
   systemctl --user daemon-reload || {
-    echo "   ✋ systemctl --user daemon-reload failed" >&2
+    echo "   ✋ ConstraintError: systemctl --user daemon-reload failed" >&2
     echo "      ⇒ the new unit files are on disk and the OLD definitions stay" >&2
     echo "        live, so the fix appears applied and the box does not change" >&2
     return 1
@@ -99,7 +99,7 @@ grove_provision_1_6_4_keyrackd_provision_upsert() {
   if systemctl --user enable --now "$timer_name"; then
     echo "   • $timer_name enabled and started (every 15m, --min-age $(grove_provision_1_6_4_keyrackd_min_age))"
   else
-    echo "   ✋ could not enable $timer_name" >&2
+    echo "   ✋ ConstraintError: could not enable $timer_name" >&2
     echo "      ⇒ the leaked-daemon pool grows unbounded, and its memory is ANON," >&2
     echo "        so it lands in swap rather than in reclaimable cache" >&2
     return 1

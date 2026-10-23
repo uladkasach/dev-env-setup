@@ -98,6 +98,32 @@ GROVE_UPGRADE_2_8_TMUX_TPM_AT="e261deb1b47614eed3400089ce7197dc68acc4eb"  # mast
 #   it would come back: `tmux.conf`, at its old `@plugin` line
 GROVE_UPGRADE_2_8_TMUX_RESURRECT_AT="cff343cf9e81983d3da0c8562b01616f12e8d548"  # master, 2023-03-06
 
+# .what = the pinned plugins, read one fact at a time
+#   `..._plugin_names`     → each plugin's tpm dir name, one per line
+#   `..._plugin_url <n>`   → where `<n>` clones from
+#   `..._plugin_at <n>`    → the commit `<n>` is pinned to
+# .why the dir NAME is tpm's contract: `@plugin 'owner/name'` resolves to
+#   `~/.tmux/plugins/<name>`, so the name keys every other fact
+# ⚠️ this set and the conf's `@plugin` lines are ONE SET, TWO READERS — a change
+#   to either belongs in the same edit as the other
+grove_provision_2_8_tmux_plugin_names() {
+  printf '%s\n' tmux-resurrect
+}
+
+grove_provision_2_8_tmux_plugin_url() {
+  case "$1" in
+    tmux-resurrect) printf 'https://github.com/tmux-plugins/tmux-resurrect' ;;
+    *) return 1 ;;
+  esac
+}
+
+grove_provision_2_8_tmux_plugin_at() {
+  case "$1" in
+    tmux-resurrect) printf '%s' "$GROVE_UPGRADE_2_8_TMUX_RESURRECT_AT" ;;
+    *) return 1 ;;
+  esac
+}
+
 ######################################################################
 # .what = the tmux BUILD a cloud grove runs, declared ONCE
 #
@@ -218,6 +244,18 @@ grove_provision_2_8_tmux_plugin_state() {
   echo whole
 }
 
+# .what = the tpm entrypoint a conf's `run` line names, `~` expanded
+#   `..._tpm_bin_of_conf "$HOME/.tmux.conf"` → `/home/<user>/.tmux/plugins/tpm/tpm`
+# .why the PATH is the conf's to declare, never this bundle's; tpm's historical
+#   default answers only when the conf names no run line, or is absent
+grove_provision_2_8_tmux_tpm_bin_of_conf() {
+  local conf="$1" bin=""
+  [[ -f "$conf" ]] && bin="$(grep -oE "run(-shell)? +'[^']*tpm/tpm'" "$conf" 2>/dev/null \
+    | head -1 | grep -oE "'[^']*'" | tr -d "'")"
+  bin="${bin/#\~/$HOME}"
+  printf '%s' "${bin:-$HOME/.tmux/plugins/tpm/tpm}"
+}
+
 # .what = which of FOUR states is a tpm dir in?
 #   `..._tpm_state "$HOME/.tmux/plugins/tpm"` → whole|adrift|half|absent
 # .why ONE reader, asked by BOTH halves — a separate `-d` (upsert) and `-x`
@@ -278,7 +316,7 @@ grove_provision_2_8_tmux_verify_live_servers() {
   elif [[ ${#haunted[@]} -eq 0 ]]; then
     echo "   • ${#sockets[@]} live server(s), none runs a removed plugin's hook ✔"
   else
-    echo "   ✋ ${#haunted[@]} of ${#sockets[@]} live tmux server(s) still run a hook" >&2
+    echo "   ✋ ConstraintError: ${#haunted[@]} of ${#sockets[@]} live tmux server(s) still run a hook" >&2
     echo "      from tmux-continuum, which this conf no longer names" >&2
     echo "      ⇒ each fires continuum_save.sh on every status refresh, and the" >&2
     echo "        timer is PER SERVER with no lock between them — measured at 118" >&2
@@ -327,7 +365,7 @@ grove_provision_2_8_tmux_verify_live_servers() {
   elif [[ ${#term_wrong[@]} -eq 0 ]]; then
     echo "   • every live server holds default-terminal '$term_declared' ✔"
   else
-    echo "   ✋ ${#term_wrong[@]} live server(s) hold a default-terminal the conf does NOT declare" >&2
+    echo "   ✋ ConstraintError: ${#term_wrong[@]} live server(s) hold a default-terminal the conf does NOT declare" >&2
     echo "      ⇒ each pane spawned there inherits that TERM and EMITS to match, so" >&2
     echo "        an 8-colour entry clamps colour at its source — invisible to every" >&2
     echo "        claim above, which read the conf rather than the server" >&2
@@ -366,7 +404,7 @@ grove_provision_2_8_tmux_verify_live_servers() {
     elif [[ "$pane_bad" -eq 0 ]]; then
       echo "   • all $pane_ok live pane(s) spawned with TERM=$term_declared ✔"
     else
-      echo "   ✋ $pane_bad of $(( pane_ok + pane_bad )) live pane(s) hold a TERM the conf does NOT declare" >&2
+      echo "   ✋ ConstraintError: $pane_bad of $(( pane_ok + pane_bad )) live pane(s) hold a TERM the conf does NOT declare" >&2
       echo "      ⇒ TERM is copied into a pane's child AT SPAWN and never re-read, so" >&2
       echo "        these predate the conf reaching their server. the app inside each" >&2
       echo "        reads that TERM, concludes 8 colours, and EMITS only 8-colour" >&2
@@ -440,7 +478,7 @@ grove_provision_2_8_tmux_verify_live_servers() {
       echo "      ($(tmux -V 2>/dev/null)) carries no 'client_termfeatures' (3.2+)"
       echo "      ⇒ the claim is unproven on this run, not disproven"
     else
-      echo "   ✋ ${#stale[@]} attached client(s) lack a feature the conf declares" >&2
+      echo "   ✋ ConstraintError: ${#stale[@]} attached client(s) lack a feature the conf declares" >&2
       echo "      ⇒ features are negotiated at ATTACH and never re-read, so a client" >&2
       echo "        that attached before this conf reached its server keeps the OLD" >&2
       echo "        set — and an RGB-less client DOWNSAMPLES every 24-bit colour an" >&2
