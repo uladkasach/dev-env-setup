@@ -113,5 +113,5 @@ _arm_whole() {
 _arm_whole || failed=$(( failed + 1 ))
 
 echo ""
-[[ "$failed" -eq 0 ]] || { echo "   ✋ ConstraintError: $failed arm(s) failed" >&2; exit 1; }
+[[ "$failed" -eq 0 ]] || { echo "   💥 MalfunctionError: $failed arm(s) failed" >&2; exit 1; }
 echo "   ✔ a whole tpm never stops the plugin pins below it"

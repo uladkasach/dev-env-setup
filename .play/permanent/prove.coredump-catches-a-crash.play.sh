@@ -33,8 +33,8 @@ cleanup() { [[ -n "$TMPDIR_BAIT" ]] && rm -rf "$TMPDIR_BAIT"; }
 trap cleanup EXIT
 
 command -v coredumpctl >/dev/null 2>&1 || {
-  echo "✋ ConstraintError: no coredumpctl — systemd-coredump is absent"
-  echo "   fix: sudo -v && rhx grove.provision --what 1.6.8.coredump --mode apply"
+  echo "✋ ConstraintError: no coredumpctl — systemd-coredump is absent" >&2
+  echo "   fix: sudo -v && rhx grove.provision --what 1.6.8.coredump --mode apply" >&2
   exit 2
 }
 
@@ -71,6 +71,6 @@ if [[ -n "$hit" ]]; then
   echo "   └─ ✔ coredumpctl holds it: $(printf '%s' "$hit" | head -1 | tr -s ' ' | cut -c1-120)"
   exit 0
 fi
-echo "   └─ ✋ ConstraintError: no core landed for pid $PID within 30s"
-echo "      read why: cat /proc/sys/kernel/core_pattern ; journalctl -u systemd-coredump -n 20"
+echo "   └─ 💥 MalfunctionError: no core landed for pid $PID within 30s" >&2
+echo "      read why: cat /proc/sys/kernel/core_pattern ; journalctl -u systemd-coredump -n 20" >&2
 exit 1

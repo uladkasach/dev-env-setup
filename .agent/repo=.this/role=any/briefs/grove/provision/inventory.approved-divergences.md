@@ -63,6 +63,15 @@ their `local@unix` test as a decline of the tool.
 ⇒ **both were absent, and neither was declined.** an absence with no decline behind it is the
 signature of a miss, and it is the cheapest claim in this file to check.
 
+## ⚠️ .the ruled miss — open, and owed a route of its own
+
+| absent from | the subject | the bundle | why it stands |
+|---|---|---|---|
+| laptop | the tmux pin (a source build at `/usr/local/bin/tmux`) | `2.8.tmux` | a SCOPE call by the director, never a physical subject: the pin cured a crash measured on a cloud grove, and the laptop build was struck from that route. a laptop can hold the pin |
+
+⇒ by the test above it is a **miss**, not an approved row. it is recorded here so a traveler
+reads it as ruled rather than accidental; the laptop pin is owed by a later route.
+
 ## .the apt half — measured 2026-09-13, and it names no miss
 
 `~/.local/bin` is one directory, so a miss of the `yq` shape could have sat in `/usr/bin` and

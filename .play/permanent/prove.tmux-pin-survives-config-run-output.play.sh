@@ -34,8 +34,9 @@
 #
 # exit:
 #   0 = the pinned build survives every arm
-#   1 = the pinned build died in an arm
-#   2 = no pinned build, or no ~/.tmux.conf, on this box — no claim was proven
+#   1 = the pinned build died in an arm, or the bundle declares no pin
+#   2 = no checkout, the bundle could not be sourced, or this box holds no pinned
+#       build, no ~/.tmux.conf, or no `script` — no claim was proven
 ######################################################################
 
 set -uo pipefail
@@ -56,7 +57,7 @@ _root="$(_root_of)" || { echo "   ✋ ConstraintError: no checkout found" >&2; e
 source "$_root/src/grove.provision/2.shell/2.8.tmux/_.sh" \
   || { echo "   ✋ ConstraintError: could not source 2.8.tmux/_.sh" >&2; exit 2; }
 declare -F grove_provision_2_8_tmux_pin_dst >/dev/null \
-  || { echo "   ✋ ConstraintError: the bundle declares no pin — there is no build to prove" >&2; exit 1; }
+  || { echo "   💥 MalfunctionError: the bundle declares no pin — there is no build to prove" >&2; exit 1; }
 
 PIN_BIN="$(grove_provision_2_8_tmux_pin_dst)"
 DISTRO_BIN="/usr/bin/tmux"   # the jammy package path; a reproduction arm, never graded
@@ -197,6 +198,6 @@ for bin in "$PIN_BIN" "$DISTRO_BIN"; do
 done
 
 echo ""
-[[ "$fails" -eq 0 ]] || { echo "   ✋ ConstraintError: the pinned build died in $fails arm(s)" >&2; exit 1; }
+[[ "$fails" -eq 0 ]] || { echo "   💥 MalfunctionError: the pinned build died in $fails arm(s)" >&2; exit 1; }
 echo "   ✔ the pinned build survives every arm"
 exit 0

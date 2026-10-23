@@ -204,9 +204,12 @@ grove_provision_2_8_tmux_binary_owed() {
 }
 
 # .what = does the tmux on PATH meet what this tier owes?
+# .why a tmux that does not answer `-V` meets no tier: a file on PATH is not a binary
+#   that runs, and a duct needs one that runs
 grove_provision_2_8_tmux_binary_meets_owed() {
   local state; state="$(grove_provision_2_8_tmux_binary_state)"
   [[ "$state" == pinned ]] && return 0
+  [[ "$(grove_provision_2_8_tmux_binary_version)" == unreadable ]] && return 1
   [[ "$state" == adrift && "$(grove_provision_2_8_tmux_binary_owed)" == present ]]
 }
 
@@ -254,6 +257,94 @@ grove_provision_2_8_tmux_tpm_bin_of_conf() {
     | head -1 | grep -oE "'[^']*'" | tr -d "'")"
   bin="${bin/#\~/$HOME}"
   printf '%s' "${bin:-$HOME/.tmux/plugins/tpm/tpm}"
+}
+
+# .what = the plugin names a conf declares, one per line, each the basename of its repo
+#   `..._plugin_names_of_conf "$HOME/.tmux.conf"` → `tpm`, `tmux-resurrect`
+# .why the upsert and the verify must agree on what "the conf names" means; one reader
+#   reads only live `set -g @plugin` lines, so a commented-out plugin is owed by neither
+grove_provision_2_8_tmux_plugin_names_of_conf() {
+  local conf="$1" line repo
+  while IFS= read -r line; do
+    repo="${line#*@plugin }"
+    repo="${repo//\'/}"
+    repo="${repo//\"/}"
+    repo="${repo%%[[:space:]]*}"
+    [[ -n "$repo" ]] && printf '%s\n' "${repo##*/}"
+  done < <(grep -E "^[[:space:]]*set[[:space:]]+-g[[:space:]]+@plugin" "$conf" 2>/dev/null)
+}
+
+# .what = the suffix a shadow conf takes when it is moved aside, e.g. `20261023-104339`
+grove_provision_2_8_tmux_backup_stamp() { date +%Y%m%d-%H%M%S; }
+
+# .what = the names, of those given, with no dir under the plugin root — one per line
+#   `..._plugins_absent_under "$root" tpm tmux-resurrect` → `tmux-resurrect`
+grove_provision_2_8_tmux_plugins_absent_under() {
+  local root="$1" name; shift
+  for name in "$@"; do
+    [[ -d "$root/$name" ]] || printf '%s\n' "$name"
+  done
+}
+
+# .what = each value a conf declares for one option, in file order, unquoted, first word
+#   `..._conf_values_of "$conf" -as terminal-features` → `xterm-kitty:RGB`, …
+grove_provision_2_8_tmux_conf_values_of() {
+  local conf="$1" flags="$2" option="$3" line value
+  while IFS= read -r line; do
+    value="${line#*"$option"}"
+    value="${value//\'/}"
+    value="${value//\"/}"
+    read -r value _ <<<"$value"
+    [[ -n "$value" ]] && printf '%s\n' "$value"
+  done < <(grep -E "^[[:space:]]*set[[:space:]]+${flags}[[:space:]]+${option}([[:space:]]|$)" "$conf" 2>/dev/null)
+}
+
+# .what = the default-terminal a conf declares — the LAST line wins, as tmux reads it
+grove_provision_2_8_tmux_default_terminal_of_conf() {
+  grove_provision_2_8_tmux_conf_values_of "$1" -g default-terminal | tail -1
+}
+
+# .what = the `term:feature` pairs a conf declares, one per line
+grove_provision_2_8_tmux_terminal_features_of_conf() {
+  local pair
+  while read -r pair; do
+    [[ "$pair" == *:* ]] && printf '%s\n' "$pair"
+  done < <(grove_provision_2_8_tmux_conf_values_of "$1" -as terminal-features)
+}
+
+# .what = the body of an `A…Z` sentinel answer; an answer of `AZ` has an empty body
+# .why the sentinel parts "the server spoke, and named naught" from "no answer at all"
+grove_provision_2_8_tmux_sentinel_body() {
+  local body="${1#A}"
+  printf '%s' "${body%Z}"
+}
+
+# .what = the confs a server loaded, one per line, from its `#{config_files}` list
+grove_provision_2_8_tmux_config_files_of() {
+  printf '%s\n' "$1" | tr ',' '\n'
+}
+
+# .what = a client's term and its feature list, from a `term|feat,feat` body
+grove_provision_2_8_tmux_client_term_of() { printf '%s' "${1%%|*}"; }
+grove_provision_2_8_tmux_client_features_of() { printf '%s' "${1#*|}"; }
+
+# .what = the term and the feature of one declared `term:feature` pair
+grove_provision_2_8_tmux_pair_term_of() { printf '%s' "${1%%:*}"; }
+grove_provision_2_8_tmux_pair_feature_of() { printf '%s' "${1##*:}"; }
+
+# .what = does a client's comma list of features hold this one feature?
+grove_provision_2_8_tmux_client_has_feature() {
+  local feats="$1" feat="$2"
+  [[ ",$feats," == *",$feat,"* ]]
+}
+
+# .what = the TERM a pane's child spawned with, from its own `/proc/<pid>/environ`
+#   → exit 1 when the environ is unreadable or names no TERM
+grove_provision_2_8_tmux_pane_term_of() {
+  local pid="$1" entry
+  [[ -r "/proc/$pid/environ" ]] || return 1
+  entry="$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -m1 '^TERM=')" || return 1
+  printf '%s' "${entry#TERM=}"
 }
 
 # .what = which of FOUR states is a tpm dir in?
@@ -383,15 +474,10 @@ grove_provision_2_8_tmux_verify_live_servers() {
     for sock_name in "${sockets[@]}"; do
       while read -r p_pid; do
         [[ "$p_pid" =~ ^[0-9]+$ ]] || continue
-        if [[ -r "/proc/$p_pid/environ" ]]; then
-          p_term="$(tr '\0' '\n' < "/proc/$p_pid/environ" 2>/dev/null | grep -m1 '^TERM=')" \
-            || p_term=""
-        else
-          p_term=""
-        fi
+        p_term="$(grove_provision_2_8_tmux_pane_term_of "$p_pid")" || p_term=""
         if [[ -z "$p_term" ]]; then
           pane_mute=$(( pane_mute + 1 ))
-        elif [[ "${p_term#TERM=}" == "$term_declared" ]]; then
+        elif [[ "$p_term" == "$term_declared" ]]; then
           pane_ok=$(( pane_ok + 1 ))
         else
           pane_bad=$(( pane_bad + 1 ))
@@ -433,12 +519,8 @@ grove_provision_2_8_tmux_verify_live_servers() {
   #    again, so a sourced server leaves an old client downsampled (m9). `A…Z` as in m4
   local want=() decl
   while read -r decl; do
-    decl="${decl#*terminal-features }"
-    decl="${decl//\'/}"
-    decl="${decl//\"/}"
-    decl="${decl%%[[:space:]]*}"
-    [[ "$decl" == *:* ]] && want+=("$decl")
-  done < <(grep -E "^[[:space:]]*set[[:space:]]+-as[[:space:]]+terminal-features" "$conf_live" 2>/dev/null)
+    [[ -n "$decl" ]] && want+=("$decl")
+  done < <(grove_provision_2_8_tmux_terminal_features_of_conf "$conf_live")
 
   if [[ ${#want[@]} -eq 0 ]]; then
     echo "   • the conf declares no terminal-features — no client claim to grade"
@@ -447,9 +529,9 @@ grove_provision_2_8_tmux_verify_live_servers() {
     for sock_name in "${sockets[@]}"; do
       while read -r c_raw; do
         [[ "$c_raw" == A*Z ]] || continue
-        c_raw="${c_raw#A}"; c_raw="${c_raw%Z}"
-        c_term="${c_raw%%|*}"
-        c_feats="${c_raw#*|}"
+        c_raw="$(grove_provision_2_8_tmux_sentinel_body "$c_raw")"
+        c_term="$(grove_provision_2_8_tmux_client_term_of "$c_raw")"
+        c_feats="$(grove_provision_2_8_tmux_client_features_of "$c_raw")"
         seen=$(( seen + 1 ))
 
         # no features at all: this tmux carries no `client_termfeatures` (3.2+)
@@ -459,10 +541,10 @@ grove_provision_2_8_tmux_verify_live_servers() {
         fi
 
         for pair in "${want[@]}"; do
-          p_term="${pair%%:*}"
-          p_feat="${pair##*:}"
+          p_term="$(grove_provision_2_8_tmux_pair_term_of "$pair")"
+          p_feat="$(grove_provision_2_8_tmux_pair_feature_of "$pair")"
           [[ "$c_term" == "$p_term" ]] || continue
-          [[ ",$c_feats," == *",$p_feat,"* ]] && continue
+          grove_provision_2_8_tmux_client_has_feature "$c_feats" "$p_feat" && continue
           stale+=("$sock_name:$c_term lacks $p_feat")
         done
       done < <(timeout -k 2 5 tmux -L "$sock_name" list-clients \

@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = the runaway-process concern, in its three answers — finders a human
-#         runs, a monitor that runs them on a timer, and a killer that needs no
-#         one to ask at all
+# .what = the runaway-process concern: find it, watch for it, kill it, and keep
+#         the seat and its evidence alive through it — one leaf per answer
 #
 # .why the bodies are TRACKED FILES, not heredocs
 #   - a quoted heredoc gets no lint, no syntax-check, and a one-line fix

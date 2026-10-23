@@ -106,7 +106,7 @@ _arm_own() {
   reap --mode plan --min-age 0 --pid "$OWN"
   echo "   ├─ arm 'own-scope'"
   [[ "$RC" -eq 0 ]] || { echo "   │  💥 MalfunctionError: reaper exit $RC — no verdict" >&2; return 1; }
-  found "$OWN" && { echo "   │  ✋ ConstraintError: named for the kill — a per-crew server in its own scope would die" >&2; return 1; }
+  found "$OWN" && { echo "   │  💥 MalfunctionError: named for the kill — a per-crew server in its own scope would die" >&2; return 1; }
   echo "   │  ✔ spared — its scope's oldest"
 }
 
@@ -115,7 +115,7 @@ _arm_pane() {
   reap --mode plan --min-age 0 --pid "$PANE"
   echo "   └─ arm 'in-pane'"
   [[ "$RC" -eq 0 ]] || { echo "      💥 MalfunctionError: reaper exit $RC — no verdict" >&2; return 1; }
-  found "$PANE" || { echo "      ✋ ConstraintError: NOT named — the own-scope arm's green proves naught" >&2; return 1; }
+  found "$PANE" || { echo "      💥 MalfunctionError: NOT named — the own-scope arm's green proves naught" >&2; return 1; }
   echo "      ✔ named — a server born in a peer's pane would be reaped"
 }
 

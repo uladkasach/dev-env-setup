@@ -49,7 +49,14 @@ grove_provision_2_8_tmux_provision_verify() {
     failed=$(( failed + 1 ))
   fi
 
-  if [[ "$state" == adrift ]] && ! grove_provision_2_8_tmux_binary_meets_owed; then
+  if [[ "$ver" == unreadable ]]; then
+    echo "   ✋ ConstraintError: the tmux at $bin does not answer 'tmux -V' within 5s" >&2
+    echo "      ⇒ a file on PATH is not a binary that runs: it is broken, or the box" >&2
+    echo "        is wedged, and a duct IS tmux" >&2
+    echo "      read why: timeout 5 $bin -V" >&2
+    echo "      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply" >&2
+    failed=$(( failed + 1 ))
+  elif [[ "$state" == adrift ]] && ! grove_provision_2_8_tmux_binary_meets_owed; then
     echo "   ✋ ConstraintError: tmux on PATH is $ver ($bin), not the pinned $GROVE_UPGRADE_2_8_TMUX_VERSION" >&2
     echo "      ⇒ every crew on a grove shares one tmux server, and the distro 3.2a" >&2
     echo "        server segfaults — one crash ends every crew on the box" >&2
