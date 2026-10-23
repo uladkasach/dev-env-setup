@@ -21,7 +21,7 @@
 #   - a grove leaks the same tool subprocesses, and has no human to notice
 #
 # .why no linger claim here
-#   - `1.6.4.keyrackd` runs first and grants linger to every human seat; this
+#   - `1.6.7.linger` runs first and grants linger to every human seat; this
 #     timer rides on the same user manager. a second linger claim would be a
 #     second declaration of one fact
 #

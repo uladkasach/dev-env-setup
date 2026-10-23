@@ -20,7 +20,8 @@
 #     manager exists only because a duct is open, so both say ✔ right up to the
 #     moment the pane closes and the manager dies with the session
 #   - ⇒ a green `is-active` on a grove is a fact about the OBSERVER's session,
-#     never about the box. linger is what makes it a fact about the box
+#     never about the box. linger is what makes it a fact about the box, and
+#     `1.6.7.linger` proves it for every seat
 #     (`gotcha.a-check-that-cries-wolf-gets-silenced`, q1)
 ######################################################################
 
@@ -86,35 +87,8 @@ grove_provision_1_6_4_keyrackd_provision_verify() {
     claims=$((claims + 1))
   fi
 
-  ####################################################################
-  # 4. linger — the only claim above that outlives this session
-  #
-  # 🛑 .why this is a 🌙 on a local tier and a ✋ on a cloud one
-  #   - it is the exact INVERSE of `1.6.2.monitor`'s gate: that leaf needs a
-  #     desktop bus, so it declines on cloud. this one needs a session that
-  #     PERSISTS, which a desktop already supplies for free
-  #   - on `local@unix` the graphical session holds the user manager up for as
-  #     long as the box is awake, so linger buys no capability. a ✋ there would
-  #     go red on a box where the timer plainly runs — and a check seen to cry
-  #     wolf gets silenced, taking the grove's real ✋ down with it
-  #     (`gotcha.a-check-that-cries-wolf-gets-silenced`)
-  ####################################################################
-  if grove_provision_1_6_4_keyrackd_lingers; then
-    echo "   • $USER lingers, so the timer outlives a logout ✔"
-  elif [[ "$GROVE_ENV_SERVER" == local@* ]]; then
-    echo "   🌙 $USER does not linger, and on $GROVE_ENV_SERVER that costs none"
-    echo "      ⇒ a desktop session keeps the user manager up already. the claim"
-    echo "        is a ✋ on a cloud grove, whose only login is the duct"
-  else
-    echo "   ✋ $USER does not linger" >&2
-    echo "      ⇒ this seat's user manager dies at its last logout, and every" >&2
-    echo "        claim above dies with it. on a grove that logout is the duct's" >&2
-    echo "        last pane, so the prune runs while somebody watches and never" >&2
-    echo "        otherwise" >&2
-    echo "      fix: run this bundle from the seat WITH sudo — only it may grant" >&2
-    echo "           linger, and it grants it for every seat on the box" >&2
-    claims=$((claims + 1))
-  fi
+  # 4. linger — the claim that makes the two above outlive this session — is
+  #    `1.6.7.linger`'s, made for every seat; one claim, one owner
 
   [[ "$claims" -eq 0 ]]
 }

@@ -11,7 +11,7 @@
 #     `$GROVE_SRC`, which lets a verify diff installed bytes against
 #     declared ones (`rule.require.repo-as-source-of-truth`)
 #
-# .why four leaves, split by WHO asks
+# .why one leaf per answer, split by WHO asks
 #   - `1.6.1.finders` — a human asks, on demand; applies everywhere, and a
 #     grove that wedges needs them MORE, since no human sits at it
 #   - `1.6.2.monitor` — a timer asks, and alerts through `notify-send`,
@@ -27,6 +27,11 @@
 #   - `1.6.6.abandoned` — a timer asks, hourly: kill and log each process
 #     abandoned for over 24h, so the orphan POPULATION earlyoom cannot see
 #     never builds up
+#   - `1.6.7.linger` — the SEAT's half: every human seat lingers, so its user
+#     manager and each crew scope under it outlive the last logout. it runs
+#     FIRST, since every leaf below that asks `systemctl --user` leans on it
+#   - `1.6.8.coredump` — a crash leaves a core, so the next crash is read
+#     rather than guessed
 #   - an absent finder means a wedged box cannot be DIAGNOSED; an absent
 #     earlyoom means it cannot be REACHED — two failures a reader acts on
 #     differently, which is why earlyoom earns its own leaf
@@ -40,13 +45,16 @@
 #   rhx grove.provision --what 1.6.procs --mode apply
 ######################################################################
 
-# .order — WRITTEN order, never numeric: `1.6.5.usermanager` runs BEFORE every leaf
+# .order — WRITTEN order, never numeric: `1.6.7.linger` runs first (see above), and
+#   `1.6.5.usermanager` runs BEFORE every leaf
 #   that asks `systemctl --user` (monitor, keyrackd, abandoned). measured 2026-10-07:
 #   in numeric order, the revive ran after monitor and keyrackd, so on a box whose
 #   manager was dead both failed `daemon-reload` with "Failed to connect to bus",
 #   while the revive two lines later brought the bus back
 #   (`define.provision-defect-shapes`, shape 1)
 grove_provision_1_6_procs() {
+  bundle.upgrade 1.6.7.linger
+  bundle.upgrade 1.6.8.coredump
   bundle.upgrade 1.6.1.finders
   bundle.upgrade 1.6.3.earlyoom
   bundle.upgrade 1.6.5.usermanager

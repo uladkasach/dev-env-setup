@@ -32,11 +32,143 @@
 #   - ⇒ an unpinned clone of either is code execution nobody vouched for
 ######################################################################
 
+######################################################################
+# .what = put the pinned tmux release at `/usr/local/bin/tmux`, from source
+#
+# .why from SOURCE
+#   - tmux publishes no linux binary; its release IS a source tarball
+#   - the build needs a compiler and three more packages, each one `pkg_install`
+#
+# 🛑 .why the swap is a RENAME, never a write in place
+#   - live crew servers run from this path. a write into a busy binary fails
+#     with ETXTBSY, and a truncate under a live process can kill it
+#   - `mv` over the path gives the NEW inode to new execs and leaves each live
+#     server on the inode it already holds (.refs = 1.vision case 3)
+#
+# ⚠️ .why every failure leaves the PRIOR tmux untouched
+#   - the bytes are verified before extract, the build happens in a temp dir,
+#     and the rename is the last step
+#   - ⇒ a mismatch or a failed build is a ✋ that names the cause, over a box
+#     whose crews still reach the tmux they had (.refs = 1.vision cases 7, 8)
+#
+# guarantee:
+#   - idempotent: a PATH tmux at the pin short-circuits, whoever built it
+#   - a seat with no root DECLINES; the verify still ✋s on an adrift box
+######################################################################
+grove_provision_2_8_tmux_pin_upsert() {
+  local ver bin dst
+  ver="$(grove_provision_2_8_tmux_binary_version)"
+  bin="$(grove_provision_2_8_tmux_binary_path)"
+  dst="$(grove_provision_2_8_tmux_pin_dst)"
+
+  # 1. converged already? a keepalive build of the pin counts (case 4)
+  if [[ "$(grove_provision_2_8_tmux_binary_state)" == pinned ]]; then
+    echo "   • tmux $ver already at the pin ($bin)"
+    return 0
+  fi
+
+  # 2. a seat with no root declines; ground converges it (case 16)
+  bundle.root.owns "the pinned tmux build at $dst" \
+    "tmux on PATH: ${ver:-absent} ${bin:+($bin)}, want $GROVE_UPGRADE_2_8_TMUX_VERSION" \
+    || return 0
+
+  # 3. the toolchain, the verified tarball, the build, the swap — each ✋ leaves the prior tmux
+  grove_provision_2_8_tmux_pin_toolchain || return 1
+
+  local tmp_dir; tmp_dir="$(web_tempdir tmux)" || return 1
+  local tarball="$tmp_dir/tmux-$GROVE_UPGRADE_2_8_TMUX_VERSION.tar.gz"
+  grove_provision_2_8_tmux_pin_fetch --into "$tarball" \
+    && grove_provision_2_8_tmux_pin_build --tarball "$tarball" --into "$tmp_dir" \
+    && grove_provision_2_8_tmux_pin_install --from "$tmp_dir/tmux-$GROVE_UPGRADE_2_8_TMUX_VERSION/tmux" --into "$dst"
+  local rc=$?
+  rm -rf "$tmp_dir"
+  [[ "$rc" -eq 0 ]] || return 1
+
+  hash -r 2>/dev/null
+  echo "   • tmux $GROVE_UPGRADE_2_8_TMUX_VERSION built → $dst"
+  echo "     prior: ${ver:-absent} ${bin:+($bin)}; live servers keep the build they started on"
+}
+
+# .what = the toolchain the build needs — each one an ordinary apt package
+# .note = no yacc: a release tarball ships its parser pre-generated; only a git
+#   checkout needs one (homebrew's stable formula carries none either)
+grove_provision_2_8_tmux_pin_toolchain() {
+  pkg_install build-essential pkg-config libevent-dev libncurses-dev && return 0
+  echo "   ✋ the tmux build toolchain did not install" >&2
+  echo "      ⇒ the prior tmux is untouched; no crew lost its server" >&2
+  echo "      read why: sudo apt-get install build-essential pkg-config libevent-dev libncurses-dev" >&2
+  return 1
+}
+
+# .what = fetch the pinned tarball, and verify it BEFORE any byte reaches a compiler
+grove_provision_2_8_tmux_pin_fetch() {
+  local tarball="$2"
+  if ! web_fetch "$GROVE_UPGRADE_2_8_TMUX_URL" --into "$tarball"; then
+    echo "   ✋ could not fetch tmux $GROVE_UPGRADE_2_8_TMUX_VERSION" >&2
+    echo "      ⇒ the prior tmux is untouched; no crew lost its server" >&2
+    echo "      read why: $GROVE_UPGRADE_2_8_TMUX_URL" >&2
+    return 1
+  fi
+  web_verify_sha256 --file "$tarball" --sha256 "$GROVE_UPGRADE_2_8_TMUX_SHA256" && return 0
+  echo "   ✋ the tmux tarball did NOT match its declared digest" >&2
+  echo "      ⇒ the bytes are discarded unbuilt; the prior tmux is untouched" >&2
+  echo "      ⇒ either the transfer corrupted, or the release was re-uploaded" >&2
+  echo "      read why: rhx play.run --play prove.tmux-tarball-matches-the-pin" >&2
+  echo "           a green there means the transfer corrupted — re-run the apply;" >&2
+  echo "           a red means the release moved — re-pin from a second party (see _.sh)" >&2
+  return 1
+}
+
+# .what = build tmux from a verified tarball, into `<dir>/tmux-<version>/tmux`
+# .why the log outlives the temp dir — a compiler error is the one fact a ✋
+#   here must hand over
+grove_provision_2_8_tmux_pin_build() {
+  local tarball="$2" into="$4"
+  local log_dir="$HOME/.local/state/grove.provision"
+  local log="$log_dir/2.8.tmux.build.log"
+  mkdir -p "$log_dir" || return 1
+
+  local src="$into/tmux-$GROVE_UPGRADE_2_8_TMUX_VERSION"
+  { tar -xzf "$tarball" -C "$into" \
+      && ( cd "$src" && ./configure --prefix=/usr/local && make -j"$(nproc)" ); } \
+    >"$log" 2>&1 && return 0
+  echo "   ✋ tmux $GROVE_UPGRADE_2_8_TMUX_VERSION did not build" >&2
+  echo "      ⇒ the prior tmux is untouched; no crew lost its server" >&2
+  echo "      read why: tail -40 $log" >&2
+  return 1
+}
+
+# .what = place a built binary at `<dst>`: install beside it, then rename over it
+# .why a rename, never a write in place (see the header: ETXTBSY); the same
+#   stage-then-rename `1.10.hosts` uses for `/etc/hosts`
+grove_provision_2_8_tmux_pin_install() {
+  local from="$2" dst="$4"
+  local stage="$dst.grove-provision.new"
+  sudo install -m 0755 -o root -g root "$from" "$stage" && sudo mv -f "$stage" "$dst" && return 0
+  sudo rm -f "$stage" 2>/dev/null
+  echo "   ✋ the built tmux could not be placed at $dst" >&2
+  echo "      read why: ls -l $(dirname "$dst")" >&2
+  return 1
+}
+
 grove_provision_2_8_tmux_provision_upsert() {
   ####################################################################
-  # 1. the binary — a duct IS tmux, so this is the reachability of the box
+  # 1a. on a GROVE, the pinned build — the distro 3.2a segfaults (see `_.sh`)
   ####################################################################
-  if ! pkg_install tmux; then
+  if [[ "${GROVE_ENV_SERVER:-}" == cloud@* ]]; then
+    grove_provision_2_8_tmux_pin_upsert || return 1
+  fi
+
+  ####################################################################
+  # 1b. elsewhere, the distro package — on a laptop it IS the tmux
+  #
+  # ⚠️ .why a grove does NOT also take the distro package
+  #   - it would be a fallback no crew reaches, since `/usr/local/bin` leads PATH
+  #   - and a fallback to the build that segfaults is a hazard, never a safety:
+  #     any caller that names `/usr/bin/tmux` would get 3.2a
+  #   - an extant grove keeps the package it already has; a fresh one never gets it
+  ####################################################################
+  if [[ "${GROVE_ENV_SERVER:-}" != cloud@* ]] && ! pkg_install tmux; then
     echo "   ✋ tmux did not install" >&2
     echo "      ⇒ a duct IS tmux: ductwork.sh opens a session, sends to a pane," >&2
     echo "        and reads its output. so on a grove this failure means the box" >&2
@@ -47,8 +179,15 @@ grove_provision_2_8_tmux_provision_upsert() {
   fi
 
   ####################################################################
-  # 2. tpm — at the exact path `~/.tmux.conf` names in its `run` line
+  # 2. tpm, then its plugins — two steps, so a tpm already at its pin never
+  #    skips the plugin pins below it
   ####################################################################
+  grove_provision_2_8_tmux_tpm_upsert || return 1
+  grove_provision_2_8_tmux_plugins_upsert || return 1
+}
+
+# .what = tpm at the exact path `~/.tmux.conf` names in its `run` line, at its pin
+grove_provision_2_8_tmux_tpm_upsert() {
   local tpm_dir="$HOME/.tmux/plugins/tpm"
 
   ####################################################################
@@ -142,7 +281,10 @@ grove_provision_2_8_tmux_provision_upsert() {
   fi
 
   echo "   • tpm installed at the declared commit ($tpm_dir)"
+}
 
+# .what = each tpm plugin at its own declared commit
+grove_provision_2_8_tmux_plugins_upsert() {
   ####################################################################
   # 🛑 now the PLUGINS, at their own declared commits
   #   - left alone, `tpm/bin/install_plugins` clones each `@plugin` at default-branch tip

@@ -14,19 +14,17 @@
 #   - systemd caches unit files, so a rewrite with no reload leaves the OLD
 #     definition live. the fix lands on disk and the box keeps its behavior
 #
-# .why sudo is asked for EXACTLY ONE step, and never for the units
+# .why this phase asks no sudo at all
 #   - the units are USER units under `$HOME/.config/systemd/user`, and the
 #     daemons they prune are this seat's own, so a camper writes them unaided
-#   - LINGER is the lone exception, and only a sudo seat may set it. ground
-#     sets it for every human seat, so a camper's own run finds it already true
-#     (`term=seat`; `rule.require.seam-claims-have-an-owner`)
+#   - LINGER, which this timer needs to outlive the duct, is owned by
+#     `1.6.7.linger`: it runs first in `1.6.procs` and grants it to every seat
+#     (`rule.require.seam-claims-have-an-owner`)
 #
 # guarantee:
 #   - idempotent: both units are re-declared from one reader on every apply
 #   - idempotent: `enable --now` converges on an already-enabled timer
-#   - idempotent: linger is read before it is set, and set once per seat
 #   - declines with 🌙, never ✋, when the skill is absent from this checkout
-#   - declines with 🌙, never ✋, when this seat cannot grant linger
 ######################################################################
 
 grove_provision_1_6_4_keyrackd_provision_upsert() {
@@ -67,10 +65,9 @@ grove_provision_1_6_4_keyrackd_provision_upsert() {
     | cmp -s - "$unit_dir/$service_name" || converged=0
   systemctl --user is-enabled "$timer_name" >/dev/null 2>&1 || converged=0
   systemctl --user is-active  "$timer_name" >/dev/null 2>&1 || converged=0
-  grove_provision_1_6_4_keyrackd_lingers || converged=0
 
   if [[ "$converged" -eq 1 ]]; then
-    echo "   • both units match this checkout, the timer is armed, and this seat lingers ✔"
+    echo "   • both units match this checkout, and the timer is armed ✔"
     return 0
   fi
 
@@ -107,44 +104,4 @@ grove_provision_1_6_4_keyrackd_provision_upsert() {
     echo "        so it lands in swap rather than in reclaimable cache" >&2
     return 1
   fi
-
-  ####################################################################
-  # 4. LINGER — the one step a seat without sudo cannot take for itself
-  #
-  # 🛑 it is set for EVERY human seat, not merely this one. ground runs first
-  #    (rule.require.one-command-provision), and it is the only seat that may
-  #    grant this — so a camper-only grant would be a grant nobody can make.
-  #    the roster is derived from the box, so no seat is hardcoded (`5.8.docker`)
-  ####################################################################
-  grove_provision_1_6_4_keyrackd_lingers && {
-    echo "   • $USER already lingers, so the timer outlives a logout ✔"
-    return 0
-  }
-
-  # a desktop session already holds the user manager up, so linger buys no
-  # capability on a local tier — see the 🛑 in `provision.verify.sh`
-  if [[ "$GROVE_ENV_SERVER" == local@* ]]; then
-    echo "   🌙 linger not set, and on $GROVE_ENV_SERVER the desktop session"
-    echo "      keeps the user manager up already"
-    return 0
-  fi
-
-  bundle.root.owns "linger for this box's seats" \
-    "$USER lingers=no; the timer dies at this seat's last logout" || return 0
-
-  local seat uid shell
-  while IFS=: read -r seat _ uid _ _ _ shell; do
-    [[ "$uid" -ge 1000 && "$uid" -lt 65534 ]] || continue
-    [[ "$shell" == *nologin* || "$shell" == *false ]] && continue
-
-    # all three lines go to stdout, none to stderr — this is a LOOP, so a
-    # stderr line could land under a different seat's message
-    if sudo loginctl enable-linger "$seat" 2>/dev/null; then
-      echo "   • $seat lingers, so its prune timer outlives a logout ✔"
-    else
-      echo "   🌙 could not set linger for $seat"
-      echo "      ⇒ its timer still fires while a session is open, and stops at"
-      echo "        that seat's last logout — on a grove, when the duct closes"
-    fi
-  done < <(getent passwd)
 }
