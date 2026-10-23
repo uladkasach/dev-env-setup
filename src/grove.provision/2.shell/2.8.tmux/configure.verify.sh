@@ -27,7 +27,7 @@ grove_provision_2_8_tmux_configure_verify() {
 
   # 1. present
   if [[ ! -f "$conf_live" ]]; then
-    echo "   ✋ no ~/.tmux.conf on this box" >&2
+    echo "   ✋ ConstraintError: no ~/.tmux.conf on this box" >&2
     echo "      ⇒ tmux runs with its stock defaults: no mouse, 2k scrollback, and" >&2
     echo "        none of the keybinds a duct and the termwork skills drive" >&2
     echo "      fix: rhx grove.provision --what 2.8.tmux --mode apply" >&2
@@ -36,13 +36,13 @@ grove_provision_2_8_tmux_configure_verify() {
 
   # 2. current
   if [[ ! -f "$conf_src" ]]; then
-    echo "   ✋ the checkout has no tmux.conf at $conf_src to compare against" >&2
+    echo "   ✋ ConstraintError: the checkout has no tmux.conf at $conf_src to compare against" >&2
     echo "      ⇒ so whether ~/.tmux.conf is current cannot be judged at all" >&2
     failed=$(( failed + 1 ))
   elif cmp -s "$conf_src" "$conf_live"; then
     echo "   • ~/.tmux.conf matches the checkout ✔"
   else
-    echo "   ✋ ~/.tmux.conf DIFFERS from the checkout" >&2
+    echo "   ✋ ConstraintError: ~/.tmux.conf DIFFERS from the checkout" >&2
     echo "      ⇒ the live conf is an older revision — invisible to a file test," >&2
     echo "        since it exists and loads. the symptom is 'my keybind change had" >&2
     echo "        no effect', which a human blames on tmux" >&2
@@ -71,7 +71,7 @@ grove_provision_2_8_tmux_configure_verify() {
   if [[ -n "$answer" && -z "$loaded" ]]; then
     local xdg_conf="${XDG_CONFIG_HOME:-$HOME/.config}/tmux/tmux.conf"
     if [[ -f "$xdg_conf" ]]; then
-      echo "   ✋ tmux loads ANOTHER conf besides ~/.tmux.conf: $xdg_conf" >&2
+      echo "   ✋ ConstraintError: tmux loads ANOTHER conf besides ~/.tmux.conf: $xdg_conf" >&2
       echo "      ⇒ tmux reads its confs in order and a LATER file wins, so any" >&2
       echo "        option named there overrides the one this repo declares —" >&2
       echo "        while the check above still reports ~/.tmux.conf as current" >&2
@@ -106,7 +106,7 @@ grove_provision_2_8_tmux_configure_verify() {
     elif [[ "${#shadow[@]}" -eq 0 ]]; then
       echo "   • ~/.tmux.conf is the only conf tmux loads ✔ ($loaded)"
     else
-      echo "   ✋ tmux loads ANOTHER conf besides ~/.tmux.conf: ${shadow[*]}" >&2
+      echo "   ✋ ConstraintError: tmux loads ANOTHER conf besides ~/.tmux.conf: ${shadow[*]}" >&2
       echo "      ⇒ tmux reads its confs in order and a LATER file wins, so any" >&2
       echo "        option named there overrides the one this repo declares —" >&2
       echo "        while the check above still reports ~/.tmux.conf as current" >&2
@@ -153,7 +153,7 @@ grove_provision_2_8_tmux_configure_verify() {
     if [[ "${#absent[@]}" -eq 0 ]]; then
       echo "   • all ${#declared[@]} declared tmux plugins present ✔ ($plugin_root)"
     else
-      echo "   ✋ a tmux plugin the conf names is ABSENT from $plugin_root: ${absent[*]}" >&2
+      echo "   ✋ ConstraintError: a tmux plugin the conf names is ABSENT from $plugin_root: ${absent[*]}" >&2
       echo "      ⇒ this is SILENT at runtime: tmux starts, the conf loads, and the" >&2
       echo "        plugin's keybinds and status segments are simply omitted with no" >&2
       echo "        error anywhere. the human finds it by pressing a dead key" >&2
@@ -171,7 +171,7 @@ grove_provision_2_8_tmux_configure_verify() {
     | tail -1 | sed -E "s/.*default-terminal[[:space:]]+//; s/['\"]//g" | awk '{print $1}')"
 
   if [[ -z "$term_declared" ]]; then
-    echo "   ✋ the conf declares no default-terminal" >&2
+    echo "   ✋ ConstraintError: the conf declares no default-terminal" >&2
     echo "      ⇒ tmux falls back to 'screen' — 8 colours — and every pane" >&2
     echo "        inherits it at spawn, so apps EMIT only 8-colour codes" >&2
     echo "      ⇒ INVISIBLE beside a correct terminal-features line: the outward" >&2
@@ -184,7 +184,7 @@ grove_provision_2_8_tmux_configure_verify() {
   elif infocmp "$term_declared" >/dev/null 2>&1; then
     echo "   • default-terminal '$term_declared' — terminfo holds it ✔"
   else
-    echo "   ✋ default-terminal names '$term_declared', which terminfo does NOT hold" >&2
+    echo "   ✋ ConstraintError: default-terminal names '$term_declared', which terminfo does NOT hold" >&2
     echo "      ⇒ tmux REFUSES to start a server on an entry it cannot look up, so" >&2
     echo "        this is not a degraded colour path — it is no tmux at all, and on" >&2
     echo "        a grove the duct IS tmux" >&2

@@ -11,7 +11,7 @@
 #     that would have caught that box
 #
 # .the arm
-#   - a copy of `sleep`, named for this play, gets SIGSEGV; within 10s a
+#   - a copy of `sleep`, named for this play, gets SIGSEGV; within 30s a
 #     coredumpctl entry must name its pid
 #
 # .the write — `rule.forbid.repair-plays` exception 2: one bait process and a
@@ -24,7 +24,7 @@
 # exit:
 #   0 = a core landed for the bait
 #   1 = no core landed
-#   2 = no coredumpctl on this box, so no claim was graded
+#   2 = no coredumpctl on this box, or the bait never ran, so no claim was graded
 ######################################################################
 set -uo pipefail
 
@@ -33,7 +33,7 @@ cleanup() { [[ -n "$TMPDIR_BAIT" ]] && rm -rf "$TMPDIR_BAIT"; }
 trap cleanup EXIT
 
 command -v coredumpctl >/dev/null 2>&1 || {
-  echo "✋ no coredumpctl — systemd-coredump is absent"
+  echo "✋ ConstraintError: no coredumpctl — systemd-coredump is absent"
   echo "   fix: sudo -v && rhx grove.provision --what 1.6.8.coredump --mode apply"
   exit 2
 }
@@ -45,8 +45,13 @@ cp "$(command -v sleep)" "$BAIT"
 # the limit is lifted for the bait alone, so the collector stores the core
 ( ulimit -c unlimited; exec "$BAIT" 600 ) &
 PID="$!"
-sleep 0.3
-kill -0 "$PID" 2>/dev/null || { echo "💥 the bait did not start — this play measured no world"; exit 1; }
+# the signal must meet the BAIT, not the subshell before its exec — polled, never one fixed sleep
+for _ in $(seq 1 20); do
+  [[ "$(readlink "/proc/$PID/exe" 2>/dev/null)" == "$BAIT" ]] && break
+  sleep 0.25
+done
+[[ "$(readlink "/proc/$PID/exe" 2>/dev/null)" == "$BAIT" ]] \
+  || { echo "✋ ConstraintError: the bait did not exec within 5s — this play measured no world" >&2; exit 2; }
 
 echo "🔭 does a segfault on this box leave a core?"
 echo "   ├─ bait pid $PID"
@@ -54,8 +59,10 @@ kill -SEGV "$PID"
 wait "$PID" 2>/dev/null
 
 hit=""
-for _ in 1 2 3 4 5 6 7 8 9 10; do
-  hit="$(timeout -k 2 5 coredumpctl list --no-pager --no-legend "COREDUMP_PID=$PID" 2>/dev/null)"
+# the collector writes after the kernel hands it the core; on a loaded box that
+# can trail the signal, so the window is generous and ends at the first hit
+for _ in $(seq 1 30); do
+  hit="$(timeout -k 2 5 coredumpctl list --no-pager --no-legend "COREDUMP_PID=$PID" </dev/null 2>/dev/null)"
   [[ -n "$hit" ]] && break
   sleep 1
 done
@@ -64,6 +71,6 @@ if [[ -n "$hit" ]]; then
   echo "   └─ ✔ coredumpctl holds it: $(printf '%s' "$hit" | head -1 | tr -s ' ' | cut -c1-120)"
   exit 0
 fi
-echo "   └─ ✋ no core landed for pid $PID within 10s"
+echo "   └─ ✋ ConstraintError: no core landed for pid $PID within 30s"
 echo "      read why: cat /proc/sys/kernel/core_pattern ; journalctl -u systemd-coredump -n 20"
 exit 1

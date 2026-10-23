@@ -75,7 +75,12 @@ grove_provision_2_8_tmux_pin_upsert() {
   # 3. the toolchain, the verified tarball, the build, the swap — each ✋ leaves the prior tmux
   grove_provision_2_8_tmux_pin_toolchain || return 1
 
-  local tmp_dir; tmp_dir="$(web_tempdir tmux)" || return 1
+  local tmp_dir; tmp_dir="$(web_tempdir tmux)" || {
+    echo "   ✋ ConstraintError: no temp dir for the tmux build" >&2
+    echo "      ⇒ the prior tmux is untouched; no crew lost its server" >&2
+    echo "      read why: df -h \"\${TMPDIR:-/tmp}\"" >&2
+    return 1
+  }
   local tarball="$tmp_dir/tmux-$GROVE_UPGRADE_2_8_TMUX_VERSION.tar.gz"
   grove_provision_2_8_tmux_pin_fetch --into "$tarball" \
     && grove_provision_2_8_tmux_pin_build --tarball "$tarball" --into "$tmp_dir" \
@@ -94,7 +99,7 @@ grove_provision_2_8_tmux_pin_upsert() {
 #   checkout needs one (homebrew's stable formula carries none either)
 grove_provision_2_8_tmux_pin_toolchain() {
   pkg_install build-essential pkg-config libevent-dev libncurses-dev && return 0
-  echo "   ✋ the tmux build toolchain did not install" >&2
+  echo "   ✋ ConstraintError: the tmux build toolchain did not install" >&2
   echo "      ⇒ the prior tmux is untouched; no crew lost its server" >&2
   echo "      read why: sudo apt-get install build-essential pkg-config libevent-dev libncurses-dev" >&2
   return 1
@@ -104,13 +109,13 @@ grove_provision_2_8_tmux_pin_toolchain() {
 grove_provision_2_8_tmux_pin_fetch() {
   local tarball="$2"
   if ! web_fetch "$GROVE_UPGRADE_2_8_TMUX_URL" --into "$tarball"; then
-    echo "   ✋ could not fetch tmux $GROVE_UPGRADE_2_8_TMUX_VERSION" >&2
+    echo "   ✋ ConstraintError: could not fetch tmux $GROVE_UPGRADE_2_8_TMUX_VERSION" >&2
     echo "      ⇒ the prior tmux is untouched; no crew lost its server" >&2
     echo "      read why: $GROVE_UPGRADE_2_8_TMUX_URL" >&2
     return 1
   fi
   web_verify_sha256 --file "$tarball" --sha256 "$GROVE_UPGRADE_2_8_TMUX_SHA256" && return 0
-  echo "   ✋ the tmux tarball did NOT match its declared digest" >&2
+  echo "   ✋ ConstraintError: the tmux tarball did NOT match its declared digest" >&2
   echo "      ⇒ the bytes are discarded unbuilt; the prior tmux is untouched" >&2
   echo "      ⇒ either the transfer corrupted, or the release was re-uploaded" >&2
   echo "      read why: rhx play.run --play prove.tmux-tarball-matches-the-pin" >&2
@@ -126,13 +131,18 @@ grove_provision_2_8_tmux_pin_build() {
   local tarball="$2" into="$4"
   local log_dir="$HOME/.local/state/grove.provision"
   local log="$log_dir/2.8.tmux.build.log"
-  mkdir -p "$log_dir" || return 1
+  mkdir -p "$log_dir" || {
+    echo "   ✋ ConstraintError: no dir for the tmux build log at $log_dir" >&2
+    echo "      ⇒ the prior tmux is untouched; no crew lost its server" >&2
+    echo "      read why: ls -ld \"$(dirname "$log_dir")\"" >&2
+    return 1
+  }
 
   local src="$into/tmux-$GROVE_UPGRADE_2_8_TMUX_VERSION"
   { tar -xzf "$tarball" -C "$into" \
       && ( cd "$src" && ./configure --prefix=/usr/local && make -j"$(nproc)" ); } \
     >"$log" 2>&1 && return 0
-  echo "   ✋ tmux $GROVE_UPGRADE_2_8_TMUX_VERSION did not build" >&2
+  echo "   ✋ ConstraintError: tmux $GROVE_UPGRADE_2_8_TMUX_VERSION did not build" >&2
   echo "      ⇒ the prior tmux is untouched; no crew lost its server" >&2
   echo "      read why: tail -40 $log" >&2
   return 1
@@ -146,7 +156,7 @@ grove_provision_2_8_tmux_pin_install() {
   local stage="$dst.grove-provision.new"
   sudo install -m 0755 -o root -g root "$from" "$stage" && sudo mv -f "$stage" "$dst" && return 0
   sudo rm -f "$stage" 2>/dev/null
-  echo "   ✋ the built tmux could not be placed at $dst" >&2
+  echo "   ✋ ConstraintError: the built tmux could not be placed at $dst" >&2
   echo "      read why: ls -l $(dirname "$dst")" >&2
   return 1
 }
@@ -169,7 +179,7 @@ grove_provision_2_8_tmux_provision_upsert() {
   #   - an extant grove keeps the package it already has; a fresh one never gets it
   ####################################################################
   if [[ "${GROVE_ENV_SERVER:-}" != cloud@* ]] && ! pkg_install tmux; then
-    echo "   ✋ tmux did not install" >&2
+    echo "   ✋ ConstraintError: tmux did not install" >&2
     echo "      ⇒ a duct IS tmux: ductwork.sh opens a session, sends to a pane," >&2
     echo "        and reads its output. so on a grove this failure means the box" >&2
     echo "        cannot be reached at all, and on a laptop every termwork skill" >&2
@@ -245,7 +255,7 @@ grove_provision_2_8_tmux_tpm_upsert() {
   if [[ "$state" != absent ]]; then
     local aside="$tpm_dir.aside.$(date +%Y%m%dT%H%M%S)"
     if ! mv "$tpm_dir" "$aside"; then
-      echo "   ✋ $tpm_dir holds a tpm this bundle cannot use ($state), and the" >&2
+      echo "   ✋ ConstraintError: $tpm_dir holds a tpm this bundle cannot use ($state), and the" >&2
       echo "      dir could not be moved aside" >&2
       echo "      ⇒ the path is named in ~/.tmux.conf's 'run' line, so a clone" >&2
       echo "        cannot land anywhere else" >&2
@@ -268,7 +278,7 @@ grove_provision_2_8_tmux_tpm_upsert() {
   ####################################################################
   if ! git_clone https://github.com/tmux-plugins/tpm "$tpm_dir" \
        --at "$GROVE_UPGRADE_2_8_TMUX_TPM_AT"; then
-    echo "   ✋ could not clone tpm to $tpm_dir" >&2
+    echo "   ✋ ConstraintError: could not clone tpm to $tpm_dir" >&2
     echo "      ⇒ ~/.tmux.conf names that exact path in its 'run' line, so tmux" >&2
     echo "        will start with NO plugins and print a run-shell error on every" >&2
     echo "        session — which reads as a broken conf rather than an absent tool" >&2
@@ -290,25 +300,15 @@ grove_provision_2_8_tmux_plugins_upsert() {
   #   - left alone, `tpm/bin/install_plugins` clones each `@plugin` at default-branch tip
   #   - ⇒ that is the exact defect the pin above removes, one layer down
   #   - these clone first, so tpm finds them present and does no fetch of its own
-  #   - ⚠️ the dir NAME is the contract
-  #   - tpm resolves `@plugin 'owner/name'` to `~/.tmux/plugins/<name>`
-  #   - ⇒ these paths are not ours to choose
+  #   - ⚠️ the set lives in `_.sh` (`..._plugin_names`), beside the conf it must
+  #     match: conf-only means tpm fetches a plugin UNPINNED, and clone-only means
+  #     a dir nobody loads (`rule.require.one-command-provision`: one set, two readers)
   ####################################################################
-  #
-  # ⚠️ this list and the conf's `@plugin` lines are ONE SET, TWO READERS
-  #   - the conf declares what tpm loads; this clones what the conf will name
-  #   - ⇒ a plugin in one and not the other is a drift no phase reports:
-  #     conf-only means tpm fetches it UNPINNED, and clone-only means a dir
-  #     nobody loads
-  #   - 🛑 so a change to either belongs in the SAME edit as the other
-  #   (`rule.require.one-command-provision`: one set, two readers)
-  local plug plug_name plug_url plug_at plug_dir plug_state plug_aside
-  for plug in \
-    "tmux-resurrect|https://github.com/tmux-plugins/tmux-resurrect|$GROVE_UPGRADE_2_8_TMUX_RESURRECT_AT"
-  do
-    plug_name="${plug%%|*}"
-    plug_url="${plug#*|}";  plug_url="${plug_url%%|*}"
-    plug_at="${plug##*|}"
+  local plug_name plug_url plug_at plug_dir plug_state plug_aside
+  while read -r plug_name; do
+    [[ -n "$plug_name" ]] || continue
+    plug_url="$(grove_provision_2_8_tmux_plugin_url "$plug_name")"
+    plug_at="$(grove_provision_2_8_tmux_plugin_at "$plug_name")"
     plug_dir="$HOME/.tmux/plugins/$plug_name"
 
     plug_state="$(grove_provision_2_8_tmux_plugin_state "$plug_dir" "$plug_at")"
@@ -323,7 +323,7 @@ grove_provision_2_8_tmux_plugins_upsert() {
     if [[ "$plug_state" != absent ]]; then
       plug_aside="$plug_dir.aside.$(date -u +%Y%m%dT%H%M%SZ)"
       if ! mv "$plug_dir" "$plug_aside"; then
-        echo "   ✋ $plug_name is '$plug_state' and could not be moved aside" >&2
+        echo "   ✋ ConstraintError: $plug_name is '$plug_state' and could not be moved aside" >&2
         echo "      ⇒ wanted: $plug_dir -> $plug_aside" >&2
         return 1
       fi
@@ -331,8 +331,8 @@ grove_provision_2_8_tmux_plugins_upsert() {
       echo "     kept at: $plug_aside"
     fi
 
-    if ! git_clone "$plug_url" "$plug_dir" --at "$plug_at"; then
-      echo "   ✋ could not clone $plug_name to $plug_dir" >&2
+    if ! git_clone "$plug_url" "$plug_dir" --at "$plug_at" </dev/null; then
+      echo "   ✋ ConstraintError: could not clone $plug_name to $plug_dir" >&2
       echo "      ⇒ tmux.conf names it as a tpm '@plugin', so tpm would fetch it" >&2
       echo "        at default-branch tip instead — which is the unpinned clone" >&2
       echo "        this step exists to prevent. do NOT let tpm cover for it" >&2
@@ -341,5 +341,5 @@ grove_provision_2_8_tmux_plugins_upsert() {
     fi
 
     echo "   • $plug_name installed at the declared commit"
-  done
+  done < <(grove_provision_2_8_tmux_plugin_names)
 }

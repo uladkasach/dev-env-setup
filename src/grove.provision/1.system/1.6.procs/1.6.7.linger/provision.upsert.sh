@@ -38,7 +38,7 @@ grove_provision_1_6_7_linger_seat_grant() {
     echo "   • $seat lingers, so its crews outlive its last logout ✔"
     return 0
   fi
-  echo "   ✋ could not grant linger to $seat" >&2
+  echo "   ✋ ConstraintError: could not grant linger to $seat" >&2
   echo "      ⇒ its user manager, and every crew scope under it, ends at its" >&2
   echo "        last logout — on a cloud grove, when the duct closes; on a laptop," >&2
   echo "        when the desktop session ends" >&2

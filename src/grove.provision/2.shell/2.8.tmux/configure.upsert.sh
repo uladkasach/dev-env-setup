@@ -23,14 +23,14 @@ grove_provision_2_8_tmux_configure_upsert() {
   local conf_src="$GROVE_SRC/grove.provision/2.shell/2.8.tmux/tmux.conf"
 
   if [[ ! -f "$conf_src" ]]; then
-    echo "   ✋ the checkout has no tmux.conf at $conf_src" >&2
+    echo "   ✋ ConstraintError: the checkout has no tmux.conf at $conf_src" >&2
     echo "      ⇒ \$GROVE_SRC is this run's own checkout, so an absent file here" >&2
     echo "        means the checkout is incomplete rather than that the path is wrong" >&2
     return 1
   fi
 
   if ! cp "$conf_src" "$HOME/.tmux.conf"; then
-    echo "   ✋ could not write ~/.tmux.conf" >&2
+    echo "   ✋ ConstraintError: could not write ~/.tmux.conf" >&2
     echo "      ⇒ tmux keeps its PRIOR conf, so the plugin install below would" >&2
     echo "        fetch the OLD plugin list and report success" >&2
     return 1
@@ -47,7 +47,7 @@ grove_provision_2_8_tmux_configure_upsert() {
       echo "     ⇒ it loaded AFTER ~/.tmux.conf and overrode it; read it there if"
       echo "       a line in it was wanted, then move that line into this bundle"
     else
-      echo "   ✋ could not move the shadow conf aside: $shadow" >&2
+      echo "   ✋ ConstraintError: could not move the shadow conf aside: $shadow" >&2
       echo "      ⇒ tmux loads it after ~/.tmux.conf, so every option it names" >&2
       echo "        still overrides the one this repo declares" >&2
       return 1
@@ -60,7 +60,7 @@ grove_provision_2_8_tmux_configure_upsert() {
   local tpm_install="$HOME/.tmux/plugins/tpm/bin/install_plugins"
 
   if [[ ! -x "$tpm_install" ]]; then
-    echo "   ✋ tpm's install_plugins is absent ($tpm_install)" >&2
+    echo "   ✋ ConstraintError: tpm's install_plugins is absent ($tpm_install)" >&2
     echo "      ⇒ the conf is on disk but its plugins cannot be fetched, so every" >&2
     echo "        tmux session prints a run-shell error and loads none of them" >&2
     echo "      fix: rhx grove.provision --what 2.8.tmux --mode apply" >&2
@@ -88,7 +88,7 @@ grove_provision_2_8_tmux_configure_upsert() {
   timeout -k 2 5 tmux -L "$sock" kill-server 2>/dev/null || true
 
   if ! timeout -k 5 15 tmux -L "$sock" -f "$HOME/.tmux.conf" new-session -d -s tpm_init 2>/dev/null; then
-    echo "   ✋ could not start an isolated tmux server to install the plugins" >&2
+    echo "   ✋ ConstraintError: could not start an isolated tmux server to install the plugins" >&2
     echo "      ⇒ tpm reads its plugin list from a server that has LOADED the conf," >&2
     echo "        so with no such server the install finds an empty list and" >&2
     echo "        reports success with no plugins fetched" >&2
@@ -121,7 +121,7 @@ grove_provision_2_8_tmux_configure_upsert() {
   timeout -k 2 5 tmux -L "$sock" kill-server 2>/dev/null || true
 
   if [[ ${#absent[@]} -gt 0 ]]; then
-    echo "   ✋ tpm did not land every plugin the conf names: ${absent[*]}" >&2
+    echo "   ✋ ConstraintError: tpm did not land every plugin the conf names: ${absent[*]}" >&2
     echo "      ⇒ this is SILENT at runtime: tmux starts, the conf loads, and the" >&2
     echo "        plugin's keybinds and status segments are simply omitted with no" >&2
     echo "        error anywhere. the human finds it by a dead keypress" >&2

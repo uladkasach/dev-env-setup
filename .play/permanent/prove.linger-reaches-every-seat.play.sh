@@ -41,7 +41,7 @@ _root_of() {
   [[ -f "$PWD/src/grove.provision._.sh" ]] && { printf '%s' "$PWD"; return 0; }
   return 1
 }
-_root="$(_root_of)" || { echo "   ✋ no checkout found" >&2; exit 2; }
+_root="$(_root_of)" || { echo "   ✋ ConstraintError: no checkout found" >&2; exit 2; }
 
 _dir="$_root/src/grove.provision/1.system/1.6.procs/1.6.7.linger"
 
@@ -50,9 +50,9 @@ echo "   └─ root: $_root"
 echo ""
 
 for _f in _.sh provision.verify.sh provision.upsert.sh; do
-  [[ -f "$_dir/$_f" ]] || { echo "   ✋ no $_dir/$_f — no bundle owns linger for every seat" >&2; exit 1; }
+  [[ -f "$_dir/$_f" ]] || { echo "   ✋ ConstraintError: no $_dir/$_f — no bundle owns linger for every seat" >&2; exit 1; }
   # shellcheck source=/dev/null
-  source "$_dir/$_f" || { echo "   ✋ could not source $_dir/$_f" >&2; exit 2; }
+  source "$_dir/$_f" || { echo "   ✋ ConstraintError: could not source $_dir/$_f" >&2; exit 2; }
 done
 
 FIX="$(mktemp -d "${TMPDIR:-/tmp}/prove.linger.XXXXXX")"
@@ -169,5 +169,5 @@ _grade "U5. converged: no grant" "$rc" 0 "$out" "every human seat lingers" && _u
   || failed=$(( failed + 1 ))
 
 echo ""
-[[ "$failed" -eq 0 ]] || { echo "   ✋ $failed arm(s) failed" >&2; exit 1; }
+[[ "$failed" -eq 0 ]] || { echo "   ✋ ConstraintError: $failed arm(s) failed" >&2; exit 1; }
 echo "   ✔ linger is read, granted, and refused per seat"

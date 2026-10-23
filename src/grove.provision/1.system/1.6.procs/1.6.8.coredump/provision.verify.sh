@@ -12,7 +12,7 @@ grove_provision_1_6_8_coredump_provision_verify() {
     return 0
   fi
 
-  echo "   ✋ a crash on this box leaves no core systemd-coredump can show" >&2
+  echo "   ✋ ConstraintError: a crash on this box leaves no core systemd-coredump can show" >&2
   echo "      ⇒ core_pattern: $(grove_provision_1_6_8_coredump_pattern || echo unreadable)" >&2
   echo "      ⇒ the next tmux segfault would be guessed at, never read" >&2
   echo "      fix: sudo -v && rhx grove.provision --what 1.6.8.coredump --mode apply" >&2

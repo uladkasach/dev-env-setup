@@ -11,6 +11,7 @@
 #   - A. cloud, `tmux 3.2a`  → the verify must ✋ and name the pin
 #   - B. cloud, `tmux <pin>` → the binary claim must ✔
 #   - C. laptop, `tmux 3.2a` → the binary claim must ✔ (the pin is grove-scoped)
+#   - D. cloud, no tmux on PATH → the verify must ✋ and name the fix
 #
 # usage:
 #   rhx play.run --play prove.tmux-verify-refuses-an-unpinned-build
@@ -31,7 +32,7 @@ _root_of() {
   [[ -f "$PWD/src/grove.provision._.sh" ]] && { printf '%s' "$PWD"; return 0; }
   return 1
 }
-_root="$(_root_of)" || { echo "   ✋ no checkout found" >&2; exit 2; }
+_root="$(_root_of)" || { echo "   ✋ ConstraintError: no checkout found" >&2; exit 2; }
 
 export GROVE_SRC="$_root/src"
 _dir="$GROVE_SRC/grove.provision/2.shell/2.8.tmux"
@@ -42,11 +43,11 @@ echo ""
 
 for _f in _.sh provision.verify.sh; do
   # shellcheck source=/dev/null
-  source "$_dir/$_f" || { echo "   ✋ could not source $_dir/$_f" >&2; exit 2; }
+  source "$_dir/$_f" || { echo "   ✋ ConstraintError: could not source $_dir/$_f" >&2; exit 2; }
 done
 
 [[ -n "${GROVE_UPGRADE_2_8_TMUX_VERSION:-}" ]] || {
-  echo "   ✋ the bundle declares no GROVE_UPGRADE_2_8_TMUX_VERSION — no pin to grade" >&2
+  echo "   ✋ ConstraintError: the bundle declares no GROVE_UPGRADE_2_8_TMUX_VERSION — no pin to grade" >&2
   exit 1
 }
 
@@ -90,6 +91,24 @@ out="$(_run 3.2a local@unix)"
 _grade "C. laptop, 3.2a: passes (the pin is grove-scoped)" "$out" "tmux present (3.2a" \
   || failed=$(( failed + 1 ))
 
+# D. no tmux at all: a PATH that holds every tool this box has, save tmux
+#   - a link farm rather than a stubbed reader, so the real `command -v` answers
+NO_TMUX="$FAKE_DIR/no-tmux"
+mkdir -p "$NO_TMUX"
+IFS=: read -ra _path_dirs <<<"$PATH"
+for _d in "${_path_dirs[@]}"; do
+  for _x in "$_d"/*; do
+    [[ -x "$_x" && ! -d "$_x" ]] || continue
+    [[ "${_x##*/}" == tmux ]] && continue
+    [[ -e "$NO_TMUX/${_x##*/}" ]] || ln -s "$_x" "$NO_TMUX/${_x##*/}"
+  done
+done
+out="$(PATH="$NO_TMUX" GROVE_ENV_SERVER=cloud@aws.ec2 grove_provision_2_8_tmux_provision_verify 2>&1)"
+_grade "D. no tmux on PATH: ✋ says so" "$out" "tmux is not on PATH" \
+  || failed=$(( failed + 1 ))
+_grade "D. no tmux on PATH: ✋ names the fix" "$out" "--what 2.8.tmux --mode apply" \
+  || failed=$(( failed + 1 ))
+
 echo ""
-[[ "$failed" -eq 0 ]] || { echo "   ✋ $failed arm(s) failed" >&2; exit 1; }
+[[ "$failed" -eq 0 ]] || { echo "   ✋ ConstraintError: $failed arm(s) failed" >&2; exit 1; }
 echo "   ✔ the verify refuses every tmux but the pin, on a grove only"
