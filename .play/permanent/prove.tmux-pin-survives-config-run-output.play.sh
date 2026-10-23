@@ -12,10 +12,14 @@
 #     `run '~/.tmux/plugins/tpm/tpm'`
 #   - ⇒ this play is the reproduction: each arm starts ONE fresh server on an
 #     isolated socket dir, then asks whether it is still alive
+#   - ⚠️ measured 2026-10-23 on the grove that crashed: the distro 3.2a server
+#     LIVED in both arms. the CHANGES line is not this crash's trigger on this
+#     path; the play still grades the pin, and the distro arms stay as the record
 #
 # .the arms
 #   - A. `run-shell 'echo …'` in a throwaway conf — the CHANGES line, alone
 #   - B. the box's real ~/.tmux.conf — the conf the crews actually load
+#   - C. the real conf, and ten clients attached then HUPed — a closed tab
 #   each arm runs against every tmux build present on the box: the pinned
 #   build (`/usr/local/bin/tmux`) and the distro package (`/usr/bin/tmux`)
 #
@@ -124,6 +128,53 @@ _probe() {
   timeout -k 2 5 "$bin" -L "$sock" kill-server </dev/null >/dev/null 2>&1
 }
 
+######################################################################
+# .what = start one server on the real conf, then attach and kill a client
+#   ten times over, the way a closed terminal tab ends a crew's client
+#
+# stdout: `alive <server version>` | `died after <n> client(s)` | `nostart`
+#
+# .why this arm
+#   - the crews' deaths lined up with `git.crew.hide`, which closes their tabs:
+#     each close ends an ATTACHED client. a fresh server with no client, the
+#     shape of the two arms above, never meets that event
+#   - `script` gives each client the pty a real tab would, and the HUP is the
+#     signal a closed tab sends; `window-size latest` is the crews' own option
+######################################################################
+_probe_client() {
+  local bin="$1" conf="$2" sock="$3" n
+  timeout -k 2 10 "$bin" -L "$sock" -f "$conf" new-session -d -s probe </dev/null >/dev/null 2>&1 \
+    || { echo nostart; return 0; }
+  timeout -k 2 5 "$bin" -L "$sock" set -g window-size latest </dev/null >/dev/null 2>&1
+
+  # each client is BOUNDED in the foreground: a HUP plus an open `wait` once
+  # hung this play past 300s, since the pty wrapper outlived the HUP. `timeout`
+  # sends HUP at 1s and KILL at 2s, so no client can outlive its turn
+  for n in $(seq 1 10); do
+    timeout -s HUP -k 1 1 script -qfec "$bin -L $sock attach -t probe" /dev/null </dev/null >/dev/null 2>&1
+    sleep 0.2
+    timeout -k 2 5 "$bin" -L "$sock" has-session -t probe </dev/null >/dev/null 2>&1 \
+      || { echo "died after $n client(s)"; return 0; }
+  done
+
+  echo "alive $(timeout -k 2 5 "$bin" -L "$sock" display-message -p '#{version}' </dev/null 2>/dev/null)"
+  timeout -k 2 5 "$bin" -L "$sock" kill-server </dev/null >/dev/null 2>&1
+}
+
+# .what = run one named arm against one build
+_arm() {
+  local arm="$1" bin="$2"
+  [[ "$arm" == echo ]]   && { _probe "$bin" "$CONF_ECHO" "probe_${arm}_$$"; return; }
+  [[ "$arm" == real ]]   && { _probe "$bin" "$CONF_REAL" "probe_${arm}_$$"; return; }
+  _probe_client "$bin" "$CONF_REAL" "probe_${arm}_$$"
+}
+
+# the client arm needs a pty for each client; without `script` it cannot run
+command -v script >/dev/null 2>&1 || {
+  echo "   ✋ no 'script' (util-linux) on this box, so the client arm cannot run" >&2
+  exit 2
+}
+
 fails=0
 
 for bin in "$PIN_BIN" "$DISTRO_BIN"; do
@@ -131,9 +182,8 @@ for bin in "$PIN_BIN" "$DISTRO_BIN"; do
   ver="$(timeout -k 2 5 "$bin" -V </dev/null 2>/dev/null)"
   echo "   ├─ $bin ($ver)"
 
-  for arm in echo real; do
-    conf="$CONF_ECHO"; [[ "$arm" == real ]] && conf="$CONF_REAL"
-    verdict="$(_probe "$bin" "$conf" "probe_${arm}_$$")"
+  for arm in echo real client; do
+    verdict="$(_arm "$arm" "$bin")"
     echo "   │  ├─ arm $arm: $verdict"
 
     # only the PINNED build's survival is this play's claim; the distro arms

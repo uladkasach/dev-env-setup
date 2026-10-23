@@ -105,9 +105,12 @@ GROVE_UPGRADE_2_8_TMUX_RESURRECT_AT="cff343cf9e81983d3da0c8562b01616f12e8d548"  
 #   - jammy ships `tmux 3.2a-4ubuntu0.2`. on a grove its SERVER segfaulted ~110
 #     times in hours at one offset, and every crew shares a server, so each
 #     segfault ended every crew on the box at once
-#   - tmux 3.3a's CHANGES reads "Do not crash when run-shell produces output
-#     from a config file", and this conf ends with a `run` line
-#     (.refs = prove.tmux-pin-survives-config-run-output)
+#   - ⚠️ the TRIGGER is unproven. tmux 3.3a's CHANGES reads "Do not crash when
+#     run-shell produces output from a config file", and this conf ends with a
+#     `run` line — but `prove.tmux-pin-survives-config-run-output` started a
+#     fresh 3.2a server on that path, and on the real conf, and both LIVED
+#     (2026-10-23). so the pin rests on the measured crash in the 3.2a build,
+#     never on a named fix in 3.5a; `1.6.8.coredump` makes the next one readable
 #   - ⇒ a grove builds this pinned release into `/usr/local/bin`, which precedes
 #     `/usr/bin` on PATH, so the distro binary may stay installed and is never
 #     the one a crew reaches
