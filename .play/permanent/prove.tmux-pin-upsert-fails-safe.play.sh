@@ -231,7 +231,9 @@ _grade "S. a build lands: the new bytes at the pin path" "$rc" 0 "$out" "built â
 ######################################################################
 _arm_live() {
   _reset
-  cp "$(command -v sleep)" "$PRIOR"
+  # a cp onto the extant stand-in keeps its 0644 mode, so the bait is placed fresh
+  rm -f "$PRIOR"
+  install -m 0755 "$(command -v sleep)" "$PRIOR"
   "$PRIOR" 600 &
   BAIT_PID=$!
   sleep 0.3
