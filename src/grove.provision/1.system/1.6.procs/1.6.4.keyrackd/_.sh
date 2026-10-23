@@ -12,7 +12,8 @@
 #   - 🛑 the TIMER is an asset and the SERVICE is generated, from one reader
 #     both halves ask, since its ExecStart names this box's checkout
 #   - 🛑 a grove needs LINGER — its user manager dies when the duct closes, and
-#     an enabled timer cannot see that
+#     an enabled timer cannot see that. `1.6.7.linger` owns that claim, for
+#     every seat; this bundle no longer restates it
 #   - ⚠️ an absent skill (a `--from src` push) is a 🌙, never a ✋
 # .refs = howdoes.the-keyrackd-prune-stays-bounded.md — every .why, measured
 #
@@ -30,15 +31,6 @@ grove_provision_1_6_4_keyrackd_unit_dir() { printf '%s/.config/systemd/user' "$H
 
 # .what = the age gate this box runs with — see the ⚠️ above for why not 60
 grove_provision_1_6_4_keyrackd_min_age() { printf '10'; }
-
-# .what = does this seat's user manager survive its last logout?
-# .why  = one reader, asked by both halves (rule.require.one-command-provision)
-# ⚠️ `show-user` FAILS for a seat with no session and no linger — that and
-#    `Linger=no` both read "no"
-grove_provision_1_6_4_keyrackd_lingers() {
-  loginctl show-user "$USER" --property=Linger 2>/dev/null \
-    | grep -qx 'Linger=yes'
-}
 
 # .what = the prune skill, as an absolute path off THIS run's checkout
 # .why  = `.agent/` sits beside `$GROVE_SRC`; a hard-coded checkout path is
