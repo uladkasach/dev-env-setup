@@ -39,7 +39,7 @@ grove_provision_2_8_tmux_configure_upsert() {
 
   # there can only be one: a conf tmux loads AFTER ours wins every option both
   # name. it is MOVED aside, never deleted — a human's edits stay readable (m10)
-  local shadow stamp; stamp="$(date +%Y%m%d-%H%M%S)"
+  local shadow stamp; stamp="$(grove_provision_2_8_tmux_backup_stamp)"
   while IFS= read -r shadow; do
     [[ -n "$shadow" ]] || continue
     if mv "$shadow" "$shadow.bak.$stamp"; then
@@ -75,13 +75,10 @@ grove_provision_2_8_tmux_configure_upsert() {
 
   # which plugins does the conf name, other than tpm itself?
   local wanted=()
-  local line name
-  while read -r line; do
-    name="${line##*/}"
-    name="${name%\'}"
-    name="${name%\"}"
+  local name
+  while read -r name; do
     [[ -n "$name" && "$name" != "tpm" ]] && wanted+=("$name")
-  done < <(grep -oE "@plugin +['\"][^'\"]+" "$HOME/.tmux.conf" | awk '{print $2}')
+  done < <(grove_provision_2_8_tmux_plugin_names_of_conf "$HOME/.tmux.conf")
 
   # ⚠️ every tmux call below is BOUNDED — this first one cleans up a corpse from
   #    an interrupted run, the likeliest wedge (`rule.require.bounded-probes-in-verifies`)
@@ -108,10 +105,7 @@ grove_provision_2_8_tmux_configure_upsert() {
   # await the clones, then judge by what is ON DISK — see the ⚠️ above
   local waited=0 absent=()
   while [[ "$waited" -lt 90 ]]; do
-    absent=()
-    for name in "${wanted[@]}"; do
-      [[ -d "$plugin_dir/$name" ]] || absent+=("$name")
-    done
+    mapfile -t absent < <(grove_provision_2_8_tmux_plugins_absent_under "$plugin_dir" "${wanted[@]}")
     [[ ${#absent[@]} -eq 0 ]] && break
     sleep 3
     waited=$(( waited + 3 ))
@@ -142,7 +136,7 @@ grove_provision_2_8_tmux_configure_upsert() {
   #    its line, and an un-sourced server still RUNS it (m7)
   # ⚠️ a FAILED socket is counted and named, never fatal — the verify grades it.
   #    an ABSENT server is a pass: the next one reads the file fresh
-  local live=() sourced=0 refused=()
+  local live=() sourced=0 refused=() line
   while read -r line; do
     [[ -n "$line" ]] && live+=("$line")
   done < <(grove_provision_2_8_tmux_live_sockets)

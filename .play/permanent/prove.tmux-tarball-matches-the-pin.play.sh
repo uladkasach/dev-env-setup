@@ -14,7 +14,7 @@
 # exit:
 #   0 = the bytes match the pin
 #   1 = no pin declared, or the bytes do NOT match
-#   2 = the fetch failed, so no claim was graded
+#   2 = no checkout, a source failed, or the fetch failed — so no claim was graded
 ######################################################################
 
 set -uo pipefail
@@ -41,11 +41,11 @@ source "$GROVE_SRC/grove.web.sh" || { echo "   ✋ ConstraintError: could not so
 source "$GROVE_SRC/grove.provision/2.shell/2.8.tmux/_.sh" || { echo "   ✋ ConstraintError: could not source 2.8.tmux/_.sh" >&2; exit 2; }
 
 if [[ -z "${GROVE_UPGRADE_2_8_TMUX_URL:-}" || -z "${GROVE_UPGRADE_2_8_TMUX_SHA256:-}" ]]; then
-  echo "   ✋ ConstraintError: the bundle declares no tmux url or digest — no pin to grade" >&2
+  echo "   💥 MalfunctionError: the bundle declares no tmux url or digest — no pin to grade" >&2
   exit 1
 fi
 
-tmp="$(web_tempdir prove-tmux)" || exit 2
+tmp="$(web_tempdir prove-tmux)" || { echo "   ✋ ConstraintError: no temp dir for the fetch — no claim graded" >&2; exit 2; }
 trap 'rm -rf "$tmp"' EXIT
 
 echo "   ├─ url:    $GROVE_UPGRADE_2_8_TMUX_URL"
@@ -60,5 +60,5 @@ if web_verify_sha256 --file "$tmp/tmux.tar.gz" --sha256 "$GROVE_UPGRADE_2_8_TMUX
   echo "   └─ ✔ the bytes match the pin"
   exit 0
 fi
-echo "   └─ ✋ ConstraintError: the bytes do NOT match the pin" >&2
+echo "   └─ 💥 MalfunctionError: the bytes do NOT match the pin" >&2
 exit 1

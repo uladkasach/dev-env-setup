@@ -11,5 +11,6 @@
 | F7 | linger and coredump reach every tier; only the tmux pin stays cloud-only | clean | best-guess | 80% |
 | F8 | a play whose fetch fails exits 2 (unread), never 1 | clean | best-guess | 85% |
 | F9 | the crash trigger stays unfound; the cure rests on what was measured | clean | ruled: held — 0 segfaults in ~7.5h on 3.5a (director) | 60% |
+| F10 | case 1 (one apply on a fresh grove) is owed on the next fresh grove | clean | ruled: owed, not a blocker (director) | 70% |
 
 entries: `inventory.of=fulcrums.case=F$n-$slug.md`

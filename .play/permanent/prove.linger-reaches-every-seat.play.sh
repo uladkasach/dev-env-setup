@@ -50,7 +50,7 @@ echo "   └─ root: $_root"
 echo ""
 
 for _f in _.sh provision.verify.sh provision.upsert.sh; do
-  [[ -f "$_dir/$_f" ]] || { echo "   ✋ ConstraintError: no $_dir/$_f — no bundle owns linger for every seat" >&2; exit 1; }
+  [[ -f "$_dir/$_f" ]] || { echo "   💥 MalfunctionError: no $_dir/$_f — no bundle owns linger for every seat" >&2; exit 1; }
   # shellcheck source=/dev/null
   source "$_dir/$_f" || { echo "   ✋ ConstraintError: could not source $_dir/$_f" >&2; exit 2; }
 done
@@ -169,5 +169,5 @@ _grade "U5. converged: no grant" "$rc" 0 "$out" "every human seat lingers" && _u
   || failed=$(( failed + 1 ))
 
 echo ""
-[[ "$failed" -eq 0 ]] || { echo "   ✋ ConstraintError: $failed arm(s) failed" >&2; exit 1; }
+[[ "$failed" -eq 0 ]] || { echo "   💥 MalfunctionError: $failed arm(s) failed" >&2; exit 1; }
 echo "   ✔ linger is read, granted, and refused per seat"
