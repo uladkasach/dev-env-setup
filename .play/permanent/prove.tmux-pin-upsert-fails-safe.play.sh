@@ -15,6 +15,8 @@
 #   - F. the fetch fails                          → ✋ names the url
 #   - M. the bytes miss the digest                → ✋, no build attempted
 #   - B. the build fails                          → ✋ names the build log
+#   - W. no temp dir for the build                → ✋, prior kept
+#   - G. no dir for the build log                 → ✋, prior kept
 #   - X. the swap is refused                      → ✋, no stage file left behind
 #   - S. a build lands                            → rc 0, the new bytes at the path
 #   - L. a swap under a LIVE process              → the process lives on, on the
@@ -34,7 +36,7 @@
 #
 # exit:
 #   0 = every arm holds
-#   1 = an arm failed, and which is named
+#   1 = an arm failed, or the bundle builds no pin — each named
 #   2 = no checkout, or the bundle could not be sourced
 ######################################################################
 
@@ -64,7 +66,7 @@ for _f in _.sh provision.upsert.sh; do
   source "$_dir/$_f" || { echo "   ✋ ConstraintError: could not source $_dir/$_f" >&2; exit 2; }
 done
 for _fn in grove_provision_2_8_tmux_pin_upsert grove_provision_2_8_tmux_pin_install; do
-  declare -F "$_fn" >/dev/null || { echo "   ✋ ConstraintError: no $_fn — the bundle builds no pin" >&2; exit 1; }
+  declare -F "$_fn" >/dev/null || { echo "   💥 MalfunctionError: no $_fn — the bundle builds no pin" >&2; exit 1; }
 done
 
 FIX="$(mktemp -d "${TMPDIR:-/tmp}/prove.tmux-pin-upsert.XXXXXX")"
@@ -198,6 +200,23 @@ _grade "B. build fails: ✋ names its log" "$rc" 1 "$out" "$LOG_REL" kept \
   || failed=$(( failed + 1 ))
 
 ######################################################################
+# W. no temp dir for the build
+######################################################################
+_reset
+out="$( GROVE_UPGRADE_2_8_TMUX_SHA256="$(_bytes_digest)"; web_tempdir() { return 1; }; _upsert )"; rc=$?
+_grade "W. no temp dir: ✋" "$rc" 1 "$out" "no temp dir for the tmux build" kept \
+  || failed=$(( failed + 1 ))
+
+######################################################################
+# G. no dir for the build log (a FILE sits where its parent dir must go)
+######################################################################
+_reset
+printf 'not a dir\n' > "$FIX/home/.local"
+out="$( GROVE_UPGRADE_2_8_TMUX_SHA256="$(_bytes_digest)"; _upsert )"; rc=$?
+_grade "G. no log dir: ✋" "$rc" 1 "$out" "no dir for the tmux build log" kept \
+  || failed=$(( failed + 1 ))
+
+######################################################################
 # X. the swap is refused — no stage file may be left beside the pin
 ######################################################################
 _reset
@@ -260,5 +279,5 @@ _arm_live() {
 _arm_live || failed=$(( failed + 1 ))
 
 echo ""
-[[ "$failed" -eq 0 ]] || { echo "   ✋ ConstraintError: $failed arm(s) failed" >&2; exit 1; }
+[[ "$failed" -eq 0 ]] || { echo "   💥 MalfunctionError: $failed arm(s) failed" >&2; exit 1; }
 echo "   ✔ the pin upsert converges, declines, or refuses — and a refusal never touches the prior tmux"

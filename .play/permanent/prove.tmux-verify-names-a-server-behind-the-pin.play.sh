@@ -101,5 +101,5 @@ failed=0
 }
 
 echo ""
-[[ "$failed" -eq 0 ]] || { echo "   ✋ ConstraintError: $failed arm(s) failed" >&2; exit 1; }
+[[ "$failed" -eq 0 ]] || { echo "   💥 MalfunctionError: $failed arm(s) failed" >&2; exit 1; }
 echo "   ✔ the verify names each live server behind the pin, and only those"
