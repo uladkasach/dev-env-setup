@@ -46,7 +46,7 @@ grove_provision_1_6_4_keyrackd_provision_verify() {
   if grove_provision_1_6_4_keyrackd_service_text | cmp -s - "$unit_dir/$service_name"; then
     echo "   • $service_name matches this checkout ✔"
   else
-    echo "   ✋ $unit_dir/$service_name does NOT match this checkout" >&2
+    echo "   ✋ ConstraintError: $unit_dir/$service_name does NOT match this checkout" >&2
     echo "      ⇒ the timer fires an ExecStart this repo did not declare —" >&2
     echo "        an old skill path, or an old --min-age gate" >&2
     echo "      fix: rhx grove.provision --what 1.6.4.keyrackd --mode apply" >&2
@@ -59,7 +59,7 @@ grove_provision_1_6_4_keyrackd_provision_verify() {
   if cmp -s "$timer_src" "$unit_dir/$timer_name"; then
     echo "   • $timer_name matches this checkout ✔"
   else
-    echo "   ✋ $unit_dir/$timer_name does NOT match $timer_src" >&2
+    echo "   ✋ ConstraintError: $unit_dir/$timer_name does NOT match $timer_src" >&2
     echo "      ⇒ the prune runs on a cadence this repo did not declare" >&2
     echo "      fix: rhx grove.provision --what 1.6.4.keyrackd --mode apply" >&2
     claims=$((claims + 1))
@@ -71,7 +71,7 @@ grove_provision_1_6_4_keyrackd_provision_verify() {
   if systemctl --user is-enabled "$timer_name" >/dev/null 2>&1; then
     echo "   • $timer_name is enabled ✔"
   else
-    echo "   ✋ $timer_name is not enabled" >&2
+    echo "   ✋ ConstraintError: $timer_name is not enabled" >&2
     echo "      ⇒ it will not survive a reboot, so the pool refills unwatched" >&2
     echo "      fix: systemctl --user enable --now $timer_name" >&2
     claims=$((claims + 1))
@@ -80,7 +80,7 @@ grove_provision_1_6_4_keyrackd_provision_verify() {
   if systemctl --user is-active "$timer_name" >/dev/null 2>&1; then
     echo "   • $timer_name is armed on this boot ✔"
   else
-    echo "   ✋ $timer_name is not armed" >&2
+    echo "   ✋ ConstraintError: $timer_name is not armed" >&2
     echo "      ⇒ enabled and inactive means it fires never, and the daemon" >&2
     echo "        pool grows with no signal until the box reaches swap" >&2
     echo "      fix: systemctl --user start $timer_name" >&2

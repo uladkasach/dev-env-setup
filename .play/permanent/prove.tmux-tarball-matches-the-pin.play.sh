@@ -27,7 +27,7 @@ _root_of() {
   [[ -f "$PWD/src/grove.provision._.sh" ]] && { printf '%s' "$PWD"; return 0; }
   return 1
 }
-_root="$(_root_of)" || { echo "   ✋ no checkout found" >&2; exit 2; }
+_root="$(_root_of)" || { echo "   ✋ ConstraintError: no checkout found" >&2; exit 2; }
 
 export GROVE_SRC="$_root/src"
 
@@ -36,12 +36,12 @@ echo "   └─ root: $_root"
 echo ""
 
 # shellcheck source=/dev/null
-source "$GROVE_SRC/grove.web.sh" || { echo "   ✋ could not source grove.web.sh" >&2; exit 2; }
+source "$GROVE_SRC/grove.web.sh" || { echo "   ✋ ConstraintError: could not source grove.web.sh" >&2; exit 2; }
 # shellcheck source=/dev/null
-source "$GROVE_SRC/grove.provision/2.shell/2.8.tmux/_.sh" || { echo "   ✋ could not source 2.8.tmux/_.sh" >&2; exit 2; }
+source "$GROVE_SRC/grove.provision/2.shell/2.8.tmux/_.sh" || { echo "   ✋ ConstraintError: could not source 2.8.tmux/_.sh" >&2; exit 2; }
 
 if [[ -z "${GROVE_UPGRADE_2_8_TMUX_URL:-}" || -z "${GROVE_UPGRADE_2_8_TMUX_SHA256:-}" ]]; then
-  echo "   ✋ the bundle declares no tmux url or digest — no pin to grade" >&2
+  echo "   ✋ ConstraintError: the bundle declares no tmux url or digest — no pin to grade" >&2
   exit 1
 fi
 
@@ -52,7 +52,7 @@ echo "   ├─ url:    $GROVE_UPGRADE_2_8_TMUX_URL"
 echo "   ├─ digest: $GROVE_UPGRADE_2_8_TMUX_SHA256"
 
 if ! web_fetch "$GROVE_UPGRADE_2_8_TMUX_URL" --into "$tmp/tmux.tar.gz"; then
-  echo "   └─ ✋ the fetch failed; no claim graded" >&2
+  echo "   └─ ✋ ConstraintError: the fetch failed; no claim graded" >&2
   exit 2
 fi
 
@@ -60,5 +60,5 @@ if web_verify_sha256 --file "$tmp/tmux.tar.gz" --sha256 "$GROVE_UPGRADE_2_8_TMUX
   echo "   └─ ✔ the bytes match the pin"
   exit 0
 fi
-echo "   └─ ✋ the bytes do NOT match the pin" >&2
+echo "   └─ ✋ ConstraintError: the bytes do NOT match the pin" >&2
 exit 1

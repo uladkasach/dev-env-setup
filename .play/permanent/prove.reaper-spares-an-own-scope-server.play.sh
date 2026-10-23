@@ -27,7 +27,8 @@
 # exit:
 #   0 = both arms hold
 #   1 = an arm failed
-#   2 = no user manager, so no scope could be planted
+#   2 = no checkout, no reaper, no user manager, or a bait that never started —
+#       no claim was graded
 ######################################################################
 set -uo pipefail
 
@@ -39,47 +40,58 @@ _root_of() {
   [[ -f "$PWD/src/grove.provision._.sh" ]] && { printf '%s' "$PWD"; return 0; }
   return 1
 }
-ROOT="$(_root_of)" || { echo "✋ no checkout found"; exit 2; }
+ROOT="$(_root_of)" || { echo "   ✋ ConstraintError: no checkout found" >&2; exit 2; }
 REAPER="$ROOT/src/machine/machine_resource_procs_reap_abandoned"
 TMPDIR_BAIT=""
 BAIT_PIDS=()
 UNIT="prove-crew-server-$$"
 FAILED=0
 
+# every call to the user manager is bounded and fed no stdin: a wedged manager is
+# a state this play may meet, and it must report rather than hang
+# (rule.require.bounded-probes-in-verifies)
 cleanup() {
   local pid
   for pid in "${BAIT_PIDS[@]}"; do kill "$pid" 2>/dev/null; done
-  systemctl --user stop "$UNIT.scope" >/dev/null 2>&1
+  timeout -k 2 10 systemctl --user stop "$UNIT.scope" </dev/null >/dev/null 2>&1
   [[ -n "$TMPDIR_BAIT" ]] && rm -rf "$TMPDIR_BAIT"
   echo "   🧹 bait killed, scope stopped, temp dir removed"
 }
 trap cleanup EXIT
 
-[[ -x "$REAPER" ]] || { echo "✋ no reaper at $REAPER — this play measures the real executable"; exit 1; }
-systemctl --user show-environment >/dev/null 2>&1 \
-  || { echo "✋ no user manager on this seat — no scope can be planted"; exit 2; }
+# .what = wait for a bait's pid file, then for the pid to live — up to 5s, never one fixed sleep
+# stdout: the live pid, or empty if none appeared in time
+_await_bait() {
+  local file="$1" pid="" tick
+  for tick in $(seq 1 20); do
+    pid="$(cat "$file" 2>/dev/null)"
+    [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null && { printf '%s' "$pid"; return 0; }
+    sleep 0.25
+  done
+  return 1
+}
+
+[[ -x "$REAPER" ]] || { echo "   ✋ ConstraintError: no reaper at $REAPER — this play measures the real executable" >&2; exit 2; }
+timeout -k 2 10 systemctl --user show-environment </dev/null >/dev/null 2>&1 \
+  || { echo "   ✋ ConstraintError: no user manager on this seat — no scope can be planted" >&2; exit 2; }
 
 TMPDIR_BAIT="$(mktemp -d "${TMPDIR:-/tmp}/prove.reaper-scope.XXXXXX")"
 cp "$(command -v sleep)" "$TMPDIR_BAIT/tmux"
 
 # own-scope: a fresh user scope whose launcher exits, so the bait is the scope's oldest
-if ! systemd-run --user --scope --quiet --unit "$UNIT" \
-     bash -c "setsid '$TMPDIR_BAIT/tmux' 600 </dev/null &>/dev/null & echo \$! > '$TMPDIR_BAIT/own.pid'"; then
-  echo "✋ systemd-run --user --scope failed — no scope planted"; exit 2
-fi
-sleep 0.3
-OWN="$(cat "$TMPDIR_BAIT/own.pid" 2>/dev/null)"
+timeout -k 2 20 systemd-run --user --scope --quiet --unit "$UNIT" \
+  bash -c "setsid '$TMPDIR_BAIT/tmux' 600 </dev/null &>/dev/null & echo \$! > '$TMPDIR_BAIT/own.pid'" \
+  </dev/null || { echo "   ✋ ConstraintError: systemd-run --user --scope failed — no scope planted" >&2; exit 2; }
+OWN="$(_await_bait "$TMPDIR_BAIT/own.pid")"
 [[ -n "$OWN" ]] && BAIT_PIDS+=("$OWN")
 
 # in-pane: the same bait, reparented, but inside THIS play's cgroup
 ( setsid "$TMPDIR_BAIT/tmux" 600 </dev/null &>/dev/null & echo "$!" > "$TMPDIR_BAIT/pane.pid" )
-PANE="$(cat "$TMPDIR_BAIT/pane.pid")"
-BAIT_PIDS+=("$PANE")
-sleep 0.3
+PANE="$(_await_bait "$TMPDIR_BAIT/pane.pid")"
+[[ -n "$PANE" ]] && BAIT_PIDS+=("$PANE")
 
-for pid in "$OWN" "$PANE"; do
-  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null || { echo "💥 a bait did not start — this play measured no world"; exit 1; }
-done
+[[ -n "$OWN" && -n "$PANE" ]] \
+  || { echo "   ✋ ConstraintError: a bait did not start within 5s — this play measured no world" >&2; exit 2; }
 
 echo "🔭 does the reaper spare a crew server born in its own scope?"
 echo "   ├─ own-scope pid $OWN, cgroup $(cut -d: -f3 "/proc/$OWN/cgroup")"
@@ -93,8 +105,8 @@ found() { printf '%s\n' "$OUT" | grep -q "🪲 $1 "; }
 _arm_own() {
   reap --mode plan --min-age 0 --pid "$OWN"
   echo "   ├─ arm 'own-scope'"
-  [[ "$RC" -eq 0 ]] || { echo "   │  💥 reaper exit $RC — no verdict"; return 1; }
-  found "$OWN" && { echo "   │  ✋ named for the kill — a per-crew server in its own scope would die"; return 1; }
+  [[ "$RC" -eq 0 ]] || { echo "   │  💥 MalfunctionError: reaper exit $RC — no verdict" >&2; return 1; }
+  found "$OWN" && { echo "   │  ✋ ConstraintError: named for the kill — a per-crew server in its own scope would die" >&2; return 1; }
   echo "   │  ✔ spared — its scope's oldest"
 }
 
@@ -102,8 +114,8 @@ _arm_own() {
 _arm_pane() {
   reap --mode plan --min-age 0 --pid "$PANE"
   echo "   └─ arm 'in-pane'"
-  [[ "$RC" -eq 0 ]] || { echo "      💥 reaper exit $RC — no verdict"; return 1; }
-  found "$PANE" || { echo "      ✋ NOT named — the own-scope arm's green proves naught"; return 1; }
+  [[ "$RC" -eq 0 ]] || { echo "      💥 MalfunctionError: reaper exit $RC — no verdict" >&2; return 1; }
+  found "$PANE" || { echo "      ✋ ConstraintError: NOT named — the own-scope arm's green proves naught" >&2; return 1; }
   echo "      ✔ named — a server born in a peer's pane would be reaped"
 }
 

@@ -42,7 +42,7 @@ _root_of() {
   [[ -f "$PWD/src/grove.provision._.sh" ]] && { printf '%s' "$PWD"; return 0; }
   return 1
 }
-_root="$(_root_of)" || { echo "   ✋ no checkout found" >&2; exit 2; }
+_root="$(_root_of)" || { echo "   ✋ ConstraintError: no checkout found" >&2; exit 2; }
 
 _dir="$_root/src/grove.provision/1.system/1.6.procs/1.6.8.coredump"
 
@@ -51,9 +51,9 @@ echo "   └─ root: $_root"
 echo ""
 
 for _f in _.sh provision.verify.sh provision.upsert.sh; do
-  [[ -f "$_dir/$_f" ]] || { echo "   ✋ no $_dir/$_f — no bundle claims a crash collector" >&2; exit 1; }
+  [[ -f "$_dir/$_f" ]] || { echo "   ✋ ConstraintError: no $_dir/$_f — no bundle claims a crash collector" >&2; exit 1; }
   # shellcheck source=/dev/null
-  source "$_dir/$_f" || { echo "   ✋ could not source $_dir/$_f" >&2; exit 2; }
+  source "$_dir/$_f" || { echo "   ✋ ConstraintError: could not source $_dir/$_f" >&2; exit 2; }
 done
 
 FIX="$(mktemp -d "${TMPDIR:-/tmp}/prove.coredump.XXXXXX")"
@@ -133,7 +133,7 @@ _pattern "$P_APPORT"; out="$( APPORT_HOLDS=yes _upsert )"; rc=$?
 _grade "U3. apport keeps the pattern: ✋" "$rc" 1 "$out" "still pipes cores elsewhere" || failed=$(( failed + 1 ))
 
 _pattern "$P_APPORT"; out="$( INSTALL_FAILS=yes _upsert )"; rc=$?
-_grade "U4. the install fails: rc 1" "$rc" 1 "$out" "" || failed=$(( failed + 1 ))
+_grade "U4. the install fails: ✋ names the package" "$rc" 1 "$out" "systemd-coredump did not install" || failed=$(( failed + 1 ))
 
 _pattern "$P_APPORT"; out="$( GROVE_ENV_SERVER=local@unix _upsert )"; rc=$?
 _grade "U5. a laptop: the same install (parity)" "$rc" 0 "$out" "collects each core" || failed=$(( failed + 1 ))
@@ -143,5 +143,5 @@ out="$( bundle.root.owns() { echo "   🌙 no root on this seat"; return 1; }; _
 _grade "U6. no root: decline" "$rc" 0 "$out" "no root" && _uninstalled U6 || failed=$(( failed + 1 ))
 
 echo ""
-[[ "$failed" -eq 0 ]] || { echo "   ✋ $failed arm(s) failed" >&2; exit 1; }
+[[ "$failed" -eq 0 ]] || { echo "   ✋ ConstraintError: $failed arm(s) failed" >&2; exit 1; }
 echo "   ✔ the coredump bundle reads core_pattern, and passes only systemd-coredump"

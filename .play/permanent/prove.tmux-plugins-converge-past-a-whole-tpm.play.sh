@@ -32,7 +32,7 @@ _root_of() {
   [[ -f "$PWD/src/grove.provision._.sh" ]] && { printf '%s' "$PWD"; return 0; }
   return 1
 }
-_root="$(_root_of)" || { echo "   ✋ no checkout found" >&2; exit 2; }
+_root="$(_root_of)" || { echo "   ✋ ConstraintError: no checkout found" >&2; exit 2; }
 
 export GROVE_SRC="$_root/src"
 _dir="$GROVE_SRC/grove.provision/2.shell/2.8.tmux"
@@ -43,7 +43,7 @@ echo ""
 
 for _f in _.sh provision.upsert.sh; do
   # shellcheck source=/dev/null
-  source "$_dir/$_f" || { echo "   ✋ could not source $_dir/$_f" >&2; exit 2; }
+  source "$_dir/$_f" || { echo "   ✋ ConstraintError: could not source $_dir/$_f" >&2; exit 2; }
 done
 
 FIX="$(mktemp -d "${TMPDIR:-/tmp}/prove.tmux-plugins.XXXXXX")"
@@ -113,5 +113,5 @@ _arm_whole() {
 _arm_whole || failed=$(( failed + 1 ))
 
 echo ""
-[[ "$failed" -eq 0 ]] || { echo "   ✋ $failed arm(s) failed" >&2; exit 1; }
+[[ "$failed" -eq 0 ]] || { echo "   ✋ ConstraintError: $failed arm(s) failed" >&2; exit 1; }
 echo "   ✔ a whole tpm never stops the plugin pins below it"
