@@ -1,0 +1,15 @@
+   ✋ ConstraintError: KEY FINGERPRINT MISMATCH — <fixture>/key.gpg
+      expected exactly these primary key(s):
+        AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555
+      received:
+        FFFF9999FFFF9999FFFF9999FFFF9999FFFF9999
+      ⇒ do NOT install this key. it is the trust anchor for every
+        package apt will take from that source, so a wrong key here is
+        not one bad install — it is every future one, each with a clean
+        signature check against the wrong anchor
+      ⇒ an EXTRA key is as bad as a wrong one: the pin is a set, so a
+        keyring holding the right key plus another still fails, and
+        that is deliberate
+      ⇒ if upstream genuinely rotated, source the new fingerprint from
+        their published documentation — never from the download you are
+        trying to verify

@@ -1,0 +1,4 @@
+   ✋ ConstraintError: the clone checked out the WRONG commit — https://example.com/x.tgz
+      expected: 1111111111111111111111111111111111111111
+      received: 2222222222222222222222222222222222222222
+      ⇒ removed the partial clone at <fixture>/clone, so a re-run refetches it

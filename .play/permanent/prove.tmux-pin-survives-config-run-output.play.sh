@@ -180,6 +180,7 @@ command -v script >/dev/null 2>&1 || {
 }
 
 fails=0
+PIN_VERDICTS=""
 
 for bin in "$PIN_BIN" "$DISTRO_BIN"; do
   [[ -x "$bin" ]] || { echo "   🌙 $bin absent; its arms are skipped"; continue; }
@@ -189,6 +190,8 @@ for bin in "$PIN_BIN" "$DISTRO_BIN"; do
   for arm in echo real client; do
     verdict="$(_arm "$arm" "$bin")"
     echo "   │  ├─ arm $arm: $verdict"
+    [[ "$bin" == "$PIN_BIN" ]] && PIN_VERDICTS+="   • arm $arm: $verdict"$'\n'
+    [[ "$bin" == "$DISTRO_BIN" ]] && PIN_VERDICTS+="   • distro arm $arm: <the reproduction's verdict, which varies by run>"$'\n'
 
     # only the PINNED build's survival is this play's claim; the distro arms
     # are the reproduction, reported but never graded
@@ -200,4 +203,10 @@ done
 echo ""
 [[ "$fails" -eq 0 ]] || { echo "   💥 MalfunctionError: the pinned build died in $fails arm(s)" >&2; exit 1; }
 echo "   ✔ the pinned build survives every arm"
+
+# the snap holds the PINNED build's verdicts — its claim; the distro arms are a
+#   reproduction whose outcome is the very flake under study, so their verdicts are masked
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/.snap.operations.sh"
+play_snap_assert arm=P rendered="   • pinned build: $PIN_BIN"$'\n'"${PIN_VERDICTS%$'\n'}" mask="$HOME" || exit 1
 exit 0

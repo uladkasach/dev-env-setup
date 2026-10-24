@@ -1,0 +1,21 @@
+usage:
+  rhx play.run --list
+  rhx play.run --play prove.nvim-fetches-no-unpinned-plugin
+  rhx play.run --play prove.linger-reaches-every-seat --within 600
+  rhx play.run --all
+
+options:
+  --play SLUG    the play to run. the `.play.sh` suffix is optional
+  --list         name every play in the index, each refused verb marked, then exit
+  --all          run every tracked play, one at a time, each under its own
+                 --within bound; then name each verdict. exit 0 only if
+                 every play passed
+  --resnap       rewrite each snap a play holds (`__snaps__/<play>/`) from
+                 this run. review the diff before you commit it
+  --within SECS  the bound on each play, in seconds (default 900)
+  -h, --help     show this header
+
+exit:
+  0 = the play passed
+  1 = the play failed, or malfunctioned
+  2 = a constraint: bad args, no such play, a forbidden verb, a decline, or a timeout

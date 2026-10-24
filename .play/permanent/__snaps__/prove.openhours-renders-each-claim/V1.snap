@@ -1,0 +1,4 @@
+   ✋ ConstraintError: openhours is opted out and the box still carries a gate
+      ⇒ the timer is 'active' and its files remain, so a
+        schedule no declaration holds still blocks commits
+      fix: rhx grove.provision --what 5.18.openhours --mode apply

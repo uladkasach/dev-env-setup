@@ -45,21 +45,27 @@
 # usage:
 #   rhx play.run --list
 #   rhx play.run --play prove.nvim-fetches-no-unpinned-plugin
-#   rhx play.run --play prove.git-alias-seam --within 600
+#   rhx play.run --play prove.linger-reaches-every-seat --within 600
+#   rhx play.run --all
 #
 # options:
 #   --play SLUG    the play to run. the `.play.sh` suffix is optional
-#   --list         name every play this box can run, then exit
-#   --within SECS  total bound, in seconds (default 900)
-#   --skill NAME   absorbed + ignored — rhachet injects this when invoked as
-#                  `rhx play.run …`. same for --repo / --role
+#   --list         name every play in the index, each refused verb marked, then exit
+#   --all          run every tracked play, one at a time, each under its own
+#                  --within bound; then name each verdict. exit 0 only if
+#                  every play passed
+#   --resnap       rewrite each snap a play holds (`__snaps__/<play>/`) from
+#                  this run. review the diff before you commit it
+#   --within SECS  the bound on each play, in seconds (default 900)
 #   -h, --help     show this header
 #
 # exit:
 #   0 = the play passed
 #   1 = the play failed, or malfunctioned
-#   2 = a constraint: bad args, no such play, a forbidden verb, or a timeout
+#   2 = a constraint: bad args, no such play, a forbidden verb, a decline, or a timeout
 ######################################################################
+# rhachet injects `--skill NAME` (and `--repo` / `--role`) when invoked as
+#   `rhx play.run …`; the parser absorbs and ignores each pair
 
 set -uo pipefail
 
@@ -75,6 +81,16 @@ PLAYDIR="$ROOT/.play/permanent"
 PLAY=""
 WITHIN=900
 LIST=0
+ALL=0
+
+# every flag this runner reads, named once for each refusal that must list them
+VALID_FLAGS="--play <slug>, --list, --all, --resnap, --within <secs>, --help"
+
+# .what = print a caller-fault header on stderr, then exit 2
+_refuse() { echo "   ✋ ConstraintError: $1" >&2; shift; local l; for l in "$@"; do echo "      $l" >&2; done; exit 2; }
+
+# .what = whether this runner drives a play of this verb (the verb is the contract, below)
+_is_driven_verb() { case "$1" in prove.*|verify.*|diagnose.*|await.*|hibernate.*) return 0 ;; esac; return 1; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -84,51 +100,52 @@ while [[ $# -gt 0 ]]; do
       shift; [[ $# -gt 0 ]] && shift ;;
     --play)
       shift
-      [[ $# -gt 0 ]] || { echo "   ✋ --play needs a value" >&2; exit 2; }
+      [[ $# -gt 0 ]] || _refuse "--play needs a value" "valid: $VALID_FLAGS"
       PLAY="$1"; shift ;;
     --within)
       shift
-      [[ $# -gt 0 ]] || { echo "   ✋ --within needs a value" >&2; exit 2; }
+      [[ $# -gt 0 ]] || _refuse "--within needs a value" "valid: $VALID_FLAGS"
       WITHIN="$1"; shift ;;
     --list) LIST=1; shift ;;
+    --all) ALL=1; shift ;;
+    --resnap) export PLAY_RESNAP=1; shift ;;
     -h|--help)
       sed -n '/^# usage:/,/^#####/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//;$d'
       exit 0 ;;
     # ⚠️ an unknown flag HALTS. a swallowed narrowing flag returns a verdict
     #    about a subject the caller never named
-    *)
-      echo "   ✋ unknown flag: $1" >&2
-      echo "      valid: --play <slug>  --list  --within <secs>  --help" >&2
-      exit 2 ;;
+    *) _refuse "unknown flag: $1" "valid: $VALID_FLAGS" ;;
   esac
 done
 
 if [[ -z "$ROOT" || ! -d "$PLAYDIR" ]]; then
-  echo "   ✋ no tracked play dir at ${PLAYDIR:-<no checkout>}" >&2
-  echo "      ⇒ an empty set would report as a pass, so this halts instead" >&2
-  exit 2
+  _refuse "no tracked play dir at ${PLAYDIR:-<no checkout>}" \
+    "⇒ an empty set would report as a pass, so this halts instead"
 fi
 
 ######################################################################
 # --list. the DIR is the inventory, so this reads it rather than a list
 ######################################################################
 if [[ "$LIST" -eq 1 ]]; then
-  echo "🎭 play.run --list"
-  echo "   ├─ $PLAYDIR"
-  echo "   └─ store: git ls-files (the INDEX, not the disk)"
-  n=0
   # ⚠️ the INDEX, to match what --play will accept. a disk glob here would
   #    ADVERTISE a play the runner then refuses — and worse, would print a
   #    grove-authored file beside the repo's own, which is how a human is
   #    invited to run it
+  listed=()
   while IFS= read -r f; do
-    [[ -n "$f" ]] || continue
-    printf '      %s\n' "$(basename "$f" .play.sh)"
-    n=$(( n + 1 ))
+    [[ -n "$f" ]] && listed+=("$(basename "$f" .play.sh)")
   done < <(git -C "$ROOT" ls-files -- '.play/permanent/*.play.sh' 2>/dev/null)
-  [[ "$n" -gt 0 ]] || echo "      (none)"
-  echo ""
-  echo "   $n play(s)"
+  echo "🎭 play.run --list"
+  echo "   ├─ dir: $PLAYDIR"
+  echo "   ├─ store: git ls-files (the INDEX, not the disk)"
+  echo "   └─ ${#listed[@]} play(s)"
+  [[ "${#listed[@]}" -gt 0 ]] || echo "      └─ (none)"
+  # a verb this runner never drives is listed, since it IS in the index, and marked so
+  for i in "${!listed[@]}"; do
+    glyph="├─"; [[ "$i" -eq $(( ${#listed[@]} - 1 )) ]] && glyph="└─"
+    note=""; _is_driven_verb "${listed[$i]}" || note="  (✋ refused — a verb this runner never drives)"
+    echo "      $glyph ${listed[$i]}$note"
+  done
 
   # ⚠️ an UNTRACKED play in that dir is absent from the list above, and silence
   #    about it is the failhide: it is either work in progress, or a file
@@ -140,19 +157,71 @@ if [[ "$LIST" -eq 1 ]]; then
     git -C "$ROOT" ls-files --error-unmatch -- "$f" >/dev/null 2>&1 || u=$(( u + 1 ))
   done
   if [[ "$u" -gt 0 ]]; then
-    echo "   ⚠️ and $u untracked .play.sh file(s) sit in that dir, unlisted" >&2
-    echo "      ⇒ this runner refuses each of them. if one is yours, git add it;" >&2
-    echo "        if it is not, read it — a pulled tree can write here" >&2
-    echo "      read them:  git -C $ROOT status --short .play/permanent" >&2
-    exit 2
+    echo "" >&2
+    _refuse "$u untracked .play.sh file(s) sit in that dir, unlisted" \
+      "⇒ this runner refuses each of them. if one is yours, git add it;" \
+      "  if it is not, read it — a pulled tree can write here" \
+      "read them: git -C $ROOT status --short .play/permanent"
   fi
   exit 0
 fi
 
-[[ -n "$PLAY" ]] || {
-  echo "   ✋ name a play: rhx play.run --play <slug>   (or --list)" >&2
-  exit 2
-}
+######################################################################
+# --all. each play runs through THIS runner, one at a time, so every gate
+# below (the index, the verb, the bound) holds for each exactly as it does
+# for a single --play. the set is the INDEX, the same set --list names
+#
+# ⚠️ a decline (exit 2) is NOT a pass: its subject was absent, so it proved
+#    no claim. it is named on its own row and fails the whole run
+######################################################################
+if [[ "$ALL" -eq 1 ]]; then
+  [[ -z "$PLAY" ]] || _refuse "--all and --play name two subjects; pick one"
+  slugs=()
+  while IFS= read -r f; do
+    [[ -n "$f" ]] && slugs+=("$(basename "$f" .play.sh)")
+  done < <(git -C "$ROOT" ls-files -- '.play/permanent/*.play.sh' 2>/dev/null)
+  [[ "${#slugs[@]}" -gt 0 ]] || _refuse "the index holds no play, and an empty set would report as a pass"
+  passed=(); failed=(); declined=(); refused=()
+  for slug in "${slugs[@]}"; do
+    # a verb this runner never drives is refused here, by name, and never run
+    _is_driven_verb "$slug" || { refused+=("$slug"); continue; }
+    one_rc=0
+    bash "${BASH_SOURCE[0]}" --play "$slug" --within "$WITHIN" || one_rc=$?
+    echo ""
+    case "$one_rc" in
+      0) passed+=("$slug") ;;
+      2) declined+=("$slug") ;;
+      *) failed+=("$slug") ;;
+    esac
+  done
+
+  # .what = one bucket row, its slugs nested beneath it; `$1` = this row's glyph, `$2` = the stem under it
+  _bucket() {
+    local glyph="$1" stem="$2" mark="$3" label="$4"; shift 4
+    echo "   $glyph $label: $#"
+    local i=0 n="$#" s g
+    for s in "$@"; do
+      i=$(( i + 1 )); g="├─"; [[ "$i" -eq "$n" ]] && g="└─"
+      echo "   $stem  $g $mark $s"
+    done
+  }
+  echo "🎭 play.run --all --within $WITHIN"
+  echo "   ├─ passed: ${#passed[@]} of ${#slugs[@]}"
+  _bucket "├─" "│" "💥" "failed" "${failed[@]}"
+  _bucket "├─" "│" "✋" "declined or timed out" "${declined[@]}"
+  _bucket "└─" " " "✋" "refused — a verb this runner never drives" "${refused[@]}"
+  [[ "${#failed[@]}" -eq 0 && "${#declined[@]}" -eq 0 && "${#refused[@]}" -eq 0 ]] && exit 0
+  echo "" >&2
+  if [[ "${#failed[@]}" -gt 0 ]]; then
+    echo "   💥 MalfunctionError: ${#failed[@]} play(s) failed" >&2
+    echo "      read one again: rhx play.run --play <slug>" >&2
+    exit 1
+  fi
+  _refuse "not every play passed: none failed, and some proved no claim" \
+    "read one again: rhx play.run --play <slug>"
+fi
+
+[[ -n "$PLAY" ]] || _refuse "name a play: rhx play.run --play <slug>" "or: rhx play.run --list, rhx play.run --all"
 
 ######################################################################
 # 🛑 the slug may not escape the tracked play dir
@@ -163,11 +232,10 @@ fi
 ######################################################################
 case "$PLAY" in
   */*|..*|-*)
-    echo "   ✋ a play is named by SLUG, never by path: '$PLAY'" >&2
-    echo "      ⇒ every play lives in $PLAYDIR, so a path adds no reach and" >&2
-    echo "        would let this runner become a general shell" >&2
-    echo "      read what exists: rhx play.run --list" >&2
-    exit 2 ;;
+    _refuse "a play is named by SLUG, never by path: '$PLAY'" \
+      "⇒ every play lives in $PLAYDIR, so a path adds no reach and" \
+      "  would let this runner become a general shell" \
+      "read what exists: rhx play.run --list" ;;
 esac
 
 PLAY="${PLAY%.play.sh}"
@@ -175,10 +243,7 @@ PLAY="${PLAY%.sh}"
 TARGET="$PLAYDIR/$PLAY.play.sh"
 
 if [[ ! -r "$TARGET" ]]; then
-  echo "   ✋ no play named '$PLAY'" >&2
-  echo "      looked for: $TARGET" >&2
-  echo "      read what exists: rhx play.run --list" >&2
-  exit 2
+  _refuse "no play named '$PLAY'" "looked for: $TARGET" "read what exists: rhx play.run --list"
 fi
 
 ######################################################################
@@ -211,34 +276,28 @@ fi
 #   silenced (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.13)
 ######################################################################
 if ! git -C "$ROOT" ls-files --error-unmatch -- "$TARGET" >/dev/null 2>&1; then
-  echo "   ✋ '$PLAY' is on disk and NOT in this repo's index" >&2
-  echo "      ⇒ this runner executes only what the repo PUBLISHES, because a" >&2
-  echo "        pulled tree can place a file here — .play/permanent is not in" >&2
-  echo "        GROVE_BOUNDARY_EXCLUDES, and .play/temporary is" >&2
-  echo "      ⇒ if you just wrote it, that is this check at work:" >&2
-  echo "           git add .play/permanent/$PLAY.play.sh" >&2
-  echo "      ⇒ if you did NOT write it, read it before you do aught else" >&2
-  exit 2
+  _refuse "'$PLAY' is on disk and NOT in this repo's index" \
+    "⇒ this runner executes only what the repo PUBLISHES, because a" \
+    "  pulled tree can place a file here — .play/permanent is not in" \
+    "  GROVE_BOUNDARY_EXCLUDES, and .play/temporary is" \
+    "⇒ if you just wrote it, that is this check at work:" \
+    "     git add .play/permanent/$PLAY.play.sh" \
+    "⇒ if you did NOT write it, read it before you do aught else"
 fi
 
 ######################################################################
 # 🛑 the VERB is the contract. a play may READ, or it may PROVE
 ######################################################################
-case "$PLAY" in
-  prove.*|verify.*|diagnose.*|await.*|hibernate.*) : ;;
-  repair.*)
-    echo "   ✋ '$PLAY' is a repair play, and this repo has no such verb" >&2
-    echo "      ⇒ a play that moves a box FORWARD toward the declared state is" >&2
-    echo "        a BUNDLE (rule.forbid.repair-plays)" >&2
-    echo "      fix: rhx grove.provision --what <slug> --mode apply" >&2
-    exit 2 ;;
-  *)
-    echo "   ✋ '$PLAY' does not name a verb this runner drives" >&2
-    echo "      ⇒ allowed: prove.* verify.* diagnose.* await.* hibernate.*" >&2
-    echo "      ⇒ the verb says what the play may do to the box, so an unnamed" >&2
-    echo "        one carries no such promise" >&2
-    exit 2 ;;
-esac
+if ! _is_driven_verb "$PLAY"; then
+  [[ "$PLAY" == repair.* ]] && _refuse "'$PLAY' is a repair play, and this repo has no such verb" \
+    "⇒ a play that moves a box FORWARD toward the declared state is" \
+    "  a BUNDLE (rule.forbid.repair-plays)" \
+    "fix: rhx grove.provision --what <slug> --mode apply"
+  _refuse "'$PLAY' does not name a verb this runner drives" \
+    "⇒ allowed: prove.* verify.* diagnose.* await.* hibernate.*" \
+    "⇒ the verb says what the play may do to the box, so an unnamed" \
+    "  one carries no such promise"
+fi
 
 ######################################################################
 # drive it
@@ -262,14 +321,12 @@ echo ""
 if [[ "$rc" -eq 0 ]]; then
   echo "🌲 $PLAY ✔"
 elif [[ "$rc" -eq 124 || "$rc" -eq 137 ]]; then
-  echo "   ✋ $PLAY did not finish within ${WITHIN}s, so it proved no claim" >&2
-  echo "      ⇒ a bound that elapses is not a verdict about the subject" >&2
-  echo "      read it wider: rhx play.run --play $PLAY --within 3600" >&2
-  exit 2
+  _refuse "$PLAY did not finish within ${WITHIN}s, so it proved no claim" \
+    "⇒ a bound that elapses is not a verdict about the subject" \
+    "rerun with a wider bound: rhx play.run --play $PLAY --within 3600"
 elif [[ "$rc" -eq 2 ]]; then
-  echo "   ✋ $PLAY declined — its subject is absent, so it proved no claim" >&2
-  exit 2
+  _refuse "$PLAY declined — its subject is absent, so it proved no claim"
 else
-  echo "   ✋ $PLAY failed (exit $rc)" >&2
+  echo "   💥 MalfunctionError: $PLAY failed (exit $rc)" >&2
   exit 1
 fi

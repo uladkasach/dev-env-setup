@@ -9,14 +9,9 @@
 #
 # .why
 #   - a QCA6390 (`ath11k_pci`) stalls under power-save: it stays associated,
-#     its transmit queue jams, DHCP renewals never leave, and the link goes
-#     silent until a human reconnects
-#   - measured 2026-10-03..05 by `rhx network.wifi.probe`: no deauth from the
-#     AP, no beacon loss, no suspend — traffic simply stops, and at the
-#     reconnect ath11k reports it could not flush its transmit queue. the
-#     drops continued with battery saver off, so the power profile was not it
-#   - pop-os ships `default-wifi-powersave-on.conf` (`wifi.powersave = 3`),
-#     which holds in every power profile
+#     its transmit queue jams, and the link goes silent until a human reconnects
+#     (measured: `howto.allowlist-a-wifi-driver-for-powersave-off`)
+#   - pop-os ships `wifi.powersave = 3`, which holds in every power profile
 #
 # .why an ALLOWLIST of drivers, not a box-wide off
 #   - power-save is free battery on a card whose driver wakes it correctly;
@@ -44,13 +39,9 @@
 #     absent, it still probes and reconnects; the record lacks the iw rows
 #
 # .why the watchdog, when power-save is already off
-#   - the same QCA6390 stalled twice on 2026-10-12 with power-save OFF: the
-#     DHCPv6 renewal stopped, no deauth, no beacon loss, no kernel line, and a
-#     reconnect restored traffic in 2s. the cause is unproven — the old ath11k
-#     firmware and a DFS channel are both candidates
-#   - the state that would name it is readable only DURING the stall, and a
-#     human reconnect erased it each time. so the watchdog records first, then
-#     reconnects (`src/machine/machine_wifi_link_watchdog`)
+#   - the same card stalled with power-save OFF too, cause unproven
+#   - the state that would name it is readable only DURING the stall, so the
+#     watchdog records first, then reconnects (`src/machine/machine_wifi_link_watchdog`)
 #
 # .why the watchdog runs on EVERY box with NetworkManager and a radio
 #   - it holds no driver list: it probes the gateway, so it catches a stall on
@@ -72,7 +63,7 @@
 # .what = the drivers whose cards stall under wifi power-save — declared ONCE
 # .why the conf file, the live write, and the verify all derive from this list
 GROVE_PROVISION_1_11_WIFI_DRIVERS=(
-  ath11k_pci   # qualcomm QCA6390 — measured 2026-10-03..05, see header
+  ath11k_pci   # qualcomm QCA6390 — measured 2026-10-03..05 (howto.allowlist-a-wifi-driver-for-powersave-off)
 )
 
 # .what = where the declaration lands, declared ONCE for both halves

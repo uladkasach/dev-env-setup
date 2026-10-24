@@ -53,8 +53,12 @@ grove_provision_1_6_7_linger_passwd() {
 }
 
 # .what = does this one seat linger?
-# .why  = ONE reader, asked by both halves of this bundle; no other bundle
-#   reads linger, so a grant can never be judged two ways
+# .why  = ONE reader, asked by both halves of this bundle, so its upsert and verify
+#   never judge a grant two ways
+# ⚠️ one other bundle grants linger on its own: `5.8.docker`'s upsert, per seat not in
+#    the docker group — a subset of this roster, so its grant is a redundant second
+#    writer. every bundle file is sourced at every depth, so it could call this reader in
+#    place; the fold is item 3 of `.dream/2026_10_23.grove-provision-shared-readers.dream.md`
 # ⚠️ the logind record, never `loginctl show-user` — that FAILS for a seat with
 #    no session, so it cannot tell "no linger" from "no session" for another seat
 grove_provision_1_6_7_linger_seat_lingers() {

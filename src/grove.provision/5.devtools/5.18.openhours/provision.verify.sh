@@ -7,7 +7,7 @@
 #   - ⚠️ the timer needs BOTH `is-enabled` (next boot) and `is-active` (this one)
 #   - 🛑 SKILL REACH is its own claim — every other row was ✔ on a box whose
 #     cwd linked no role, so only an ask from that cwd proves the gate can move
-#   - ⚠️ LINGER and the live gate are reported, never failed
+#   - ⚠️ the live gate is reported, never failed; linger is `1.6.7.linger`'s claim
 #   - 🛑 the CONVERGE leg is unproven on a box with no drift, by design
 # .refs = howdoes.the-openhours-gate-converges.md — how the verify proves the gate
 #
@@ -45,7 +45,7 @@ grove_provision_5_18_openhours_provision_verify() {
       return 0
     fi
 
-    echo "   ✋ openhours is opted out and the box still carries a gate" >&2
+    echo "   ✋ ConstraintError: openhours is opted out and the box still carries a gate" >&2
     echo "      ⇒ the timer is '${state_out:-absent}' and its files remain, so a" >&2
     echo "        schedule no declaration holds still blocks commits" >&2
     echo "      fix: rhx grove.provision --what 5.18.openhours --mode apply" >&2
@@ -66,7 +66,7 @@ grove_provision_5_18_openhours_provision_verify() {
     local src="$GROVE_SRC/machine/$name"
 
     if [[ ! -f "$dst" ]]; then
-      echo "   ✋ $name is absent from $dst" >&2
+      echo "   ✋ ConstraintError: $name is absent from $dst" >&2
       echo "      fix: rhx grove.provision --what 5.18.openhours --mode apply" >&2
       failed=1
     elif [[ ! -f "$src" ]]; then
@@ -74,7 +74,7 @@ grove_provision_5_18_openhours_provision_verify() {
     elif diff -q "$src" "$dst" >/dev/null 2>&1; then
       echo "   • $name matches this checkout ✔"
     else
-      echo "   ✋ the installed $name DIFFERS from this checkout" >&2
+      echo "   ✋ ConstraintError: the installed $name DIFFERS from this checkout" >&2
       echo "      read the drift: diff $src $dst" >&2
       echo "      fix: rhx grove.provision --what 5.18.openhours --mode apply" >&2
       failed=1
@@ -86,7 +86,7 @@ grove_provision_5_18_openhours_provision_verify() {
   if [[ -x "$bin_dir/machine_openhours_reconcile" ]]; then
     echo "   • the reconciler is executable ✔"
   else
-    echo "   ✋ $bin_dir/machine_openhours_reconcile is not executable" >&2
+    echo "   ✋ ConstraintError: $bin_dir/machine_openhours_reconcile is not executable" >&2
     echo "      ⇒ every tick fails 203/EXEC and the gate never converges" >&2
     echo "      fix: rhx grove.provision --what 5.18.openhours --mode apply" >&2
     failed=1
@@ -97,16 +97,16 @@ grove_provision_5_18_openhours_provision_verify() {
   local want_schedule
   want_schedule="$(grove_provision_5_18_openhours_schedule_render)"
   if [[ ! -f "$GROVE_OPENHOURS_SCHEDULE" ]]; then
-    echo "   ✋ no schedule at $GROVE_OPENHOURS_SCHEDULE" >&2
+    echo "   ✋ ConstraintError: no schedule at $GROVE_OPENHOURS_SCHEDULE" >&2
     echo "      ⇒ the reconciler reads no window and dies on every tick" >&2
     echo "      fix: rhx grove.provision --what 5.18.openhours --mode apply" >&2
     failed=1
   elif diff -q <(printf '%s\n' "$want_schedule") "$GROVE_OPENHOURS_SCHEDULE" >/dev/null 2>&1; then
     echo "   • schedule matches the tree ✔ — days $GROVE_OPENHOURS_DAYS, ${GROVE_OPENHOURS_FROM}–${GROVE_OPENHOURS_TILL} $GROVE_OPENHOURS_ZONE"
   else
-    echo "   ✋ the installed schedule DIFFERS from what the tree declares" >&2
+    echo "   ✋ ConstraintError: the installed schedule DIFFERS from what the tree declares" >&2
     echo "      ⇒ the gate enforces a window no declaration holds" >&2
-    echo "      the box holds:  cat $GROVE_OPENHOURS_SCHEDULE" >&2
+    echo "      read the box:   cat $GROVE_OPENHOURS_SCHEDULE" >&2
     echo "      the tree wants: days $GROVE_OPENHOURS_DAYS, ${GROVE_OPENHOURS_FROM}–${GROVE_OPENHOURS_TILL} $GROVE_OPENHOURS_ZONE" >&2
     echo "      fix: rhx grove.provision --what 5.18.openhours --mode apply" >&2
     failed=1
@@ -125,7 +125,7 @@ grove_provision_5_18_openhours_provision_verify() {
     echo "   • machine_openhours_reconcile.timer is active ✔"
     [[ -n "$next" ]] && echo "     next: $next"
   else
-    echo "   ✋ machine_openhours_reconcile.timer is '${state_active:-absent}', not active" >&2
+    echo "   ✋ ConstraintError: machine_openhours_reconcile.timer is '${state_active:-absent}', not active" >&2
     echo "      ⇒ every file above can be byte-perfect and the gate never moves" >&2
     echo "      read why: systemctl --user status machine_openhours_reconcile.timer" >&2
     echo "      fix: rhx grove.provision --what 5.18.openhours --mode apply" >&2
@@ -135,7 +135,7 @@ grove_provision_5_18_openhours_provision_verify() {
   if [[ "$state_enabled" == "enabled" ]]; then
     echo "   • the timer is enabled — it returns after a reboot ✔"
   else
-    echo "   ✋ the timer is '${state_enabled:-absent}', not enabled" >&2
+    echo "   ✋ ConstraintError: the timer is '${state_enabled:-absent}', not enabled" >&2
     echo "      ⇒ it may be active THIS boot and gone the next, so the gate" >&2
     echo "        silently stops converging while the check above passes" >&2
     echo "      fix: rhx grove.provision --what 5.18.openhours --mode apply" >&2
@@ -157,14 +157,14 @@ grove_provision_5_18_openhours_provision_verify() {
       echo "     $GROVE_OPENHOURS_CWD"
       ;;
     absent)
-      echo "   ✋ the reconciler's cwd was never built at $GROVE_OPENHOURS_CWD" >&2
+      echo "   ✋ ConstraintError: the reconciler's cwd was never built at $GROVE_OPENHOURS_CWD" >&2
       echo "      ⇒ rhx resolves a skill among the roles linked into its cwd, so" >&2
       echo "        every tick dies before it reads a clock" >&2
       echo "      fix: rhx grove.provision --what 5.18.openhours --mode apply" >&2
       failed=1
       ;;
     *)
-      echo "   ✋ the reconciler's cwd reads 'half' — built, and not to the pin" >&2
+      echo "   ✋ ConstraintError: the reconciler's cwd is built, but not at the pin" >&2
       echo "      ⇒ expected a git repo that holds both gate skills at:" >&2
       echo "        ${GROVE_OPENHOURS_ROLE_PKGS[*]}" >&2
       echo "      fix: rhx grove.provision --what 5.18.openhours --mode apply" >&2
@@ -180,13 +180,15 @@ grove_provision_5_18_openhours_provision_verify() {
       if [[ "$probe_rc" -eq 0 ]]; then
         echo "   • rhx $skill answers from that cwd ✔"
       else
-        echo "   ✋ rhx $skill did not answer (exit $probe_rc)" >&2
+        echo "   ✋ ConstraintError: rhx $skill did not answer (exit $probe_rc)" >&2
         echo "      ⇒ the timer ticks, the clock math runs, and the gate never" >&2
         echo "        moves — a failure with no symptom except an open gate" >&2
-        # ⚠️ the probe's OWN sentence, quoted — never the stack frames (q1)
+        # ⚠️ the probe's OWN sentence, quoted — never the stack frames (q1), and never its
+        #   glyph and class, so one refusal reads as one header, not two
         echo "$probe_out" \
           | grep -iE '(error|✋|🛑|no skill|not found|required)' \
           | grep -vE '^\s*(at |[0-9]+ \|)' | head -4 \
+          | sed -E 's/^[[:space:]]*(✋|🛑|💥)?[[:space:]]*((Constraint|Malfunction)Error:)?[[:space:]]*//' \
           | sed 's/^/        │ /' >&2
         echo "      read why: cd $GROVE_OPENHOURS_CWD && rhx $skill get --global" >&2
         failed=1
@@ -194,21 +196,7 @@ grove_provision_5_18_openhours_provision_verify() {
     done
   fi
 
-  ####################################################################
-  # 5. linger — reported, never failed (see the header)
-  ####################################################################
-  local linger
-  linger="$(loginctl show-user "$USER" --property=Linger --value 2>/dev/null)"
-  if [[ "$linger" == "yes" ]]; then
-    echo "   • linger is on — the timer survives a logout ✔"
-  else
-    echo "   🌙 linger is off for '$USER'"
-    echo "      harmless while a human session is live; on a HEADLESS box the"
-    echo "      user manager exits with the last session and the gate stops."
-    echo "      grant it from a seat with sudo: sudo loginctl enable-linger $USER"
-  fi
-
-  # 6. what the gate reads RIGHT NOW — reported, never failed: an assert would
+  # 5. what the gate reads RIGHT NOW — reported, never failed: an assert would
   #    be a second copy of the policy the payload owns
   local commit_meter="$HOME/.rhachet/storage/repo=ehmpathy/role=mechanic/.meter/git.commit.uses.jsonc"
   local radio_meter="$HOME/.rhachet/storage/repo=bhuild/role=dispatcher/.meter/radio.uses.global.jsonc"
@@ -218,7 +206,7 @@ grove_provision_5_18_openhours_provision_verify() {
   echo "   • gate right now — commit: $commit_now · radio: $radio_now"
   echo "     read the store: rhx rhachet.storage.get --what '.meter/*' --body"
 
-  # 7. 🛑 the one claim NO verify here can make — the CONVERGE leg runs only on
+  # 6. 🛑 the one claim NO verify here can make — the CONVERGE leg runs only on
   #    drift, and to manufacture drift would OPEN a gate a human closed
   echo "   🌙 the CONVERGE leg is unproven on a box with no drift"
   echo "      it runs only when the gate disagrees with the clock, so the next"

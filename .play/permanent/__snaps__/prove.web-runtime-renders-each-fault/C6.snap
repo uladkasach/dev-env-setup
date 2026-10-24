@@ -1,0 +1,4 @@
+   💥 MalfunctionError: the clone failed (git 128) — https://example.com/x.tgz
+      ⇒ the transfer was bounded and returned, so read git's own error
+        above. a 'could not read Username' means github answered 401 —
+        usually an unauthenticated rate limit on this box's egress ip

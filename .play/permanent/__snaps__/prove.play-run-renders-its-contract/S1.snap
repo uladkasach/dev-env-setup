@@ -1,0 +1,8 @@
+🎭 play.run --play prove.stub-snaps --within 900
+   └─ <fixture>/.play/permanent/prove.stub-snaps.play.sh
+
+   │  ✋ ConstraintError: no snap on disk: __snaps__/prove.stub-snaps/S.snap
+   │     ⇒ the message this arm renders is pinned nowhere, so no drift in it can redden
+   │     fix: rhx play.run --play prove.stub-snaps --resnap, then read each new snap
+
+   💥 MalfunctionError: prove.stub-snaps failed (exit 1)

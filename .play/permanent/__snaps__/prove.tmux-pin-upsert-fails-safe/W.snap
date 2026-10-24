@@ -1,0 +1,3 @@
+   ✋ ConstraintError: no temp dir for the tmux build
+      ⇒ the prior tmux is untouched; no crew lost its server
+      read why: df -h "${TMPDIR:-/tmp}"

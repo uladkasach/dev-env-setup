@@ -17,8 +17,13 @@
 #   - B. the build fails                          → ✋ names the build log
 #   - W. no temp dir for the build                → ✋, prior kept
 #   - G. no dir for the build log                 → ✋, prior kept
+#   - H. the pin placed, PATH resolves another    → ✋ names the shadow, no fetch
+#   - A. no tmux at all, and the pin fails        → the distro tmux laid as a floor
+#   - O. the pin placed, PATH holds no tmux       → ✋ names PATH; no fetch, no floor
+#   - V. a build lands, a stale tmux leads PATH   → the read-back ✋ names the shadow
 #   - X. the swap is refused                      → ✋, no stage file left behind
 #   - S. a build lands                            → rc 0, the new bytes at the path
+#   - K. a laptop apply                           → the distro package; the pin never reached
 #   - L. a swap under a LIVE process              → the process lives on, on the
 #                                                   old inode; the path holds the new
 #   in every ✋ arm the stand-in keeps the prior bytes
@@ -69,6 +74,9 @@ for _fn in grove_provision_2_8_tmux_pin_upsert grove_provision_2_8_tmux_pin_inst
   declare -F "$_fn" >/dev/null || { echo "   💥 MalfunctionError: no $_fn — the bundle builds no pin" >&2; exit 1; }
 done
 
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/.snap.operations.sh"
+
 FIX="$(mktemp -d "${TMPDIR:-/tmp}/prove.tmux-pin-upsert.XXXXXX")"
 BAIT_PID=""
 _teardown() {
@@ -89,9 +97,11 @@ web_fetch() {
   [[ "${FETCH_FAILS:-}" == yes ]] && return 1
   cp "$FIX/bytes" "$3"
 }
-pkg_install() { return 0; }
+pkg_install() { printf '%s\n' "$*" >> "$FIX/installed"; return 0; }
 bundle.root.owns() { return 0; }
 grove_provision_2_8_tmux_pin_dst() { printf '%s' "$PRIOR"; }
+# a build dir at a fixed fixture path, so a ✋ that names it renders the same each run (its snap)
+web_tempdir() { local d="$FIX/build.$1"; rm -rf "$d"; mkdir -p "$d" && printf '%s' "$d"; }
 
 # .what = run the given command as this seat, minus the root owner flags
 sudo() {
@@ -112,7 +122,7 @@ _fake() {
 
 # .what = a fresh world per arm: the prior bytes, an empty home, an adrift tmux
 _reset() {
-  rm -rf "$FIX/home" "$FIX/fetched" "$FIX/prior"
+  rm -rf "$FIX/home" "$FIX/fetched" "$FIX/prior" "$FIX/installed"
   mkdir -p "$FIX/home" "$FIX/prior" "$FIX/bin"
   printf '%s\n' "$PRIOR_BYTES" > "$PRIOR"
   printf 'not a tarball\n' > "$FIX/bytes"
@@ -136,7 +146,8 @@ _grade() {
   [[ "$held" == yes && "$out" != *"$phrase"* ]] && held="no '$phrase' in the output"
   [[ "$held" == yes && "$prior" == kept && "$(cat "$PRIOR" 2>/dev/null)" != "$PRIOR_BYTES" ]] \
     && held="the prior tmux CHANGED"
-  [[ "$held" == yes ]] && { echo "   ├─ $label ✔"; return 0; }
+  # the phrase holds → snap the whole message, keyed by the arm id (`P`, `S`, …)
+  [[ "$held" == yes ]] && { play_snap_assert arm="${label%%.*}" rendered="$out" mask="$FIX" || return 1; echo "   ├─ $label ✔"; return 0; }
   echo "   ├─ $label: $held" >&2
   printf '%s\n' "$out" | sed 's/^/   │     /' >&2
   return 1
@@ -186,8 +197,11 @@ _grade "F. fetch fails: ✋" "$rc" 1 "$out" "could not fetch" kept \
 ######################################################################
 _reset
 out="$( GROVE_UPGRADE_2_8_TMUX_SHA256="sha256:$(printf '0%.0s' {1..64})"; _upsert )"; rc=$?
-_grade "M. digest miss: ✋" "$rc" 1 "$out" "did NOT match its declared digest" kept \
+_grade "M. digest miss: ✋" "$rc" 1 "$out" "the tmux tarball is discarded unbuilt" kept \
   || failed=$(( failed + 1 ))
+# the cause is graded too, never left to the snap alone: the runtime names the miss itself
+[[ "$out" == *"INTEGRITY CHECK FAILED"* ]] \
+  || { echo "   │  └─ M: the digest miss is not named as the cause" >&2; failed=$(( failed + 1 )); }
 [[ ! -e "$FIX/home/$LOG_REL" ]] \
   || { echo "   │  └─ M: a build log exists — the bytes reached a compiler" >&2; failed=$(( failed + 1 )); }
 
@@ -196,7 +210,7 @@ _grade "M. digest miss: ✋" "$rc" 1 "$out" "did NOT match its declared digest" 
 ######################################################################
 _reset
 out="$( GROVE_UPGRADE_2_8_TMUX_SHA256="$(_bytes_digest)"; _upsert )"; rc=$?
-_grade "B. build fails: ✋ names its log" "$rc" 1 "$out" "$LOG_REL" kept \
+_grade "B. build fails: ✋ names its log" "$rc" 1 "$out" "read why: tail -40 $FIX/home/$LOG_REL" kept \
   || failed=$(( failed + 1 ))
 
 ######################################################################
@@ -214,6 +228,83 @@ _reset
 printf 'not a dir\n' > "$FIX/home/.local"
 out="$( GROVE_UPGRADE_2_8_TMUX_SHA256="$(_bytes_digest)"; _upsert )"; rc=$?
 _grade "G. no log dir: ✋" "$rc" 1 "$out" "no dir for the tmux build log" kept \
+  || failed=$(( failed + 1 ))
+
+######################################################################
+# H. the pin is placed, and PATH resolves another tmux first — ✋ the shadow, no rebuild
+######################################################################
+_reset
+rm -f "$PRIOR"
+printf '#!/usr/bin/env bash\n[[ "${1:-}" == -V ]] && echo "tmux %s"\nexit 0\n' "$GROVE_UPGRADE_2_8_TMUX_VERSION" > "$PRIOR"
+chmod +x "$PRIOR"
+out="$(_upsert)"; rc=$?
+_grade "H. a shadowed pin: ✋ names the shadow" "$rc" 1 "$out" "but PATH resolves" any && _unfetched H \
+  || failed=$(( failed + 1 ))
+
+######################################################################
+# A. a grove with NO tmux, and the pin does not land — the distro tmux is laid as a floor
+#   - the real bundle orchestrator runs; only tpm and its plugins are stubbed out
+######################################################################
+_reset
+rm -f "$FIX/bin/tmux"
+NO_TMUX="$FIX/no-tmux"
+mkdir -p "$NO_TMUX"
+IFS=: read -ra _path_dirs <<<"$PATH"
+for _d in "${_path_dirs[@]}"; do
+  for _x in "$_d"/*; do
+    [[ -x "$_x" && ! -d "$_x" ]] || continue
+    [[ "${_x##*/}" == tmux ]] && continue
+    [[ -e "$NO_TMUX/${_x##*/}" ]] || ln -s "$_x" "$NO_TMUX/${_x##*/}"
+  done
+done
+out="$(
+  grove_provision_2_8_tmux_tpm_upsert() { return 0; }
+  grove_provision_2_8_tmux_plugins_upsert() { return 0; }
+  GROVE_UPGRADE_2_8_TMUX_SHA256="sha256:$(printf '0%.0s' {1..64})"
+  PATH="$NO_TMUX" HOME="$FIX/home" GROVE_ENV_SERVER=cloud@aws.ec2 grove_provision_2_8_tmux_provision_upsert 2>&1
+)"; rc=$?
+_grade "A. no tmux, pin fails: the note says so" "$rc" 1 "$out" "held no tmux before this step" any \
+  || failed=$(( failed + 1 ))
+_grade "A. no tmux, pin fails: a floor is laid" "$rc" 1 "$out" "laid as a floor" any \
+  || failed=$(( failed + 1 ))
+grep -qx 'tmux' "$FIX/installed" 2>/dev/null \
+  || { echo "   │  └─ A: no 'pkg_install tmux' was asked for the floor" >&2; failed=$(( failed + 1 )); }
+
+######################################################################
+# O. the pin is placed, and PATH holds no tmux at all — ✋ names PATH, and no floor beside it
+######################################################################
+_reset
+rm -f "$FIX/bin/tmux" "$PRIOR"
+printf '#!/usr/bin/env bash\n[[ "${1:-}" == -V ]] && echo "tmux %s"\nexit 0\n' "$GROVE_UPGRADE_2_8_TMUX_VERSION" > "$PRIOR"
+chmod +x "$PRIOR"
+out="$(
+  grove_provision_2_8_tmux_tpm_upsert() { return 0; }
+  grove_provision_2_8_tmux_plugins_upsert() { return 0; }
+  PATH="$NO_TMUX" HOME="$FIX/home" GROVE_ENV_SERVER=cloud@aws.ec2 grove_provision_2_8_tmux_provision_upsert 2>&1
+)"; rc=$?
+_grade "O. a pin off PATH: ✋ names PATH" "$rc" 1 "$out" "but PATH holds no tmux" any && _unfetched O \
+  || failed=$(( failed + 1 ))
+if grep -qx 'tmux' "$FIX/installed" 2>/dev/null; then
+  echo "   │  └─ O: a distro floor was laid beside a placed pin" >&2
+  failed=$(( failed + 1 ))
+fi
+
+######################################################################
+# V. a build lands, yet PATH still answers with a stale tmux first — the swap is read back
+######################################################################
+_reset
+rm -f "$PRIOR"
+out="$(
+  GROVE_UPGRADE_2_8_TMUX_SHA256="$(_bytes_digest)"
+  grove_provision_2_8_tmux_pin_build() {
+    mkdir -p "$4/tmux-$GROVE_UPGRADE_2_8_TMUX_VERSION"
+    printf '#!/usr/bin/env bash\n[[ "${1:-}" == -V ]] && echo "tmux %s"\nexit 0\n' "$GROVE_UPGRADE_2_8_TMUX_VERSION" \
+      > "$4/tmux-$GROVE_UPGRADE_2_8_TMUX_VERSION/tmux"
+    chmod +x "$4/tmux-$GROVE_UPGRADE_2_8_TMUX_VERSION/tmux"
+  }
+  _upsert
+)"; rc=$?
+_grade "V. a build lands under a shadow: the read-back ✋ names it" "$rc" 1 "$out" "but PATH resolves" any \
   || failed=$(( failed + 1 ))
 
 ######################################################################
@@ -244,6 +335,32 @@ _grade "S. a build lands: the new bytes at the pin path" "$rc" 0 "$out" "built �
   || failed=$(( failed + 1 ))
 [[ "$(cat "$PRIOR" 2>/dev/null)" == "the new build" ]] \
   || { echo "   │  └─ S: the pin path does not hold the new build" >&2; failed=$(( failed + 1 )); }
+# the swap note is the one line that tells the ground operator every crew's server still runs the
+#   prior build — a green apply must never read as "the crews are on the pin"
+_grade "S. a build lands: the swap note names every seat's live servers" "$rc" 0 "$out" \
+  "that holds for EVERY seat's servers" replaced || failed=$(( failed + 1 ))
+_grade "S. a build lands: the swap note names the crew seat's own plan" "$rc" 0 "$out" \
+  "seat's own plan names them (rhx grove.provision --what 2.8.tmux)" replaced || failed=$(( failed + 1 ))
+
+######################################################################
+# K. a laptop apply — the distro package, never the pin build (catalog row 17)
+######################################################################
+_reset
+out="$(
+  grove_provision_2_8_tmux_tpm_upsert() { return 0; }
+  grove_provision_2_8_tmux_plugins_upsert() { return 0; }
+  grove_provision_2_8_tmux_pin_upsert() { echo "PIN UPSERT REACHED"; return 1; }
+  PATH="$FIX/bin:$PATH" HOME="$FIX/home" GROVE_ENV_SERVER=local@unix grove_provision_2_8_tmux_provision_upsert 2>&1
+)"; rc=$?
+# a laptop apply with tmux present prints no line, so the snap states what the apply asked
+#   of the package manager — the one act a laptop owes, and the claim this arm proves
+out="${out:-   (the upsert printed no line)}"$'\n'"   asked of the package manager: $(paste -sd' ' "$FIX/installed" 2>/dev/null)"
+_grade "K. a laptop apply: rc 0" "$rc" 0 "$out" "" kept && _unfetched K \
+  || failed=$(( failed + 1 ))
+[[ "$out" != *"PIN UPSERT REACHED"* ]] \
+  || { echo "   │  └─ K: a laptop apply reached the pin build" >&2; failed=$(( failed + 1 )); }
+grep -qx 'tmux' "$FIX/installed" 2>/dev/null \
+  || { echo "   │  └─ K: a laptop apply asked no 'pkg_install tmux'" >&2; failed=$(( failed + 1 )); }
 
 ######################################################################
 # L. a swap under a LIVE process — a crew server must keep the binary it runs

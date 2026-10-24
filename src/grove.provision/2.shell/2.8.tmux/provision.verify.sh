@@ -41,11 +41,19 @@ grove_provision_2_8_tmux_provision_verify() {
   ver="$(grove_provision_2_8_tmux_binary_version)"
   bin="$(grove_provision_2_8_tmux_binary_path)"
 
-  if [[ "$state" == absent ]]; then
+  # a placed pin off PATH is a PATH defect, and the apply refuses to rebuild under it — so this
+  #   ✋ names PATH, never an apply that would loop (the upsert's arm O says the same)
+  if [[ "$state" == absent \
+    && "$(grove_provision_2_8_tmux_pin_dst_version)" == "$GROVE_UPGRADE_2_8_TMUX_VERSION" ]]; then
+    # one reader for one defect, so the verify and the upsert's arm O read alike
+    grove_provision_2_8_tmux_pin_shadow_refusal "" "$(grove_provision_2_8_tmux_pin_dst)"
+    failed=$(( failed + 1 ))
+  elif [[ "$state" == absent ]]; then
     echo "   ✋ ConstraintError: tmux is not on PATH" >&2
     echo "      ⇒ a duct IS tmux, so this box cannot be reached over a duct and" >&2
     echo "        every termwork skill fails" >&2
     echo "      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply" >&2
+    echo "           (on a grove: run it on the ground seat, which holds sudo)" >&2
     failed=$(( failed + 1 ))
   fi
 
@@ -55,6 +63,11 @@ grove_provision_2_8_tmux_provision_verify() {
     echo "        is wedged, and a duct IS tmux" >&2
     echo "      read why: timeout 5 $bin -V" >&2
     echo "      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply" >&2
+    echo "           (on a grove: run it on the ground seat, which holds sudo)" >&2
+    failed=$(( failed + 1 ))
+  elif [[ "$state" == adrift ]] && ! grove_provision_2_8_tmux_binary_meets_owed \
+    && grove_provision_2_8_tmux_pin_is_shadowed; then
+    grove_provision_2_8_tmux_pin_shadow_refusal "$bin" "$(grove_provision_2_8_tmux_pin_dst)"
     failed=$(( failed + 1 ))
   elif [[ "$state" == adrift ]] && ! grove_provision_2_8_tmux_binary_meets_owed; then
     echo "   ✋ ConstraintError: tmux on PATH is $ver ($bin), not the pinned $GROVE_UPGRADE_2_8_TMUX_VERSION" >&2
@@ -62,6 +75,7 @@ grove_provision_2_8_tmux_provision_verify() {
     echo "        server segfaults — one crash ends every crew on the box" >&2
     echo "      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply" >&2
     echo "           the seat with root builds the pin into $(grove_provision_2_8_tmux_pin_dst)" >&2
+    echo "           (on a grove: run it on the ground seat, which holds sudo)" >&2
     failed=$(( failed + 1 ))
   fi
 

@@ -1,0 +1,6 @@
+   • tmux.conf declared (~/.tmux.conf)
+   ✋ ConstraintError: tpm's install_plugins is absent (<fixture>/home/.tmux/plugins/tpm/bin/install_plugins)
+      ⇒ the conf is on disk but its plugins cannot be fetched, so every
+        tmux session prints a run-shell error and loads none of them
+      fix: rhx grove.provision --what 2.8.tmux --mode apply
+        (the provision phase above owns tpm)

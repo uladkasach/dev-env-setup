@@ -1,0 +1,1 @@
+   ✋ ConstraintError: web_verify_gpg_signature: absent file(s) — <fixture>/absent.sig, <fixture>/absent.gpg
