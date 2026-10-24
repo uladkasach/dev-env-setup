@@ -15,4 +15,8 @@
 - verdict: ruled by the director — the cure stands on what was measured. the grove that
   crashed has run tmux 3.5a since 03:05Z with 0 segfaults since the swap through 10:30Z,
   about 7.5h with crews live. the unfound trigger is an accepted gap; no canary is owed
+- the crew server ran 3.5a over that span: a plan of `2.8.tmux` at 11:xxZ, run as camper
+  (uid 1002, the seat that owns the crews' `default` socket), asked each live server its own
+  `#{version}` and printed `• 1 live server(s) run the pinned build (3.5a) ✔`, beside 33 panes
+  and 21 clients
 - where: `.play/permanent/prove.tmux-pin-survives-config-run-output.play.sh`; `2.8.tmux/_.sh`

@@ -59,10 +59,11 @@ grove_provision_1_6_4_keyrackd_provision_upsert() {
   ####################################################################
   # 1. what is ALREADY true — read before any write
   ####################################################################
+  # a read: a unit cmp cannot read is simply not converged, so cmp's own complaint is not news
   local converged=1
-  cmp -s "$timer_src" "$unit_dir/$timer_name" || converged=0
+  cmp -s "$timer_src" "$unit_dir/$timer_name" 2>/dev/null || converged=0
   grove_provision_1_6_4_keyrackd_service_text \
-    | cmp -s - "$unit_dir/$service_name" || converged=0
+    | cmp -s - "$unit_dir/$service_name" 2>/dev/null || converged=0
   systemctl --user is-enabled "$timer_name" >/dev/null 2>&1 || converged=0
   systemctl --user is-active  "$timer_name" >/dev/null 2>&1 || converged=0
 
@@ -74,16 +75,29 @@ grove_provision_1_6_4_keyrackd_provision_upsert() {
   ####################################################################
   # 2. declare both units — EVERY run, from the one reader
   ####################################################################
-  mkdir -p "$unit_dir" || return 1
+  # each write's own complaint rides inside its ✋ as the cause, never as a bare line above it
+  local write_err
+  write_err="$(LC_ALL=C mkdir -p "$unit_dir" 2>&1)" || {
+    echo "   ✋ ConstraintError: could not make $unit_dir" >&2
+    echo "      cause: ${write_err#mkdir: }" >&2
+    return 1
+  }
 
   # ⚠️ a plain redirect, never `rhx teesafe` — a grove links no repo role, so
   #    `rhx <skill>` resolves no skill there (rule.forbid.the-driver-by-path,
   #    carve-out 3). a bundle reaches for shell, and its own verify is the check
-  grove_provision_1_6_4_keyrackd_service_text > "$unit_dir/$service_name" || {
+  # the shell's redirect complaint reads `bash: line N: <path>: <why>`; the header names the
+  #   path, so the cause keeps only the why
+  write_err="$( { LC_ALL=C grove_provision_1_6_4_keyrackd_service_text > "$unit_dir/$service_name"; } 2>&1 )" || {
     echo "   ✋ ConstraintError: could not write $unit_dir/$service_name" >&2
+    echo "      cause: ${write_err##*: }" >&2
     return 1
   }
-  cp "$timer_src" "$unit_dir/$timer_name" || return 1
+  write_err="$(LC_ALL=C cp "$timer_src" "$unit_dir/$timer_name" 2>&1)" || {
+    echo "   ✋ ConstraintError: could not write $unit_dir/$timer_name" >&2
+    echo "      cause: ${write_err#cp: }" >&2
+    return 1
+  }
   echo "   • $service_name and $timer_name declared"
 
   ####################################################################

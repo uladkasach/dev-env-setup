@@ -1,0 +1,6 @@
+   🌙 linger for this box's seats is a BOX-WIDE fact, and this seat has no root
+      ⇒ no linger: seattwo
+      ⇒ a seat converges its own $HOME; this lives outside it, and the
+        seat with sudo runs this same bundle and sets it there
+      ⇒ this seat owes no step. if that seat has not run it yet, this
+        bundle's verify names the run

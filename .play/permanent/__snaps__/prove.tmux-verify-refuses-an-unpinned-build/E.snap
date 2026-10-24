@@ -1,0 +1,7 @@
+   ✋ ConstraintError: the tmux at <fixture>/tmux does not answer 'tmux -V' within 5s
+      ⇒ a file on PATH is not a binary that runs: it is broken, or the box
+        is wedged, and a duct IS tmux
+      read why: timeout 5 <fixture>/tmux -V
+      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply
+           (on a grove: run it on the ground seat, which holds sudo)
+   • tpm present at the declared commit ✔ (<fixture>/tpm/tpm)

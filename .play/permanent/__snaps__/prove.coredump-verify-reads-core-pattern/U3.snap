@@ -1,0 +1,3 @@
+   ✋ ConstraintError: systemd-coredump is installed, and the kernel still pipes cores elsewhere
+      ⇒ another handler (a sysctl.d file sorted after the package's) holds core_pattern
+      read why: cat <fixture>/core_pattern ; sysctl --system

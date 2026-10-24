@@ -1,0 +1,6 @@
+🎭 play.run --play prove.stub-fails --within 900
+   └─ <fixture>/.play/permanent/prove.stub-fails.play.sh
+
+   ✋ stub broke
+
+   💥 MalfunctionError: prove.stub-fails failed (exit 1)

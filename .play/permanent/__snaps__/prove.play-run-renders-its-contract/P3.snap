@@ -1,0 +1,6 @@
+🎭 play.run --play prove.stub-declines --within 900
+   └─ <fixture>/.play/permanent/prove.stub-declines.play.sh
+
+   🌙 stub subject absent
+
+   ✋ ConstraintError: prove.stub-declines declined — its subject is absent, so it proved no claim

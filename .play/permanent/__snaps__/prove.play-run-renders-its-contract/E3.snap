@@ -1,0 +1,3 @@
+   ✋ ConstraintError: no play named 'prove.stub-absent'
+      looked for: <fixture>/.play/permanent/prove.stub-absent.play.sh
+      read what exists: rhx play.run --list

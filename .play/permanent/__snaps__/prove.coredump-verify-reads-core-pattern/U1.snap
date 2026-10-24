@@ -1,0 +1,1 @@
+   • the kernel already pipes each core to systemd-coredump, and no apport claims the boot

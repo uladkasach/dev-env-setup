@@ -1,0 +1,15 @@
+🎭 play.run --list
+   ├─ dir: <fixture>/.play/permanent
+   ├─ store: git ls-files (the INDEX, not the disk)
+   └─ 6 play(s)
+      ├─ lint.stub-reads  (✋ refused — a verb this runner never drives)
+      ├─ prove.stub-declines
+      ├─ prove.stub-fails
+      ├─ prove.stub-hangs
+      ├─ prove.stub-passes
+      └─ repair.stub-mends  (✋ refused — a verb this runner never drives)
+
+   ✋ ConstraintError: 1 untracked .play.sh file(s) sit in that dir, unlisted
+      ⇒ this runner refuses each of them. if one is yours, git add it;
+        if it is not, read it — a pulled tree can write here
+      read them: git -C <fixture> status --short .play/permanent

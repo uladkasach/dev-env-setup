@@ -1,0 +1,7 @@
+   ✋ ConstraintError: 'prove.stub-planted' is on disk and NOT in this repo's index
+      ⇒ this runner executes only what the repo PUBLISHES, because a
+        pulled tree can place a file here — .play/permanent is not in
+        GROVE_BOUNDARY_EXCLUDES, and .play/temporary is
+      ⇒ if you just wrote it, that is this check at work:
+           git add .play/permanent/prove.stub-planted.play.sh
+      ⇒ if you did NOT write it, read it before you do aught else

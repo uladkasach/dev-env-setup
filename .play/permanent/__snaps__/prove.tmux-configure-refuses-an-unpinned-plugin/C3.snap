@@ -1,0 +1,8 @@
+   • tmux.conf declared (~/.tmux.conf)
+   • shadow conf retired: <fixture>/xdg/tmux.conf → <fixture>/xdg/tmux.conf.bak.20261023T000000Z
+     ⇒ it loaded AFTER ~/.tmux.conf and overrode it; read it there if
+       a line in it was wanted, then move that line into this bundle
+   • tmux plugins installed (tmux-resurrect)
+   • no tmux server up — the next one reads the conf fresh
+     ⚠️ a live CLIENT still needs a reattach: terminal-features (RGB,
+        extkeys, clipboard) are negotiated at attach, never at source

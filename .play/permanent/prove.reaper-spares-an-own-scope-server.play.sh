@@ -26,9 +26,8 @@
 #
 # exit:
 #   0 = both arms hold
-#   1 = an arm failed
-#   2 = no checkout, no reaper, no user manager, or a bait that never started —
-#       no claim was graded
+#   1 = an arm failed, or the checkout holds no executable reaper
+#   2 = no checkout, no user manager, or a bait that never started — no claim was graded
 ######################################################################
 set -uo pipefail
 
@@ -71,7 +70,9 @@ _await_bait() {
   return 1
 }
 
-[[ -x "$REAPER" ]] || { echo "   ✋ ConstraintError: no reaper at $REAPER — this play measures the real executable" >&2; exit 2; }
+# the reaper is a CHECKOUT file, so its absence is a defect in the tree under proof, never an
+#   absent subject on this seat — it fails, where a seat with no user manager declines
+[[ -x "$REAPER" ]] || { echo "   💥 MalfunctionError: the checkout holds no executable reaper at $REAPER" >&2; exit 1; }
 timeout -k 2 10 systemctl --user show-environment </dev/null >/dev/null 2>&1 \
   || { echo "   ✋ ConstraintError: no user manager on this seat — no scope can be planted" >&2; exit 2; }
 
@@ -117,11 +118,25 @@ _arm_pane() {
   [[ "$RC" -eq 0 ]] || { echo "      💥 MalfunctionError: reaper exit $RC — no verdict" >&2; return 1; }
   found "$PANE" || { echo "      💥 MalfunctionError: NOT named — the own-scope arm's green proves naught" >&2; return 1; }
   echo "      ✔ named — a server born in a peer's pane would be reaped"
+  PANE_LINE="$(printf '%s\n' "$OUT" | grep "🪲 $PANE ")"
 }
+PANE_LINE=""
 
 _arm_own  || FAILED=1
 _arm_pane || FAILED=1
 
+[[ "$FAILED" -eq 0 ]] || exit "$FAILED"
+
+# the snap keeps the reaper's own words for the in-pane bait — its glyph, its name, its
+#   shape — and masks what any run varies by: the pid, the bait dir, its age, rss, and cgroup
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/.snap.operations.sh"
+PANE_SHAPE="${PANE_LINE//$PANE/<pid>}"
+PANE_SHAPE="$(printf '%s\n' "$PANE_SHAPE" | sed -E 's/^ *├─//; s/age [0-9.]+h/age <age>h/; s/rss [0-9.]+M/rss <rss>M/; s# — /.*# — <the pane cgroup, which varies by seat and session>#')"
+play_snap_assert arm=R rendered="$(printf '%s\n' \
+  "   • own-scope bait spared — the reaper named no 🪲 line for it ✔" \
+  "   • in-pane bait named — $PANE_SHAPE ✔")" mask="$TMPDIR_BAIT" || exit 1
+
 echo ""
-[[ "$FAILED" -eq 0 ]] && echo "🌲 a crew server born in its own scope is spared; one born in a pane is not"
-exit "$FAILED"
+echo "🌲 a crew server born in its own scope is spared; one born in a pane is not"
+exit 0

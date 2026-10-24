@@ -42,8 +42,10 @@ TMPDIR_BAIT="$(mktemp -d "${TMPDIR:-/tmp}/prove.coredump.XXXXXX")"
 BAIT="$TMPDIR_BAIT/prove-coredump-bait"
 cp "$(command -v sleep)" "$BAIT"
 
-# the limit is lifted for the bait alone, so the collector stores the core
-( ulimit -c unlimited; exec "$BAIT" 600 ) &
+# the bait keeps this seat's own core limit (soft 0 on a grove), as a crashed tmux
+#   server does. a lift here would prove a path production never takes: the core
+#   lands only where `core_pattern` hands the collector a limit it ignores
+( exec "$BAIT" 600 ) &
 PID="$!"
 # the signal must meet the BAIT, not the subshell before its exec — polled, never one fixed sleep
 for _ in $(seq 1 20); do
@@ -69,6 +71,15 @@ done
 
 if [[ -n "$hit" ]]; then
   echo "   └─ ✔ coredumpctl holds it: $(printf '%s' "$hit" | head -1 | tr -s ' ' | cut -c1-120)"
+
+  # the snap keeps the row's stable fields — signal, core state, exe — and masks the
+  #   pid, ids, and time a crash on any box varies by
+  # shellcheck source=/dev/null
+  source "$(dirname "${BASH_SOURCE[0]}")/.snap.operations.sh"
+  read -r _ _ _ _ _ _ _ sig core exe _ <<<"$(printf '%s' "$hit" | head -1)"
+  play_snap_assert arm=C rendered="$(printf '%s\n' \
+    "   • bait pid <pid>, sent SIGSEGV" \
+    "   • coredumpctl holds it: signal=$sig core=$core exe=${exe##*/} ✔")" || exit 1
   exit 0
 fi
 echo "   └─ 💥 MalfunctionError: no core landed for pid $PID within 30s" >&2

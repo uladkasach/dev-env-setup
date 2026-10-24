@@ -196,6 +196,53 @@ grove_provision_2_8_tmux_binary_state() {
   printf 'adrift'
 }
 
+# .what = what the build at the pin path names itself, or empty if no build sits there
+# .why the pin path and PATH's answer can part: a tmux earlier on PATH shadows the pin,
+#   and a rebuild cannot fix that — so the upsert asks both before it builds
+grove_provision_2_8_tmux_pin_dst_version() {
+  local dst ver; dst="$(grove_provision_2_8_tmux_pin_dst)"
+  [[ -x "$dst" ]] || return 0
+  ver="$(timeout -k 2 5 "$dst" -V </dev/null 2>/dev/null)"
+  printf '%s' "${ver#tmux }"
+}
+
+# .what = is the pin placed, yet a different tmux answers first on PATH?
+grove_provision_2_8_tmux_pin_is_shadowed() {
+  [[ "$(grove_provision_2_8_tmux_binary_state)" != pinned ]] \
+    && [[ "$(grove_provision_2_8_tmux_pin_dst_version)" == "$GROVE_UPGRADE_2_8_TMUX_VERSION" ]]
+}
+
+# .what = the ✋ for a pin that sits at its path while PATH resolves another tmux first
+#   asked by the upsert (before a build, and after the swap) and by the verify
+#   an empty `<shadow>` means PATH holds no tmux at all: the pin's dir is off PATH
+grove_provision_2_8_tmux_pin_shadow_refusal() {
+  local shadow="$1" dst="$2"
+  if [[ -z "$shadow" ]]; then
+    echo "   ✋ ConstraintError: tmux $GROVE_UPGRADE_2_8_TMUX_VERSION sits at $dst, but PATH holds no tmux" >&2
+    echo "      ⇒ $(dirname "$dst") is off this PATH, so no caller finds the pin" >&2
+    echo "      ⇒ no rebuild is attempted: the pin is already built, and a rebuild cannot move PATH" >&2
+    echo "      read why: echo \"\$PATH\"" >&2
+    echo "      fix: put $(dirname "$dst") on PATH for this seat's shells" >&2
+    return 0
+  fi
+  echo "   ✋ ConstraintError: tmux $GROVE_UPGRADE_2_8_TMUX_VERSION sits at $dst, but PATH resolves $shadow first" >&2
+  echo "      ⇒ every caller that asks PATH gets the shadow, so the pin protects no crew" >&2
+  echo "      ⇒ no rebuild is attempted: the pin is already built, and a rebuild cannot move PATH" >&2
+  echo "      read why: type -a tmux" >&2
+  echo "      fix: remove $shadow, or put $(dirname "$dst") ahead of $(dirname "$shadow") on PATH" >&2
+}
+
+# .what = the line a pin refusal prints about the box's tmux, true on a fresh grove too
+# .why a refusal leaves the box as it found it; what that MEANS turns on whether a tmux
+#   was there to keep
+grove_provision_2_8_tmux_refusal_note() {
+  if [[ "$(grove_provision_2_8_tmux_binary_state)" == absent ]]; then
+    printf '      ⇒ this box held no tmux before this step, and the floor below decides what it holds now\n'
+    return 0
+  fi
+  printf '      ⇒ the prior tmux is untouched; no crew lost its server\n'
+}
+
 # .what = which state does THIS tier owe? a grove owes the pin; any other tier
 #   owes a tmux present at all (the pin is grove-scoped, F2 struck)
 grove_provision_2_8_tmux_binary_owed() {
@@ -213,20 +260,17 @@ grove_provision_2_8_tmux_binary_meets_owed() {
   [[ "$state" == adrift && "$(grove_provision_2_8_tmux_binary_owed)" == present ]]
 }
 
-# .what = each live server whose OWN build is not the pin, one `<socket>=<version>` per line
+# .what = each live server's OWN build, one `<socket>=<version>` per line, or
+#   `<socket>=unreadable` for a server that did not name it
 # .why  = a server keeps the binary it started on until it ends (vision case 10);
-#   `#{version}` is the server's answer, never the client's
-# .note = a socket that does not answer is skipped here; the live walk already
-#   counts it as mute, so it is reported, never lost
-grove_provision_2_8_tmux_servers_behind_pin() {
+#   `#{version}` is the server's answer, never the client's. a silent server is
+#   reported as such, so a clean read is never inferred from an absent line
+grove_provision_2_8_tmux_server_versions() {
   local sock_name srv_ver
   while read -r sock_name; do
     [[ -n "$sock_name" ]] || continue
-    srv_ver="$(timeout -k 2 5 tmux -L "$sock_name" display-message -p '#{version}' </dev/null 2>/dev/null)" \
-      || continue
-    [[ -n "$srv_ver" ]] || continue
-    [[ "$srv_ver" == "$GROVE_UPGRADE_2_8_TMUX_VERSION" ]] && continue
-    printf '%s=%s\n' "$sock_name" "$srv_ver"
+    srv_ver="$(timeout -k 2 5 tmux -L "$sock_name" display-message -p '#{version}' </dev/null 2>/dev/null)"
+    printf '%s=%s\n' "$sock_name" "${srv_ver:-unreadable}"
   done < <(grove_provision_2_8_tmux_live_sockets)
 }
 
@@ -245,6 +289,25 @@ grove_provision_2_8_tmux_plugin_state() {
   [[ "$head" == "$pin" ]] || { echo adrift; return 0; }
 
   echo whole
+}
+
+# .what = each named plugin under a root, judged against its pin, one `<name>=<state>` per line
+#   `..._plugins_judged "$root" tpm tmux-resurrect` → `tpm=present`, `tmux-resurrect=whole`
+#   states: whole | adrift | half | absent (from `plugin_state`), `unpinned` for a name this
+#   repo pins no commit for, and `present` for tpm, which `provision.verify` grades at its pin
+# .why the verify asks the SAME state reader the upsert asks, so the two cannot disagree on a
+#   carcass or a checkout at another commit (the defect `tpm_state` already cured for tpm)
+grove_provision_2_8_tmux_plugins_judged() {
+  local root="$1"; shift
+  local name pin
+  for name in "$@"; do
+    if [[ "$name" == tpm ]]; then
+      [[ -d "$root/$name" ]] && printf '%s=present\n' "$name" || printf '%s=absent\n' "$name"
+      continue
+    fi
+    pin="$(grove_provision_2_8_tmux_plugin_at "$name")" || { printf '%s=unpinned\n' "$name"; continue; }
+    printf '%s=%s\n' "$name" "$(grove_provision_2_8_tmux_plugin_state "$root/$name" "$pin")"
+  done
 }
 
 # .what = the tpm entrypoint a conf's `run` line names, `~` expanded
@@ -391,23 +454,25 @@ grove_provision_2_8_tmux_verify_live_servers() {
 
   # 🛑 no live server still runs a plugin the conf no longer names — `status-right` IS the
   #    timer, and an unreachable socket is a corpse, so a 🌙 (m7)
-  local sockets=() haunted=() mute=0 right sock_name
+  local sockets=() haunted=() mute=0 muted=" " right sock_name
   while read -r sock_name; do
     [[ -n "$sock_name" ]] && sockets+=("$sock_name")
   done < <(grove_provision_2_8_tmux_live_sockets)
 
   for sock_name in "${sockets[@]}"; do
     right="$(timeout -k 2 5 tmux -L "$sock_name" show-options -gv status-right 2>/dev/null)" \
-      || { mute=$(( mute + 1 )); continue; }
+      || { mute=$(( mute + 1 )); muted+="$sock_name "; continue; }
     [[ "$right" == *continuum* ]] && haunted+=("$sock_name")
   done
 
-  if [[ ${#sockets[@]} -eq 0 ]]; then
+  # a mute socket is a corpse, never a live server — so it is counted below, apart
+  local live=$(( ${#sockets[@]} - mute ))
+  if [[ "$live" -eq 0 ]]; then
     echo "   • no tmux server up — none holds a stale conf"
   elif [[ ${#haunted[@]} -eq 0 ]]; then
-    echo "   • ${#sockets[@]} live server(s), none runs a removed plugin's hook ✔"
+    echo "   • $live live server(s), none runs a removed plugin's hook ✔"
   else
-    echo "   ✋ ConstraintError: ${#haunted[@]} of ${#sockets[@]} live tmux server(s) still run a hook" >&2
+    echo "   ✋ ConstraintError: ${#haunted[@]} of $live live tmux server(s) still run a hook" >&2
     echo "      from tmux-continuum, which this conf no longer names" >&2
     echo "      ⇒ each fires continuum_save.sh on every status refresh, and the" >&2
     echo "        timer is PER SERVER with no lock between them — measured at 118" >&2
@@ -423,20 +488,41 @@ grove_provision_2_8_tmux_verify_live_servers() {
   [[ "$mute" -eq 0 ]] || {
     echo "   🌙 $mute socket(s) did not answer — a socket outlives its server, so"
     echo "      these are most likely corpses, and a corpse runs no timer"
+    echo "      read why: coredumpctl list tmux   (a server that crashed leaves its core there)"
   }
 
   # 🌙 a live server older than the pin swap still runs the build it started on (case 10)
   #   - `#{version}` is the SERVER's own answer, never the client's
-  #   - a 🌙, never a ✋: the only cure is a restart, and a restart ends that crew's panes —
-  #     a choice for the crew that owns them, never for an apply
+  #   - a 🌙, never a ✋: the only cure is a restart, and a restart ends every session on
+  #     that server — a choice for whoever owns those sessions, never for an apply
+  #   - it reads the sockets of the seat that runs the verify (`live_sockets`), so a seat
+  #     sees its own servers only; the crew seat's own plan is the one that names them
+  #   - 🛑 it prints no command that ends a server: the seat that reads it is a crew seat,
+  #     often an agent inside a pane on that very server, and to end it ends every crew
   if [[ "$(grove_provision_2_8_tmux_binary_owed)" == pinned ]]; then
-    local prior=() one
-    while read -r one; do [[ -n "$one" ]] && prior+=("$one"); done \
-      < <(grove_provision_2_8_tmux_servers_behind_pin)
+    local prior=() on_pin=0 unread=0 one
+    while read -r one; do
+      [[ -n "$one" ]] || continue
+      case "${one#*=}" in
+        "$GROVE_UPGRADE_2_8_TMUX_VERSION") on_pin=$(( on_pin + 1 )) ;;
+        # a socket mute to BOTH asks is a corpse, reported once above; one that answered the
+        #   walk above and not this ask is a live server with no build named
+        unreadable) [[ "$muted" == *" ${one%%=*} "* ]] || unread=$(( unread + 1 )) ;;
+        *) prior+=("$one") ;;
+      esac
+    done < <(grove_provision_2_8_tmux_server_versions)
+    [[ ${#prior[@]} -eq 0 && "$on_pin" -gt 0 ]] \
+      && echo "   • $on_pin live server(s) run the pinned build ($GROVE_UPGRADE_2_8_TMUX_VERSION) ✔"
+    [[ "$unread" -gt 0 ]] \
+      && echo "   🌙 $unread live server(s) did not name their build — not graded against the pin"
     [[ ${#prior[@]} -eq 0 ]] || {
       echo "   🌙 ${#prior[@]} live server(s) still run a build older than the pin"
       echo "      ⇒ each keeps the binary it started on until it ends; a new server takes the pin"
-      echo "      ⇒ no apply restarts them — a restart ends that crew's panes"
+      echo "      ⇒ no apply restarts them, and no seat inside one should: a restart ends EVERY"
+      echo "        session on that server — while crews share one server, that is every crew"
+      echo "        on it, the reader's own session among them"
+      echo "      next: a human decides when those sessions may end. once each crew holds its"
+      echo "        own server (nheuron#44), a crew's restart moves only that crew to the pin"
       echo "      servers: ${prior[*]}"
     }
   fi
@@ -451,7 +537,8 @@ grove_provision_2_8_tmux_verify_live_servers() {
     [[ "$term_live" == "$term_declared" ]] || term_wrong+=("$sock_name=$term_live")
   done
 
-  if [[ ${#sockets[@]} -eq 0 ]]; then
+  # graded on LIVE servers: a corpse answers no option, so a count of sockets would print ✔ over none
+  if [[ "$live" -eq 0 ]]; then
     : # no server up — the claim above already covers what the next one loads
   elif [[ ${#term_wrong[@]} -eq 0 ]]; then
     echo "   • every live server holds default-terminal '$term_declared' ✔"
@@ -463,7 +550,7 @@ grove_provision_2_8_tmux_verify_live_servers() {
     echo "      fix: rhx grove.provision --what 2.8.tmux --mode apply" >&2
     echo "      ⚠️ a pane that ALREADY exists keeps its spawn-time TERM, so open a" >&2
     echo "        new window or pane to see the repair" >&2
-    printf '        %s\n' "${term_wrong[@]}" >&2
+    echo "      servers: ${term_wrong[*]}" >&2
     failed=$(( failed + 1 ))
   fi
 
@@ -576,6 +663,104 @@ grove_provision_2_8_tmux_verify_live_servers() {
   fi
 
   [[ "$failed" -eq 0 ]]
+}
+
+######################################################################
+# .what = the pin's build operations — floor, toolchain, fetch, build, install
+# .why here: each is one step `provision.upsert` composes; the phase keeps the order
+######################################################################
+
+# .what = on a grove with NO tmux, after the pin did not land: lay the distro tmux as a floor
+# .why a duct IS tmux — a grove with none cannot be reached at all, which is worse than
+#   the 3.2a build the pin replaces. the verify still ✋s, since the pin stays owed
+#   - never beside a placed pin: there the cure is PATH, and a second tmux adds a shadow
+grove_provision_2_8_tmux_pin_floor() {
+  [[ "$(grove_provision_2_8_tmux_binary_state)" == absent ]] || return 0
+  [[ "$(grove_provision_2_8_tmux_pin_dst_version)" == "$GROVE_UPGRADE_2_8_TMUX_VERSION" ]] && return 0
+  if pkg_install tmux; then
+    hash -r 2>/dev/null
+    echo "   🌙 the pin did not land and this grove held no tmux, so the distro tmux is laid as a floor"
+    echo "      ⇒ the box stays reachable over a duct, on the build whose server segfaulted;"
+    echo "        the pin is still owed, and the verify says so"
+    return 0
+  fi
+  echo "   ✋ ConstraintError: the pin did not land, and the distro tmux floor did not install either" >&2
+  echo "      ⇒ this grove holds no tmux, so no duct can reach it" >&2
+  echo "      read why: sudo apt-get install tmux" >&2
+  return 1
+}
+
+# .what = the toolchain the build needs — each one an ordinary apt package
+# .note = no yacc: a release tarball ships its parser pre-generated
+grove_provision_2_8_tmux_pin_toolchain() {
+  pkg_install build-essential pkg-config libevent-dev libncurses-dev && return 0
+  echo "   ✋ ConstraintError: the tmux build toolchain did not install" >&2
+  grove_provision_2_8_tmux_refusal_note >&2
+  echo "      read why: sudo apt-get install build-essential pkg-config libevent-dev libncurses-dev" >&2
+  return 1
+}
+
+# .what = fetch the pinned tarball, and verify it BEFORE any byte reaches a compiler
+grove_provision_2_8_tmux_pin_fetch() {
+  local tarball="$2"
+  if ! web_fetch "$GROVE_UPGRADE_2_8_TMUX_URL" --into "$tarball"; then
+    echo "   ✋ ConstraintError: could not fetch tmux $GROVE_UPGRADE_2_8_TMUX_VERSION" >&2
+    grove_provision_2_8_tmux_refusal_note >&2
+    echo "      read why: $GROVE_UPGRADE_2_8_TMUX_URL" >&2
+    return 1
+  fi
+  web_verify_sha256 --file "$tarball" --sha256 "$GROVE_UPGRADE_2_8_TMUX_SHA256" && return 0
+  # the runtime's ✋ above already names the miss; these lines are its tmux share, one block
+  echo "      ⇒ the tmux tarball is discarded unbuilt" >&2
+  grove_provision_2_8_tmux_refusal_note >&2
+  echo "      ⇒ either the transfer corrupted, or the release was re-uploaded" >&2
+  echo "      read why: rhx play.run --play prove.tmux-tarball-matches-the-pin" >&2
+  echo "           a green there means the transfer corrupted — re-run the apply;" >&2
+  echo "           a red means the release moved — re-pin from a second party (see _.sh)" >&2
+  return 1
+}
+
+# .what = build tmux from a verified tarball, into `<dir>/tmux-<version>/tmux`
+# .why the log outlives the temp dir — a compiler error is the one fact a ✋ here must hand over
+grove_provision_2_8_tmux_pin_build() {
+  local tarball="$2" into="$4"
+  local log_dir="$HOME/.local/state/grove.provision"
+  local log="$log_dir/2.8.tmux.build.log"
+  # mkdir's own complaint rides inside the ✋ as its cause, never as a bare line above it
+  local mkdir_err
+  # LC_ALL=C: the tool's words ride inside the ✋ as `cause:`, and one locale keeps them alike on every box
+  mkdir_err="$(LC_ALL=C mkdir -p "$log_dir" 2>&1)" || {
+    echo "   ✋ ConstraintError: no dir for the tmux build log at $log_dir" >&2
+    grove_provision_2_8_tmux_refusal_note >&2
+    echo "      cause: ${mkdir_err#mkdir: }" >&2
+    echo "      read why: ls -ld \"$(dirname "$log_dir")\"" >&2
+    return 1
+  }
+
+  # the build is quiet for minutes, so say so first; `nice` keeps it below live crews
+  echo "   • tmux $GROVE_UPGRADE_2_8_TMUX_VERSION builds from source now — a few minutes (log: $log)"
+  local src="$into/tmux-$GROVE_UPGRADE_2_8_TMUX_VERSION"
+  { tar -xzf "$tarball" -C "$into" \
+      && ( cd "$src" && ./configure --prefix=/usr/local && nice -n 10 make -j"$(nproc)" ); } \
+    >"$log" 2>&1 && return 0
+  echo "   ✋ ConstraintError: tmux $GROVE_UPGRADE_2_8_TMUX_VERSION did not build" >&2
+  grove_provision_2_8_tmux_refusal_note >&2
+  echo "      read why: tail -40 $log" >&2
+  return 1
+}
+
+# .what = place a built binary at `<dst>`: install beside it, then rename over it
+# .why a rename, never a write in place: a live server holds the old inode (ETXTBSY);
+#   the same stage-then-rename `1.10.hosts` uses for `/etc/hosts`
+grove_provision_2_8_tmux_pin_install() {
+  local from="$2" dst="$4"
+  local stage="$dst.grove-provision.new"
+  sudo install -m 0755 -o root -g root "$from" "$stage" && sudo mv -f "$stage" "$dst" && return 0
+  sudo rm -f "$stage" 2>/dev/null
+  echo "   ✋ ConstraintError: the built tmux could not be placed at $dst" >&2
+  grove_provision_2_8_tmux_refusal_note >&2
+  echo "      read why: ls -l $(dirname "$dst")" >&2
+  return 1
 }
 
 grove_provision_2_8_tmux() {

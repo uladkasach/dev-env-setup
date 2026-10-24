@@ -1,0 +1,4 @@
+   ✋ ConstraintError: no ~/.tmux.conf on this box
+      ⇒ tmux runs with its stock defaults: no mouse, 2k scrollback, and
+        none of the keybinds a duct and the termwork skills drive
+      fix: rhx grove.provision --what 2.8.tmux --mode apply

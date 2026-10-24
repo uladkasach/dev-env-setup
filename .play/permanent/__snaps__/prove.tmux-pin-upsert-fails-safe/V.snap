@@ -1,0 +1,10 @@
+   • tmux 3.5a built → <fixture>/prior/tmux
+     prior: 3.2a (<fixture>/bin/tmux); live servers keep the build they started on
+     ⇒ that holds for EVERY seat's servers, and this seat's plan sees its own only:
+       a crew seat's servers stay on the prior build until they end, and the crew
+       seat's own plan names them (rhx grove.provision --what 2.8.tmux)
+   ✋ ConstraintError: tmux 3.5a sits at <fixture>/prior/tmux, but PATH resolves <fixture>/bin/tmux first
+      ⇒ every caller that asks PATH gets the shadow, so the pin protects no crew
+      ⇒ no rebuild is attempted: the pin is already built, and a rebuild cannot move PATH
+      read why: type -a tmux
+      fix: remove <fixture>/bin/tmux, or put <fixture>/prior ahead of <fixture>/bin on PATH

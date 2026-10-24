@@ -1,0 +1,4 @@
+   ✋ ConstraintError: a play is named by SLUG, never by path: '../prove.stub-passes'
+      ⇒ every play lives in <fixture>/.play/permanent, so a path adds no reach and
+        would let this runner become a general shell
+      read what exists: rhx play.run --list

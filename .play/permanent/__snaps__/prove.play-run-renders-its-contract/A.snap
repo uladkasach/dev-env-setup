@@ -1,0 +1,42 @@
+🎭 play.run --play prove.stub-declines --within 2
+   └─ <fixture>/.play/permanent/prove.stub-declines.play.sh
+
+   🌙 stub subject absent
+
+   ✋ ConstraintError: prove.stub-declines declined — its subject is absent, so it proved no claim
+
+🎭 play.run --play prove.stub-fails --within 2
+   └─ <fixture>/.play/permanent/prove.stub-fails.play.sh
+
+   ✋ stub broke
+
+   💥 MalfunctionError: prove.stub-fails failed (exit 1)
+
+🎭 play.run --play prove.stub-hangs --within 2
+   └─ <fixture>/.play/permanent/prove.stub-hangs.play.sh
+
+
+   ✋ ConstraintError: prove.stub-hangs did not finish within 2s, so it proved no claim
+      ⇒ a bound that elapses is not a verdict about the subject
+      rerun with a wider bound: rhx play.run --play prove.stub-hangs --within 3600
+
+🎭 play.run --play prove.stub-passes --within 2
+   └─ <fixture>/.play/permanent/prove.stub-passes.play.sh
+
+   • stub holds ✔
+
+🌲 prove.stub-passes ✔
+
+🎭 play.run --all --within 2
+   ├─ passed: 1 of 6
+   ├─ failed: 1
+   │  └─ 💥 prove.stub-fails
+   ├─ declined or timed out: 2
+   │  ├─ ✋ prove.stub-declines
+   │  └─ ✋ prove.stub-hangs
+   └─ refused — a verb this runner never drives: 2
+      ├─ ✋ lint.stub-reads
+      └─ ✋ repair.stub-mends
+
+   💥 MalfunctionError: 1 play(s) failed
+      read one again: rhx play.run --play <slug>

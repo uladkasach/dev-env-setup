@@ -1,0 +1,12 @@
+   • ~/.tmux.conf matches the checkout ✔
+   🌙 no tmux server answered, so which confs tmux loads cannot be observed
+      ⇒ either none runs, or none that runs replied within 5s
+   ✋ ConstraintError: a tmux plugin the conf names is ABSENT, or a cut clone: tmux-resurrect
+      in: <fixture>/home/.tmux/plugins
+      ⇒ this is SILENT at runtime: tmux starts, the conf loads, and the
+        plugin's keybinds and status segments are simply omitted with no
+        error anywhere. the human finds it by pressing a dead key
+      ⇒ tmux-resurrect is what saves a session on prefix+ctrl-s and
+        restores it on prefix+ctrl-r, so its absence makes both keys dead
+      fix: rhx grove.provision --what 2.8.tmux --mode apply
+   • default-terminal 'tmux-256color' — terminfo holds it ✔

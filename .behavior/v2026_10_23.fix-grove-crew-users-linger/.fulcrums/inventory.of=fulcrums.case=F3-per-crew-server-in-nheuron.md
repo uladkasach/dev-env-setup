@@ -10,3 +10,9 @@
 - confidence 70%, low because the instruction says the provision fix should "carry" one server
   per crew, which may mean it expects code here
 - where: radio task into uladkasach/nheuron
+- re-asked i004 by r10 (enroll-impl-behavior-intent, blocker.1): the wish title promises one
+  crash ends one crew, and here every crew still shares `default`; case 6 has no test here. the
+  test of case 6 is owed where the split lands (nheuron#44). this repo's share: the PR now says
+  what it does not deliver (draft `.temp/pr170.body.md`). a per-plan 🌙 "N crews share one
+  server" was weighed and declined: it would fire on every grove until nheuron#44 lands, a
+  permanent moon a reader learns to skip

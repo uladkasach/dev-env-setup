@@ -1,0 +1,5 @@
+   💥 MalfunctionError: the fetch TIMED OUT (curl 28) — https://example.com/x.tgz
+      ⇒ the transfer stalled: it sat below 1KB/s for 60s, or ran past
+        600s in total. that is a wire fault, NOT an absent file
+      ⇒ a grove reaches the wire through its nat, so a stalled flow
+        there is the ordinary failure of that path — retry first

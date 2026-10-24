@@ -1,0 +1,7 @@
+   • keyrack_daemon_prune.service matches this checkout ✔
+   • keyrack_daemon_prune.timer matches this checkout ✔
+   • keyrack_daemon_prune.timer is enabled ✔
+   ✋ ConstraintError: keyrack_daemon_prune.timer is not armed
+      ⇒ enabled and inactive means it fires never, and the daemon
+        pool grows with no signal until the box reaches swap
+      fix: systemctl --user start keyrack_daemon_prune.timer

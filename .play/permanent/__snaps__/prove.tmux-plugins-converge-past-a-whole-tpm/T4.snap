@@ -1,0 +1,5 @@
+   ✋ ConstraintError: <fixture>/home/.tmux/plugins/tpm holds a tpm this bundle cannot use (half), and the
+      dir could not be moved aside
+      ⇒ the path is named in ~/.tmux.conf's 'run' line, so a clone
+        cannot land anywhere else
+      read why: ls -ld <fixture>/home/.tmux/plugins/tpm ; touch <fixture>/home/.tmux/plugins/tpm/.probe
