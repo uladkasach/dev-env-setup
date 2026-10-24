@@ -37,8 +37,10 @@ grove_provision_1_6_4_keyrackd_min_age() { printf '10'; }
 #         false on any worktree
 # 🛑 apply `--from main` — a `--from tree` apply binds a PERMANENT timer to a
 #    worktree a remove can delete, and a worktree plan's drift ✋ is CORRECT
+#   the checkout root is `$GROVE_SRC`'s parent, cut by string so no `..` reaches a unit or a message
 grove_provision_1_6_4_keyrackd_skill() {
-  printf '%s/../.agent/repo=.this/role=any/skills/keyrack.daemon.prune.sh' "$GROVE_SRC"
+  local src="${GROVE_SRC%/}"
+  printf '%s/.agent/repo=.this/role=any/skills/keyrack.daemon.prune.sh' "${src%/*}"
 }
 
 # .what = the DECLARED service bytes for this box

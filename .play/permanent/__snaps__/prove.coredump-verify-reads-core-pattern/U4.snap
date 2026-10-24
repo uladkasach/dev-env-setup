@@ -1,0 +1,3 @@
+   ✋ ConstraintError: systemd-coredump did not install
+      ⇒ a crash on this box still leaves no core to read
+      read why: sudo apt-get install systemd-coredump

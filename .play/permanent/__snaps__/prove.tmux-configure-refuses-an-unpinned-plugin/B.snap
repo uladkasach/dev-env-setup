@@ -1,0 +1,3 @@
+   • a server on the bad conf: starts, holds no @plugin
+   • source-file -n on the bad conf: refused — <fixture>/bad.conf:2: unknown command: this-is-not-a-tmux-command
+   • source-file -n on the repo's conf: parses

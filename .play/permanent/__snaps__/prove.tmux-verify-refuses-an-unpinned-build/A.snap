@@ -1,0 +1,7 @@
+   ✋ ConstraintError: tmux on PATH is 3.2a (<fixture>/tmux), not the pinned 3.5a
+      ⇒ every crew on a grove shares one tmux server, and the distro 3.2a
+        server segfaults — one crash ends every crew on the box
+      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply
+           the seat with root builds the pin into <fixture>/no-pin/tmux
+           (on a grove: run it on the ground seat, which holds sudo)
+   • tpm present at the declared commit ✔ (<fixture>/tpm/tpm)

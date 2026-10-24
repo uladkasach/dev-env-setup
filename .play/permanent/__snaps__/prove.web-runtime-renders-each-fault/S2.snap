@@ -1,0 +1,3 @@
+   ✋ ConstraintError: web_verify_sha256: no file at <fixture>/absent
+      ⇒ an absent file is a FAILED check, never a passed one — a fetch
+        that landed no bytes must not read as an artifact that matched

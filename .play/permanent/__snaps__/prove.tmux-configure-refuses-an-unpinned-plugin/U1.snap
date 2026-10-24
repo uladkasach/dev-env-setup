@@ -1,0 +1,5 @@
+   ✋ ConstraintError: the conf names a tmux plugin this repo pins no commit for: tmux-unvouched
+      ⇒ ~/.tmux.conf is left as it was, no plugin was installed, and no live server
+        sourced the conf
+      fix: pin it in 2.8.tmux/_.sh (plugin_names, plugin_url, plugin_at), or drop
+        its @plugin line from tmux.conf

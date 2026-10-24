@@ -1,0 +1,32 @@
+   • 2 live server(s), none runs a removed plugin's hook ✔
+   🌙 1 live server(s) still run a build older than the pin
+      ⇒ each keeps the binary it started on until it ends; a new server takes the pin
+      ⇒ no apply restarts them, and no seat inside one should: a restart ends EVERY
+        session on that server — while crews share one server, that is every crew
+        on it, the reader's own session among them
+      next: a human decides when those sessions may end. once each crew holds its
+        own server (nheuron#44), a crew's restart moves only that crew to the pin
+      servers: prior=3.2a
+   ✋ ConstraintError: 1 live server(s) hold a default-terminal the conf does NOT declare
+      ⇒ each pane spawned there inherits that TERM and EMITS to match, so
+        an 8-colour entry clamps colour at its source — invisible to every
+        claim above, which read the conf rather than the server
+      fix: rhx grove.provision --what 2.8.tmux --mode apply
+      ⚠️ a pane that ALREADY exists keeps its spawn-time TERM, so open a
+        new window or pane to see the repair
+      servers: prior=screen
+   ✋ ConstraintError: 1 of 2 live pane(s) hold a TERM the conf does NOT declare
+      ⇒ TERM is copied into a pane's child AT SPAWN and never re-read, so
+        these predate the conf reaching their server. the app inside each
+        reads that TERM, concludes 8 colours, and EMITS only 8-colour
+        codes — a clamp at the SOURCE that no client feature can undo
+      ⇒ no re-apply repairs a pane. the server is already correct, so a
+        NEW pane or window spawns right; these carry their old copy until
+        they exit
+      fix, per affected pane — whichever reaches it:
+        • a pane you sit at:  open a new one (prefix c / prefix %)
+        • a grove's duct:     rhx duct.reboot --on 'duct://<grove>/<tree>/<role>'
+          ⇒ the session, its name, its scrollback, and its cwd survive;
+            only the pane's child dies, and its replacement spawns with
+            the TERM the server now declares
+   • the conf declares no terminal-features — no client claim to grade

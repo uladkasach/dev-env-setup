@@ -6,7 +6,7 @@
 # .why
 #   - a USER timer, since the gate state lives under the human's home
 #   - `daemon-reload` runs before `enable --now`, since systemd caches unit files
-#   - linger is attempted and reported, never asserted
+#   - no linger here: `1.6.7.linger` owns that fact for every human seat, and runs first
 #   - each step's reason: `howdoes.the-openhours-gate-converges`
 ######################################################################
 
@@ -23,7 +23,7 @@ grove_provision_5_18_openhours_provision_upsert() {
   ####################################################################
   local fault
   if ! fault="$(grove_provision_5_18_openhours_schedule_check)"; then
-    echo "   ✋ the declared schedule is malformed: $fault" >&2
+    echo "   ✋ ConstraintError: the declared schedule is malformed: $fault" >&2
     echo "      ⇒ fix it at its one declaration:" >&2
     echo "        src/grove.provision/5.devtools/5.18.openhours/_.sh" >&2
     return 1
@@ -56,7 +56,7 @@ grove_provision_5_18_openhours_provision_upsert() {
     return 0
   fi
 
-  mkdir -p "$bin_dir" "$unit_dir" || return 1
+  grove_provision_5_18_openhours_step "make $bin_dir and $unit_dir" mkdir -p "$bin_dir" "$unit_dir" || return 1
 
   ####################################################################
   # 1. the reconciler and its two units — each from a declared source
@@ -72,13 +72,14 @@ grove_provision_5_18_openhours_provision_upsert() {
     local src="$GROVE_SRC/machine/$name"
 
     if [[ ! -f "$src" ]]; then
-      echo "   ✋ no $name at $src" >&2
+      echo "   ✋ ConstraintError: no $name at $src" >&2
       echo "      ⇒ this run's own checkout is incomplete" >&2
       return 1
     fi
-    cp "$src" "$dst" || return 1
+    grove_provision_5_18_openhours_step "write $dst" cp "$src" "$dst" || return 1
   done
-  chmod +x "$bin_dir/machine_openhours_reconcile" || return 1
+  grove_provision_5_18_openhours_step "mark the reconciler executable" \
+    chmod +x "$bin_dir/machine_openhours_reconcile" || return 1
   echo "   • the open-hours reconciler and its two units declared"
 
   # 2. the cwd the reconciler stands in, BUILT rather than borrowed
@@ -90,7 +91,7 @@ grove_provision_5_18_openhours_provision_upsert() {
     echo "   • the reconciler's cwd is built and at the pin"
   else
     command -v pnpm >/dev/null 2>&1 || {
-      echo "   ✋ pnpm is absent, so the reconciler's cwd cannot be built" >&2
+      echo "   ✋ ConstraintError: pnpm is absent, so the reconciler's cwd cannot be built" >&2
       echo "      ⇒ 5.1.node installs it and runs BEFORE this bundle, so an" >&2
       echo "        absent pnpm means THAT bundle did not converge" >&2
       echo "      fix: rhx grove.provision --what 5.1.node --mode apply" >&2
@@ -102,19 +103,19 @@ grove_provision_5_18_openhours_provision_upsert() {
     #    link is a top-level rhachet verb, so it wants the base binary
     #    (`rule.require.invoke-rhx-by-its-bare-name` governs the SKILL surface)
     command -v rhachet >/dev/null 2>&1 || {
-      echo "   ✋ rhachet is absent, so no role can be linked into the cwd" >&2
+      echo "   ✋ ConstraintError: rhachet is absent, so no role can be linked into the cwd" >&2
       echo "      ⇒ 5.3.brains installs it and runs BEFORE this bundle" >&2
       echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
       return 1
     }
 
-    mkdir -p "$GROVE_OPENHOURS_CWD" || return 1
+    grove_provision_5_18_openhours_step "make the cwd $GROVE_OPENHOURS_CWD" mkdir -p "$GROVE_OPENHOURS_CWD" || return 1
 
     # ⚠️ `git init` alone satisfies the gate skills — both ask
     #    `git rev-parse --show-toplevel`, which answers on a repo with no
     #    commit (`git.commit.operations.sh:102`). so no commit is owed here
     if [[ ! -d "$GROVE_OPENHOURS_CWD/.git" ]]; then
-      git -C "$GROVE_OPENHOURS_CWD" init -q || return 1
+      grove_provision_5_18_openhours_step "git init the cwd" git -C "$GROVE_OPENHOURS_CWD" init -q || return 1
     fi
 
     # a package.json is what `pnpm add` writes into; without one it walks UP
@@ -128,7 +129,7 @@ grove_provision_5_18_openhours_provision_upsert() {
     #    provision path does not fail one phase, it holds the duct and every
     #    command sent after it (`rule.require.bounded-probes-in-verifies`)
     if ! ( cd "$GROVE_OPENHOURS_CWD" && web_pnpm add "${GROVE_OPENHOURS_ROLE_PKGS[@]}" ); then
-      echo "   ✋ could not install the gate skills' role packages" >&2
+      echo "   ✋ ConstraintError: could not install the gate skills' role packages" >&2
       echo "      ⇒ the reconciler would tick, read the clock, and reach no" >&2
       echo "        skill — the gate never moves" >&2
       echo "      read why: cd $GROVE_OPENHOURS_CWD && pnpm add ${GROVE_OPENHOURS_ROLE_PKGS[*]}" >&2
@@ -141,7 +142,7 @@ grove_provision_5_18_openhours_provision_upsert() {
     for link in "ehmpathy:mechanic" "bhuild:dispatcher"; do
       if ! ( cd "$GROVE_OPENHOURS_CWD" \
              && rhachet roles link --repo "${link%%:*}" --role "${link#*:}" >/dev/null 2>&1 ); then
-        echo "   ✋ could not link repo=${link%%:*}/role=${link#*:} into the cwd" >&2
+        echo "   ✋ ConstraintError: could not link repo=${link%%:*}/role=${link#*:} into the cwd" >&2
         echo "      ⇒ rhx finds a skill among the roles linked into its cwd, so" >&2
         echo "        the reconciler resolves no gate skill without this" >&2
         echo "      read why: cd $GROVE_OPENHOURS_CWD && rhachet roles link --repo ${link%%:*} --role ${link#*:}" >&2
@@ -154,7 +155,7 @@ grove_provision_5_18_openhours_provision_upsert() {
     #   than infer it from its last exit code (`rule.forbid.failhide`)
     cwd_state="$(grove_provision_5_18_openhours_cwd_state)"
     if [[ "$cwd_state" != "whole" ]]; then
-      echo "   ✋ the cwd was built and still reads '$cwd_state'" >&2
+      echo "   ✋ ConstraintError: the cwd was built, and still is not at the pin" >&2
       echo "      ⇒ expected a git repo that carries both gate skills at the pin:" >&2
       echo "        $GROVE_OPENHOURS_CWD" >&2
       return 1
@@ -164,9 +165,10 @@ grove_provision_5_18_openhours_provision_upsert() {
   echo "     $GROVE_OPENHOURS_CWD"
 
   # 2.5 the schedule the payload reads — RENDERED, so the verify can diff it
-  mkdir -p "$(dirname "$GROVE_OPENHOURS_SCHEDULE")" || return 1
+  grove_provision_5_18_openhours_step "make the schedule's dir" \
+    mkdir -p "$(dirname "$GROVE_OPENHOURS_SCHEDULE")" || return 1
   grove_provision_5_18_openhours_schedule_render > "$GROVE_OPENHOURS_SCHEDULE" || {
-    echo "   ✋ could not write the schedule to $GROVE_OPENHOURS_SCHEDULE" >&2
+    echo "   ✋ ConstraintError: could not write the schedule to $GROVE_OPENHOURS_SCHEDULE" >&2
     echo "      ⇒ the reconciler reads no window and dies on every tick" >&2
     return 1
   }
@@ -176,7 +178,7 @@ grove_provision_5_18_openhours_provision_upsert() {
   # 3. reload FIRST — the header says why a rewrite alone does no work
   ####################################################################
   systemctl --user daemon-reload || {
-    echo "   ✋ systemctl --user daemon-reload failed" >&2
+    echo "   ✋ ConstraintError: systemctl --user daemon-reload failed" >&2
     echo "      ⇒ the new unit files are on disk and the OLD definitions stay" >&2
     echo "        live, so the fix appears applied and the box does not change" >&2
     return 1
@@ -185,34 +187,17 @@ grove_provision_5_18_openhours_provision_upsert() {
   if systemctl --user enable --now machine_openhours_reconcile.timer; then
     echo "   • machine_openhours_reconcile.timer enabled and started (2/hr)"
   else
-    echo "   ✋ could not enable machine_openhours_reconcile.timer" >&2
+    echo "   ✋ ConstraintError: could not enable machine_openhours_reconcile.timer" >&2
     echo "      ⇒ the gate never converges, so a box left open at 20:00 stays" >&2
     echo "        open through the next work day with no signal that it did" >&2
     return 1
   fi
 
-  ####################################################################
-  # 4. linger — attempted, reported, never fatal (see the header)
-  ####################################################################
-  local linger
-  linger="$(loginctl show-user "$USER" --property=Linger --value 2>/dev/null)"
-  if [[ "$linger" == "yes" ]]; then
-    echo "   • linger already on — the timer survives a logout"
-  elif loginctl enable-linger "$USER" 2>/dev/null; then
-    echo "   • linger enabled — the timer survives a logout"
-  else
-    echo "   🌙 could not enable linger for '$USER'"
-    echo "      costs no gate while a human session is live; on a HEADLESS box"
-    echo "      the user manager exits with the last session and the gate stops."
-    echo "      grant it from a seat with sudo:"
-    echo "        sudo loginctl enable-linger $USER"
-  fi
-
-  # 5. converge once, now: an un-converged gate on a first apply reads "open"
+  # 4. converge once, now: an un-converged gate on a first apply reads "open"
   if "$bin_dir/machine_openhours_reconcile"; then
     echo "   • the gate converged to the policy for right now"
   else
-    echo "   ✋ the reconciler ran and could not converge the gate" >&2
+    echo "   ✋ ConstraintError: the reconciler ran and could not converge the gate" >&2
     echo "      read why: $bin_dir/machine_openhours_reconcile" >&2
     return 1
   fi

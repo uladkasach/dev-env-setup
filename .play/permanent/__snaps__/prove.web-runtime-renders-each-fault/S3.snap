@@ -1,0 +1,10 @@
+   ✋ ConstraintError: INTEGRITY CHECK FAILED — <fixture>/artifact
+      expected: 0000000000000000000000000000000000000000000000000000000000000000
+      received: 95cc8e8ec552664096b998c62dfd5dfd0a41c96154de6814d918d1ca34bfc225
+      ⇒ do NOT extract, run, or install these bytes. two causes, and
+        they want opposite repairs:
+        · the pin is STALE — upstream published a new build under the
+          same url. bump the version AND the hash in one edit
+        · the bytes are WRONG — a mirror, cdn, or release account served
+          something upstream did not publish. that is the case this
+          check exists for, and it is not a bump

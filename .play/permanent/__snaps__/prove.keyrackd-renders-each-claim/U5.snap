@@ -1,0 +1,4 @@
+   • keyrack_daemon_prune.service and keyrack_daemon_prune.timer declared
+   ✋ ConstraintError: systemctl --user daemon-reload failed
+      ⇒ the new unit files are on disk and the OLD definitions stay
+        live, so the fix appears applied and the box does not change

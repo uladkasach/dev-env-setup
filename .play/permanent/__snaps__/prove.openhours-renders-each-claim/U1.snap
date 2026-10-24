@@ -1,0 +1,6 @@
+   🌙 openhours is opted out — the timer is stopped and its files removed
+      the gates are left EXACTLY as they stand; this opens none
+      this box has not elected the gate; the default is off
+      opt in: rhx machine.openhours.optin.set --mode apply
+              rhx grove.provision --what 5.18.openhours --mode apply
+      read it: rhx machine.openhours.optin.get

@@ -1,0 +1,3 @@
+   ✋ ConstraintError: the tmux build toolchain did not install
+      ⇒ the prior tmux is untouched; no crew lost its server
+      read why: sudo apt-get install build-essential pkg-config libevent-dev libncurses-dev

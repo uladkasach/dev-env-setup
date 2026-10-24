@@ -390,9 +390,14 @@ bundle.root.declines() {
     return 0
   fi
 
+  # ⚠️ this seat cannot read whether the seat with sudo has RUN yet, so it claims only
+  #    what it owns. "and none by a human" was printed here above a verify ✋ that named
+  #    the ground seat's run as owed — on a live grove, before that seat had applied a new
+  #    bundle. the verify reads the fact; the decline points at it
   echo "      ⇒ a seat converges its own \$HOME; this lives outside it, and the"
   echo "        seat with sudo runs this same bundle and sets it there"
-  echo "      ⇒ no step is owed by this seat, and none by a human"
+  echo "      ⇒ this seat owes no step. if that seat has not run it yet, this"
+  echo "        bundle's verify names the run"
   return 0
 }
 

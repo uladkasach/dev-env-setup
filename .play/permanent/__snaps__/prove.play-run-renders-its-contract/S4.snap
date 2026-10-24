@@ -1,0 +1,12 @@
+🎭 play.run --play prove.stub-snaps --within 900
+   └─ <fixture>/.play/permanent/prove.stub-snaps.play.sh
+
+   │  ✋ snap differs: __snaps__/prove.stub-snaps/S.snap
+   │     --- snap: S
+   │     +++ this run: S
+   │     @@ -1 +1 @@
+   │     -the stub message
+   │     +a drifted stub message
+   │     ⇒ if the change is meant: rhx play.run --play prove.stub-snaps --resnap, then review the diff
+
+   💥 MalfunctionError: prove.stub-snaps failed (exit 1)

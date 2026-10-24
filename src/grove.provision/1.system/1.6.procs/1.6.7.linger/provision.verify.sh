@@ -15,13 +15,25 @@
 ######################################################################
 
 grove_provision_1_6_7_linger_provision_verify() {
-  local unlingered=() seat
+  # an empty roster proves no seat lingers — a ✔ over zero seats is the very silence
+  #   this bundle exists to end
+  local roster=() unlingered=() seat
+  while read -r seat; do
+    [[ -n "$seat" ]] && roster+=("$seat")
+  done < <(grove_provision_1_6_7_linger_roster)
+  if [[ ${#roster[@]} -eq 0 ]]; then
+    echo "   ✋ ConstraintError: the passwd roster names no human seat, so no seat's linger could be read" >&2
+    echo "      ⇒ a box with crews has at least one; an empty read means the roster itself is unread" >&2
+    echo "      read why: getent passwd" >&2
+    return 1
+  fi
+
   while read -r seat; do
     [[ -n "$seat" ]] && unlingered+=("$seat")
   done < <(grove_provision_1_6_7_linger_unlingered)
 
   if [[ ${#unlingered[@]} -eq 0 ]]; then
-    echo "   • every human seat lingers ✔"
+    echo "   • every human seat lingers: ${roster[*]} ✔"
     return 0
   fi
 
@@ -33,5 +45,6 @@ grove_provision_1_6_7_linger_provision_verify() {
   done
   echo "      fix: sudo -v && rhx grove.provision --what 1.6.7.linger --mode apply" >&2
   echo "           the seat with root grants it to every seat" >&2
+  echo "           (on a grove: run it on the ground seat, which holds sudo)" >&2
   return 1
 }
