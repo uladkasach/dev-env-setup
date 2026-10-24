@@ -1,0 +1,5 @@
+   ✋ ConstraintError: a crash on this box leaves no core systemd-coredump can show
+      ⇒ core_pattern: |/usr/share/apport/apport -p%p -s%s -c%c -d%d -P%P -u%u -g%g -- %E
+      ⇒ the next tmux segfault would be guessed at, never read
+      fix: sudo -v && rhx grove.provision --what 1.6.8.coredump --mode apply
+           (on a grove: run it on the ground seat, which holds sudo)

@@ -1,0 +1,6 @@
+   • tpm already at the declared commit (<fixture>/home/.tmux/plugins/tpm)
+   ✋ ConstraintError: could not clone tmux-resurrect to <fixture>/home/.tmux/plugins/tmux-resurrect
+      ⇒ tmux.conf names it as a tpm '@plugin', so tpm would fetch it
+        at default-branch tip instead — which is the unpinned clone
+        this step exists to prevent. do NOT let tpm cover for it
+      ⇒ git_clone named the fault above and removed the partial dir

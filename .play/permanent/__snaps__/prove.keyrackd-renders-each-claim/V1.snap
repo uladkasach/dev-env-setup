@@ -1,0 +1,4 @@
+   • keyrack_daemon_prune.service matches this checkout ✔
+   • keyrack_daemon_prune.timer matches this checkout ✔
+   • keyrack_daemon_prune.timer is enabled ✔
+   • keyrack_daemon_prune.timer is armed on this boot ✔

@@ -1,0 +1,2 @@
+   ✋ ConstraintError: web_verify_gpg_fingerprints: unknown argument '--key'
+      valid: --file <key file>, --fpr <fingerprint> (repeatable)

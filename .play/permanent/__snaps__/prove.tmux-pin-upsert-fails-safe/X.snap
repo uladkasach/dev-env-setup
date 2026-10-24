@@ -1,0 +1,3 @@
+   ✋ ConstraintError: the built tmux could not be placed at <fixture>/prior/tmux
+      ⇒ the prior tmux is untouched; no crew lost its server
+      read why: ls -l <fixture>/prior

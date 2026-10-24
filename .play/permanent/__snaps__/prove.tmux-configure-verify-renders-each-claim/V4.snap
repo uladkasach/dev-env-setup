@@ -1,0 +1,10 @@
+   • ~/.tmux.conf matches the checkout ✔
+   🌙 no tmux server answered, so which confs tmux loads cannot be observed
+      ⇒ either none runs, or none that runs replied within 5s
+   ✋ ConstraintError: a tmux plugin is present but NOT at its pinned commit: tmux-resurrect
+      ⇒ its .tmux file runs on every server start, so this box runs code no
+        pin vouched for
+      read why: cat <fixture>/home/.tmux/plugins/tmux-resurrect/.git/HEAD
+      fix: rhx grove.provision --what 2.8.tmux --mode apply
+           its upsert moves the adrift checkout aside and re-clones it at the pin
+   • default-terminal 'tmux-256color' — terminfo holds it ✔

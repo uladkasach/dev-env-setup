@@ -1,0 +1,6 @@
+   ✋ ConstraintError: tmux did not install
+      ⇒ a duct IS tmux: ductwork.sh opens a session, sends to a pane,
+        and reads its output. so on a grove this failure means the box
+        cannot be reached at all, and on a laptop every termwork skill
+        fails
+      read why: sudo apt-get install tmux
