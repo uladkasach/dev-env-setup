@@ -1,0 +1,9 @@
+   • ~/.tmux.conf matches the checkout ✔
+   🌙 no tmux server answered, so which confs tmux loads cannot be observed
+      ⇒ either none runs, or none that runs replied within 5s
+   ✋ ConstraintError: the conf names a tmux plugin this repo pins no commit for: tmux-sensible
+      ⇒ tpm clones it at its tip, and tpm sources its .tmux file on every server
+        start — so whoever can push to that repo runs code on this box
+      fix: pin it in 2.8.tmux/_.sh (plugin_names, plugin_url, plugin_at), or drop
+           its @plugin line from tmux.conf
+   • default-terminal 'tmux-256color' — terminfo holds it ✔

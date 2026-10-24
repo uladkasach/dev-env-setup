@@ -1,0 +1,4 @@
+   💥 MalfunctionError: the server REFUSED the fetch (curl 22, an http >=400) — https://example.com/x.tgz
+      ⇒ the wire is fine; the far end refused this url — it moved, was taken
+        down, or asks for a credential
+      ⇒ a pinned version that was yanked upstream reads exactly like this

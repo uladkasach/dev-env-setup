@@ -1,0 +1,4 @@
+   ✋ ConstraintError: could not write ~/.tmux.conf
+      cause: cannot create regular file '<fixture>/home/.tmux.conf': Permission denied
+      ⇒ tmux keeps its PRIOR conf, so the plugin install below would
+        fetch the OLD plugin list and report success

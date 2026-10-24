@@ -1,0 +1,5 @@
+   • no tmux server up — none holds a stale conf
+   🌙 3 socket(s) did not answer — a socket outlives its server, so
+      these are most likely corpses, and a corpse runs no timer
+      read why: coredumpctl list tmux   (a server that crashed leaves its core there)
+   • the conf declares no terminal-features — no client claim to grade

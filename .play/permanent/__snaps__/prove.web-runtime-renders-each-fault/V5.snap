@@ -1,0 +1,10 @@
+   ✋ ConstraintError: SIGNATURE CHECK FAILED — <fixture>/artifact
+      the pinned key did NOT sign these bytes
+      key: AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555
+      ⇒ do NOT run, extract, or install this artifact. one of three
+        statements is true, and each is a reason to stop:
+          · the bytes were altered between upstream and this box
+          · the signature is for a DIFFERENT version than the file
+          · upstream rotated its key, and this pin is now stale
+      ⇒ to tell them apart, re-fetch both and check whether the version
+        in the url matches the version in the signature's filename

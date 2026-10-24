@@ -80,12 +80,14 @@ collect() {
     while IFS= read -r line; do
       # a dynamic tail (`$GROVE_SRC/machine/$name`) is caught FIRST, before the
       # charset below can eat its prefix as a literal
-      if [[ "$line" =~ \$GROVE_SRC/[A-Za-z0-9._/-]*\$ ]]; then
+      if [[ "$line" =~ \$GROVE_SRC/[A-Za-z0-9._@/-]*\$ ]]; then
         DYNAMIC+=( "${file#"$ROOT"/} — a runtime-built path" )
         continue
       fi
-      # every `$GROVE_SRC/...` on the line, one per match
-      while [[ "$line" =~ \$GROVE_SRC/([A-Za-z0-9._/-]+) ]]; do
+      # every `$GROVE_SRC/...` on the line, one per match. `@` is in the set: a systemd
+      #   template drop-in (`user@.revive.conf`) carries one, and a set without it
+      #   reported the truncated `…/user` as an untracked asset
+      while [[ "$line" =~ \$GROVE_SRC/([A-Za-z0-9._@/-]+) ]]; do
         rest="${BASH_REMATCH[1]}"
         line="${line/\$GROVE_SRC\/${rest}/}"
         expanded="$(realpath -m --relative-to="$ROOT" "$ROOT/src/$rest" 2>/dev/null || true)"

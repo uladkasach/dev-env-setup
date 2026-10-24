@@ -1,0 +1,3 @@
+   🌙 no keyrack.daemon.prune skill at <fixture>/repo/.agent/repo=.this/role=any/skills/keyrack.daemon.prune.sh
+      ⇒ the timer would fire against an absent command, so it is not
+        declared. the leaked-daemon pool stays unbounded on this box

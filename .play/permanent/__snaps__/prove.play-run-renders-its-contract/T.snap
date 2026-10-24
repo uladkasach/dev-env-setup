@@ -1,0 +1,7 @@
+🎭 play.run --play prove.stub-hangs --within 2
+   └─ <fixture>/.play/permanent/prove.stub-hangs.play.sh
+
+
+   ✋ ConstraintError: prove.stub-hangs did not finish within 2s, so it proved no claim
+      ⇒ a bound that elapses is not a verdict about the subject
+      rerun with a wider bound: rhx play.run --play prove.stub-hangs --within 3600

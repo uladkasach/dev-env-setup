@@ -18,6 +18,13 @@ for name in rhx claude; do
   chmod +x "$stubs/$name"
 done
 
+# the capped launch: `systemd-run` drops its own flags and runs the call it wraps, and
+# the manager wait answers at once — the play judges WHICH binary, never the cap
+printf '#!/usr/bin/env bash\nwhile [[ "${1:-}" == -* ]]; do [[ "$1" == -p ]] && shift; shift; done\nexec "$@"\n' \
+  | tee "$stubs/systemd-run" >/dev/null
+chmod +x "$stubs/systemd-run"
+fn="_user_systemd_await() { return 0; }"$'\n'"$fn"
+
 fails=0
 # assert the first launched binary from <dir> is <want>; print the argv as evidence
 drive() {

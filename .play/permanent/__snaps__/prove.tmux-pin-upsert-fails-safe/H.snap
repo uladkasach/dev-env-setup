@@ -1,0 +1,5 @@
+   ✋ ConstraintError: tmux 3.5a sits at <fixture>/prior/tmux, but PATH resolves <fixture>/bin/tmux first
+      ⇒ every caller that asks PATH gets the shadow, so the pin protects no crew
+      ⇒ no rebuild is attempted: the pin is already built, and a rebuild cannot move PATH
+      read why: type -a tmux
+      fix: remove <fixture>/bin/tmux, or put <fixture>/prior ahead of <fixture>/bin on PATH

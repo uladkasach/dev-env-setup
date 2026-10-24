@@ -1,0 +1,6 @@
+   ✋ ConstraintError: git_clone: --at <commit> is required — https://example.com/x.tgz
+      ⇒ an unpinned clone lands whatever the default branch points at
+        right now, so two applies install different code. that breaks
+        the deterministic half of one-command provision
+      fix: source the sha from the tag you mean:
+        gh api -X GET repos/OWNER/REPO/git/ref/tags/vX --jq .object.sha

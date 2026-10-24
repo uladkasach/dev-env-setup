@@ -1,0 +1,12 @@
+   • ~/.tmux.conf matches the checkout ✔
+   ✋ ConstraintError: tmux loads ANOTHER conf besides ~/.tmux.conf: <fixture>/home/.config/tmux/tmux.conf
+      ⇒ tmux reads its confs in order and a LATER file wins, so any
+        option named there overrides the one this repo declares —
+        while the check above still reports ~/.tmux.conf as current
+      ⚠️ read by a FILE test, not by tmux: this tmux (tmux 3.2a)
+        carries no '#{config_files}', which lands in 3.3
+      read why: diff <fixture>/home/.tmux.conf <fixture>/home/.config/tmux/tmux.conf
+      fix: rhx grove.provision --what 2.8.tmux --mode apply
+        (the upsert moves every shadow aside, so one conf is left)
+   • all 2 declared tmux plugins present, each at its pin ✔ (<fixture>/home/.tmux/plugins)
+   • default-terminal 'tmux-256color' — terminfo holds it ✔

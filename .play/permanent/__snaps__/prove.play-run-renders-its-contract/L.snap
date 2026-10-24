@@ -1,0 +1,10 @@
+🎭 play.run --list
+   ├─ dir: <fixture>/.play/permanent
+   ├─ store: git ls-files (the INDEX, not the disk)
+   └─ 6 play(s)
+      ├─ lint.stub-reads  (✋ refused — a verb this runner never drives)
+      ├─ prove.stub-declines
+      ├─ prove.stub-fails
+      ├─ prove.stub-hangs
+      ├─ prove.stub-passes
+      └─ repair.stub-mends  (✋ refused — a verb this runner never drives)
