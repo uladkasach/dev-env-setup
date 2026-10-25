@@ -1,0 +1,19 @@
+{
+  "key": "154622c71bbdab4d",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-bhrain"
+  },
+  "exid": null,
+  "title": "fix(guard): a later refusal at a rung must void its older cached verdict, so the lane re-runs",
+  "description": "## the defect\n\n`getAllCachedPassedReviews` keeps every `passed` given at the hash, and `getOneCacheSafePeerReviewArtifact` then serves the latest of those. a LATER given at the same rung that refused (`constraint`) or malfunctioned is filtered out of the cache, so the guard serves the OLDER passed verdict and holds the lane: it never re-runs.\n\nthe judge reads the latest given per slug, finds the refusal, and scores it 1 blocker (`asPeerGivenVerdict`, unreadable). the stance tool refuses a stance on it (\"there is no verdict to take a stance on\"). so neither a stance nor a re-run can clear the residual, and a depth-0 arrive changes naught.\n\n## the repro (measured)\n\n- an l3 lane (`rhx enroll claude ...`) gives a real verdict at hash H, iteration i9\n- a driver at clone depth 1 re-arrives; the lane refuses with `clone enroll depth budget spent`, given i10 at the same hash H\n- a human arrives from depth 0: the lane is held on the i9 verdict, no i11 is written, and the judge still counts the i10 refusal as 1 blocker\n\n## the cure\n\na passed given is cache-eligible only while it is its rung's latest given at the hash:\n\n```js\nconst getAllCachedPassedReviews = (input) => input.reviews.filter((r) => r.exitClass === 'passed' &&\n    !isSupersededAtRung({ review: r, reviews: input.reviews }));\nconst isSupersededAtRung = (input) => input.reviews.some((other) => other.index === input.review.index &&\n    other.iteration > input.review.iteration &&\n    other.exitClass !== 'passed');\n```\n\na refusal BEFORE a pass voids naught; a refusal at another rung voids naught at this one.\n\n## the clamp\n\na red-then-green clamp exists downstream as `prove.guard-reruns-a-lane-whose-latest-given-refused` (uladkasach/dev-env-setup), applied there as a local pnpm patch on 0.42.1. arms:\n\n- [i9 passed, i10 constraint] → miss\n- [i9 passed, i10 malfunction] → miss\n- [i9 passed] → i9\n- [i9 constraint, i10 passed] → i10\n- a refusal at another rung → this rung's i9 kept\n\n## also owed\n\nthe guard reads a refusal with no counts as a terminal constraint (0 blockers), while the judge scores the same given as 1 blocker. the two readers should agree on one verdict for one file.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": null,
+  "heldSeq": 3,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "711"
+}

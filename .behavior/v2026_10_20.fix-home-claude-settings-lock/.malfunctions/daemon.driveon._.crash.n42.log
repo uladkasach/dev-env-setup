@@ -1,0 +1,8 @@
+RouteReminder daemon crash — reason=session-dead
+route:  /home/<user>/git/more/_worktrees/dev-env-setup.beav.fix-home-claude-settings-lock/.behavior/v2026_10_20.fix-home-claude-settings-lock
+clone:  @:9b010477-f033-4fdb-b43a-db95bd109cb2
+ticks:  1
+detail: the daemon could not reach the driver session (clone say reach-state gate), so it
+        self-exited on the first failed reach — the U3 no-clog guarantee (no retry, no
+        infiniloop). if this was a transient blip rather than a true session-end, route.drive
+        re-findserts a fresh daemon on the next live drive while the route stays live.

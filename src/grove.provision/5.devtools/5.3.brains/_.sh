@@ -68,7 +68,7 @@ grove_provision_5_3_brains_claude_latest_shim_render() {
 # an edit here is overwritten by the next apply
 #
 # .what = run the CANDIDATE claude, capped, without touching the pinned default
-bin="\$HOME/.local/opt/claude/latest/node_modules/.bin/claude"
+bin="$GROVE_BRAIN_CLAUDE_LATEST_PREFIX/latest/node_modules/.bin/claude"
 
 if [ ! -x "\$bin" ]; then
   echo "✋ the candidate claude is absent at \$bin" >&2
@@ -106,31 +106,97 @@ grove_provision_5_3_brains_claude_latest_upsert() {
   local shim="$GROVE_BRAIN_CLAUDE_LATEST_SHIM"
   local pin="$GROVE_BRAIN_CLAUDE_LATEST_PIN"
 
+  # every `rm -rf` below is rooted at the prefix, so an empty one (a stripped `$HOME`) never reaches them
+  if [[ -z "$prefix" || "$prefix" == / || -z "$HOME" ]]; then
+    echo "   ✋ the claude.latest prefix reads '$prefix', so the candidate is not touched" >&2
+    echo "      ⇒ an empty prefix would root its teardown and its reap at /" >&2
+    echo "      fix: run from a shell with \$HOME set, then rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 1
+  fi
+
   # opted out — TEAR DOWN, never skip (.refs "opt in, opt out")
   if [[ -z "$pin" ]]; then
-    if [[ -e "$shim" || -d "$prefix" ]]; then
-      rm -f "$shim" || return 1
-      rm -rf "$prefix" || return 1
-      echo "   🌙 claude.latest is opted out — its shim and prefixes removed"
-    else
-      echo "   🌙 claude.latest is opted out — no candidate installed"
-    fi
+    grove_provision_5_3_brains_claude_latest_teardown "$shim" "$prefix" || return 1
     echo "      opt in: set GROVE_BRAIN_CLAUDE_LATEST_PIN in this bundle's _.sh"
     return 0
   fi
 
   # 1. the versioned prefix, guarded by the three-valued reader
+  grove_provision_5_3_brains_claude_latest_build "$prefix" "$pin" || return 1
+
+  # 2. the `latest` pointer — `-n`, or a bump lands inside the old target (.refs "`ln -sfn`")
+  ln -sfn "v$pin" "$prefix/latest" || {
+    echo "   ✋ could not point $prefix/latest at v$pin" >&2
+    echo "      ⇒ the shim reads the pointer, so it would run the prior candidate" >&2
+    echo "      fix: check the owner of $prefix, then rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 1
+  }
+
+  # 3. REAP every prefix the pin no longer names (.refs "the reap of undeclared prefixes")
+  grove_provision_5_3_brains_claude_latest_reap "$prefix" "$pin" || return 1
+
+  # 4. the shim, RENDERED, so the verify can diff it
+  if ! mkdir -p "$(dirname "$shim")"; then
+    echo "   ✋ could not make $(dirname "$shim") for the claude.latest shim" >&2
+    echo "      fix: check the owner of $HOME/.local, then rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 1
+  fi
+  grove_provision_5_3_brains_claude_latest_shim_render > "$shim" || {
+    echo "   ✋ could not write the claude.latest shim to $shim" >&2
+    echo "      fix: check the owner and free space of $(dirname "$shim"), then rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 1
+  }
+  if ! chmod +x "$shim"; then
+    echo "   ✋ could not make the claude.latest shim $shim executable, so claude.latest will not run" >&2
+    echo "      fix: check the owner of $shim, then rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 1
+  fi
+  echo "   • claude.latest shim declared → $shim"
+}
+
+# .what = opted out — TEAR DOWN the shim and every prefix, never skip (.refs "opt in, opt out")
+# guarantee: exits nonzero, with the path named, where a removal fails
+grove_provision_5_3_brains_claude_latest_teardown() {
+  local shim="$1" prefix="$2"
+  if [[ ! -e "$shim" && ! -d "$prefix" ]]; then
+    echo "   🌙 claude.latest is opted out — no candidate installed"
+    return 0
+  fi
+  if ! rm -f "$shim"; then
+    echo "   ✋ claude.latest is opted out, and its shim $shim could not be removed" >&2
+    echo "      fix: check the owner of $(dirname "$shim"), then rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 1
+  fi
+  if ! rm -rf "$prefix"; then
+    echo "   ✋ claude.latest is opted out, and its prefix $prefix could not be removed" >&2
+    echo "      fix: check the owner of $prefix, then rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 1
+  fi
+  echo "   🌙 claude.latest is opted out — its shim and prefixes removed"
+}
+
+# .what = step 1: build the candidate at `<prefix>/v<pin>`, unless the reader already reads it `whole`
+# guarantee: exits nonzero, with the cause named, where the prefix, the manifest, or the install fails
+grove_provision_5_3_brains_claude_latest_build() {
+  local prefix="$1" pin="$2"
   local dir="$prefix/v$pin"
   local state
   state="$(grove_provision_5_3_brains_claude_latest_state)"
 
   if [[ "$state" == "whole" ]]; then
     echo "   • claude.latest is built at the declared candidate ($pin)"
-  else
-    mkdir -p "$dir" || return 1
+    return 0
+  fi
 
-    # WRITTEN, never `pnpm init`, with its build approval inside (.refs "the package.json")
-    cat > "$dir/package.json" <<'EOF' || return 1
+  if ! mkdir -p "$dir"; then
+    echo "   ✋ could not make the candidate prefix $dir" >&2
+    echo "      ⇒ the pinned default is untouched; only the candidate is absent" >&2
+    echo "      fix: check the owner of $prefix, then rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 1
+  fi
+
+  # WRITTEN, never `pnpm init`, with its build approval inside (.refs "the package.json")
+  if ! cat > "$dir/package.json" <<'EOF'
 {
   "name": "claude-latest",
   "private": true,
@@ -139,56 +205,88 @@ grove_provision_5_3_brains_claude_latest_upsert() {
   }
 }
 EOF
-
-    # `web_pnpm` — an unbounded registry call holds the duct (`rule.require.bounded-probes-in-verifies`)
-    if ! ( cd "$dir" && web_pnpm add "@anthropic-ai/claude-code@$pin" ); then
-      echo "   ✋ could not install the candidate claude@$pin" >&2
-      echo "      ⇒ the pinned default is untouched; only the candidate is absent" >&2
-      echo "      read why: cd $dir && pnpm add @anthropic-ai/claude-code@$pin" >&2
-      return 1
-    fi
-    echo "   • claude.latest candidate installed ✔ ($pin)"
+  then
+    echo "   ✋ could not write $dir/package.json, so the candidate cannot install" >&2
+    echo "      fix: check the owner and free space of $dir, then rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 1
   fi
 
-  # 2. the `latest` pointer — `-n`, or a bump lands inside the old target (.refs "`ln -sfn`")
-  ln -sfn "v$pin" "$prefix/latest" || {
-    echo "   ✋ could not point $prefix/latest at v$pin" >&2
-    echo "      ⇒ the shim reads the pointer, so it would run the prior candidate" >&2
+  # `web_pnpm` — an unbounded registry call holds the duct (`rule.require.bounded-probes-in-verifies`)
+  if ! ( cd "$dir" && web_pnpm add "@anthropic-ai/claude-code@$pin" ); then
+    echo "   ✋ could not install the candidate claude@$pin" >&2
+    echo "      ⇒ the pinned default is untouched; only the candidate is absent" >&2
+    echo "      read why: cd $dir && pnpm add @anthropic-ai/claude-code@$pin" >&2
     return 1
-  }
-
-  # 3. REAP every prefix the pin no longer names (.refs "the reap of undeclared prefixes")
-  local stale reaped=0
-  for stale in "$prefix"/v*; do
-    [[ -d "$stale" ]] || continue
-    [[ "$(basename "$stale")" == "v$pin" ]] && continue
-    rm -rf "$stale" || {
-      echo "   ✋ could not reap the undeclared candidate prefix $stale" >&2
-      return 1
-    }
-    echo "   • reaped an undeclared candidate prefix → $(basename "$stale")"
-    reaped=1
-  done
-  [[ "$reaped" -eq 1 ]] || true
-
-  # 4. the shim, RENDERED, so the verify can diff it
-  mkdir -p "$(dirname "$shim")" || return 1
-  grove_provision_5_3_brains_claude_latest_shim_render > "$shim" || {
-    echo "   ✋ could not write the claude.latest shim to $shim" >&2
-    return 1
-  }
-  chmod +x "$shim" || return 1
-  echo "   • claude.latest shim declared → $shim"
+  fi
+  echo "   • claude.latest candidate installed ✔ ($pin)"
 }
 
-# .what = prove the candidate matches the tree, and that nothing in ~/.local/bin
-#   has displaced the pinned default. READ-ONLY
+# .what = remove every candidate prefix under <prefix> that is not `v<pin>`, and name each
+# .why  = a bump leaves the prior candidate on disk; the pin is the one declared candidate
+# guarantee: exits nonzero, with the prefix named, at the first one it cannot remove
+grove_provision_5_3_brains_claude_latest_reap() {
+  local prefix="$1" pin="$2" stale
+  # never a reap rooted at / — the caller guards this too, and a reap is the one place it costs a box
+  if [[ -z "$prefix" || "$prefix" == / ]]; then
+    echo "   ✋ the claude.latest reap was handed prefix '$prefix', so no prefix was removed" >&2
+    return 1
+  fi
+  for stale in "$prefix"/v*; do
+    # a glob that matched naught, or a stray file, is no candidate prefix
+    if [[ ! -d "$stale" ]]; then continue; fi
+    # the declared candidate stays
+    if [[ "$stale" == "$prefix/v$pin" ]]; then continue; fi
+    if ! rm -rf "$stale"; then
+      echo "   ✋ could not reap the undeclared candidate prefix $stale" >&2
+      echo "      fix: check the owner of $stale, then rhx grove.provision --what 5.3.brains --mode apply" >&2
+      return 1
+    fi
+    echo "   • reaped an undeclared candidate prefix → ${stale#"$prefix"/}"
+  done
+}
+
+# .what = print `present` or `absent` for <path>
+grove_provision_5_3_brains_presence_word() {
+  if [[ -e "$1" ]]; then echo present; return 0; fi
+  echo absent
+}
+
+# .what = print where `<prefix>/latest` points, or `(no symlink)` where it names naught
+grove_provision_5_3_brains_claude_latest_pointer() {
+  local target
+  if target="$(readlink "$1/latest")"; then echo "$target"; return 0; fi
+  echo '(no symlink)'
+}
+
+####################################################################
+# .what = print the version the candidate <shim> answers to `--version`
+# .why  = one reader, so the verify names WHAT it read, and a shim that fails names WHY
+# guarantee: exits 0 with the semver; else exits 1 and prints `exit <code>: <its last line>`,
+#            so a timeout, a crash, or a refusal reaches the 🌙 in the shim's own words
+####################################################################
+grove_provision_5_3_brains_claude_latest_live_version() {
+  local out code version
+  out="$(timeout -k 5 "${GROVE_BRAIN_PROBE_SECONDS:-20}" "$1" --version 2>&1)"; code=$?
+  version="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' <<< "$out" | head -1)"
+  if (( code == 0 )) && [[ -n "$version" ]]; then
+    echo "$version"
+    return 0
+  fi
+  echo "exit $code: $(tail -1 <<< "$out")"
+  return 1
+}
+
+# .what = prove the candidate matches the tree, and that no file in ~/.local/bin
+#   has displaced the pinned default
+# guarantee: it writes no file. step 3 RUNS the shim once (`--version`), which opens and closes a
+#   transient systemd scope — the one way to prove the launch a human takes works at all
 grove_provision_5_3_brains_claude_latest_verify() {
   local failed=0
 
   # 🔴 a `claude` in ~/.local/bin would BECOME the default — asked on every run
   #    (.refs "why the shim is `claude.latest` and never `claude`")
-  if [[ -e "$HOME/.local/bin/claude" ]]; then
+  # `-L` too: a broken arrow named `claude` still wins the PATH lookup, and `-e` reads it false
+  if [[ -e "$HOME/.local/bin/claude" || -L "$HOME/.local/bin/claude" ]]; then
     echo "   ✋ a file named 'claude' sits in ~/.local/bin" >&2
     echo "      ⇒ that dir outranks \$PNPM_HOME/bin in a human's shell, so this" >&2
     echo "        file — not the declared pin — is what 'claude' now runs" >&2
@@ -206,85 +304,297 @@ grove_provision_5_3_brains_claude_latest_verify() {
   local latest_pin="$GROVE_BRAIN_CLAUDE_LATEST_PIN"
 
   if [[ -z "$latest_pin" ]]; then
-    if [[ -e "$latest_shim" || -d "$latest_prefix" ]]; then
-      echo "   ✋ claude.latest is opted out and the box still carries it" >&2
-      echo "      ⇒ shim: ${latest_shim} $([[ -e "$latest_shim" ]] && echo present || echo absent)" >&2
-      echo "      ⇒ prefix: ${latest_prefix} $([[ -d "$latest_prefix" ]] && echo present || echo absent)" >&2
-      echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
-      failed=1
-    else
-      echo "   • claude.latest is opted out, and no candidate is installed ✔"
-      echo "     opt in: set GROVE_BRAIN_CLAUDE_LATEST_PIN in this bundle's _.sh"
-    fi
+    grove_provision_5_3_brains_claude_latest_verify_opted_out "$latest_shim" "$latest_prefix" || failed=1
     return $failed
   fi
 
   # 1. the install, by the SAME reader the upsert guards on
-  local latest_state
-  latest_state="$(grove_provision_5_3_brains_claude_latest_state)"
-
-  if [[ "$latest_state" != "whole" ]]; then
-    echo "   ✋ the claude.latest candidate reads '$latest_state', not 'whole'" >&2
-    echo "      ⇒ expected a runnable bin at $latest_prefix/v$latest_pin, with" >&2
-    echo "        '$latest_prefix/latest' naming it" >&2
-    echo "      ⇒ found: latest → $(readlink "$latest_prefix/latest" 2>/dev/null || echo '(no symlink)')" >&2
-    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
-    failed=1
-  else
-    echo "   • claude.latest candidate is built at $latest_pin ✔ (latest → v$latest_pin)"
-  fi
+  grove_provision_5_3_brains_claude_latest_verify_install "$latest_prefix" "$latest_pin" || failed=1
 
   # 2. the shim is CURRENT — diffed against a fresh render, never a presence test
-  if [[ ! -x "$latest_shim" ]]; then
-    echo "   ✋ the claude.latest shim is absent or not executable" >&2
-    echo "      ⇒ looked for: $latest_shim" >&2
-    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
-    failed=1
-  elif ! grove_provision_5_3_brains_claude_latest_shim_render | diff -q - "$latest_shim" >/dev/null 2>&1; then
-    echo "   ✋ the claude.latest shim has drifted from this checkout" >&2
-    echo "      ⇒ it may still name a prior target or a prior memory cap" >&2
-    echo "      read the diff: diff <(…render…) $latest_shim" >&2
-    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
-    failed=1
-  else
-    echo "   • the claude.latest shim matches this checkout ✔"
-  fi
+  grove_provision_5_3_brains_claude_latest_verify_shim "$latest_shim" || failed=1
 
-  # 3. the SHIM runs and the BINARY answers (.refs "the verify runs the shim")
+  # 3 and 4 RUN the shim, so only a runnable shim reaches them — step 2 already ✋s one that is not
   if [[ -x "$latest_shim" ]]; then
-    local latest_live
-    latest_live="$(timeout -k 5 "$GROVE_BRAIN_PROBE_SECONDS" "$latest_shim" --version 2>/dev/null \
-      | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
-
-    if [[ -z "$latest_live" ]]; then
-      echo "   🌙 claude.latest ran, but did not answer a version this run"
-      echo "      ⇒ the candidate ($latest_pin) is unproven here, not disproven"
-    elif [[ "$latest_live" == "$latest_pin" ]]; then
-      echo "   • claude.latest is $latest_live, the declared candidate ✔"
-    else
-      echo "   ✋ claude.latest is $latest_live, but the declared candidate is $latest_pin" >&2
-      echo "      ⇒ the candidate drifted, so a trial reports on a version the" >&2
-      echo "        tree does not name — and a comparison against the pin is then" >&2
-      echo "        one nobody else can reproduce" >&2
-      echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
-      echo "      or, if the drift is wanted: bump GROVE_BRAIN_CLAUDE_LATEST_PIN first" >&2
-      failed=1
-    fi
-
-    # 4. REACH — a 🌙, since this shell's PATH is not the human's
-    local latest_which
-    latest_which="$(command -v claude.latest 2>/dev/null || true)"
-    if [[ "$latest_which" == "$latest_shim" ]]; then
-      echo "   • claude.latest is on PATH ✔"
-    else
-      echo "   🌙 claude.latest is installed and this shell's PATH does not name it"
-      echo "      ⇒ found: ${latest_which:-(no match)}"
-      echo "      ⇒ ~/.local/bin reaches PATH from ~/.zshenv (owned by 2.5.zsh), so"
-      echo "        a shell that read neither rc will not see it — unproven here"
-    fi
+    grove_provision_5_3_brains_claude_latest_verify_answer "$latest_shim" "$latest_pin" || failed=1
+    grove_provision_5_3_brains_claude_latest_verify_reach "$latest_shim"
   fi
 
   return $failed
+}
+
+# .what = opted out, residue is the defect: ✋ a shim or prefix left on disk, else ✔
+grove_provision_5_3_brains_claude_latest_verify_opted_out() {
+  local shim="$1" prefix="$2"
+  if [[ ! -e "$shim" && ! -d "$prefix" ]]; then
+    echo "   • claude.latest is opted out, and no candidate is installed ✔"
+    echo "     opt in: set GROVE_BRAIN_CLAUDE_LATEST_PIN in this bundle's _.sh"
+    return 0
+  fi
+  echo "   ✋ claude.latest is opted out and the box still carries it" >&2
+  echo "      ⇒ shim: ${shim} $(grove_provision_5_3_brains_presence_word "$shim")" >&2
+  echo "      ⇒ prefix: ${prefix} $(grove_provision_5_3_brains_presence_word "$prefix")" >&2
+  echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+  return 1
+}
+
+# .what = step 1: ✔ where the candidate reads `whole` at <pin>, else ✋ with the pointer it found
+grove_provision_5_3_brains_claude_latest_verify_install() {
+  local prefix="$1" pin="$2" state
+  state="$(grove_provision_5_3_brains_claude_latest_state)"
+  if [[ "$state" == "whole" ]]; then
+    echo "   • claude.latest candidate is built at $pin ✔ (latest → v$pin)"
+    return 0
+  fi
+  echo "   ✋ the claude.latest candidate reads '$state', not 'whole'" >&2
+  echo "      ⇒ expected a runnable bin at $prefix/v$pin, with" >&2
+  echo "        '$prefix/latest' naming it" >&2
+  echo "      ⇒ found: latest → $(grove_provision_5_3_brains_claude_latest_pointer "$prefix")" >&2
+  echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+  return 1
+}
+
+# .what = step 2: ✋ an absent or drifted shim, else ✔
+grove_provision_5_3_brains_claude_latest_verify_shim() {
+  local shim="$1"
+  if [[ ! -x "$shim" ]]; then
+    echo "   ✋ the claude.latest shim is absent or not executable" >&2
+    echo "      ⇒ looked for: $shim" >&2
+    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 1
+  fi
+  if ! grove_provision_5_3_brains_claude_latest_shim_render | diff -q - "$shim" >/dev/null 2>&1; then
+    echo "   ✋ the claude.latest shim has drifted from this checkout" >&2
+    echo "      ⇒ it may still name a prior target or a prior memory cap" >&2
+    echo "      read the diff: diff <(…render…) $shim" >&2
+    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+    return 1
+  fi
+  echo "   • the claude.latest shim matches this checkout ✔"
+}
+
+# .what = step 3: the SHIM runs and the BINARY answers (.refs "the verify runs the shim")
+# guarantee: 🌙 where it answers no version (unproven, not disproven), ✔ at the pin, ✋ at any other
+grove_provision_5_3_brains_claude_latest_verify_answer() {
+  local shim="$1" pin="$2" live
+  if ! live="$(grove_provision_5_3_brains_claude_latest_live_version "$shim")"; then
+    echo "   🌙 claude.latest ran, but did not answer a version this run"
+    echo "      ⇒ the candidate ($pin) is unproven here, not disproven"
+    echo "      ⇒ it answered: $live"
+    return 0
+  fi
+  if [[ "$live" == "$pin" ]]; then
+    echo "   • claude.latest is $live, the declared candidate ✔"
+    return 0
+  fi
+  echo "   ✋ claude.latest is $live, but the declared candidate is $pin" >&2
+  echo "      ⇒ the candidate drifted, so a trial reports on a version the" >&2
+  echo "        tree does not name — and a comparison against the pin is then" >&2
+  echo "        one nobody else can reproduce" >&2
+  echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+  echo "      or, if the drift is wanted: bump GROVE_BRAIN_CLAUDE_LATEST_PIN first" >&2
+  return 1
+}
+
+# .what = step 4: REACH — a 🌙, never a ✋, since this shell's PATH is not the human's
+grove_provision_5_3_brains_claude_latest_verify_reach() {
+  local shim="$1" which
+  which="$(command -v claude.latest 2>/dev/null || true)"
+  if [[ "$which" == "$shim" ]]; then
+    echo "   • claude.latest is on PATH ✔"
+    return 0
+  fi
+  echo "   🌙 claude.latest is installed and this shell's PATH does not name it"
+  echo "      ⇒ found: ${which:-(no match)}"
+  echo "      ⇒ ~/.local/bin reaches PATH from ~/.zshenv (owned by 2.5.zsh), so"
+  echo "        a shell that read neither rc will not see it — unproven here"
+}
+
+####################################################################
+# the CONFIG READERS — asked by both configure phases, so they live here, once
+#   - the upsert's skip and the verify's claim read one census, one lock state, one
+#     resolved path, so the two halves cannot judge the same box two ways
+#   - the entrypoint sources this file with every phase (`grove.provision._.sh`), and a
+#     play that sources a phase alone sources this file first
+####################################################################
+
+####################################################################
+# .what = a ROLE HOOK — a hook entry whose `author` begins `repo=`
+# .why  = rhachet stamps every hook a role writes with `author: repo=<org>/role=<role>`.
+#         such a hook belongs in that repo's own settings; in home it fires in every
+#         session on the box, the commander's included. an entry with no author is the
+#         commander's own, and is kept
+# 🛑 ONE home for the selector, read by the strip, the count, and the verify, so the three
+#    cannot disagree on what a role hook is
+####################################################################
+_GROVE_PROVISION_5_3_BRAINS_ROLE_HOOK='objects | select((.author | type) == "string" and (.author | startswith("repo=")))'
+
+####################################################################
+# .what = a FOREIGN-AUTHOR hook — a hook entry that carries an `author` key the role selector
+#         does not match: a string outside `repo=…`, OR an author of any other type
+# .why  = the strip judges one stamp shape. a hook stamped any other way is one this repo cannot
+#         judge, so it is never stripped, and the verify names it for a human. so a change to
+#         rhachet's stamp shape (a structured author, say) reads as a ✋, never as "zero role hooks"
+# ⚠️ an entry with NO `author` key is the commander's own (the wish), so it is neither
+####################################################################
+_GROVE_PROVISION_5_3_BRAINS_FOREIGN_HOOK='objects | select(has("author") and (((.author | type) != "string") or ((.author | startswith("repo=")) | not)))'
+
+# .what = print one `<author>\t<count>` line per author whose hooks match <selector> in <file>
+# .why  = the upsert's count and the verify's tree read one census
+# .note = an author that is not a string prints as its compact json, so the census can name it
+# .note = a TAB parts the two fields, so an author with a space (`"Jane Doe"`) still counts
+# guarantee: exits nonzero where jq cannot read <file>, so "none" is never inferred from a failure
+_grove_provision_5_3_brains_hooks_by_author() {
+  jq -r "[.hooks | objects | .[] | arrays | .[] | objects | .hooks | arrays | .[]
+    | $2 | .author | if type == \"string\" then gsub(\"\t\"; \" \") else tojson end]
+    | group_by(.) | map(\"\(.[0])\t\(length)\") | .[]" "$1"
+}
+
+# .what = print the role-hook census of <file> (see `..._hooks_by_author`)
+_grove_provision_5_3_brains_role_hooks_by_author() {
+  _grove_provision_5_3_brains_hooks_by_author "$1" "$_GROVE_PROVISION_5_3_BRAINS_ROLE_HOOK"
+}
+
+# .what = print the foreign-author census of <file> (see `..._hooks_by_author`)
+_grove_provision_5_3_brains_foreign_hooks_by_author() {
+  _grove_provision_5_3_brains_hooks_by_author "$1" "$_GROVE_PROVISION_5_3_BRAINS_FOREIGN_HOOK"
+}
+
+# .what = print the sum of the counts in a census read on stdin
+_grove_provision_5_3_brains_census_total() {
+  awk -F'\t' '{n += $2} END {print n + 0}'
+}
+
+# .what = print a census read on stdin as a tree, one `├─ <author> <count>` row per author
+_grove_provision_5_3_brains_census_tree() {
+  awk -F'\t' '{ a[NR] = $1; n[NR] = $2 }
+    END { for (i = 1; i <= NR; i++) printf "      %s %-28s %3d\n", (i == NR ? "└─" : "├─"), a[i], n[i] }'
+}
+
+# .what = print how many role hooks <file> holds
+# guarantee: exits nonzero where jq cannot read <file> — the census exit is never lost to a pipe
+_grove_provision_5_3_brains_role_hook_count() {
+  local census
+  census="$(_grove_provision_5_3_brains_role_hooks_by_author "$1")" || return 1
+  _grove_provision_5_3_brains_census_total <<< "$census"
+}
+
+# .what = print the octal mode of <file> (e.g. `444`)
+# guarantee: exits nonzero where the mode cannot be read
+_grove_provision_5_3_brains_file_mode() {
+  stat -c '%a' "$1"
+}
+
+# .what = print the lock word of an octal <mode>: `writable` (any write bit) · `locked` (none)
+# guarantee: exits nonzero where <mode> is not octal — an arithmetic error must never read as `locked`
+_grove_provision_5_3_brains_lock_of_mode() {
+  [[ "$1" =~ ^[0-7]{3,4}$ ]] || return 1
+  (( 8#$1 & 8#222 )) && { echo writable; return 0; }
+  echo locked
+}
+
+####################################################################
+# .what = whether an apply LOCKS the home settings file: `on` (mode 0400) or `off` (mode 0600)
+# .why  = a repo pinned below the shielded rhachet (1.49.2) runs an init that writes its role
+#         hooks into home through the tree's arrow. against a lock that write fails, and the
+#         repo's `prepare` exits 1 — every such install breaks until its pin moves. so, until the
+#         pins move, the apply strips the hooks on every run and leaves the owner's write bit;
+#         flip this ONE value to `on` once they have (define.5-3-brains.declared-keys, the lock)
+# ⚠️ under `off` no writer re-strips between applies: a pre-shield install after an apply re-adds its
+#    hooks, and they fire until the next apply. the plan's ✋ is the only detector
+# 🛑 the flip to `on` is the commander's, and owes three things no check detects:
+#   1. every repo that runs on this box pins rhachet >= 1.49.2 (a stale pin fails its install)
+#   2. a hermetic probe of claude against a read-only settings file, and one of claude's own
+#      settings writes under it (fulcrum F10 — does a `/model` switch fail, or rename past the lock?)
+#   3. a skill that unlocks, edits, and re-applies, so the hand `chmod u+w` row retires (fulcrum F13)
+# 🛑 the upsert's swap and skip and the verify's claim all read it, so they never disagree; and
+#    the apply is the bit's ONE writer — a gate that meets a halt keeps the declared mode
+####################################################################
+_GROVE_PROVISION_5_3_BRAINS_SETTINGS_LOCK=off
+
+# .what = the two modes the declaration picks between, named once so no reader restates them
+#   - LOCKED = 0400: no write bit for anyone, and no read bit beyond the owner — the file keeps the
+#     commander's `env`, which can hold a token, so the lock must not widen who may read it
+#   - OPEN   = 0600: the mode the file held before any lock
+_GROVE_PROVISION_5_3_BRAINS_SETTINGS_MODE_LOCKED=400
+_GROVE_PROVISION_5_3_BRAINS_SETTINGS_MODE_OPEN=600
+
+# .what = print the lock word the declaration wants: `locked` (on) or `writable` (off)
+# guarantee: exits nonzero where the declaration reads neither, so a typo never unlocks in silence
+_grove_provision_5_3_brains_lock_declared() {
+  [[ "$_GROVE_PROVISION_5_3_BRAINS_SETTINGS_LOCK" == on ]] && { echo locked; return 0; }
+  [[ "$_GROVE_PROVISION_5_3_BRAINS_SETTINGS_LOCK" == off ]] && { echo writable; return 0; }
+  return 1
+}
+
+# .what = print the octal mode an apply gives the file: `..._MODE_LOCKED` (on) or `..._MODE_OPEN` (off)
+# guarantee: exits nonzero where the declaration reads neither
+_grove_provision_5_3_brains_mode_declared() {
+  [[ "$_GROVE_PROVISION_5_3_BRAINS_SETTINGS_LOCK" == on ]] && { echo "$_GROVE_PROVISION_5_3_BRAINS_SETTINGS_MODE_LOCKED"; return 0; }
+  [[ "$_GROVE_PROVISION_5_3_BRAINS_SETTINGS_LOCK" == off ]] && { echo "$_GROVE_PROVISION_5_3_BRAINS_SETTINGS_MODE_OPEN"; return 0; }
+  return 1
+}
+
+####################################################################
+# .what = print the file <path> resolves to — itself, or an arrow's target
+# .why  = a rename over a SYMLINK replaces the link and leaves its target writable, so every
+#         half writes, and the verify reads, the file the path resolves to. one resolver, so
+#         no two readers judge two different files
+# guarantee: exits nonzero where an arrow cannot be resolved (a loop, an unreadable hop)
+####################################################################
+_grove_provision_5_3_brains_arrow_target() {
+  local real
+  [[ -L "$1" ]] || { echo "$1"; return 0; }
+  real="$(readlink -f "$1")" && [[ -n "$real" ]] || return 1
+  echo "$real"
+}
+
+# .what = print the file `~/.claude/settings.json` resolves to — the one the lock sits on
+_grove_provision_5_3_brains_settings_path() {
+  _grove_provision_5_3_brains_arrow_target "$HOME/.claude/settings.json"
+}
+
+####################################################################
+# .what = where claude's GLOBAL CONFIG lives, as the cli itself resolves it
+# 🛑 `CLAUDE_CONFIG_DIR` is IGNORED here — an apply from an enrolled claude inherits
+#   it, and a seat converges its OWN `$HOME` (define.5-3-brains.declared-keys)
+# 🛑 resolved through `..._arrow_target`, as the other two halves are: a rename over a symlink
+#    would cut the oauth session file from its target and leave the target stale
+# guarantee: exits nonzero where the path is an arrow that cannot be resolved
+####################################################################
+_grove_provision_5_3_brains_config_path() {
+  local dir="$HOME/.claude"
+  [[ -f "$dir/.config.json" ]] && { _grove_provision_5_3_brains_arrow_target "$dir/.config.json"; return; }
+  _grove_provision_5_3_brains_arrow_target "$HOME/.claude.json"
+}
+
+# .what = print the diff panel's start state in the global config <file>: `shut` or `open`
+# .why  = ONE reader for the upsert's skip and the verify's claim, so the two never judge the
+#         same box two ways. claude opens the panel on its own unless the key reads `false`
+# guarantee: exits nonzero where jq cannot read <file>, so "open" is never inferred from a failure;
+#            jq's own stderr passes through, so the human sees the line and column it choked on
+_grove_provision_5_3_brains_config_diff_panel() {
+  local live
+  live="$(jq -c '.diffSidebarOpen' "$1")" || return 1
+  [[ "$live" == false ]] && { echo shut; return 0; }
+  echo open
+}
+
+# .what = print the send-now chord's state in the keybindings <file>: `unbound`, `bound`, or `misshapen`
+#   - `unbound` = at least one Chat block sets `ctrl+x ctrl+s` to null, and no Chat block binds it
+#   - `bound`   = any Chat block binds it, or none names it — an ABSENT key leaves claude's default
+#   - `misshapen` = `.bindings` is present and not a list, a shape the upsert refuses to merge into
+# .why  = claude merges every Chat block, so one null beside a second bind still leaves the chord
+#         bound; `all` over the blocks that name the key, never `any`
+# 🛑 an ABSENT `.bindings` reads as `[]`, as the upsert's merge filter reads it — an apply creates
+#    the list, so the two halves judge that box alike (`bound`, and the apply's fix is the fix)
+# guarantee: exits nonzero where jq cannot read <file>, so "bound" is never inferred from a failure
+_grove_provision_5_3_brains_keybindings_chord() {
+  jq -r 'if ((.bindings // []) | type) != "array" then "misshapen"
+    else [(.bindings // [])[] | objects | select(.context == "Chat") | .bindings | objects
+          | select(has("ctrl+x ctrl+s")) | .["ctrl+x ctrl+s"]] as $v
+      | if ($v | length) > 0 and ($v | all(. == null)) then "unbound" else "bound" end
+    end' "$1"
 }
 
 grove_provision_5_3_brains() {
