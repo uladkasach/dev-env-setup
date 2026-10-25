@@ -1,5 +1,5 @@
 RouteReminder daemon crash — reason=session-dead
-route:  /home/vlad/git/more/_worktrees/dev-env-setup.beav.fix-home-claude-settings-lock/.behavior/v2026_10_20.fix-home-claude-settings-lock
+route:  /home/<user>/git/more/_worktrees/dev-env-setup.beav.fix-home-claude-settings-lock/.behavior/v2026_10_20.fix-home-claude-settings-lock
 clone:  @:4ae72a7f-5c74-4ae1-aa7c-215d1b863d56
 ticks:  1
 detail: the daemon could not reach the driver session (clone say reach-state gate), so it

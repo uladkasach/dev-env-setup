@@ -28,7 +28,7 @@
        `Path:` beside `/etc/ImageMagick-6/policy.xml`.
 
   🛑 ⚠️ THAT CLAIM DOES NOT HOLD ON THE LAPTOP — re-measured 2026-09-20
-       the file is installed at `/home/vlad/.config/ImageMagick/policy.xml` and
+       the file is installed at `~/.config/ImageMagick/policy.xml` and
        `identify -list policy` names only `/etc/ImageMagick-6/policy.xml` and
        `[built-in]` — with `XDG_CONFIG_HOME` unset AND with it set explicitly.
        so every rule below is INERT here: the ghostscript reach rule 1 exists to
