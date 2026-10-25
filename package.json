@@ -16,6 +16,11 @@
     "rhachet-roles-rhachet": "^0.1.7",
     "tsx": "4.20.6"
   },
+  "pnpm": {
+    "patchedDependencies": {
+      "rhachet-roles-bhrain@0.42.1": "patches/rhachet-roles-bhrain@0.42.1.patch"
+    }
+  },
   "scripts": {
     "prepare:rhachet": "rhachet init --hooks --roles mechanic behaver driver architect ergonomist reviewer dreamer dispatcher learner enroller playwright",
     "prepare": "npm run prepare:rhachet"
