@@ -37,9 +37,9 @@
 #      9b a mode stat cannot read         → ✋ the lock is unproven
 #      9c a hooked, writable home         → ✋ role hooks AND ✋ writable
 #      9d a stripped, locked home         → ✔ no role hook AND ✔ read-only
-#      9e a hook by a foreign author      → ✋ outside `repo=…`
+#      9e an unjudged hook                → ✋ outside `repo=…`
 #      9f an author that is no string     → ✋ outside `repo=…` (a stamp-shape change)
-#      9g a foreign hook, through an apply → [KEEP] and ✋ named, so apply and verify agree
+#      9g an unjudged hook, through an apply → [KEEP] and ✋ named, so apply and verify agree
 #   10 the public entry, with CLAUDE_CONFIG_DIR unset, converges all three files;
 #      10b the verify after it is exit 0, every claim ✔ · 10c a second run keeps keybindings ·
 #      10d keybindings through an arrow · 10e a non-list `.bindings` is refused
@@ -72,6 +72,8 @@
 #      under `off`, both fixes pinned · 22j a fresh home is written at 0600 · 22e a declaration
 #      that reads neither on nor off → the apply refuses and the verify ✋s · 22f the shipped `_.sh`
 #      reads `on` or `off`. every text a human reads under `off` is pinned whole
+#   23 the SEAM: `bundle.upgrade` drives both configure phases under the shipped declaration,
+#      and the whole report is pinned to `<this play>.seam.snap` (`GROVE_RESNAP=1` rewrites it)
 #
 # guarantee:
 #   - HERMETIC: HOME and every checkout point into the fixture; arms 2–6 run with no checkout,
@@ -302,7 +304,7 @@ out="$( HOME="$home" GROVE_SRC="$co/src" bash -c 'source "$GROVE_5_3_SHARED"; so
 # 8m: the checkout's arrow loops → ✋ a broken tree, never 🌙 "no subject"
 rm -f "$co/.claude/settings.json"; ln -s settings.json "$co/.claude/settings.json"
 out="$(gate_apply 'true')"; code=$?
-[[ "$code" == 1 && "$out" == *"boot gate:"*"could not be resolved, so the lock is unproven"* && "$out" != *"is no arrow to"* ]] \
+[[ "$code" == 1 && "$out" == *"boot gate:"*"could not be followed, so the lock is unproven"* && "$out" != *"is no arrow to"* ]] \
   && pass "8m gate: a checkout arrow that loops → ✋ unresolved, never 🌙" || fail "8m gate loop: exit $code: $out"
 rm -f "$co/.claude/settings.json"; ln -s "$settings" "$co/.claude/settings.json"
 
@@ -404,17 +406,17 @@ jq '.hooks.Stop = [{"hooks": [{"type": "command", "command": "y", "author": "acm
   && mv -f "$settings.x" "$settings"; chmod $lockmode "$settings"
 out="$(verify_run ':')"; code=$?
 [[ "$code" == 1 && "$out" == *"by an author outside"* && "$out" == *"acme-tool"* ]] \
-  && pass "9e verify: a foreign-author hook → ✋ named for a human" \
-  || fail "9e verify on a foreign author: exit $code: $out"
+  && pass "9e verify: a unjudged hook → ✋ named for a human" \
+  || fail "9e verify on an unjudged hook: exit $code: $out"
 
-# 9g: the same foreign hook, through an apply → [KEEP] AND ✋ named, so the apply never goes green
+# 9g: the same unjudged hook, through an apply → [KEEP] AND ✋ named, so the apply never goes green
 #     over a file its verify reddens
 locked="$(cat "$settings")"
 out="$(apply 2>&1)"; code=$?
 [[ "$code" == 1 && "$out" == *"[KEEP]"* && "$out" == *"outside \`repo=…\`, which no apply strips"* && "$out" == *"acme-tool"* \
    && "$(cat "$settings")" == "$locked" ]] \
-  && pass "9g apply: a foreign-author hook → [KEEP] and ✋ named, byte-equal — the apply and verify agree" \
-  || fail "9g apply on a foreign author: exit $code: $out"
+  && pass "9g apply: a unjudged hook → [KEEP] and ✋ named, byte-equal — the apply and verify agree" \
+  || fail "9g apply on an unjudged hook: exit $code: $out"
 
 # 9f: an author that is no string (a stamp shape this repo does not know) → ✋, never "no role hook ✔" alone
 chmod u+w "$settings"
@@ -516,7 +518,7 @@ out="$(apply 2>&1)"; code=$?
   && pass "13b an extant file that is not json → ✋ with both remedies, byte-equal, no backup, no tmp" \
   || fail "13b invalid json: exit $code: $out"
 # the census still speaks after a failed converge, and names the same unread file as its own verdict
-[[ "$out" == *"   ✋ jq could not read $settings, so its foreign-author hooks are uncounted"* ]] \
+[[ "$out" == *"   ✋ jq could not read $settings, so its unjudged hooks are uncounted"* ]] \
   && pass "13b invalid json: the census still speaks, and names the file uncounted" \
   || fail "13b invalid json, census absent: $out"
 pinned "13b invalid json: the refusal and both remedies pinned whole" "$(sed -n '/jq could not read/,/or move it aside/{p;/or move it aside/q}' <<< "$out")" \
@@ -540,7 +542,7 @@ out="$(apply 2>&1)"; code=$?
 #      and still reads the keybindings claim beside it
 rm -f "$settings"; ln -s settings.json "$settings"
 out="$(apply 2>&1)"; code=$?
-[[ "$code" == 1 && "$out" == *"could not be resolved, so naught was written"* && -L "$settings" ]] \
+[[ "$code" == 1 && "$out" == *"could not be followed, so naught was written"* && -L "$settings" ]] \
   && pass "13c an arrow that loops → the upsert ✋, naught written" || fail "13c upsert on a loop: exit $code: $out"
 out="$(verify_run ':')"; code=$?
 [[ "$code" == 1 && "$out" == *"the strip and the lock are unproven"* && "$out" == *"send-now"* ]] \
@@ -643,7 +645,7 @@ out="$(half ':' _grove_provision_5_3_brains_config_upsert)"; code=$?
 # 14h: a config arrow that loops → ✋, naught written
 rm -f "$config"; ln -s .claude.json "$config"
 out="$(half ':' _grove_provision_5_3_brains_config_upsert)"; code=$?
-[[ "$code" == 1 && -L "$config" && "$out" == *"global config is an arrow that could not be resolved"* ]] \
+[[ "$code" == 1 && -L "$config" && "$out" == *"global config is an arrow that could not be followed"* ]] \
   && pass "14h a config arrow that loops → ✋, naught written" || fail "14h config loop: exit $code: $out"
 rm -f "$config"
 
@@ -668,7 +670,7 @@ rm -f "$keys"; ln -s keybindings.json "$keys"
 out="$(half ':' _grove_provision_5_3_brains_keybindings_upsert)"; code=$?
 (( code == 1 )) && [[ -L "$keys" ]] || fail "15b keybindings loop: exit $code: $out"
 pinned "15b a keybindings arrow that loops → the whole ✋ verdict, naught written" "$out" \
-"   ✋ $keys is an arrow that could not be resolved, so naught was written
+"   ✋ $keys is an arrow that could not be followed, so naught was written
       read why: readlink -f $keys
       fix: repair or remove that arrow, then rhx grove.provision --what 5.3.brains --mode apply"
 rm -f "$keys"
@@ -1039,16 +1041,46 @@ out="$(half '_grove_provision_5_3_brains_file_mode() { return 1; }' _grove_provi
   && pass "9h apply, an unread mode → named, rewritten at mode $lockmode" \
   || fail "9h apply unread mode: exit $code, mode $(mode_of "$settings"): $out"
 
-# a failed converge skips the gate alone: the foreign census and the backup reap still speak
+# a failed converge skips the gate alone: the unjudged-hook census and the backup reap still speak
 reseed 0644
 out="$(half '_grove_provision_5_3_brains_settings_upsert() { return 1; }
              _grove_provision_5_3_brains_settings_boot_gate() { echo "GATE RAN"; }
-             _grove_provision_5_3_brains_settings_foreign_name() { echo "CENSUS RAN"; }
+             _grove_provision_5_3_brains_settings_unjudged_name() { echo "CENSUS RAN"; }
              _grove_provision_5_3_brains_settings_backup_reap() { echo "REAP RAN"; }' \
   _grove_provision_5_3_brains_settings_step)"; code=$?
 [[ "$code" == 1 && "$out" == *"CENSUS RAN"* && "$out" == *"REAP RAN"* && "$out" != *"GATE RAN"* ]] \
   && pass "9i apply, a failed converge → exit 1, no gate, the census and the reap still run" \
   || fail "9i apply failed converge: exit $code: $out"
+
+# ── arm 23: the SEAM — the real runtime drives both configure phases, end to end, under the
+#    SHIPPED declaration. every arm above calls a half by its own name; this one goes through
+#    `bundle.upgrade <slug>`, the way `grove.provision --what 5.3.brains` does, so a dispatch,
+#    a mode gate, or a phase name that drifts goes red here. the whole report is pinned to a
+#    `.snap` beside this play: a changed line is a diff a reviewer reads, never a silent drift
+#    .note = `rhx play.run --play <this> --resnap` rewrites the baseline; review its diff before a commit
+snap="${BASH_SOURCE[0]%.play.sh}.seam.snap"
+seam="$fix/seam"
+mkdir -p "$seam/home/.claude"
+printf '%s\n' "$seed" > "$seam/home/.claude/settings.json"
+chmod 0644 "$seam/home/.claude/settings.json"
+out="$( cd "$seam" && env -u CLAUDE_CONFIG_DIR HOME="$seam/home" GROVE_SRC="$repo/src" GROVE_MODE=apply \
+  bash -c 'WHAT=(); source "$1/src/bundle.upgrade.sh"; source "$2"; source "$3"; source "$4"
+           bundle.upgrade 5.3.brains.configure.upsert; bundle.upgrade 5.3.brains.configure.verify
+           echo "exit=$BUNDLE_FAILED"' _ "$repo" "$GROVE_5_3_SHARED_REAL" "$upsert" "$verify" 2>&1 )"
+# the fixture path and the backup stamp differ per run, so each is replaced by a fixed token
+out="${out//$seam/<seam>}"
+out="$(printf '%s\n' "$out" | sed -E 's/settings\.[0-9TZ.:-]+\.bak\.json/settings.<stamp>.bak.json/g')"
+if [[ "${GROVE_RESNAP:-}" == 1 ]]; then
+  printf '%s\n' "$out" > "$snap" && pass "23 seam: baseline rewritten at $snap — review its diff"
+elif [[ ! -f "$snap" ]]; then
+  fail "23 seam: no baseline at $snap — run with GROVE_RESNAP=1, then review it"
+else
+  pinned "23 seam: bundle.upgrade drives both configure phases, the report byte-equal to its .snap" \
+    "$out" "$(cat "$snap")"
+fi
+[[ "$out" == *"exit=0"* && "$(roles_in "$seam/home/.claude/settings.json")" == 0 ]] \
+  && pass "23 seam: the run exits clean and the sandbox home holds zero role hooks" \
+  || fail "23 seam: exit or strip: roles $(roles_in "$seam/home/.claude/settings.json"): $out"
 
 (( fails == 0 )) || { echo "   └─ ✋ ${fails} arm(s) failed"; exit 1; }
 shipped="$( bash -c 'source "$1"; echo "$_GROVE_PROVISION_5_3_BRAINS_SETTINGS_LOCK"' _ "$GROVE_5_3_SHARED_REAL" )"

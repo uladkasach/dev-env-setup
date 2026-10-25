@@ -40,7 +40,7 @@ this patch is the sole home of every brain knob (`rule.require.brain-config-has-
 |---|---|---|
 | `DISABLE_AUTOUPDATER` | the one update kill-switch, cli and plugins (`ED6()`) | `j96()` |
 | `DISABLE_INSTALLATION_CHECKS` | the npm→native migration nag (#23683) | `$w6()`, `kFz()` |
-| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | auto-compact at 50%, not ~83%; cuts ITPM spikes | `et6()` |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | auto-compact at 50%, not ~83%; cuts input-tokens-per-minute spikes | `et6()` |
 | `CLAUDE_CODE_SUBAGENT_MODEL` | subagents on `claude-sonnet-5-5[1m]`, never the session's opus | `Ik6()` |
 | `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` | idle compaction fires past 450k tokens, not its 200k default | none in 2.1.280; idle compaction ships in 2.1.299. declared ahead of the pin bump |
 
@@ -224,7 +224,7 @@ the phase ignores `CLAUDE_CONFIG_DIR`, where the cli honors it. an apply launche
 
 ## the global config holds the oauth session — two guards
 
-claude's own writer refuses a write whose re-read config lacks the auth its cache holds (`saveConfigWithLock`, GH #3117). the hazard is measured upstream, so the phase guards its write twice.
+claude's own writer refuses a write whose re-read config lacks the auth its cache holds (`saveConfigWithLock`, github #3117). the hazard is measured upstream, so the phase guards its write twice.
 
 1. skip: the phase reads the value first and never opens a file that already holds it. every apply after the first touches none of it, which closes the race window.
 2. atomic rename: the merge lands in a tmp beside the target and is `mv`d over. `mktemp` alone would land in /tmp, a tmpfs here, where a cross-device `mv` is a copy with a half-written window.

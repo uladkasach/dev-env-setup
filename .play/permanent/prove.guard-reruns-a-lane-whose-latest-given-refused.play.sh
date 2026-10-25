@@ -105,7 +105,8 @@ arms.forEach((a, i) => {
 console.log('');
 if (failed.length > 0) {
   console.log(`🐢 bummer dude — ${failed.length} arm(s) do not hold`);
-  process.exit(2);
+  // exit 1, never 2: play.run reads 2 as "declined, its subject absent"
+  process.exit(1);
 }
 console.log('🐢 righteous — every arm holds');
 NODE

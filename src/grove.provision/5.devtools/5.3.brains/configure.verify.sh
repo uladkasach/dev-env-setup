@@ -42,7 +42,7 @@ _grove_provision_5_3_brains_verify_readers_present() {
     _grove_provision_5_3_brains_mode_declared \
     _grove_provision_5_3_brains_lock_of_mode \
     _grove_provision_5_3_brains_role_hooks_by_author \
-    _grove_provision_5_3_brains_foreign_hooks_by_author \
+    _grove_provision_5_3_brains_unjudged_hooks_by_author \
     _grove_provision_5_3_brains_census_total \
     _grove_provision_5_3_brains_census_tree \
     _grove_provision_5_3_brains_config_path \
@@ -56,13 +56,13 @@ if ! _grove_provision_5_3_brains_verify_readers_present; then
 fi
 
 ####################################################################
-# .what = print why <path> cannot be read: `absent`, an arrow that cannot be resolved or that
+# .what = print why <path> cannot be read: `absent`, an arrow that cannot be followed or that
 #         points at naught, or `unreadable`
 # .why  = `-r` is false for all of them alike, and each wants a different repair — a verdict
 #         that names one cause for all sends a human to mend the wrong file
 ####################################################################
 _grove_provision_5_3_brains_unread_cause() {
-  [[ -L "$1" ]] && ! _grove_provision_5_3_brains_arrow_target "$1" >/dev/null && { echo "an arrow that cannot be resolved"; return 0; }
+  [[ -L "$1" ]] && ! _grove_provision_5_3_brains_arrow_target "$1" >/dev/null && { echo "an arrow that cannot be followed"; return 0; }
   [[ -L "$1" && ! -e "$1" ]] && { echo "an arrow to a file that is absent"; return 0; }
   [[ -e "$1" ]] && { echo unreadable; return 0; }
   echo absent
@@ -80,7 +80,7 @@ _grove_provision_5_3_brains_unread_fix() {
 }
 
 ####################################################################
-# .what = the LOCK claims — zero role hooks, no foreign-author hook, and the declared lock
+# .what = the LOCK claims — zero role hooks, no unjudged hook, and the declared lock
 # .why  = a role hook fires in every session on the box; a writable file lets any tree's init
 #         write it through its arrow, and a locked one breaks a pre-shield install. the readers
 #         and the declaration live in `_.sh`, shared with the upsert, so the two cannot disagree
@@ -89,7 +89,7 @@ _grove_provision_5_3_brains_unread_fix() {
 _grove_provision_5_3_brains_lock_verify() {
   local settings="$HOME/.claude/settings.json" real mode lock want wantmode failed=0
   if ! real="$(_grove_provision_5_3_brains_settings_path)"; then
-    echo "   ✋ $settings is an arrow that could not be resolved, so the strip and the lock are unproven" >&2
+    echo "   ✋ $settings is an arrow that could not be followed, so the strip and the lock are unproven" >&2
     echo "      read why: readlink -f $settings" >&2
     echo "      fix: repair or remove that arrow, then rhx grove.provision --what 5.3.brains --mode apply" >&2
     return 1
@@ -101,7 +101,7 @@ _grove_provision_5_3_brains_lock_verify() {
   fi
 
   _grove_provision_5_3_brains_role_hooks_verify "$real" || failed=1
-  _grove_provision_5_3_brains_foreign_hooks_verify "$real" || failed=1
+  _grove_provision_5_3_brains_unjudged_hooks_verify "$real" || failed=1
 
   # the mode is read ONCE, and the verdict renders the value it read
   if ! mode="$(_grove_provision_5_3_brains_file_mode "$real")"; then
@@ -197,30 +197,30 @@ _grove_provision_5_3_brains_role_hooks_verify() {
   return 1
 }
 
-# .what = the FOREIGN HOOK claim — a hook stamped in a shape this repo cannot judge is never
+# .what = the UNJUDGED HOOK claim — a hook stamped in a shape this repo cannot judge is never
 #         stripped, so a human must
 # .why  = a ✋, never a 🌙: a change to rhachet's stamp shape (a structured author, say) would put
 #         every role hook here, and a 🌙 would read that box as clean. a human's own hook carries no
 #         `author` key, so it never lands in this census
-_grove_provision_5_3_brains_foreign_hooks_verify() {
-  local real="$1" foreign total
-  if ! foreign="$(_grove_provision_5_3_brains_foreign_hooks_by_author "$real")"; then
-    echo "   ✋ jq could not read $real, so its foreign-author hooks are uncounted" >&2
+_grove_provision_5_3_brains_unjudged_hooks_verify() {
+  local real="$1" unjudged total
+  if ! unjudged="$(_grove_provision_5_3_brains_unjudged_hooks_by_author "$real")"; then
+    echo "   ✋ jq could not read $real, so its unjudged hooks are uncounted" >&2
     echo "      read why: jq . $real" >&2
     return 1
   fi
-  # no foreign author → no verdict to print
-  if [[ -z "$foreign" ]]; then
+  # no unjudged hook → no verdict to print
+  if [[ -z "$unjudged" ]]; then
     return 0
   fi
-  if ! total="$(_grove_provision_5_3_brains_census_total <<< "$foreign")"; then
+  if ! total="$(_grove_provision_5_3_brains_census_total <<< "$unjudged")"; then
     echo "   ✋ $real holds hooks by an author outside \`repo=…\`, and the census could not total them" >&2
     echo "      ⇒ the census totals with awk, so awk is absent or failed on this box" >&2
     echo "      read why: command -v awk" >&2
     return 1
   fi
   echo "   ✋ $real holds $total hooks by an author outside \`repo=…\`, which the strip cannot judge" >&2
-  _grove_provision_5_3_brains_census_tree <<< "$foreign" >&2
+  _grove_provision_5_3_brains_census_tree <<< "$unjudged" >&2
   echo "      ⇒ each fires in every session on this box, as a role hook would" >&2
   echo "      fix: judge each author — a role's belongs in its repo, so widen" >&2
   echo "           _GROVE_PROVISION_5_3_BRAINS_ROLE_HOOK to it; a human's own, drop its \`author\`" >&2
@@ -277,7 +277,7 @@ _grove_provision_5_3_brains_keybindings_verify() {
 _grove_provision_5_3_brains_config_verify() {
   local config panel
   if ! config="$(_grove_provision_5_3_brains_config_path)"; then
-    echo "   ✋ the claude global config is an arrow that could not be resolved, so the diff panel shut-at-start is unproven" >&2
+    echo "   ✋ the claude global config is an arrow that could not be followed, so the diff panel shut-at-start is unproven" >&2
     echo "      read why: readlink -f $HOME/.claude.json $HOME/.claude/.config.json" >&2
     echo "      fix: repair that arrow, then rhx grove.provision --what 5.3.brains --mode apply" >&2
     return 1

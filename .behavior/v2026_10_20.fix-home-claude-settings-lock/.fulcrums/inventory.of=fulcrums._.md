@@ -19,3 +19,5 @@
 | F15 | the verify restates each declared key by hand, as the independent half of a double entry | clean | open | 70% |
 | F16 | the `off` window closes by a full-bundle apply, not a settings-only one (B: split the half into its own bundle) | dirty | open | 75% |
 | F17 | the pre-strip original stays a hand copy, not a pinned backup the apply mints (dream caught) | dirty | open | 70% |
+| F18 | the clamp play is the test surface; no jest suite or skill snapshot harness is added | clean | open | 75% |
+| F19 | the reviewer read a spliced diff; the real files parse and run whole (r1 i001, r9 i003) | clean | open | 90% |
