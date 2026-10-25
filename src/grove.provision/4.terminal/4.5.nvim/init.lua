@@ -177,7 +177,7 @@ vim.api.nvim_create_autocmd('FocusGained', {
 -- self-watchdog: cap runaway memory of THIS nvim core
 -- .what = a low-freq timer that reads our own RSS, writes a trend log,
 --         and trips a breaker (disable the heavy handlers + notify)
---         before the systemd MemoryHigh scope throttles us.
+--         before the systemd scope's MemoryMax=2G OOM-kills us.
 -- .why  = neovim 0.11+ runs the editor core as its own process. a
 --         runaway plugin (treesitter / neominimap-vdiff / image) can
 --         leak it to multi-GB and thrash swap until the box freezes.
@@ -188,7 +188,7 @@ vim.api.nvim_create_autocmd('FocusGained', {
 do
   local log_path = vim.fn.stdpath('state') .. '/selfwatch.log'
   local warn_rss_kb = 800 * 1024   -- 0.8 GB: start to log the trend
-  local soft_rss_kb = 1200 * 1024  -- 1.2 GB: trip the breaker (below MemoryHigh=1.5G)
+  local soft_rss_kb = 1200 * 1024  -- 1.2 GB: trip the breaker (well below MemoryMax=2G)
   local log_max_bytes = 2 * 1024 * 1024  -- 2 MB: cap the trend log, keep one rotation
   local tripped = false
   local cpu_last = nil
