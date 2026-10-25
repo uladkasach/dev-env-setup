@@ -19,12 +19,16 @@ on:
     paths:
       # `**`, not `*`: github path globs never cross a `/` with a single `*`
       - 'src/grove.provision/5.devtools/5.3.brains/**'
-      - '.play/permanent/prove.claude-home-settings-refuses-a-foreign-write.play.sh'
+      # the play and its `.seam.snap` baseline; the seam arm drives the runtime, so it is here too
+      - '.play/permanent/prove.claude-home-settings-refuses-a-foreign-write.*'
+      - 'src/bundle.upgrade.sh'
       - '.github/workflows/test.claude-home-settings.yml'
   pull_request:
     paths:
       - 'src/grove.provision/5.devtools/5.3.brains/**'
-      - '.play/permanent/prove.claude-home-settings-refuses-a-foreign-write.play.sh'
+      # the play and its `.seam.snap` baseline; the seam arm drives the runtime, so it is here too
+      - '.play/permanent/prove.claude-home-settings-refuses-a-foreign-write.*'
+      - 'src/bundle.upgrade.sh'
       - '.github/workflows/test.claude-home-settings.yml'
   workflow_dispatch:
 
