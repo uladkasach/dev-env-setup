@@ -16,6 +16,15 @@ apple magic keyboard or trackpad pairs but doesn't work — paired without bond.
 |---|---|---|
 | connected, no input at all | paired without a bond | `.fix — absent bond` |
 | trackpad clicks, pointer frozen | driver never switched on multitouch | `.fix — click-only trackpad` |
+| keyboard pair times out, or `AuthenticationCanceled` | no agent showed its passkey | `.move a device between two machines` |
+| device absent from a scan | still bound to the other host, or asleep | `.move a device between two machines` |
+
+⇒ the paved move for every pair here is one skill — it scans, pairs with a live passkey,
+trusts, connects, and verifies `Bonded: yes`:
+
+```sh
+rhx bluetooth.device.set --name 'Magic Keyboard' --mode apply
+```
 
 ## .symptoms — absent bond
 
@@ -109,6 +118,50 @@ on a first pair:
 1. ensure device is in pair mode (light blinks)
 2. pair via `bluetoothctl pair`, not a GUI click
 3. verify `Bonded: yes` after pair
+
+## .move a device between two machines
+
+### .the property — a magic device holds ONE host
+
+- a magic keyboard or trackpad keeps a bond with the last host that paired it
+- a pair on machine B leaves machine A's bond stale; A must pair again to take it back
+- the device has no multi-host switch, and no host-side option adds one
+- ⇒ "forget it on A" is never owed. a stale bond on A is harmless; it simply fails to connect
+
+### .the move
+
+1. on the other machine: turn bluetooth **off**. a host that stays on reclaims the device
+   the instant it wakes
+2. power-cycle the device. bluetooth-off on the old host alone does NOT make it
+   discoverable — it keeps a reconnect attempt to the old host until it restarts
+3. here: `rhx bluetooth.device.set --name '<name>' --mode apply`
+4. if a passkey prints (a keyboard asks for one), type it **on the device**, then enter
+
+to take it back, run the same skill on the other machine. a two-way hop is one skill per hop.
+
+### 🛑 .why a bare `bluetoothctl pair <mac>` fails on a keyboard
+
+- the one-shot form registers no agent that can answer a passkey request
+- a trackpad pairs that way — it is NoInputNoOutput and asks for no code
+- a keyboard asks for a typed passkey. no agent shows it, so the pair stalls: it connects,
+  waits, and ends in a timeout or `Failed to pair: org.bluez.Error.AuthenticationCanceled`
+- `--agent NoInputNoOutput` does not rescue it; the keyboard still holds out for a passkey
+- ⇒ the skill drives ONE interactive session as the default agent, and surfaces the passkey
+  on stdout and as a desktop notification while the pair is open
+
+### .adjacent facts, so they are not re-asked
+
+| question | answer |
+|---|---|
+| natural scroll on a magic trackpad? | `3.3.desktop` declares it for every touchpad; the magic trackpad is one |
+| one trackpad across two machines, no re-pair? | a software kvm (deskflow) shares it over the network. untried on cosmic/wayland |
+| desk / wireless charge? | 📌 unverified, from model knowledge 2026-10: magic devices charge by usb-c cable only, no qi. a magnetic usb-c tip is the nearest substitute |
+
+.refs = 2026-10-25, Magic Trackpad + Magic Keyboard moved from a second pop-os host. the trackpad
+paired one-shot; the keyboard failed one-shot three times (two timeouts, one
+`AuthenticationCanceled`). `bluetooth.device.set` then paired it on its first run: the passkey
+reached the human by desktop notification, and the verify read `bonded=yes trusted=yes
+connected=yes`.
 
 ## .fix — click-only trackpad
 
