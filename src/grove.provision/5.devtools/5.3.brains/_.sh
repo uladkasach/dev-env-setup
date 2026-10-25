@@ -413,7 +413,7 @@ grove_provision_5_3_brains_claude_latest_verify_reach() {
 ####################################################################
 # the CONFIG READERS — asked by both configure phases, so they live here, once
 #   - the upsert's skip and the verify's claim read one census, one lock state, one
-#     resolved path, so the two halves cannot judge the same box two ways
+#     followed path, so the two halves cannot judge the same box two ways
 #   - the entrypoint sources this file with every phase (`grove.provision._.sh`), and a
 #     play that sources a phase alone sources this file first
 ####################################################################
@@ -430,14 +430,14 @@ grove_provision_5_3_brains_claude_latest_verify_reach() {
 _GROVE_PROVISION_5_3_BRAINS_ROLE_HOOK='objects | select((.author | type) == "string" and (.author | startswith("repo=")))'
 
 ####################################################################
-# .what = a FOREIGN-AUTHOR hook — a hook entry that carries an `author` key the role selector
+# .what = an UNJUDGED hook — a hook entry that carries an `author` key the role selector
 #         does not match: a string outside `repo=…`, OR an author of any other type
 # .why  = the strip judges one stamp shape. a hook stamped any other way is one this repo cannot
 #         judge, so it is never stripped, and the verify names it for a human. so a change to
 #         rhachet's stamp shape (a structured author, say) reads as a ✋, never as "zero role hooks"
 # ⚠️ an entry with NO `author` key is the commander's own (the wish), so it is neither
 ####################################################################
-_GROVE_PROVISION_5_3_BRAINS_FOREIGN_HOOK='objects | select(has("author") and (((.author | type) != "string") or ((.author | startswith("repo=")) | not)))'
+_GROVE_PROVISION_5_3_BRAINS_UNJUDGED_HOOK='objects | select(has("author") and (((.author | type) != "string") or ((.author | startswith("repo=")) | not)))'
 
 # .what = print one `<author>\t<count>` line per author whose hooks match <selector> in <file>
 # .why  = the upsert's count and the verify's tree read one census
@@ -455,9 +455,9 @@ _grove_provision_5_3_brains_role_hooks_by_author() {
   _grove_provision_5_3_brains_hooks_by_author "$1" "$_GROVE_PROVISION_5_3_BRAINS_ROLE_HOOK"
 }
 
-# .what = print the foreign-author census of <file> (see `..._hooks_by_author`)
-_grove_provision_5_3_brains_foreign_hooks_by_author() {
-  _grove_provision_5_3_brains_hooks_by_author "$1" "$_GROVE_PROVISION_5_3_BRAINS_FOREIGN_HOOK"
+# .what = print the unjudged-hook census of <file> (see `..._hooks_by_author`)
+_grove_provision_5_3_brains_unjudged_hooks_by_author() {
+  _grove_provision_5_3_brains_hooks_by_author "$1" "$_GROVE_PROVISION_5_3_BRAINS_UNJUDGED_HOOK"
 }
 
 # .what = print the sum of the counts in a census read on stdin
@@ -536,11 +536,11 @@ _grove_provision_5_3_brains_mode_declared() {
 }
 
 ####################################################################
-# .what = print the file <path> resolves to — itself, or an arrow's target
+# .what = print the file <path> leads to — itself, or an arrow's target
 # .why  = a rename over a SYMLINK replaces the link and leaves its target writable, so every
-#         half writes, and the verify reads, the file the path resolves to. one resolver, so
+#         half writes, and the verify reads, the file the path leads to. one follower, so
 #         no two readers judge two different files
-# guarantee: exits nonzero where an arrow cannot be resolved (a loop, an unreadable hop)
+# guarantee: exits nonzero where an arrow cannot be followed (a loop, an unreadable hop)
 ####################################################################
 _grove_provision_5_3_brains_arrow_target() {
   local real
@@ -549,18 +549,18 @@ _grove_provision_5_3_brains_arrow_target() {
   echo "$real"
 }
 
-# .what = print the file `~/.claude/settings.json` resolves to — the one the lock sits on
+# .what = print the file `~/.claude/settings.json` leads to — the one the lock sits on
 _grove_provision_5_3_brains_settings_path() {
   _grove_provision_5_3_brains_arrow_target "$HOME/.claude/settings.json"
 }
 
 ####################################################################
-# .what = where claude's GLOBAL CONFIG lives, as the cli itself resolves it
+# .what = where claude's GLOBAL CONFIG lives, as the cli itself finds it
 # 🛑 `CLAUDE_CONFIG_DIR` is IGNORED here — an apply from an enrolled claude inherits
 #   it, and a seat converges its OWN `$HOME` (define.5-3-brains.declared-keys)
-# 🛑 resolved through `..._arrow_target`, as the other two halves are: a rename over a symlink
+# 🛑 followed through `..._arrow_target`, as the other two halves are: a rename over a symlink
 #    would cut the oauth session file from its target and leave the target stale
-# guarantee: exits nonzero where the path is an arrow that cannot be resolved
+# guarantee: exits nonzero where the path is an arrow that cannot be followed
 ####################################################################
 _grove_provision_5_3_brains_config_path() {
   local dir="$HOME/.claude"

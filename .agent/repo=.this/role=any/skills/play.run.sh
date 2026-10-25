@@ -54,6 +54,8 @@
 #   --all          run every play --list names, one verdict line each; each
 #                  play's full output lands in a log dir the summary names
 #   --within SECS  bound per play, in seconds (default 900)
+#   --resnap       rewrite the play's `.snap` baselines (exports GROVE_RESNAP=1);
+#                  a play with no baseline ignores it. review the diff before a commit
 #   --skill NAME   absorbed + ignored — rhachet injects this when invoked as
 #                  `rhx play.run …`. same for --repo / --role
 #   -h, --help     show this header
@@ -97,6 +99,7 @@ while [[ $# -gt 0 ]]; do
       WITHIN="$1"; shift ;;
     --list) LIST=1; shift ;;
     --all)  ALL=1; shift ;;
+    --resnap) export GROVE_RESNAP=1; shift ;;
     -h|--help)
       sed -n '/^# usage:/,/^#####/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//;$d'
       exit 0 ;;
@@ -104,7 +107,7 @@ while [[ $# -gt 0 ]]; do
     #    about a subject the caller never named
     *)
       echo "   ✋ ConstraintError: unknown flag: $1" >&2
-      echo "      valid: --play <slug>  --list  --all  --within <secs>  --help" >&2
+      echo "      valid: --play <slug>  --list  --all  --within <secs>  --resnap  --help" >&2
       exit 2 ;;
   esac
 done

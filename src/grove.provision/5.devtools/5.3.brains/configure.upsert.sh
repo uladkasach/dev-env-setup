@@ -26,8 +26,8 @@
 #   - idempotent: a merge of the same patch converges
 #   - it PRESERVES every key it does not declare
 #
-# 🛑 .the READERS it shares with the verify — the role and foreign selectors, the census, the
-#   mode and the lock declaration, the arrow resolver, the two paths — live in this bundle's `_.sh`
+# 🛑 .the READERS it shares with the verify — the role and unjudged selectors, the census, the
+#   mode and the lock declaration, the arrow follower, the two paths — live in this bundle's `_.sh`
 
 # .what = print whether the two json files hold one document, key order aside: `same` or `differs`
 # .why  = TWO words and an exit, never a boolean: a read that fails must not read as "differs",
@@ -390,9 +390,9 @@ _grove_provision_5_3_brains_settings_boot_gate() {
     echo "   🌙 boot gate: no rhachet checkout beside this run, so no init to prove the lock against"
     return 0
   fi
-  # an arrow that cannot be resolved is a broken tree, never a tree with no subject
+  # an arrow that cannot be followed is a broken tree, never a tree with no subject
   if ! target="$(_grove_provision_5_3_brains_arrow_target "$root/.claude/settings.json")"; then
-    echo "   ✋ boot gate: $root/.claude/settings.json is an arrow that could not be resolved, so the lock is unproven" >&2
+    echo "   ✋ boot gate: $root/.claude/settings.json is an arrow that could not be followed, so the lock is unproven" >&2
     echo "      read why: readlink -f $root/.claude/settings.json" >&2
     echo "      fix: repair that arrow, then rhx grove.provision --what 5.3.brains --mode apply" >&2
     return 1
@@ -533,7 +533,7 @@ _grove_provision_5_3_brains_converge_filter() {
 #   - a file that already holds the patch, no role hook, and the declared lock is never opened
 #   - the census and the merge read the backup, so the backup is the before this apply converged
 #   - the boot gate runs after this half on every apply, a `[KEEP]` too (`..._settings_step`)
-# <settings> is the resolved target, <backup> the path a swap backs up to, <want> the declared mode
+# <settings> is the followed target, <backup> the path a swap backs up to, <want> the declared mode
 #   — all three from the step, so a backup exists on disk exactly where this half took one
 ####################################################################
 _grove_provision_5_3_brains_settings_upsert() {
@@ -653,7 +653,7 @@ _grove_provision_5_3_brains_settings_upsert() {
 # guarantee: no gate where the converge failed — a file this apply could not converge has no
 #            lock to prove
 # 🛑 the backup reap runs LAST, as its own verdict: a failed `rm` of an old copy never masks the
-#    gate or the foreign-author census
+#    gate or the unjudged-hook census
 ####################################################################
 _grove_provision_5_3_brains_settings_step() {
   local settings backup want failed=0
@@ -667,9 +667,9 @@ _grove_provision_5_3_brains_settings_step() {
     return 1
   fi
   _grove_provision_5_3_brains_claude_dir_upsert || return 1
-  # 🛑 the half writes the file the path resolves to (`..._settings_path`)
+  # 🛑 the half writes the file the path leads to (`..._settings_path`)
   if ! settings="$(_grove_provision_5_3_brains_settings_path)"; then
-    echo "   ✋ $HOME/.claude/settings.json is an arrow that could not be resolved, so naught was written" >&2
+    echo "   ✋ $HOME/.claude/settings.json is an arrow that could not be followed, so naught was written" >&2
     echo "      read why: readlink -f $HOME/.claude/settings.json" >&2
     return 1
   fi
@@ -681,7 +681,7 @@ _grove_provision_5_3_brains_settings_step() {
 
   # a failed converge skips the gate alone — the census and the reap still speak their verdicts
   _grove_provision_5_3_brains_settings_converge_then_gate "$settings" "$backup" "$want" || failed=1
-  _grove_provision_5_3_brains_settings_foreign_name "$settings" || failed=1
+  _grove_provision_5_3_brains_settings_unjudged_name "$settings" || failed=1
   _grove_provision_5_3_brains_settings_backup_reap "$settings" || failed=1
   return $failed
 }
@@ -708,28 +708,28 @@ _grove_provision_5_3_brains_settings_converge_then_gate() {
 # .why  = the strip never touches such a hook, so an apply alone cannot clear it — and an apply
 #         that printed `[KEEP]` over one would go green while the verify ✋s the same file. the
 #         upsert names the very set the verify reads, so the two never disagree
-# guarantee: exits nonzero where a foreign hook stands or the census cannot be read
+# guarantee: exits nonzero where an unjudged hook stands or the census cannot be read
 ####################################################################
-_grove_provision_5_3_brains_settings_foreign_name() {
-  local foreign total
-  if ! foreign="$(_grove_provision_5_3_brains_foreign_hooks_by_author "$1")"; then
-    echo "   ✋ jq could not read $1, so its foreign-author hooks are uncounted" >&2
+_grove_provision_5_3_brains_settings_unjudged_name() {
+  local unjudged total
+  if ! unjudged="$(_grove_provision_5_3_brains_unjudged_hooks_by_author "$1")"; then
+    echo "   ✋ jq could not read $1, so its unjudged hooks are uncounted" >&2
     echo "      read why: jq . $1" >&2
     echo "      fix: repair the json by hand, then rhx grove.provision --what 5.3.brains --mode apply" >&2
     return 1
   fi
-  # no foreign author → no verdict to print
-  if [[ -z "$foreign" ]]; then
+  # no unjudged hook → no verdict to print
+  if [[ -z "$unjudged" ]]; then
     return 0
   fi
-  if ! total="$(_grove_provision_5_3_brains_census_total <<< "$foreign")"; then
+  if ! total="$(_grove_provision_5_3_brains_census_total <<< "$unjudged")"; then
     echo "   ✋ $1 holds hooks by an author outside \`repo=…\`, and the census could not total them" >&2
     echo "      ⇒ the census totals with awk, so awk is absent or failed on this box" >&2
     echo "      read why: command -v awk" >&2
     return 1
   fi
   echo "   ✋ $1 holds $total hooks by an author outside \`repo=…\`, which no apply strips" >&2
-  _grove_provision_5_3_brains_census_tree <<< "$foreign" >&2
+  _grove_provision_5_3_brains_census_tree <<< "$unjudged" >&2
   echo "      ⇒ each fires in every session on this box, as a role hook would" >&2
   echo "      fix: judge each author — a role's belongs in its repo, so widen" >&2
   echo "           _GROVE_PROVISION_5_3_BRAINS_ROLE_HOOK to it; a human's own, drop its \`author\`" >&2
@@ -748,7 +748,7 @@ _grove_provision_5_3_brains_config_upsert() {
   local patch='{"diffSidebarOpen": false}'
   local config tmp
   if ! config="$(_grove_provision_5_3_brains_config_path)"; then
-    echo "   ✋ the claude global config is an arrow that could not be resolved, so naught was written" >&2
+    echo "   ✋ the claude global config is an arrow that could not be followed, so naught was written" >&2
     echo "      read why: readlink -f $HOME/.claude.json $HOME/.claude/.config.json" >&2
     echo "      fix: repair that arrow, then rhx grove.provision --what 5.3.brains --mode apply" >&2
     return 1
@@ -868,14 +868,14 @@ _grove_provision_5_3_brains_config_upsert() {
 #   file, until rhachet links it there the way it links `.credentials.json` (ehmpathy/rhachet#579)
 ####################################################################
 _grove_provision_5_3_brains_keybindings_upsert() {
-  # `arrow` is the path claude reads; `file` is what it resolves to, and the one the half writes
+  # `arrow` is the path claude reads; `file` is what it leads to, and the one the half writes
   local arrow="$HOME/.claude/keybindings.json" file tmp
   local add='{"ctrl+x ctrl+s": null}'
   _grove_provision_5_3_brains_claude_dir_upsert || return 1
 
-  # 🛑 a rename over a SYMLINK replaces the link, so the half writes the file it resolves to
+  # 🛑 a rename over a SYMLINK replaces the link, so the half writes the file it leads to
   if ! file="$(_grove_provision_5_3_brains_arrow_target "$arrow")"; then
-    echo "   ✋ $arrow is an arrow that could not be resolved, so naught was written" >&2
+    echo "   ✋ $arrow is an arrow that could not be followed, so naught was written" >&2
     echo "      read why: readlink -f $arrow" >&2
     echo "      fix: repair or remove that arrow, then rhx grove.provision --what 5.3.brains --mode apply" >&2
     return 1

@@ -1,0 +1,37 @@
+      ├─ 5.3.brains.configure.upsert
+         • backup → <seam>/home/.claude/settings.<stamp>.bak.json
+         • role hooks stripped → 3 removed; every unauthored hook kept
+         • claude settings merged → <seam>/home/.claude/settings.json (mode 644 → 600, swapped in by rename)
+         🌙 boot gate: the lock is declared off, so no lock to prove — no init is run
+            ⇒ a repo pinned below the shielded rhachet 1.49.2 still writes its hooks into home on install,
+              and no writer re-strips them between applies; the plan's ✋ role hooks is the one detector
+         • claude global config declared → <seam>/home/.claude.json
+         • claude keybindings merged → <seam>/home/.claude/keybindings.json (ctrl+enter is the one send-now key)
+      ├─ 5.3.brains.configure.verify
+         • the auto-updater holds the declared value ✔
+         • the native-installer migration nag holds the declared value ✔
+         • the prompt suggestion holds the declared value ✔
+         • the command injection check holds the declared value ✔
+         • the todo and task tools holds the declared value ✔
+         • the auto-compact threshold holds the declared value ✔
+         • the idle-compaction floor holds the declared value ✔
+         • the claude.ai connector fetch holds the declared value ✔
+         • the auto default mode holds the declared value ✔
+         • the subagent tool, never denied holds the declared value ✔
+         • the default model holds the declared value ✔
+         • the default model env override holds the declared value ✔
+         • the subagent model holds the declared value ✔
+         • the default effort level holds the declared value ✔
+         • the default effort, unshadowed by a per-model override holds the declared value ✔
+         • the auto-permission prompt skip holds the declared value ✔
+         • the fullscreen tui holds the declared value ✔
+         • the verbose output default holds the declared value ✔
+         • the claude-drafted feedback queue holds the declared value ✔
+         • the never-prune transcript retention holds the declared value ✔
+         • no role-authored hook in <seam>/home/.claude/settings.json ✔
+         🌙 <seam>/home/.claude/settings.json keeps its write bit (mode 600), as declared off — the lock is owed, and waits for the pre-shield pins
+         • ctrl+enter is the one send-now key (the ctrl+x ctrl+s chord is unbound) ✔
+            ⇒ a bare session reads this file; an ENROLLED clone reads its actor dir's copy until
+              rhachet links it there (ehmpathy/rhachet#579), so an enrolled hint may still name the chord
+         • the diff panel shut-at-start holds the declared value ✔
+exit=0
