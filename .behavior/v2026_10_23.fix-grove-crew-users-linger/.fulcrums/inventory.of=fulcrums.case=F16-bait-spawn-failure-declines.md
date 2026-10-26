@@ -31,4 +31,12 @@ one exit code per bait check; the budget sits in the ledger, not the code.
 
 ## .verdict
 
-open — raised by 5.3 i004 r12 (blocker.1 in part, nitpick.2) and i005 r12 (blocker.2, blocker.3), disputed here each time
+ruled: struck (director, 2026-10-26) — the reviewer holds. a play that could not set up its own
+bait proved naught, and a decline would let that read as a non-failure (`rule.forbid.failhide`).
+a bait that never starts, never execs, or whose scope `systemd-run` cannot plant now exits 1 with
+`💥 MalfunctionError` in both plays. a seat with no subject (no coredumpctl, no user manager)
+still declines, exit 2: there the play has no claim to grade, which is not a setup failure.
+the budget half was outside the verdict and stands on the ledger.
+
+raised by 5.3 i004 r12 (blocker.1 in part, nitpick.2), i005 r12 (blocker.2, blocker.3), i006 r12
+(blocker.2, blocker.3).
