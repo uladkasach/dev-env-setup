@@ -1,0 +1,117 @@
+# .what = run, on every push and pull request, the part of this repo's proof that a stock
+#   runner can hold: every shell file parses, and each play whose subject is the checkout
+#   itself (fixtures, stubs, a static read of the tree) passes
+#
+# .why  = the plays ran only where a human typed `rhx play.run`. a PR read "no checks" while
+#   its proof sat in a local log nobody else could open. a gate that runs itself is the fix
+#
+# .note = no secrets, no node, no install of this repo's toolchain. both skills are tracked
+#   bash that run on bash + git + coreutils, so the job calls them by path, as the runner
+#   has no `rhx` (the same shape as `test.brains.auth.yml`). `permissions: contents: read`
+#   holds the token to a read of the checkout, so a fork PR runs it alike
+#
+# .note = every exit but 0 is red. `play.run` exits 2 for a decline, and a decline proves
+#   no claim, so a play that declines here belongs on the local-only list below, not in
+#   the matrix
+#
+# 🌙 partial on a runner — no zsh is installed in the plays job, by design. with zsh but
+#   none of this repo's dotfiles, three of these four would grade a bare `~/.zshenv` and
+#   fail for want of a seat, not a defect. each skips its zsh arms with a 🌙 and grades
+#   its static arms:
+#     dual-shell-files-hold-no-bash-only-syntax · node-toolchain-reaches-a-noninteractive-zsh
+#     rc-hooks-never-reach-a-capture · rc-is-quiet-on-boot
+#   the syntax job installs zsh in its own job, so every `.zsh` file still parses
+#
+# ✋ LOCAL-ONLY — each needs what a stock runner lacks; run them with `rhx play.run --all`
+#   on a seat that holds it:
+#   - sudo, or a write as root (the runner HAS passwordless sudo, so these would mutate it):
+#       apt-lock-wait-engages · ground-seat-converges · rc-seed-guard-reads-at-its-writes-privilege
+#   - a user systemd manager or systemd-coredump:
+#       coredump-catches-a-crash · reaper-spares-an-own-scope-server
+#       a-bait-that-never-starts-fails-the-play (it runs those two)
+#   - a grove registry or a live keyrack:
+#       orphan-sweep-bites · rack-reads-a-foreign-org
+#   - `rhx` itself, or a pnpm toolchain and the npm registry:
+#       reply-captures-bypass-the-runner · pnpm-pins-need-no-wire
+#       openhours-role-packages-install-at-the-pin
+#   - nvim, kitty-side plugins, or earlyoom on the box:
+#       breaker-spares-cached-buffers · codediff-copy-path · codediff-explorer-dir-nav
+#       codediff-refresh-stays-quiet · codediff-resize-renders-once
+#       codediff-single-pane-keeps-the-view · nvim-fetches-no-unpinned-plugin
+#       copy-gate-discriminates · earlyoom-spares-the-session
+#   - the pinned tmux or fnm installed under this seat's own HOME:
+#       tmux-pin-survives-config-run-output · tmux-verify-names-a-server-behind-the-pin
+#       fnm-guard-reads-the-path-not-the-var
+#   - a source build of tmux (dev headers and minutes of cc):
+#       tmux-tarball-matches-the-pin
+#   - the rhachet roles under `.agent/repo=<org>/`, installed by `rhachet init` and never
+#     tracked, which tracked briefs point into:
+#       brief-pointers-reach
+#   - reparent to pid 1, which the runner's own process tree does not promise:
+#       abandoned-procs-are-reaped
+name: test.plays
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # zsh, so the `.zsh` files parse too; without it the skill skips them with a 🌙
+      - name: install zsh
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
+
+      - name: every shell file parses
+        run: bash '.agent/repo=.this/role=any/skills/shell.syntax.verify.sh'
+
+  plays:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        play:
+          - prove.audio-peak-seal-covers-the-take
+          - prove.boot-claims-are-bounded-to-one-run
+          - prove.claude-enrolls-only-in-a-linked-repo
+          - prove.coredump-verify-reads-core-pattern
+          - prove.declared-assets-are-tracked
+          - prove.declared-skills-are-tracked
+          - prove.dual-shell-files-hold-no-bash-only-syntax
+          - prove.every-bundle-is-dispatched
+          - prove.for-detect-refuses-an-underived-env
+          - prove.grove-ports-are-claimed-once
+          - prove.headers-carry-their-weight
+          - prove.keyrackd-renders-each-claim
+          - prove.kitty-signature-binds-the-pin
+          - prove.linger-reaches-every-seat
+          - prove.node-toolchain-reaches-a-noninteractive-zsh
+          - prove.openhours-renders-each-claim
+          - prove.org-scoped-rows
+          - prove.play-run-renders-its-contract
+          - prove.port-reads-span-both-families
+          - prove.rack-consumers-are-dispositioned
+          - prove.rc-hooks-never-reach-a-capture
+          - prove.rc-is-quiet-on-boot
+          - prove.reach-envs-are-declared
+          - prove.the-driver-is-never-named-by-path
+          - prove.tmux-configure-refuses-an-unpinned-plugin
+          - prove.tmux-configure-verify-renders-each-claim
+          - prove.tmux-pin-upsert-fails-safe
+          - prove.tmux-plugins-clone-at-the-pin
+          - prove.tmux-plugins-converge-past-a-whole-tpm
+          - prove.tmux-verify-refuses-an-unpinned-build
+          - prove.web-runtime-renders-each-fault
+    name: play ${{ matrix.play }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: run the play
+        run: bash '.agent/repo=.this/role=any/skills/play.run.sh' --play '${{ matrix.play }}'
