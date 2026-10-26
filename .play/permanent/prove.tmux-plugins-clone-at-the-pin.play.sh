@@ -88,7 +88,10 @@ _arm_pinned "C2. tmux-resurrect lands at its pin" "$(grove_provision_2_8_tmux_pl
 # C3. a commit the remote lacks: the clone refuses, and the boundary removes what it fetched
 out="$( git_clone "$TPM_URL" "$FIX/tpm-absent" --at "$ABSENT_AT" 2>&1 )"; rc=$?
 if [[ "$rc" -ne 0 && ! -e "$FIX/tpm-absent" && "$out" == *"the pinned commit is absent"* ]]; then
-  play_snap_assert arm=C3 rendered="$out" mask="$FIX" \
+  # git's own `fatal:` line is masked, as a pid or a temp path is: its words vary by git
+  #   version (this seat's git says `reference is not a tree`, a CI runner's `unable to read
+  #   tree`), and the claim is the ✋ beneath it, which this repo writes
+  play_snap_assert arm=C3 rendered="$(printf '%s\n' "$out" | sed "s/^fatal: .*/fatal: <git's own words>/")" mask="$FIX" \
     && echo "   ├─ C3. a commit the remote lacks is refused, and no partial clone stays ✔" \
     || failed=$(( failed + 1 ))
 else
