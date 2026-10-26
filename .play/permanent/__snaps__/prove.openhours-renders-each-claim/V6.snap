@@ -1,0 +1,22 @@
+   • machine_openhours_reconcile matches this checkout ✔
+   • machine_openhours_reconcile.service matches this checkout ✔
+   • machine_openhours_reconcile.timer matches this checkout ✔
+   • the reconciler is executable ✔
+   ✋ ConstraintError: the installed schedule DIFFERS from what the tree declares
+      ⇒ the gate enforces a window no declaration holds
+      read the box:   cat <fixture>/home/.local/state/machine_openhours/schedule.env
+      the tree wants: days 1-5, 08:00–20:00 America/Chicago
+      fix: rhx grove.provision --what 5.18.openhours --mode apply
+   • machine_openhours_reconcile.timer is active ✔
+     next: <next> <left> <last> <passed> machine_openhours_reconcile.timer machine_openhours_reconcile.service
+   • the timer is enabled — it returns after a reboot ✔
+   • the reconciler's cwd is built and at the pin ✔
+     <fixture>/home/.local/state/machine_openhours/cwd
+   • rhx git.commit.uses answers from that cwd ✔
+   • rhx radio.uses answers from that cwd ✔
+   • gate right now — commit: open · radio: open
+     read the store: rhx rhachet.storage.get --what '.meter/*' --body
+   🌙 the CONVERGE leg is unproven on a box with no drift
+      it runs only when the gate disagrees with the clock, so the next
+      real boundary crossing is what proves it. read the verdict:
+        journalctl --user -u machine_openhours_reconcile.service --since today

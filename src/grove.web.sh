@@ -253,11 +253,12 @@ web_fetch() {
       --into)   into="$2";   shift 2 ;;
       --within) within="$2"; shift 2 ;;
       -*)
-        echo "   ✋ web_fetch: unknown flag '$1'" >&2
+        echo "   ✋ ConstraintError: web_fetch: unknown flag '$1'" >&2
+        echo "      valid: <url>, --into <file>, --within <secs>" >&2
         return 2 ;;
       *)
         if [[ -n "$url" ]]; then
-          echo "   ✋ web_fetch takes ONE url (got '$url' and '$1')" >&2
+          echo "   ✋ ConstraintError: web_fetch takes ONE url (got '$url' and '$1')" >&2
           return 2
         fi
         url="$1"; shift ;;
@@ -265,7 +266,7 @@ web_fetch() {
   done
 
   if [[ -z "$url" ]]; then
-    echo "   ✋ web_fetch: no url given" >&2
+    echo "   ✋ ConstraintError: web_fetch: no url given" >&2
     return 2
   fi
 
@@ -287,23 +288,24 @@ web_fetch() {
   ####################################################################
   case $rc in
     28)
-      echo "   ✋ the fetch TIMED OUT (curl 28) — $url" >&2
+      echo "   💥 MalfunctionError: the fetch TIMED OUT (curl 28) — $url" >&2
       echo "      ⇒ the transfer stalled: it sat below 1KB/s for 60s, or ran past" >&2
       echo "        ${within}s in total. that is a wire fault, NOT an absent file" >&2
       echo "      ⇒ a grove reaches the wire through its nat, so a stalled flow" >&2
       echo "        there is the ordinary failure of that path — retry first" >&2
       ;;
     22)
-      echo "   ✋ the server REFUSED the fetch (curl 22, an http >=400) — $url" >&2
-      echo "      ⇒ the wire is fine; the url is wrong, moved, or needs a credential" >&2
+      echo "   💥 MalfunctionError: the server REFUSED the fetch (curl 22, an http >=400) — $url" >&2
+      echo "      ⇒ the wire is fine; the far end refused this url — it moved, was taken" >&2
+      echo "        down, or asks for a credential" >&2
       echo "      ⇒ a pinned version that was yanked upstream reads exactly like this" >&2
       ;;
     6)
-      echo "   ✋ the host could not be RESOLVED (curl 6) — $url" >&2
+      echo "   💥 MalfunctionError: the host could not be RESOLVED (curl 6) — $url" >&2
       echo "      ⇒ dns, not the far end. check the box's resolver first" >&2
       ;;
     *)
-      echo "   ✋ the fetch failed (curl $rc) — $url" >&2
+      echo "   💥 MalfunctionError: the fetch failed (curl $rc) — $url" >&2
       echo "      read why: curl -fsSL --max-time ${within} '$url' -o /dev/null" >&2
       ;;
   esac
@@ -517,7 +519,7 @@ web_tempdir() {
   local dir
 
   if ! dir="$(mktemp -d "/tmp/grove.${label}.XXXXXXXX" 2>/dev/null)"; then
-    echo "   ✋ could not make a private temp dir for '$label'" >&2
+    echo "   💥 MalfunctionError: could not make a private temp dir for '$label'" >&2
     echo "      ⇒ /tmp may be full or read-only. a fetch has nowhere safe to" >&2
     echo "        land, and a fixed name is not an acceptable fallback" >&2
     return 1
@@ -527,7 +529,7 @@ web_tempdir() {
   # the implementation, since the whole point of this helper is that mode
   if ! chmod 700 "$dir" 2>/dev/null; then
     rm -rf "$dir"
-    echo "   ✋ could not make $dir private (chmod 700 failed)" >&2
+    echo "   💥 MalfunctionError: could not make $dir private (chmod 700 failed)" >&2
     return 1
   fi
 
@@ -577,7 +579,8 @@ web_verify_sha256() {
       --file)   file="$2"; shift 2 ;;
       --sha256) want="$2"; shift 2 ;;
       *)
-        echo "   ✋ web_verify_sha256: unknown argument '$1'" >&2
+        echo "   ✋ ConstraintError: web_verify_sha256: unknown argument '$1'" >&2
+        echo "      valid: --file <path>, --sha256 <hex>" >&2
         return 2 ;;
     esac
   done
@@ -586,12 +589,12 @@ web_verify_sha256() {
   want="${want#sha256:}"
 
   if [[ -z "$file" || -z "$want" ]]; then
-    echo "   ✋ web_verify_sha256: needs --file AND --sha256" >&2
+    echo "   ✋ ConstraintError: web_verify_sha256: needs --file AND --sha256" >&2
     return 2
   fi
 
   if [[ ! -f "$file" ]]; then
-    echo "   ✋ web_verify_sha256: no file at $file" >&2
+    echo "   ✋ ConstraintError: web_verify_sha256: no file at $file" >&2
     echo "      ⇒ an absent file is a FAILED check, never a passed one — a fetch" >&2
     echo "        that landed no bytes must not read as an artifact that matched" >&2
     return 1
@@ -599,7 +602,7 @@ web_verify_sha256() {
 
   local got
   if ! got="$(sha256sum "$file" | awk '{print $1}')"; then
-    echo "   ✋ web_verify_sha256: could not hash $file" >&2
+    echo "   💥 MalfunctionError: web_verify_sha256: could not hash $file" >&2
     return 1
   fi
 
@@ -607,7 +610,7 @@ web_verify_sha256() {
     return 0
   fi
 
-  echo "   ✋ INTEGRITY CHECK FAILED — $file" >&2
+  echo "   ✋ ConstraintError: INTEGRITY CHECK FAILED — $file" >&2
   echo "      expected: $want" >&2
   echo "      received: $got" >&2
   echo "      ⇒ do NOT extract, run, or install these bytes. two causes, and" >&2
@@ -669,23 +672,24 @@ web_verify_gpg_fingerprints() {
       --file) file="$2"; shift 2 ;;
       --fpr)  want+=("${2^^}"); shift 2 ;;
       *)
-        echo "   ✋ web_verify_gpg_fingerprints: unknown argument '$1'" >&2
+        echo "   ✋ ConstraintError: web_verify_gpg_fingerprints: unknown argument '$1'" >&2
+        echo "      valid: --file <key file>, --fpr <fingerprint> (repeatable)" >&2
         return 2 ;;
     esac
   done
 
   if [[ -z "$file" || ${#want[@]} -eq 0 ]]; then
-    echo "   ✋ web_verify_gpg_fingerprints: needs --file AND at least one --fpr" >&2
+    echo "   ✋ ConstraintError: web_verify_gpg_fingerprints: needs --file AND at least one --fpr" >&2
     return 2
   fi
 
   if [[ ! -f "$file" ]]; then
-    echo "   ✋ web_verify_gpg_fingerprints: no key file at $file" >&2
+    echo "   ✋ ConstraintError: web_verify_gpg_fingerprints: no key file at $file" >&2
     return 1
   fi
 
   if ! command -v gpg >/dev/null 2>&1; then
-    echo "   ✋ gpg is absent, so this key cannot be checked — refusing to trust it" >&2
+    echo "   ✋ ConstraintError: gpg is absent, so this key cannot be checked — refusing to trust it" >&2
     echo "      ⇒ a box that cannot verify a key must not install one; an" >&2
     echo "        unverified apt anchor is trusted for every package after it" >&2
     echo "      fix: rhx grove.provision --what 2.1.toolkit --mode apply" >&2
@@ -713,7 +717,7 @@ web_verify_gpg_fingerprints() {
     return 0
   fi
 
-  echo "   ✋ KEY FINGERPRINT MISMATCH — $file" >&2
+  echo "   ✋ ConstraintError: KEY FINGERPRINT MISMATCH — $file" >&2
   echo "      expected exactly these primary key(s):" >&2
   printf '        %s\n' "${want[@]}" >&2
   if [[ ${#got[@]} -eq 0 ]]; then
@@ -792,13 +796,14 @@ web_verify_gpg_signature() {
       --key)  key="$2";  shift 2 ;;
       --fpr)  fpr="$2";  shift 2 ;;
       *)
-        echo "   ✋ web_verify_gpg_signature: unknown argument '$1'" >&2
+        echo "   ✋ ConstraintError: web_verify_gpg_signature: unknown argument '$1'" >&2
+        echo "      valid: --file <path>, --sig <path>, --key <path>, --fpr <fingerprint>" >&2
         return 2 ;;
     esac
   done
 
   if [[ -z "$file" || -z "$sig" || -z "$key" || -z "$fpr" ]]; then
-    echo "   ✋ web_verify_gpg_signature: needs --file, --sig, --key and --fpr" >&2
+    echo "   ✋ ConstraintError: web_verify_gpg_signature: needs --file, --sig, --key and --fpr" >&2
     return 2
   fi
 
@@ -807,12 +812,12 @@ web_verify_gpg_signature() {
   [[ -f "$sig"  ]] || absent="${absent:+$absent, }$sig"
   [[ -f "$key"  ]] || absent="${absent:+$absent, }$key"
   if [[ -n "$absent" ]]; then
-    echo "   ✋ web_verify_gpg_signature: absent file(s) — $absent" >&2
+    echo "   ✋ ConstraintError: web_verify_gpg_signature: absent file(s) — $absent" >&2
     return 1
   fi
 
   if ! command -v gpg >/dev/null 2>&1; then
-    echo "   ✋ gpg is absent, so this signature cannot be checked" >&2
+    echo "   ✋ ConstraintError: gpg is absent, so this signature cannot be checked" >&2
     echo "      ⇒ the artifact is NOT run. a box that cannot verify a signature" >&2
     echo "        must not execute the bytes it would have verified" >&2
     echo "      fix: rhx grove.provision --what 2.1.toolkit --mode apply" >&2
@@ -836,7 +841,7 @@ web_verify_gpg_signature() {
 
   local rc=0
   if ! GNUPGHOME="$gpghome" gpg --batch --quiet --import "$key" 2>/dev/null; then
-    echo "   ✋ could not read the pinned public key — $key" >&2
+    echo "   ✋ ConstraintError: could not read the pinned public key — $key" >&2
     rm -rf "$gpghome"
     return 1
   fi
@@ -848,7 +853,7 @@ web_verify_gpg_signature() {
     return 0
   fi
 
-  echo "   ✋ SIGNATURE CHECK FAILED — $file" >&2
+  echo "   ✋ ConstraintError: SIGNATURE CHECK FAILED — $file" >&2
   echo "      the pinned key did NOT sign these bytes" >&2
   echo "      key: $fpr" >&2
   echo "      ⇒ do NOT run, extract, or install this artifact. one of three" >&2
@@ -943,13 +948,14 @@ git_clone() {
       --at)     at="$2"; shift 2 ;;
       --within) within="$2"; shift 2 ;;
       -*)
-        echo "   ✋ git_clone: unknown flag '$1'" >&2
+        echo "   ✋ ConstraintError: git_clone: unknown flag '$1'" >&2
+        echo "      valid: <url> <dir>, --at <commit>, --within <secs>" >&2
         return 2 ;;
       *)
         if   [[ -z "$url" ]]; then url="$1"
         elif [[ -z "$dir" ]]; then dir="$1"
         else
-          echo "   ✋ git_clone takes ONE url and ONE dir (got a third: '$1')" >&2
+          echo "   ✋ ConstraintError: git_clone takes ONE url and ONE dir (got a third: '$1')" >&2
           return 2
         fi
         shift ;;
@@ -957,16 +963,16 @@ git_clone() {
   done
 
   if [[ -z "$url" || -z "$dir" ]]; then
-    echo "   ✋ git_clone: needs a url AND a target dir" >&2
+    echo "   ✋ ConstraintError: git_clone: needs a url AND a target dir" >&2
     return 2
   fi
 
   if [[ -z "$at" ]]; then
-    echo "   ✋ git_clone: --at <commit> is required — $url" >&2
+    echo "   ✋ ConstraintError: git_clone: --at <commit> is required — $url" >&2
     echo "      ⇒ an unpinned clone lands whatever the default branch points at" >&2
     echo "        right now, so two applies install different code. that breaks" >&2
     echo "        the deterministic half of one-command provision" >&2
-    echo "      ⇒ source the sha from the tag you mean:" >&2
+    echo "      fix: source the sha from the tag you mean:" >&2
     echo "        gh api -X GET repos/OWNER/REPO/git/ref/tags/vX --jq .object.sha" >&2
     return 2
   fi
@@ -993,12 +999,12 @@ git_clone() {
       if [[ "$head" == "$at" ]]; then
         return 0
       fi
-      echo "   ✋ the clone checked out the WRONG commit — $url" >&2
+      echo "   ✋ ConstraintError: the clone checked out the WRONG commit — $url" >&2
       echo "      expected: $at" >&2
       echo "      received: $head" >&2
     else
-      echo "   ✋ the pinned commit is absent from $url" >&2
-      echo "      wanted: $at" >&2
+      echo "   ✋ ConstraintError: the pinned commit is absent from $url" >&2
+      echo "      expected: $at" >&2
       echo "      ⇒ upstream force-pushed or deleted it. do NOT relax the pin to" >&2
       echo "        make this pass — find what the sha should now be and bump it" >&2
     fi
@@ -1021,12 +1027,12 @@ git_clone() {
   if [[ $named -eq 1 ]]; then
     : # the cause is already stated; fall through to the cleanup below
   elif [[ $rc -eq 124 ]]; then
-    echo "   ✋ the clone TIMED OUT after ${within}s — $url" >&2
+    echo "   💥 MalfunctionError: the clone TIMED OUT after ${within}s — $url" >&2
     echo "      ⇒ it stalled or never spoke. that is a wire fault, NOT a bad url" >&2
     echo "      ⇒ a grove reaches the wire through its nat, so a stalled flow" >&2
     echo "        there is the ordinary failure of that path — retry first" >&2
   else
-    echo "   ✋ the clone failed (git $rc) — $url" >&2
+    echo "   💥 MalfunctionError: the clone failed (git $rc) — $url" >&2
     echo "      ⇒ the transfer was bounded and returned, so read git's own error" >&2
     echo "        above. a 'could not read Username' means github answered 401 —" >&2
     echo "        usually an unauthenticated rate limit on this box's egress ip" >&2

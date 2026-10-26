@@ -1,0 +1,7 @@
+   ✋ ConstraintError: <fixture>/home/.config/systemd/user/keyrack_daemon_prune.service does NOT match this checkout
+      ⇒ the timer fires an ExecStart this repo did not declare —
+        an old skill path, or an old --min-age gate
+      fix: rhx grove.provision --what 1.6.4.keyrackd --mode apply
+   • keyrack_daemon_prune.timer matches this checkout ✔
+   • keyrack_daemon_prune.timer is enabled ✔
+   • keyrack_daemon_prune.timer is armed on this boot ✔

@@ -1,0 +1,6 @@
+   ✋ ConstraintError: tmux is not on PATH
+      ⇒ a duct IS tmux, so this box cannot be reached over a duct and
+        every termwork skill fails
+      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply
+           (on a grove: run it on the ground seat, which holds sudo)
+   • tpm present at the declared commit ✔ (<fixture>/tpm/tpm)

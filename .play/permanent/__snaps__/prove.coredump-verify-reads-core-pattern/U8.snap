@@ -1,0 +1,6 @@
+   • apport's boot claim on core_pattern is off (enabled=0)
+     ⇒ apport no longer files crash reports into /var/crash; systemd-coredump keeps
+       each core instead (coredumpctl list)
+     ⇒ undo: set enabled=1 in <fixture>/apport.default;
+       this bundle's verify then ✋s, since the next boot hands the pattern back to apport
+   • systemd-coredump collects each core, across a boot; read them with coredumpctl

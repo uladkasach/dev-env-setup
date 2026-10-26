@@ -1,0 +1,18 @@
+   • machine_openhours_reconcile matches this checkout ✔
+   • machine_openhours_reconcile.service matches this checkout ✔
+   • machine_openhours_reconcile.timer matches this checkout ✔
+   • the reconciler is executable ✔
+   • schedule matches the tree ✔ — days 1-5, 08:00–20:00 America/Chicago
+   • machine_openhours_reconcile.timer is active ✔
+     next: <next> <left> <last> <passed> machine_openhours_reconcile.timer machine_openhours_reconcile.service
+   • the timer is enabled — it returns after a reboot ✔
+   ✋ ConstraintError: the reconciler's cwd is built, but not at the pin
+      ⇒ expected a git repo that holds both gate skills at:
+        rhachet-roles-ehmpathy@<pin> rhachet-roles-bhuild@<pin>
+      fix: rhx grove.provision --what 5.18.openhours --mode apply
+   • gate right now — commit: open · radio: open
+     read the store: rhx rhachet.storage.get --what '.meter/*' --body
+   🌙 the CONVERGE leg is unproven on a box with no drift
+      it runs only when the gate disagrees with the clock, so the next
+      real boundary crossing is what proves it. read the verdict:
+        journalctl --user -u machine_openhours_reconcile.service --since today

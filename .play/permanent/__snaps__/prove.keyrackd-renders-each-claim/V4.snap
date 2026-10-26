@@ -1,0 +1,6 @@
+   • keyrack_daemon_prune.service matches this checkout ✔
+   • keyrack_daemon_prune.timer matches this checkout ✔
+   ✋ ConstraintError: keyrack_daemon_prune.timer is not enabled
+      ⇒ it will not survive a reboot, so the pool refills unwatched
+      fix: systemctl --user enable --now keyrack_daemon_prune.timer
+   • keyrack_daemon_prune.timer is armed on this boot ✔

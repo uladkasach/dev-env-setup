@@ -1,0 +1,5 @@
+   • tmux.conf declared (~/.tmux.conf)
+   ✋ ConstraintError: could not move the shadow conf aside: <fixture>/xdg/tmux.conf
+      cause: cannot move '<fixture>/xdg/tmux.conf' to '<fixture>/xdg/tmux.conf.bak.20261023T000000Z': Permission denied
+      ⇒ tmux loads it after ~/.tmux.conf, so every option it names
+        still overrides the one this repo declares

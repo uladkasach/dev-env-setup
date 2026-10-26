@@ -8,29 +8,16 @@
 #   not its cgroup's oldest process · older than 24h
 #
 # .why a timer
-#   - on 2026-10-07 ~254 abandoned processes (nearly all node) accrued across a
-#     35-day session, to 27.4G RAM + 45G swap, and no reader watched for them:
-#       · `1.6.4.keyrackd` reaps ONE population, the keyrack daemons
-#       · `machine.usage.diagnose` runs only when a human asks
-#       · earlyoom kills ONE process by score, and a population of medium
-#         orphans never outranked a 4 MiB session daemon — so it killed the
-#         session instead (`gotcha.earlyoom-kills-the-session-not-the-hog`)
-#   - ⇒ the population has to be reaped by age, before memory pressure exists
+#   - a population of orphans is reaped by age, before memory pressure exists
+#   - earlyoom kills one process by score, and once killed the session instead
+#     (`gotcha.earlyoom-kills-the-session-not-the-hog`, which holds the measurement)
 #
-# .why every box, no decline
-#   - a grove leaks the same tool subprocesses, and has no human to notice
-#
-# .why no linger claim here
-#   - `1.6.4.keyrackd` runs first and grants linger to every human seat; this
-#     timer rides on the same user manager. a second linger claim would be a
-#     second declaration of one fact
+# .why every box, no decline: a grove leaks the same subprocesses, with no human to notice
+# .why no linger claim: `1.6.7.linger` runs first and owns that one fact
 #
 # ⚠️ .why the service is generated and the timer is an asset
-#   - same split as `1.6.4.keyrackd`: the ExecStart names THIS checkout's
-#     executable, so it comes from one reader both halves ask; the timer holds
-#     no path, so it is a tracked file the verify can `cmp`
-#   - ⇒ apply `--from main`. a `--from tree` apply binds the timer to a
-#     worktree a `git worktree remove` can delete
+#   - the ExecStart names THIS checkout's executable; the timer holds no path (`cmp`-able)
+#   - ⇒ apply `--from main`; a `--from tree` apply binds it to a deletable worktree
 #
 # usage:
 #   rhx grove.provision --what 1.6.6.abandoned --mode apply
@@ -55,6 +42,19 @@ Description=Reap processes abandoned for over 24h
 Type=oneshot
 ExecStart=$(grove_provision_1_6_6_abandoned_bin) --mode apply --min-age 86400
 SERVICE
+}
+
+# .what = whether the unit at $1 holds the declared service bytes, exact
+# .why  = a pipe into `cmp -s -` leaves its writer on EPIPE when cmp exits before it reads
+#         (an absent unit); where SIGPIPE is ignored, as on a CI runner, the writer prints
+#         `write error: Broken pipe` into the phase's own output. each side is read whole,
+#         a sentinel keeps the final newlines, and no pipe is left to break
+grove_provision_1_6_6_abandoned_service_matches() {
+  local unit="$1" want got
+  [[ -f "$unit" ]] || return 1
+  want="$(grove_provision_1_6_6_abandoned_service_text; printf x)"
+  got="$(cat -- "$unit"; printf x)"
+  [[ "$want" == "$got" ]]
 }
 
 grove_provision_1_6_6_abandoned() {

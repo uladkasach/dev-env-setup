@@ -1,0 +1,2 @@
+   ✋ ConstraintError: web_verify_sha256: unknown argument '--path'
+      valid: --file <path>, --sha256 <hex>

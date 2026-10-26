@@ -1,0 +1,7 @@
+   ✋ ConstraintError: seattwo does not linger
+      ⇒ its user manager and every crew scope under it end at its last
+        logout — on a cloud grove, when the duct's last pane closes; on a
+        laptop, when the desktop session ends
+      fix: sudo -v && rhx grove.provision --what 1.6.7.linger --mode apply
+           the seat with root grants it to every seat
+           (on a grove: run it on the ground seat, which holds sudo)
