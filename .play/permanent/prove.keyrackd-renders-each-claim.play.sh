@@ -54,6 +54,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/.snap.operations.sh"
 FIX="$(mktemp -d "${TMPDIR:-/tmp}/prove.keyrackd.XXXXXX")"
 trap 'rm -rf "$FIX"' EXIT
 
+# SIGPIPE ignored, as a CI runner hands it to every child: a phase that pipes its declared
+#   text into a reader that exits early then prints `write error: Broken pipe`, and the
+#   snap catches it. on a seat where SIGPIPE kills the writer, the same defect is silent
+trap '' PIPE
+
 # the phase reads its skill and timer off `$GROVE_SRC`, so the fixture checkout stands in now
 export GROVE_SRC="$FIX/repo/src" HOME="$FIX/home"
 SKILL="$(grove_provision_1_6_4_keyrackd_skill)"

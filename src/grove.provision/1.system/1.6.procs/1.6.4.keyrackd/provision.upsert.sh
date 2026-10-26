@@ -62,8 +62,7 @@ grove_provision_1_6_4_keyrackd_provision_upsert() {
   # a read: a unit cmp cannot read is simply not converged, so cmp's own complaint is not news
   local converged=1
   cmp -s "$timer_src" "$unit_dir/$timer_name" 2>/dev/null || converged=0
-  grove_provision_1_6_4_keyrackd_service_text \
-    | cmp -s - "$unit_dir/$service_name" 2>/dev/null || converged=0
+  grove_provision_1_6_4_keyrackd_service_matches "$unit_dir/$service_name" || converged=0
   systemctl --user is-enabled "$timer_name" >/dev/null 2>&1 || converged=0
   systemctl --user is-active  "$timer_name" >/dev/null 2>&1 || converged=0
 

@@ -13,7 +13,7 @@ grove_provision_1_6_6_abandoned_provision_verify() {
   timer_src="$GROVE_SRC/machine/$timer_name"
   local fix="fix: rhx grove.provision --what 1.6.6.abandoned --mode apply"
 
-  if grove_provision_1_6_6_abandoned_service_text | cmp -s - "$unit_dir/$service_name"; then
+  if grove_provision_1_6_6_abandoned_service_matches "$unit_dir/$service_name"; then
     echo "   • $service_name matches this checkout ✔"
   else
     echo "   ✋ $unit_dir/$service_name does NOT match this checkout — an old path or age gate" >&2

@@ -44,6 +44,19 @@ ExecStart=$(grove_provision_1_6_6_abandoned_bin) --mode apply --min-age 86400
 SERVICE
 }
 
+# .what = whether the unit at $1 holds the declared service bytes, exact
+# .why  = a pipe into `cmp -s -` leaves its writer on EPIPE when cmp exits before it reads
+#         (an absent unit); where SIGPIPE is ignored, as on a CI runner, the writer prints
+#         `write error: Broken pipe` into the phase's own output. each side is read whole,
+#         a sentinel keeps the final newlines, and no pipe is left to break
+grove_provision_1_6_6_abandoned_service_matches() {
+  local unit="$1" want got
+  [[ -f "$unit" ]] || return 1
+  want="$(grove_provision_1_6_6_abandoned_service_text; printf x)"
+  got="$(cat -- "$unit"; printf x)"
+  [[ "$want" == "$got" ]]
+}
+
 grove_provision_1_6_6_abandoned() {
   bundle.upgrade 1.6.6.abandoned.provision.upsert
   bundle.upgrade 1.6.6.abandoned.provision.verify
