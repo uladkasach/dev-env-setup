@@ -26,8 +26,9 @@
 #
 # exit:
 #   0 = both arms hold
-#   1 = an arm failed, or the checkout holds no executable reaper
-#   2 = no checkout, no user manager, or a bait that never started — no claim was graded
+#   1 = an arm failed, the checkout holds no executable reaper, or a bait never
+#       started — a play that could not set up proved naught (rule.forbid.failhide)
+#   2 = no checkout, or no user manager — no claim was graded
 ######################################################################
 set -uo pipefail
 
@@ -82,7 +83,7 @@ cp "$(command -v sleep)" "$TMPDIR_BAIT/tmux"
 # own-scope: a fresh user scope whose launcher exits, so the bait is the scope's oldest
 timeout -k 2 20 systemd-run --user --scope --quiet --unit "$UNIT" \
   bash -c "setsid '$TMPDIR_BAIT/tmux' 600 </dev/null &>/dev/null & echo \$! > '$TMPDIR_BAIT/own.pid'" \
-  </dev/null || { echo "   ✋ ConstraintError: systemd-run --user --scope failed — no scope planted" >&2; exit 2; }
+  </dev/null || { echo "   💥 MalfunctionError: systemd-run --user --scope failed — no scope planted" >&2; exit 1; }
 OWN="$(_await_bait "$TMPDIR_BAIT/own.pid")"
 [[ -n "$OWN" ]] && BAIT_PIDS+=("$OWN")
 
@@ -92,7 +93,7 @@ PANE="$(_await_bait "$TMPDIR_BAIT/pane.pid")"
 [[ -n "$PANE" ]] && BAIT_PIDS+=("$PANE")
 
 [[ -n "$OWN" && -n "$PANE" ]] \
-  || { echo "   ✋ ConstraintError: a bait did not start within 5s — this play measured no world" >&2; exit 2; }
+  || { echo "   💥 MalfunctionError: a bait did not start within 5s — this play measured no world" >&2; exit 1; }
 
 echo "🔭 does the reaper spare a crew server born in its own scope?"
 echo "   ├─ own-scope pid $OWN, cgroup $(cut -d: -f3 "/proc/$OWN/cgroup")"
