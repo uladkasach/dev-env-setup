@@ -43,7 +43,7 @@ grove_provision_1_6_4_keyrackd_provision_verify() {
   ####################################################################
   # 1. the service — declared bytes vs installed bytes
   ####################################################################
-  if grove_provision_1_6_4_keyrackd_service_text | cmp -s - "$unit_dir/$service_name"; then
+  if grove_provision_1_6_4_keyrackd_service_matches "$unit_dir/$service_name"; then
     echo "   • $service_name matches this checkout ✔"
   else
     echo "   ✋ ConstraintError: $unit_dir/$service_name does NOT match this checkout" >&2

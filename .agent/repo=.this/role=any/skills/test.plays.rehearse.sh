@@ -14,6 +14,8 @@
 #   - PATH: a shadow of the stock bin dirs, minus zsh, tmux, nvim, sudo, node, npm, npx,
 #     pnpm, corepack, rhx, rhachet, fnm, coredumpctl, kitty and earlyoom
 #   - env: cleared, then HOME, PATH, TMPDIR, LANG=C.UTF-8 and USER=runner
+#   - SIGPIPE ignored, as the runner hands it to every step: a writer whose reader exits
+#     early then prints `write error: Broken pipe` rather than die quietly
 #   ⚠️ an approximation, never the runner: the kernel, the process tree, and the git and
 #     coreutils versions are this box's. a green rehearsal lowers the risk of a red run; only
 #     the run itself proves the run
@@ -75,6 +77,7 @@ echo "🐚 test.plays.rehearse"
 echo "   ├─ matrix: ${#SLUGS[@]} play(s) from .github/workflows/test.plays.yml"
 echo "   ├─ seat: fresh HOME; a PATH with no${DROP% }"
 FAILED=()
+trap '' PIPE
 for slug in "${SLUGS[@]}"; do
   out="$(cd "$ROOT" && env -i HOME="$FIX/home" PATH="$FIX/bin" TMPDIR="$FIX/tmp" LANG=C.UTF-8 USER=runner \
     bash "$RUNNER" --play "$slug" 2>&1)"

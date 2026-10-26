@@ -1,5 +1,5 @@
 Cloning into '<fixture>/tpm-absent'...
-fatal: reference is not a tree: 0000000000000000000000000000000000000000
+fatal: <git's own words>
    ✋ ConstraintError: the pinned commit is absent from https://github.com/tmux-plugins/tpm
       expected: 0000000000000000000000000000000000000000
       ⇒ upstream force-pushed or deleted it. do NOT relax the pin to
