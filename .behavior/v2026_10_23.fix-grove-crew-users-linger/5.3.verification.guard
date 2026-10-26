@@ -274,7 +274,7 @@ reviews:
       level: 1
 
     - slug: mech-test-scope-purity
-      run: $rhx review --repo bhrain --mode hard --rules '.agent/repo=ehmpathy/role=mechanic/briefs/practices/code.test/scope.*/rule.*.md' --diffs since-main --paths-with '{src,blackbox}/**/*.test.ts' --join intersect --conversation $conversation --output "$output"
+      run: $rhx review --repo bhrain --mode hard --rules '.agent/repo=ehmpathy/role=mechanic/briefs/practices/code.test/scope.*/rule.*.md' --diffs since-main --paths-with '.play/permanent/prove.*.play.sh' --join intersect --conversation $conversation --output "$output"
       budget: 3
       level: 1
 
