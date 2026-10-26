@@ -23,8 +23,9 @@
 #
 # exit:
 #   0 = a core landed for the bait
-#   1 = no core landed
-#   2 = no coredumpctl on this box, or the bait never ran, so no claim was graded
+#   1 = no core landed, or the bait never ran — a play that could not set up
+#       proved naught, so it fails loud (rule.forbid.failhide)
+#   2 = no coredumpctl on this box, so no claim was graded
 ######################################################################
 set -uo pipefail
 
@@ -53,7 +54,7 @@ for _ in $(seq 1 20); do
   sleep 0.25
 done
 [[ "$(readlink "/proc/$PID/exe" 2>/dev/null)" == "$BAIT" ]] \
-  || { echo "✋ ConstraintError: the bait did not exec within 5s — this play measured no world" >&2; exit 2; }
+  || { echo "💥 MalfunctionError: the bait did not exec within 5s — this play measured no world" >&2; exit 1; }
 
 echo "🔭 does a segfault on this box leave a core?"
 echo "   ├─ bait pid $PID"

@@ -31,4 +31,6 @@ the 30s bound is a judgment about load. no box here has yet shown a collector pa
 
 ## .verdict
 
-open — raised by 5.3 i004 r12 blocker.2 and i005 r12 blocker.1, disputed here each time
+ruled: approved (director, 2026-10-26). a 30s collector window, ended at the first hit, with the
+seat's own core limit kept, is an execution tune: it changes how long the play waits, never what
+it grades. raised by 5.3 i004 r12 blocker.2, i005 r12 blocker.1, i006 r12 blocker.1.

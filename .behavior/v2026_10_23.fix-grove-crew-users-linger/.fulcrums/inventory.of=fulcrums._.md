@@ -16,8 +16,8 @@
 | F12 | the `settings.of.grove.json` symlink retarget is handed to a human, not restored here | clean | best-guess | 75% |
 | F13 | the 33 unqualified ✋ headers in `src/grove.web.sh` are qualified here, not deferred | clean | best-guess; first deferred on an unmeasured ripple, then measured (2 snaps) and done | 80% |
 | F14 | the tree-wide copy polish (emphasis caps, `(s)` plurals, `read why:` on rows that write state, layout drift, mask words) deferred to a dream | clean | best-guess | 70% |
-| F15 | the coredump bait keeps this seat's core limit, under a 30s collector window ended at the first hit | clean | best-guess; disputed at i004, i005 (r12) | 80% |
-| F16 | a bait that never starts declines (exit 2); the 5.1 budget top-up stands on its urgent concessions | clean | best-guess; disputed at i004, i005 (r12) | 85% |
+| F15 | the coredump bait keeps this seat's core limit, under a 30s collector window ended at the first hit | clean | ruled: approved — an execution tune (director) | 80% |
+| F16 | a bait that never starts declines (exit 2); the 5.1 budget top-up stands on its urgent concessions | clean | ruled: struck — a bait that never starts fails loud, exit 1 (director) | 85% |
 | F17 | a plan-mode arm through the entrypoint deferred to a dream; the phase plays stand as the snap of each phase | dirty | best-guess | 75% |
 
 entries: `inventory.of=fulcrums.case=F$n-$slug.md`
