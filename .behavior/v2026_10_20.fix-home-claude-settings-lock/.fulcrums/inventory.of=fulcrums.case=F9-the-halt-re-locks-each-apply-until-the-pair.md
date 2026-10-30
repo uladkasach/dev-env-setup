@@ -29,10 +29,14 @@ the options, restated for this fact:
 
 - **confidence in the lean 60%, low because**: E leaves a window between an unshielded init and the next apply where role hooks fire in home — the defect itself, shortened, not closed
 - **where**: `_grove_provision_5_3_brains_settings_boot_gate`
-- **verdict**: ruled E by the driver, 2026-10-23, under the director's order (a clean rework is
-  ruled, not relayed). E lands as ONE declared value that gates the chmod and the verify's lock
-  claim; the clamp proves both values, so a flip back to A is one line. landed: the value is
-  `_GROVE_PROVISION_5_3_BRAINS_SETTINGS_LOCK=off` (mode 0600) in `5.3.brains/_.sh`; clamp arm 22
+- **verdict**: overruled by the commander, 2026-10-29 — **A: ship `on`.** a repo pinned below the
+  shielded rhachet upgrades; the lock is never lifted for it. landed as the one-line flip the
+  record names: `_GROVE_PROVISION_5_3_BRAINS_SETTINGS_LOCK=on` (mode 0400) in `5.3.brains/_.sh`;
+  clamp arms 22 and 23 prove it, the seam snap pins `mode 644 → 400` and `read-only (mode 400) ✔`.
+  the prior verdict, E by the driver on 2026-10-23 under the director's order, is superseded. the
+  sections below weigh E's window and stay as the record of why A was the commander's to call;
+  F10 (claude's own writes under the lock) and the rename-writer note in the last section remain
+  open beside A
 
 ## 🔴 what E leaves open — the commander's to weigh (i007, r010 blocker.1)
 

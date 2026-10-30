@@ -1,10 +1,8 @@
       ├─ 5.3.brains.configure.upsert
          • backup → <seam>/home/.claude/settings.<stamp>.bak.json
          • role hooks stripped → 3 removed; every unauthored hook kept
-         • claude settings merged → <seam>/home/.claude/settings.json (mode 644 → 600, swapped in by rename)
-         🌙 boot gate: the lock is declared off, so no lock to prove — no init is run
-            ⇒ a repo pinned below the shielded rhachet 1.49.2 still writes its hooks into home on install,
-              and no writer re-strips them between applies; the plan's ✋ role hooks is the one detector
+         • claude settings merged → <seam>/home/.claude/settings.json (mode 644 → 400, swapped in by rename)
+         🌙 boot gate: <repo>/.claude/settings.json is no arrow to <seam>/home/.claude/settings.json, so an init there never meets the lock
          • claude global config declared → <seam>/home/.claude.json
          • claude keybindings merged → <seam>/home/.claude/keybindings.json (ctrl+enter is the one send-now key)
       ├─ 5.3.brains.configure.verify
@@ -29,7 +27,7 @@
          • the claude-drafted feedback queue holds the declared value ✔
          • the never-prune transcript retention holds the declared value ✔
          • no role-authored hook in <seam>/home/.claude/settings.json ✔
-         🌙 <seam>/home/.claude/settings.json keeps its write bit (mode 600), as declared off — the lock is owed, and waits for the pre-shield pins
+         • <seam>/home/.claude/settings.json is read-only (mode 400) ✔
          • ctrl+enter is the one send-now key (the ctrl+x ctrl+s chord is unbound) ✔
             ⇒ a bare session reads this file; an ENROLLED clone reads its actor dir's copy until
               rhachet links it there (ehmpathy/rhachet#579), so an enrolled hint may still name the chord

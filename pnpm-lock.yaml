@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  rhachet-roles-bhrain@0.42.4:
+    hash: a34b5f057e5681e021bbac139a15ce2df61c25720d163c60a0c7fcffc8c09a15
+    path: patches/rhachet-roles-bhrain@0.42.4.patch
+
 importers:
 
   .:

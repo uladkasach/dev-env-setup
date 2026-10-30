@@ -1067,8 +1067,11 @@ out="$( cd "$seam" && env -u CLAUDE_CONFIG_DIR HOME="$seam/home" GROVE_SRC="$rep
   bash -c 'WHAT=(); source "$1/src/bundle.upgrade.sh"; source "$2"; source "$3"; source "$4"
            bundle.upgrade 5.3.brains.configure.upsert; bundle.upgrade 5.3.brains.configure.verify
            echo "exit=$BUNDLE_FAILED"' _ "$repo" "$GROVE_5_3_SHARED_REAL" "$upsert" "$verify" 2>&1 )"
-# the fixture path and the backup stamp differ per run, so each is replaced by a fixed token
+# the fixture path, the checkout path, and the backup stamp differ per run and per box, so each is
+# replaced by a fixed token — the checkout path also names the human's home, which a public snap
+# must never carry
 out="${out//$seam/<seam>}"
+out="${out//$repo/<repo>}"
 out="$(printf '%s\n' "$out" | sed -E 's/settings\.[0-9TZ.:-]+\.bak\.json/settings.<stamp>.bak.json/g')"
 if [[ "${GROVE_RESNAP:-}" == 1 ]]; then
   printf '%s\n' "$out" > "$snap" && pass "23 seam: baseline rewritten at $snap — review its diff"
