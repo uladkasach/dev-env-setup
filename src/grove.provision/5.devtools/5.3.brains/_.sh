@@ -495,22 +495,21 @@ _grove_provision_5_3_brains_lock_of_mode() {
 
 ####################################################################
 # .what = whether an apply LOCKS the home settings file: `on` (mode 0400) or `off` (mode 0600)
-# .why  = a repo pinned below the shielded rhachet (1.49.2) runs an init that writes its role
-#         hooks into home through the tree's arrow. against a lock that write fails, and the
-#         repo's `prepare` exits 1 — every such install breaks until its pin moves. so, until the
-#         pins move, the apply strips the hooks on every run and leaves the owner's write bit;
-#         flip this ONE value to `on` once they have (define.5-3-brains.declared-keys, the lock)
-# ⚠️ under `off` no writer re-strips between applies: a pre-shield install after an apply re-adds its
-#    hooks, and they fire until the next apply. the plan's ✋ is the only detector
-# 🛑 the flip to `on` is the commander's, and owes three things no check detects:
-#   1. every repo that runs on this box pins rhachet >= 1.49.2 (a stale pin fails its install)
-#   2. a hermetic probe of claude against a read-only settings file, and one of claude's own
-#      settings writes under it (fulcrum F10 — does a `/model` switch fail, or rename past the lock?)
-#   3. a skill that unlocks, edits, and re-applies, so the hand `chmod u+w` row retires (fulcrum F13)
+# .why  = the lock is what stops a foreign write; under `off`, a write lands and its hooks fire
+#         until the next apply. so the apply locks the file on every run
+# ⚠️ a repo pinned below the shielded rhachet (1.49.2) runs an init that writes its role hooks into
+#    home through the tree's arrow. against the lock that write fails, and the repo's `prepare`
+#    exits 1. the cure is that repo's upgrade, never an unlock: the commander settled it — a stale
+#    pin upgrades (define.5-3-brains.declared-keys, the lock)
+# 🛑 the file changes only through this bundle: edit a declared key here, then apply. the apply
+#    swaps the merged file in by rename and re-locks it, so no hand edit and no unlock skill is
+#    owed — a hand `chmod u+w` is forbidden (fulcrum F13, the commander settled it)
+# ⚠️ the lock still owes one probe no check here makes: claude's own settings writes under it in
+#    a bare session (fulcrum F10 — does a `/model` switch fail, or rename past the lock?)
 # 🛑 the upsert's swap and skip and the verify's claim all read it, so they never disagree; and
 #    the apply is the bit's ONE writer — a gate that meets a halt keeps the declared mode
 ####################################################################
-_GROVE_PROVISION_5_3_BRAINS_SETTINGS_LOCK=off
+_GROVE_PROVISION_5_3_BRAINS_SETTINGS_LOCK=on
 
 # .what = the two modes the declaration picks between, named once so no reader restates them
 #   - LOCKED = 0400: no write bit for anyone, and no read bit beyond the owner — the file keeps the
