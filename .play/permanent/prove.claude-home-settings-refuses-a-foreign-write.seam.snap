@@ -2,7 +2,7 @@
          • backup → <seam>/home/.claude/settings.<stamp>.bak.json
          • role hooks stripped → 3 removed; every unauthored hook kept
          • claude settings merged → <seam>/home/.claude/settings.json (mode 644 → 400, swapped in by rename)
-         🌙 boot gate: <repo>/.claude/settings.json is no arrow to <seam>/home/.claude/settings.json, so an init there never meets the lock
+         🌙 boot gate: no rhachet checkout beside this run, so no init to prove the lock against
          • claude global config declared → <seam>/home/.claude.json
          • claude keybindings merged → <seam>/home/.claude/keybindings.json (ctrl+enter is the one send-now key)
       ├─ 5.3.brains.configure.verify

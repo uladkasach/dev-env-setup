@@ -1063,7 +1063,13 @@ seam="$fix/seam"
 mkdir -p "$seam/home/.claude"
 printf '%s\n' "$seed" > "$seam/home/.claude/settings.json"
 chmod 0644 "$seam/home/.claude/settings.json"
-out="$( cd "$seam" && env -u CLAUDE_CONFIG_DIR HOME="$seam/home" GROVE_SRC="$repo/src" GROVE_MODE=apply \
+# the seam's checkout is a fixture whose src is an arrow to the real one: the halves and the
+# runtime stay real, but no rhachet install sits beside it, so the boot gate takes one branch on
+# every box. the real checkout's gate branch hangs on whether that box ran an install — the
+# laptop has one, a ci runner does not — and the gate's branches are arm 8's to prove
+mkdir -p "$seam/co"
+ln -s "$repo/src" "$seam/co/src"
+out="$( cd "$seam" && env -u CLAUDE_CONFIG_DIR HOME="$seam/home" GROVE_SRC="$seam/co/src" GROVE_MODE=apply \
   bash -c 'WHAT=(); source "$1/src/bundle.upgrade.sh"; source "$2"; source "$3"; source "$4"
            bundle.upgrade 5.3.brains.configure.upsert; bundle.upgrade 5.3.brains.configure.verify
            echo "exit=$BUNDLE_FAILED"' _ "$repo" "$GROVE_5_3_SHARED_REAL" "$upsert" "$verify" 2>&1 )"
