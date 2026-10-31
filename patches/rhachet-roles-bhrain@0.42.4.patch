@@ -1,0 +1,26 @@
+diff --git a/dist/domain.operations/route/guard/review/getAllCachedPassedReviews.js b/dist/domain.operations/route/guard/review/getAllCachedPassedReviews.js
+--- a/dist/domain.operations/route/guard/review/getAllCachedPassedReviews.js
++++ b/dist/domain.operations/route/guard/review/getAllCachedPassedReviews.js
+@@ -5,7 +5,21 @@ exports.getAllCachedPassedReviews = void 0;
+  * .what = the prior review artifacts eligible for reuse — those whose run passed
+  * .why = only a successful review is cached. a malfunction may mean the reviewer was fixed;
+  *        a constraint may mean the artifact was fixed — both need a re-run
++ * .note = a passed review is reused only while it is its rung's LATEST given at the hash.
++ *         a later refusal or malfunction at the same rung supersedes it: the lane owes a
++ *         re-run, and the judge reads that later given. to serve the older verdict holds the
++ *         lane on a verdict the judge no longer counts, a residual no stance can clear.
++ *         local patch, clamp `prove.guard-reruns-a-lane-whose-latest-given-refused`;
++ *         the cure is owed upstream in rhachet-roles-bhrain
+  */
+-const getAllCachedPassedReviews = (input) => input.reviews.filter((r) => r.exitClass === 'passed');
++const getAllCachedPassedReviews = (input) => input.reviews.filter((r) => r.exitClass === 'passed' &&
++    !isSupersededAtRung({ review: r, reviews: input.reviews }));
+ exports.getAllCachedPassedReviews = getAllCachedPassedReviews;
++/**
++ * .what = whether a later given at the same rung did not pass
++ * .why = a refusal or malfunction after a pass means the lane must run again
++ */
++const isSupersededAtRung = (input) => input.reviews.some((other) => other.index === input.review.index &&
++    other.iteration > input.review.iteration &&
++    other.exitClass !== 'passed');
+ //# sourceMappingURL=getAllCachedPassedReviews.js.map

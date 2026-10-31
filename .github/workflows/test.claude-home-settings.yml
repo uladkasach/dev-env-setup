@@ -1,0 +1,46 @@
+# .what = run the home-claude-settings clamp on every push and pr that touches the 5.3.brains
+#   bundle, its play, or this workflow
+#
+# .why  = the bundle rewrites `~/.claude/settings.json` (strips role hooks, sets its mode) and two
+#   other home files. a defect there reaches every session on the box, so its clamp must run
+#   where no one has to remember it — the same reason `test.brains.auth.yml` exists
+#
+# .note = HERMETIC, no secrets. the play builds a sandbox home in `mktemp -d`, points HOME and every
+#   checkout into it, and removes it on exit; it never reads or writes the runner's own home files.
+#   the boot gate arms drive a FIXTURE checkout whose `prepare:rhachet` is a local stub, so npm runs
+#   no install and reaches no registry. no `npm ci`, no token: a fork pr runs it the same way
+#
+# .note = the play refuses root (a mode lock does not stop root, so no arm could fail) and halts
+#   by name where jq or npm is absent — both ship on ubuntu-latest, and the job runs as `runner`
+name: test.claude-home-settings
+
+on:
+  push:
+    paths:
+      # `**`, not `*`: github path globs never cross a `/` with a single `*`
+      - 'src/grove.provision/5.devtools/5.3.brains/**'
+      # the play and its `.seam.snap` baseline; the seam arm drives the runtime, so it is here too
+      - '.play/permanent/prove.claude-home-settings-refuses-a-foreign-write.*'
+      - 'src/bundle.upgrade.sh'
+      - '.github/workflows/test.claude-home-settings.yml'
+  pull_request:
+    paths:
+      - 'src/grove.provision/5.devtools/5.3.brains/**'
+      # the play and its `.seam.snap` baseline; the seam arm drives the runtime, so it is here too
+      - '.play/permanent/prove.claude-home-settings-refuses-a-foreign-write.*'
+      - 'src/bundle.upgrade.sh'
+      - '.github/workflows/test.claude-home-settings.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # one clear line where a runner image drops a tool, never a wall of arm failures
+      - name: assert jq and npm
+        run: jq --version && npm --version
+
+      - name: home claude settings clamp
+        run: bash '.play/permanent/prove.claude-home-settings-refuses-a-foreign-write.play.sh'
