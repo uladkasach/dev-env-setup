@@ -51,7 +51,9 @@ grove_provision_1_7_usage_provision_verify() {
     echo "        sections simply print no number, forever, on every capture" >&2
     echo "      ⇒ disk i/o is the evidence for a swap-thrash, which is the very" >&2
     echo "        event the snapshot exists to explain" >&2
-    echo "      fix: rhx grove.provision --what 1.7.usage --mode apply" >&2
+    # an apt install needs root, and `rhx` hands a skill no tty to ask on
+    #   (gotcha.rhx-runs-a-skill-with-no-tty), so the fix caches sudo first
+    echo "      fix: sudo -v && rhx grove.provision --what 1.7.usage --mode apply" >&2
     failed=1
   fi
 
@@ -66,7 +68,9 @@ grove_provision_1_7_usage_provision_verify() {
   local name
   for name in \
     machine_resource_observe \
-    machine_usage_snapshot
+    machine_usage_snapshot \
+    machine_usage_record \
+    machine_usage_history
   do
     local bin
     bin="$(bundle.bin.at "$name")"
@@ -138,6 +142,36 @@ grove_provision_1_7_usage_provision_verify() {
       echo "        complete — a human then reasons from a truncated snapshot" >&2
       [[ -n "$snap_err" ]] && echo "      it said: $(echo "$snap_err" | tail -3)" >&2
       echo "      read why: machine_usage_snapshot --stdout" >&2
+      failed=1
+    fi
+  fi
+
+  ####################################################################
+  # 4. the recorder is ARMED, and its record is FRESH
+  #
+  # ⚠️ an enabled timer is not proof of a record: the unit can fire and
+  #    fail on every run. so the claim is read off the record itself — a
+  #    state file the recorder rewrites each run, touched in the last 5 min
+  #   - the first minute after an apply has no sample yet, so a fresh arm
+  #     reads 🌙, never ✋
+  ####################################################################
+  if ! systemctl --user show-environment >/dev/null 2>&1; then
+    echo "   🌙 no user manager answers here, so no recorder timer is owed"
+  elif ! systemctl --user is-active --quiet machine_usage_record.timer; then
+    echo "   ✋ machine_usage_record.timer is not active" >&2
+    echo "      ⇒ no usage record is kept; machine_usage_history has naught to read" >&2
+    echo "      fix: rhx grove.provision --what 1.7.usage --mode apply" >&2
+    failed=1
+  else
+    local state="${XDG_STATE_HOME:-$HOME/.local/state}/machine.usage/prev.box"
+    if [[ -n "$(find "$state" -mmin -5 2>/dev/null)" ]]; then
+      echo "   • machine_usage_record.timer active, and its record is fresh ✔"
+    elif [[ ! -e "$state" ]]; then
+      echo "   🌙 machine_usage_record.timer active; its first sample lands within a minute"
+    else
+      echo "   ✋ machine_usage_record.timer is active, yet its record is over 5 minutes stale" >&2
+      echo "      ⇒ the timer fires and the run fails, so the record silently stops" >&2
+      echo "      read why: journalctl --user -u machine_usage_record.service -n 20" >&2
       failed=1
     fi
   fi

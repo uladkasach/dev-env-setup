@@ -22,7 +22,7 @@
 #   one, and you must add all three: the file, the source line, and the cp in the phase.
 #
 # vision: .behavior/v2026_07_28.brain-budget-utilization/1.vision.yield.md
-# tests:  rhx brains.auth.test   (330 cases, hermetic, no network, no real ~/.claude)
+# tests:  rhx brains.auth.test   (334 cases, hermetic, no network, no real ~/.claude)
 #         ⚠️ this number is ASSERTED, not maintained by hand — `header.count-matches-the-suite`
 #           reads it back out of this very line and compares it to the suite's own total. it
 #           drifted ~100 cases wrong once, when it was only a promise. now a case added
@@ -1019,7 +1019,15 @@ _brains_auth_login_isolated() {
     echo "   fix: run it yourself in a terminal — brains.auth.set" >&2
     return 3
   }
-  CLAUDE_CONFIG_DIR="$authdir" script -q -c "claude" /dev/null </dev/tty
+  # 🛑 BOTH vars, always. claude v2.1.280 resolves its credential store from
+  #   CLAUDE_SECURESTORAGE_CONFIG_DIR, and absent that, from ~/.claude — CLAUDE_CONFIG_DIR no
+  #   longer reaches it. with CLAUDE_CONFIG_DIR alone the sign-in is HALF isolated: the account
+  #   record lands in $authdir, the oauth token lands in the GLOBAL ~/.claude/.credentials.json.
+  #   measured 2026-10-20: the extract found no token (it was not in $authdir), and the global
+  #   login had silently become the newly signed-in account while ~/.claude.json still named
+  #   the old one. `rhx brains.auth.creds.get` reports which account a live token truly holds.
+  CLAUDE_CONFIG_DIR="$authdir" CLAUDE_SECURESTORAGE_CONFIG_DIR="$authdir" \
+    script -q -c "claude" /dev/null </dev/tty
 }
 
 # .what = lift the oauth refresh token out of an isolated sign-in dir ($1=authdir)
@@ -1183,10 +1191,13 @@ _brains_auth_set() {
   #   a broad guarantee and delivered a narrow one. a SIGTERM (a killed terminal, a logout, a
   #   parent process reaped) left a LIVE, durable oauth refresh token on disk, world-readable
   #   the moment the 0700 dir's parent is walked by a backup or a temp sweeper. so the trap
-  #   covers TERM and HUP too, and — the part that actually closes the gap — RETURN, so every
-  #   early exit below shreds the dir whether or not its author remembered to.
+  #   covers TERM and HUP too.
+  # 🛑 no `RETURN` arm. this file is sourced by zsh as well as bash, and zsh has no RETURN
+  #   signal: `trap … RETURN` fails as `undefined signal: RETURN` and arms not one signal,
+  #   INT/TERM/HUP included. so every early return between this arm and the shred below must
+  #   `rm -rf` the dir itself; there is exactly one (the no-tty refusal).
   chmod 700 "$authdir"
-  trap 'rm -rf "$authdir"' INT TERM HUP RETURN
+  trap 'rm -rf "$authdir"' INT TERM HUP
 
   echo "🐢 paddle out — a claude sign-in opens"
   echo "   ├─ isolated from your global claude — pick any account"
@@ -1200,11 +1211,30 @@ _brains_auth_set() {
   #   failure to the extract leaf, which can only report an absent token — and the human would
   #   be told to redo a browser approval that was never opened. the leaf has already said the
   #   true cause; we only need to stop rather than overwrite it with a friendlier wrong one.
+  # 🛑 snapshot the GLOBAL login's refresh token before the sign-in, and compare after. the
+  #   isolation rests on env vars whose reach claude has already moved once (see the login
+  #   leaf); when it moves again the sign-in silently swaps the human's global login to another
+  #   account. this compare is what turns that into a loud stop rather than a quiet swap.
+  # ⚠️ a change ALONE is not proof: an open claude session rotates the global token on its own
+  #   clock, and a sign-in can take minutes. a leak shows BOTH symptoms — the global token
+  #   moved AND the private dir holds no credentials file — so both are required to fire.
+  local live_before live_after
+  live_before="$(_brains_auth_creds_field "$_BRAINS_AUTH_LIVE_CREDS" '.claudeAiOauth.refreshToken')"
   local lrc=0
   _brains_auth_login_isolated "$authdir" || lrc=$?
+  live_after="$(_brains_auth_creds_field "$_BRAINS_AUTH_LIVE_CREDS" '.claudeAiOauth.refreshToken')"
+  if [[ "$live_before" != "$live_after" && ! -f "$authdir/.credentials.json" ]]; then
+    rm -rf "$authdir"; trap - INT TERM HUP
+    echo "💥 MalfunctionError: the isolated sign-in wrote into your GLOBAL claude login" >&2
+    echo "   ${_BRAINS_AUTH_LIVE_CREDS} changed while the sign-in ran, so claude no longer" >&2
+    echo "   honors the env vars that aim its credential store at a private dir" >&2
+    echo "   ├─ see which account it now holds: rhx brains.auth.creds.get" >&2
+    echo "   └─ fix: find claude's current credential-dir env var, set it in _brains_auth_login_isolated" >&2
+    return 1
+  fi
   # rc 3 is the no-tty refusal and ONLY that; every other rc is claude's own, and those still
   # fall through to the extract below, which reports what the sign-in did or did not leave.
-  (( lrc == 3 )) && return 2
+  (( lrc == 3 )) && { rm -rf "$authdir"; trap - INT TERM HUP; return 2; }
   local xrc
   refresh="$(_brains_auth_extract_refresh "$authdir")"; xrc=$?
 
@@ -1213,15 +1243,12 @@ _brains_auth_set() {
     echo "🔎 brains.auth.set: no sk-ant-ort refresh token in ${authdir} (files: $(ls -a "$authdir" 2>/dev/null | tr '\n' ' '))" >&2
   fi
 
-  # shred the isolated credentials the moment the refresh token is lifted. the RETURN trap
-  # would also shred them, but this eager shred narrows the window the secret sits on disk
-  # from "until the function ends" to "until we hold it in memory". the trap is the backstop
-  # for the paths that never reach this line — never a licence to leave the file at rest on
-  # the paths that do.
+  # shred the isolated credentials the moment the refresh token is lifted, so the secret
+  # sits on disk only until we hold it in memory. the trap is the backstop for a signal.
   # ⚠️ the disarm must name EVERY signal the arm named. disarm a subset and the rest stay
   #   armed past this point, so the two lines drift apart with no signal that they have.
   rm -rf "$authdir"
-  trap - INT TERM HUP RETURN
+  trap - INT TERM HUP
 
   # ⚠️ the three causes each earn their OWN hint, because each earns a different next move.
   #   this branch used to be a single `[[ -z "$refresh" ]]`, so an unparseable state file and
@@ -2394,9 +2421,29 @@ _brains_auth_node_via_access() {
   #   the present-but-unreadable half open. both halves now route to `unexpected_shape`.
   #   the null case rides along for free — `(null|type)` is "null", not "number" — so an
   #   endpoint that starts to omit the value is caught by this test rather than by `// 0`.
-  if ! jq -e '(.five_hour.utilization|type)=="number" and (.seven_day.utilization|type)=="number"' \
+  #
+  # ⚠️ a window that is PRESENT and null is a real answer, not a drift: the plan has no such
+  #   limit. 📜 2026-10-31 — max 20x plans were rebranded ultra, and some lost the 5h limit, so
+  #   their body reads `"five_hour": null`. the old test refused it and every such account read
+  #   💥. the key must still be PRESENT (`has`), so an endpoint that drops the field is caught
+  #   rather than read as "no limit"
+  if ! jq -e '
+       def window_ok(k): has(k) and ((.[k] == null) or ((.[k].utilization|type) == "number"));
+       type == "object" and window_ok("five_hour") and window_ok("seven_day")' \
        <<< "$body" >/dev/null 2>&1; then
-    _brains_auth_error_node 'unexpected_shape'
+    # ⚠️ the refusal names WHAT it saw, as types only — never the values. a bare
+    #   `unexpected_shape` threw the body away, so the one fact a repair needs (which field
+    #   drifted, and into what) was unrecoverable without a re-read by hand
+    jq -nc --arg b "$body" '
+      ($b | try fromjson catch null) as $j
+      | {error:"unexpected_shape",
+         seen: (if ($j|type) != "object" then {body:($j|type), bytes:($b|length)}
+                else {five_hour:($j.five_hour|type),
+                      five_hour_utilization:(try ($j.five_hour.utilization|type) catch "n/a"),
+                      seven_day:($j.seven_day|type),
+                      seven_day_utilization:(try ($j.seven_day.utilization|type) catch "n/a"),
+                      keys:($j|keys|.[:12])}
+                end)}' 2>/dev/null || _brains_auth_error_node 'unexpected_shape'
     return
   fi
   printf '%s' "$body"
@@ -2753,10 +2800,18 @@ _brains_auth_render() {
     #   when they had room, or charges ahead when they had none. the bar direction hints at
     #   it, but a hint is not a label. "used" is what the endpoint reports (`utilization`),
     #   so the word matches the source and no conversion sits between them to invert.
+    # two absences, two meanings — never "resets at ?, in ?":
+    #   - a window that is null: this PLAN has no such limit (ultra plans dropped the 5h one),
+    #     so its row is simply not drawn — a limit that does not exist earns no line
+    #   - a window present with no reset: the limit exists, and no window has opened yet
+    s_tail="no window open yet"
+    [[ -n "$s_reset" ]] && s_tail="resets at $(_brains_auth_when "$s_reset"), in $(_brains_auth_until "$s_reset")"
+    w_tail="no window open yet"
+    [[ -n "$w_reset" ]] && w_tail="resets at $(_brains_auth_when "$w_reset"), in $(_brains_auth_until "$w_reset")"
     printf '   ├─ %s%s\n' "$reach" "$mark"
-    printf '   │  ├─ session  %s %3d%% used  ·  resets at %s, in %s\n' \
-      "$(_brains_auth_bar "$s_pct")" "$s_pct" \
-      "$(_brains_auth_when "$s_reset")" "$(_brains_auth_until "$s_reset")"
+    [[ "$(jq -r '.five_hour != null' <<< "$node")" == true ]] && \
+      printf '   │  ├─ session  %s %3d%% used  ·  %s\n' \
+        "$(_brains_auth_bar "$s_pct")" "$s_pct" "$s_tail"
     # opus rides just after session (same 5h window) only when the account has one
     [[ -n "$o_used" ]] && printf '   │  ├─ opus     %s %3d%% used\n' \
       "$(_brains_auth_bar "$(_brains_auth_round "$o_used")")" "$(_brains_auth_round "$o_used")"
@@ -2764,9 +2819,14 @@ _brains_auth_render() {
     reset_txt="$(_brains_auth_reset_line "$node")"
     week_glyph='└─'
     [[ -n "$reset_txt" ]] && week_glyph='├─'
-    printf '   │  %s week     %s %3d%% used  ·  resets at %s, in %s\n' "$week_glyph" \
-      "$(_brains_auth_bar "$w_pct")" "$w_pct" \
-      "$(_brains_auth_when "$w_reset")" "$(_brains_auth_until "$w_reset")"
+    # the week row stays even when null: it closes the block, and with no session row either
+    #   an absent line would leave the account header bare and unexplained
+    if [[ "$(jq -r '.seven_day == null' <<< "$node")" == true ]]; then
+      printf '   │  %s week     no weekly limit on this plan\n' "$week_glyph"
+    else
+      printf '   │  %s week     %s %3d%% used  ·  %s\n' "$week_glyph" \
+        "$(_brains_auth_bar "$w_pct")" "$w_pct" "$w_tail"
+    fi
     [[ -n "$reset_txt" ]] && printf '   │  └─ reset    %s\n' "$reset_txt"
   done < <(jq -r 'keys[]' <<< "$combined")
   echo "   └─"

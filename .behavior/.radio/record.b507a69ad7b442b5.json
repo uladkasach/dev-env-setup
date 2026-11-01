@@ -1,0 +1,19 @@
+{
+  "key": "b507a69ad7b442b5",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-bhuild"
+  },
+  "exid": null,
+  "title": "perf(kitty): speak the rc protocol on the socket directly instead of a kitten @ client per call",
+  "description": "## .what\n\nwhere a skill queries or drives kitty, talk to kitty's remote-control socket directly with the documented protocol, instead of a fresh `kitten @ <cmd>` client per call.\n\n## .why\n\n- measured upstream in kovidgoyal/kitty#3209: `kitty @ ls` takes **~77ms**, and the kitty maintainer states that is almost entirely client startup time; a direct socket roundtrip with the documented protocol takes **~10-20ms**\n- measured on a dev box: a 10s churn sample saw **~114 distinct short-lived `kitten` processes** and ~57 `kitty` processes, steady across samples (clock-driven, not workload)\n- the protocol is documented (kitty remote-control protocol): a JSON `kitty-cmd` payload framed as an escape sequence, sent over the `listen_on` unix socket\n\n## .proposed shape\n\n- one small socket client (or a resident helper) that speaks the rc protocol, used by the termwork / duct skills that today call `kitten @ ls`, `@ send-text`, and similar on a loop\n- for state a loop re-reads (e.g. the window list), prefer a cache refreshed on change over a query per tick\n\n## .acceptance\n\n- the hot paths that call `kitten @` on a loop use the direct socket client\n- measured before/after: distinct `kitten` processes per 10s sample, and the per-call latency\n\n## .sources\n\n- https://github.com/kovidgoyal/kitty/issues/3209\n- https://sw.kovidgoyal.net/kitty/rc_protocol/\n- https://sw.kovidgoyal.net/kitty/remote-control/",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 6,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "517"
+}

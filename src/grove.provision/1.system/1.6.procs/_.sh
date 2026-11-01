@@ -27,6 +27,9 @@
 #   - `1.6.6.abandoned` — a timer asks, hourly: kill and log each process
 #     abandoned for over 24h, so the orphan POPULATION earlyoom cannot see
 #     never builds up
+#   - `1.6.7.grepsafe` — a timer asks, every minute: kill and log each grepsafe
+#     run older than 2min. the one population whose kill is SETTLED, so it
+#     needs no human to decide, and a minute's delay costs gigabytes
 #   - an absent finder means a wedged box cannot be DIAGNOSED; an absent
 #     earlyoom means it cannot be REACHED — two failures a reader acts on
 #     differently, which is why earlyoom earns its own leaf
@@ -53,4 +56,5 @@ grove_provision_1_6_procs() {
   bundle.upgrade 1.6.2.monitor
   bundle.upgrade 1.6.4.keyrackd
   bundle.upgrade 1.6.6.abandoned
+  bundle.upgrade 1.6.7.grepsafe
 }

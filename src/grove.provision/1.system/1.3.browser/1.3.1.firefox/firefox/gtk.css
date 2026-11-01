@@ -1,0 +1,16 @@
+/* firefox-only gtk keybinds — lands at the flatpak's own
+ * ~/.var/app/org.mozilla.firefox/config/gtk-3.0/gtk.css, so no other app sees it
+ *
+ * ctrl+w deletes the word before the cursor in a text field, as in the terminal.
+ * firefox routes text-field edits through gtk's native keybinds, but only for a
+ * key no browser shortcut claims first — firefox.cfg frees ctrl+w (close-tab
+ * moves to ctrl+q), which is what lets this bind reach the field
+ *
+ * .note = `@binding-set` and `-gtk-key-bindings` are gtk's own syntax
+ */
+@binding-set terminal-words {
+  bind "<Control>w" { "delete-from-cursor" (word-ends, -1) };
+}
+
+entry    { -gtk-key-bindings: terminal-words; }
+textview { -gtk-key-bindings: terminal-words; }

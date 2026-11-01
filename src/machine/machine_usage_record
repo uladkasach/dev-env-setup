@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+######################################################################
+# .what = record one sample of where this box's cpu and memory went, as
+#         rows appended to a day-file. a user timer runs it once a minute;
+#         `machine_usage_history` reads the rows back
+#
+# .why  = every other tool here reads the box AT ONE MOMENT. a moment is
+#         blind to the two shapes that make a box slow for hours:
+#           - a SPAWN STORM. 1400 forks/sec, each child dead in a few ms, so
+#             `ps`, `top`, and a sampler never see one alive (2026-10-22)
+#           - a DRIFT. what burned at 3am is gone by the time a human asks
+#         so this records DELTAS between samples, per process, and keeps them
+#
+# .the trick that makes a spawn storm visible — reaped-child cpu
+#   /proc/<pid>/stat carries `cutime` + `cstime`: the cpu of every child the
+#   process has WAITED on, grandchildren included. a child that lives 3ms and
+#   is reaped hands its cpu to the parent that reaped it. so a loop that
+#   forks a thousand `awk`s a second shows here as ONE long-lived bash whose
+#   `kids` column climbs — named, with its cwd, where `ps` saw naught
+#
+#   ⚠️ a child seen alive at one sample and reaped by the next is counted
+#      twice: once as itself, once in its parent's `kids`. so a dead child's
+#      last total is subtracted from its parent's `kids` delta, one hop. a
+#      chain of deaths inside one minute stays approximate — the storm still
+#      ranks first, which is the question the record answers
+#
+# .what a row holds — tab-separated, one day-file per date
+#   B  ts dt load1 mem_avail_mb swap_used_mb forks ctxsw busy_s psi_cpu psi_mem
+#   P  ts dt pid ppid self_s kids_s rss_mb swap_mb where comm args
+#   - `self_s` / `kids_s` = cpu-seconds over `dt`, never a lifetime average
+#   - `where` = the repo or worktree of the cwd, so a row names WHICH agent
+#   - a P row is written only where it clears a floor (cpu or rss), so a
+#     day-file stays small; the B row carries the whole-box totals, so the
+#     share no P row explains is still visible
+#
+# usage:
+#   machine_usage_record            # one sample (the timer's call)
+#   machine_usage_record --dir D    # write under D (a test fixture)
+#
+# guarantee:
+#   - reads /proc and `ps` only; signals no process, sets no option
+#   - the first run writes a baseline and no P rows — a delta needs two reads
+#   - prunes day-files older than 30 days
+#   - exit 0 = sampled; 1 = could not write its dir
+######################################################################
+set -uo pipefail
+
+DIR="${XDG_STATE_HOME:-$HOME/.local/state}/machine.usage"
+KEEP_DAYS=30
+FLOOR_CPU_S=0.5   # a P row needs this many cpu-seconds over dt (self + kids) ...
+FLOOR_RSS_MB=300  # ... or this much resident memory
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dir) DIR="$2"; shift 2 ;;
+    --repo|--role|--skill) shift 2 ;;
+    -h|--help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print } !/^#/ && NR > 1 { exit }' "$0"; exit 0 ;;
+    *) echo "✋ ConstraintError: unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+mkdir -p "$DIR/log" || { echo "💥 MalfunctionError: cannot create $DIR/log" >&2; exit 1; }
+
+NOW=$(date +%s)
+DAY=$(date +%F)
+HZ=$(getconf CLK_TCK 2>/dev/null || echo 100)
+PAGE_KB=$(( $(getconf PAGESIZE 2>/dev/null || echo 4096) / 1024 ))
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/machine_usage_record.XXXXXX") || exit 1
+trap 'rm -rf "$WORK"' EXIT
+
+# the user's processes, and each one's cwd — one call each, never a fork per pid
+ps -u "$(id -u)" -o pid=,ppid=,args= 2>/dev/null | cut -c1-200 >"$WORK/ps"
+find /proc -mindepth 2 -maxdepth 2 -name cwd -printf '%h\t%l\n' 2>/dev/null >"$WORK/cwd"
+
+touch "$DIR/prev.proc" "$DIR/prev.box"
+
+awk -v now="$NOW" -v hz="$HZ" -v page_kb="$PAGE_KB" -v home="$HOME" \
+    -v floor_cpu="$FLOOR_CPU_S" -v floor_rss="$FLOOR_RSS_MB" \
+    -v prev_proc="$DIR/prev.proc" -v prev_box="$DIR/prev.box" \
+    -v next_proc="$WORK/next.proc" -v next_box="$WORK/next.box" \
+    -v cwdfile="$WORK/cwd" -v psfile="$WORK/ps" '
+  # the repo or worktree a cwd sits in, so a row names the agent behind it
+  function where_of(d,   n, p, i, out) {
+    if (d == "") return "?"
+    if (index(d, home) == 1) d = "~" substr(d, length(home) + 1)
+    n = split(d, p, "/")
+    # ~/git/<org>/_worktrees/<tree>/...  →  <org>/<tree>
+    if (p[1] == "~" && p[2] == "git" && n >= 5 && p[4] == "_worktrees") return p[3] "/" p[5]
+    # ~/git/_worktrees/<tree>/...         →  <tree>
+    if (p[1] == "~" && p[2] == "git" && n >= 4 && p[3] == "_worktrees") return p[4]
+    # ~/git/<org>/<repo>/...              →  <org>/<repo>
+    if (p[1] == "~" && p[2] == "git" && n >= 4) return p[3] "/" p[4]
+    out = p[1]; for (i = 2; i <= n && i <= 3; i++) out = out "/" p[i]
+    return out
+  }
+  # the comm, read after the LAST ") " since a comm may hold spaces or parens
+  BEGIN {
+    # the prior sample: key = pid:starttime
+    while ((getline line < prev_proc) > 0) {
+      split(line, f, "\t")
+      pkey[f[1]] = 1; pppid[f[1]] = f[2]; pself[f[1]] = f[3]; pkids[f[1]] = f[4]
+      ppidof[f[1]] = f[5]
+    }
+    close(prev_proc)
+    have_prev = 0
+    while ((getline line < prev_box) > 0) {
+      split(line, f, "\t"); pts = f[1]; pforks = f[2]; pctxt = f[3]; pbusy = f[4]; have_prev = 1
+    }
+    close(prev_box)
+    dt = have_prev ? now - pts : 0
+
+    while ((getline line < cwdfile) > 0) {
+      split(line, f, "\t"); sub(/^\/proc\//, "", f[1]); cwd[f[1]] = f[2]
+    }
+    close(cwdfile)
+
+    # every live process: its stat, its status, its args
+    np = 0
+    while ((getline line < psfile) > 0) {
+      sub(/^ +/, "", line)
+      pid = line; sub(/ .*/, "", pid)
+      rest = substr(line, length(pid) + 1); sub(/^ +/, "", rest)
+      ppid = rest; sub(/ .*/, "", ppid)
+      args = substr(rest, length(ppid) + 1); sub(/^ +/, "", args)
+      gsub(/\t/, " ", args)
+
+      statf = "/proc/" pid "/stat"
+      if ((getline st < statf) <= 0) { close(statf); continue }
+      close(statf)
+      comm = st; sub(/^[0-9]+ \(/, "", comm); sub(/\) [A-Za-z] .*$/, "", comm); gsub(/\t/, " ", comm)
+      tail = st; sub(/^.*\) /, "", tail)
+      split(tail, s, " ")
+      # after the comm: s[1]=state … s[12]=utime s[13]=stime s[14]=cutime
+      #   s[15]=cstime … s[20]=starttime … s[22]=rss (pages)
+      self = s[12] + s[13]; kids = s[14] + s[15]
+      key = pid ":" s[20]
+
+      swap = 0
+      statusf = "/proc/" pid "/status"
+      while ((getline sl < statusf) > 0) if (sl ~ /^VmSwap:/) { split(sl, w, " "); swap = w[2] }
+      close(statusf)
+
+      np++
+      K[np] = key; PID[np] = pid; PPID[np] = ppid; SELF[np] = self; KIDS[np] = kids
+      RSS[np] = s[22] * page_kb; SWAP[np] = swap; COMM[np] = comm; ARGS[np] = args
+      alive_pid[pid] = np; alive_key[key] = 1
+    }
+    close(psfile)
+
+    # deltas, then the double-count repair for children that died since
+    for (i = 1; i <= np; i++) {
+      if (K[i] in pkey) { dself[i] = SELF[i] - pself[K[i]]; dkids[i] = KIDS[i] - pkids[K[i]] }
+      else              { dself[i] = SELF[i];             dkids[i] = KIDS[i] }
+    }
+    for (k in pkey) {
+      if (k in alive_key) continue
+      parent = ppidof[k]
+      if (parent in alive_pid) dkids[alive_pid[parent]] -= pself[k] + pkids[k]
+    }
+
+    # the whole box, from /proc
+    while ((getline sl < "/proc/stat") > 0) {
+      split(sl, w, " ")
+      if (w[1] == "cpu")       busy = w[2] + w[3] + w[4] + w[7] + w[8] + w[9]
+      if (w[1] == "processes") forks = w[2]
+      if (w[1] == "ctxt")      ctxt = w[2]
+    }
+    close("/proc/stat")
+    getline la < "/proc/loadavg"; close("/proc/loadavg"); split(la, w, " "); load1 = w[1]
+    while ((getline sl < "/proc/meminfo") > 0) {
+      split(sl, w, " ")
+      if (w[1] == "MemAvailable:") avail = w[2]
+      if (w[1] == "SwapTotal:")    swt = w[2]
+      if (w[1] == "SwapFree:")     swf = w[2]
+    }
+    close("/proc/meminfo")
+    psic = "?"; psim = "?"
+    if ((getline sl < "/proc/pressure/cpu") > 0)    { split(sl, w, " "); psic = w[3]; sub(/avg60=/, "", psic) }
+    close("/proc/pressure/cpu")
+    if ((getline sl < "/proc/pressure/memory") > 0) { split(sl, w, " "); psim = w[3]; sub(/avg60=/, "", psim) }
+    close("/proc/pressure/memory")
+
+    # the state the next sample diffs against
+    for (i = 1; i <= np; i++) printf "%s\t%s\t%d\t%d\t%s\n", K[i], PPID[i], SELF[i], KIDS[i], PPID[i] > next_proc
+    printf "%d\t%d\t%d\t%d\n", now, forks, ctxt, busy > next_box
+    close(next_proc); close(next_box)
+
+    # a baseline has no delta to report
+    if (!have_prev || dt <= 0) exit
+
+    printf "B\t%d\t%d\t%s\t%d\t%d\t%d\t%d\t%.1f\t%s\t%s\n", now, dt, load1, avail / 1024, (swt - swf) / 1024,
+      forks - pforks, ctxt - pctxt, (busy - pbusy) / hz, psic, psim
+    for (i = 1; i <= np; i++) {
+      if (dkids[i] < 0) dkids[i] = 0
+      cs = dself[i] / hz; ck = dkids[i] / hz; rmb = RSS[i] / 1024
+      if (cs + ck < floor_cpu && rmb < floor_rss) continue
+      printf "P\t%d\t%d\t%s\t%s\t%.2f\t%.2f\t%d\t%d\t%s\t%s\t%s\n", now, dt, PID[i], PPID[i], cs, ck,
+        rmb, SWAP[i] / 1024, where_of(cwd[PID[i]]), COMM[i], ARGS[i]
+    }
+  }' >>"$DIR/log/$DAY.tsv"
+
+mv "$WORK/next.proc" "$DIR/prev.proc"
+mv "$WORK/next.box" "$DIR/prev.box"
+
+# keep a month
+find "$DIR/log" -name '*.tsv' -mtime +"$KEEP_DAYS" -delete 2>/dev/null
+exit 0

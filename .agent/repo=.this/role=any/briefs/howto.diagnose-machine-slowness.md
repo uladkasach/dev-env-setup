@@ -31,6 +31,46 @@ the single most misread signal: **`idle: 89%` with `load: 24`**. the machine is 
 | high | **high** | **blocked on I/O** — check swap, check D-state |
 | low | high | not a machine problem — look at the app |
 
+### 0.5 read the RECORD before you read the moment
+
+```sh
+rhx machine.usage.history --since 1h --by where     # which worktree / agent
+rhx machine.usage.history --by comm                 # which kind of process
+rhx machine.usage.history --where <tree> --by args  # drill into one worktree
+```
+
+`1.7.usage` arms a timer that samples once a minute into `~/.local/state/machine.usage/`. a moment
+answers "what runs now"; the record answers **"what has cost the most"** — which is the list of
+what to fix, in order. ask it first; every later step only zooms in on a name it gave you.
+
+read each consumer's split:
+
+| column | means |
+|---|---|
+| `self` | the process itself ran |
+| `kids` | children it **reaped** — a spawn storm lands here, credited to the loop that forks it |
+
+`kids ≫ self` on a long-lived bash or zsh is a fork loop. `kids ≫ self` on an agent is its hooks
+and tools.
+
+### 0.6 a SPAWN STORM is invisible to `ps` — measure the rate, then name the parent
+
+```sh
+rhx machine.diagnose.churn                           # forks/sec, ctxsw, and the parent blamed
+rhx machine.diagnose.births --secs 8 --sweeps 30    # what is born, and who forked it
+```
+
+the tell: load far above cores, `top` shows only `elapsed=0s` ghosts, and `forks/sec` in the
+hundreds or thousands. each child dies in milliseconds, so no sampler sees it alive — only the
+rate, the births, and the parent's `kids` column do.
+
+measured 2026-10-22: 1,400 forks/sec, load 40–85 on 12 cores. `births` named a `duct.poll.sh`
+loop in an nheuron director worktree: each round, per pane, a fresh `bash -c source <skill file>`
+— so a whole skill file re-parsed to call one function — plus a `tmux capture-pane`. one director
+cost ~a core, and each extra director stacked another. the agents themselves were the other
+~60%: ~15 claude sessions, two thirds of whose cpu was `kids` — hooks that each boot node or bun,
+and a `node -e` statusline per refresh.
+
 ### ⚠️ 1. discount the diagnostic's own cost
 
 `machine.diagnose.lag` spawns node processes that show at **150-950% cpu, elapsed=0s**. those are
@@ -132,7 +172,30 @@ in a system under memory pressure needs a wall-clock guard, not just an interval
 
 its log had no cap either: 7.2 MB, written mid-storm.
 
-### trap 5 — search for a prior issue BEFORE you file one
+### trap 5 — a lifetime ratio reads history as a live burn
+
+`ps` `%cpu`, and cputime ÷ elapsed, average over a process's **whole life**. the tmux server read
+`48% over 14498m` while it drew 8% of a core, and two detectors offered it `kill -9`. the spinner
+and wedged checks now also sample `/proc/<pid>/stat` ticks over a live window; trust the `now`
+number.
+
+### trap 6 — a HOST is never the culprit
+
+tmux, kitty, the compositor: their cpu is the sum of their tenants. a kill ends every session and
+not the burn. find the tenant — `births` and `--by args` name it.
+
+### trap 7 — reaped cpu lands in ONE minute
+
+a child's cpu is credited to its parent when the child is **reaped**, so a 10-minute test run
+shows as one huge slice (12.9 cores on a 12-core box) the minute it ends. the `named` share can
+read above 100%. judge a consumer by its window total, never by one slice.
+
+### trap 8 — a heavy sampler on a saturated box never returns
+
+`births --sweeps 100` produced no output in 5 minutes at load 55. at `--sweeps 30` it answered in
+seconds. on a pinned box, sample lighter, and stop a probe that does not answer.
+
+### trap 9 — search for a prior issue BEFORE you file one
 
 two issues were filed that duplicated month-old, better-researched ones (#442, #540). always:
 
@@ -145,6 +208,9 @@ gh issue list --repo <owner>/<repo> --search "<keywords>" --state all
 ## the fast path (copy-paste)
 
 ```sh
+rhx machine.usage.history --by where    # 0.5: what cost the most, over the last hour
+rhx machine.diagnose.churn              # 0.6: forks/sec — is it a spawn storm?
+rhx machine.diagnose.births --secs 8 --sweeps 30   # 0.6: what is born, and who forks it
 rhx machine.diagnose.lag --quick        # 0-1: load vs idle; discount elapsed=0s procs
 rhx machine.attribute.memory --top 12   # 2: cgroup truth, read the anon column
 rhx machine.attribute.memory --orphans  # 2: reparented procs, invisible to ps
@@ -159,8 +225,9 @@ rhx nvim.diagnose.runaway
 
 ## the lesson
 
-> the loudest process is rarely the cause. attribute by cgroup, read the slab, and trust a
-> purpose-built log over any general tool.
+> the loudest process is rarely the cause. read the record before the moment, count births when
+> `ps` sees ghosts, attribute by cgroup, read the slab, and trust a purpose-built log over any
+> general tool.
 
 ## .see also
 

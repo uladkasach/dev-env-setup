@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+######################################################################
+# .what = read back what `machine_usage_record` kept, and rank what
+#         consumed this box's cpu and memory over a window
+#
+# .why  = "why is it slow?" asked at one moment gets a moment's answer, and
+#         the moment is often after the culprit stopped or between its
+#         spawns. this answers "what has cost the most, over the last N" —
+#         which is the list of what to fix, in order
+#
+# .what it prints
+#   - the box: busy cores, load, forks/sec, swap — average and worst
+#   - cpu by consumer: cpu-minutes, each split into SELF (the process ran)
+#     and KIDS (children it reaped — a spawn storm lands here)
+#   - memory by consumer: the peak resident memory a consumer held at once
+#   - a timeline: the box per slice, and the slice's top consumer
+#
+#   a CONSUMER is `where` + `comm`: the repo or worktree the process ran in,
+#   and its name. so `nheuron/direction.ahbode-10kpm bash` and
+#   `dev-env-setup bash` are two lines, since they are two things to fix
+#
+# usage:
+#   machine_usage_history                  # the last hour
+#   machine_usage_history --since 6h       # 30m, 6h, 2d …
+#   machine_usage_history --top 15         # more consumers per list
+#   machine_usage_history --by where       # group by worktree alone
+#   machine_usage_history --by comm        # group by name alone
+#   machine_usage_history --by args        # group by the command line — the drill-down
+#   machine_usage_history --where storefronts --by args
+#                                          # one worktree, by what it ran
+#
+# guarantee:
+#   - read-only; reads the day-files, never /proc
+#   - exit 0 = answered; 2 = bad input, or no record yet (the timer is off)
+######################################################################
+set -uo pipefail
+
+DIR="${XDG_STATE_HOME:-$HOME/.local/state}/machine.usage"
+SINCE=1h
+TOP=10
+BY=both
+WHERE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --since) SINCE="$2"; shift 2 ;;
+    --where) WHERE="$2"; shift 2 ;;
+    --top)   TOP="$2"; shift 2 ;;
+    --by)    BY="$2"; shift 2 ;;
+    --dir)   DIR="$2"; shift 2 ;;
+    --repo|--role|--skill) shift 2 ;;
+    -h|--help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print } !/^#/ && NR > 1 { exit }' "$0"; exit 0 ;;
+    *) echo "✋ ConstraintError: unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+[[ "$SINCE" =~ ^([0-9]+)([mhd])$ ]] || {
+  echo "✋ ConstraintError: --since takes <n>m, <n>h, or <n>d — got '$SINCE'" >&2
+  exit 2
+}
+case "${BASH_REMATCH[2]}" in m) MUL=60 ;; h) MUL=3600 ;; d) MUL=86400 ;; esac
+WINDOW_S=$(( BASH_REMATCH[1] * MUL ))
+[[ "$TOP" =~ ^[1-9][0-9]*$ ]] || { echo "✋ ConstraintError: --top takes a whole number, got '$TOP'" >&2; exit 2; }
+[[ "$BY" =~ ^(both|where|comm|args)$ ]] || { echo "✋ ConstraintError: --by takes both, where, comm, or args — got '$BY'" >&2; exit 2; }
+
+NOW=$(date +%s)
+CUTOFF=$(( NOW - WINDOW_S ))
+
+# the day-files that can hold a row in the window
+FILES=()
+for (( d = 0; d <= WINDOW_S / 86400 + 1; d++ )); do
+  f="$DIR/log/$(date -d "@$(( NOW - d * 86400 ))" +%F).tsv"
+  [[ -s "$f" ]] && FILES+=("$f")
+done
+if (( ${#FILES[@]} == 0 )); then
+  echo "✋ ConstraintError: no usage record under $DIR/log for the last $SINCE" >&2
+  echo "   ⇒ the recorder writes one row set a minute, once its timer runs:" >&2
+  echo "     systemctl --user status machine_usage_record.timer" >&2
+  echo "   fix: rhx grove.provision --what 1.7.usage --mode apply" >&2
+  exit 2
+fi
+
+cat "${FILES[@]}" | awk -F'\t' -v cutoff="$CUTOFF" -v top="$TOP" -v by="$BY" -v since="$SINCE" -v wf="$WHERE" '
+  # .note = a bare `>` inside a printf argument list is a REDIRECT in awk, so
+  #         every comparison passed to printf sits in parentheses
+  function key_of(where, comm, args) {
+    if (by == "where") return where
+    if (by == "comm")  return comm
+    # the command line, with its long absolute prefix cut, so one tool reads as one row
+    if (by == "args")  { sub(/^\/home\/[^ ]*\/node_modules\/[^ ]*\//, "…/", args); return substr(args, 1, 100) }
+    return where "  " comm
+  }
+  # a --where filter narrows the P rows; the B rows (the whole box) stay
+  $1 == "P" && wf != "" && index($10, wf) == 0 { next }
+  function cores(s, d) { return d > 0 ? s / d : 0 }
+  $2 < cutoff { next }
+  $1 == "B" {
+    nb++; bt[nb] = $2; bdt[nb] = $3; bload[nb] = $4; bavail[nb] = $5; bswap[nb] = $6
+    bforks[nb] = $7; bbusy[nb] = $9; bpsic[nb] = $10
+    span += $3; busy += $9; forks += $7; load += $4
+    if ($4 > maxload) { maxload = $4; maxload_t = $2 }
+    if ($3 > 0 && $7 / $3 > maxfork) { maxfork = $7 / $3; maxfork_t = $2 }
+    if ($6 > maxswap) maxswap = $6
+    if (minavail == "" || $5 < minavail) minavail = $5
+    if (first == "" || $2 < first) first = $2
+    if ($2 > last) last = $2
+    next
+  }
+  $1 == "P" {
+    k = key_of($10, $11, $12)
+    cself[k] += $6; ckids[k] += $7
+    attributed += $6 + $7
+    if (!(k in sample) || $6 + $7 > sbest[k]) { sample[k] = $12; sbest[k] = $6 + $7 }
+    rss_at[k SUBSEP $2] += $8
+    if (rss_at[k SUBSEP $2] > rpeak[k]) { rpeak[k] = rss_at[k SUBSEP $2]; rpeak_t[k] = $2 }
+    slice_cpu[$2 SUBSEP k] += $6 + $7
+    keys_at[$2] = keys_at[$2] SUBSEP k
+    next
+  }
+  END {
+    if (nb == 0) { print "✋ no sample in the last " since " — is the recorder timer on?"; exit 2 }
+
+    printf "🐈 heres where the box went, over the last %s  (%d samples, %s → %s)\n", since, nb,
+      strftime("%m-%d %H:%M", first), strftime("%m-%d %H:%M", last)
+    print "   │"
+    print "   ├─ 🌕 the box"
+    printf "   │     ├─ busy:   %.1f cores on average\n", cores(busy, span)
+    printf "   │     ├─ load:   %.1f on average, %.1f at worst (%s)\n", load / nb, maxload, strftime("%H:%M", maxload_t)
+    printf "   │     ├─ forks:  %.0f/sec on average, %.0f/sec at worst (%s)\n", cores(forks, span), maxfork, strftime("%H:%M", maxfork_t)
+    printf "   │     ├─ mem:    %d MB available at the least, swap %d MB at the most\n", minavail, maxswap
+    printf "   │     └─ named:  %.0f%% of the busy cpu is named below; the rest ran as other users, or under the floor\n",
+      ((busy > 0) ? 100 * attributed / busy : 0)
+
+    # cpu, ranked
+    n = 0; for (k in cself) { n++; ord[n] = k }
+    for (i = 2; i <= n; i++) { v = ord[i]; j = i - 1
+      while (j > 0 && cself[ord[j]] + ckids[ord[j]] < cself[v] + ckids[v]) { ord[j + 1] = ord[j]; j-- }
+      ord[j + 1] = v }
+    print "   │"
+    print "   ├─ 🔥 cpu by consumer  (cpu-minutes; avg cores held; self + kids it reaped)"
+    for (i = 1; i <= n && i <= top; i++) {
+      k = ord[i]; tot = cself[k] + ckids[k]
+      br = (i == n || i == top) ? "└─" : "├─"
+      ind = (i == n || i == top) ? "   " : "│  "
+      printf "   │     %s %7.1f min  %4.2f cores  %s\n", br, tot / 60, cores(tot, span), k
+      printf "   │     %s       self %.1f + kids %.1f%s\n", ind, cself[k] / 60, ckids[k] / 60,
+        ((ckids[k] > 4 * cself[k] && ckids[k] > 60) ? "   ← its CHILDREN burn it: a spawn loop" : "")
+      printf "   │     %s       e.g. %s\n", ind, substr(sample[k], 1, 110)
+    }
+
+    # memory, ranked by peak
+    m = 0; for (k in rpeak) { m++; mo[m] = k }
+    for (i = 2; i <= m; i++) { v = mo[i]; j = i - 1
+      while (j > 0 && rpeak[mo[j]] < rpeak[v]) { mo[j + 1] = mo[j]; j-- }
+      mo[j + 1] = v }
+    print "   │"
+    print "   ├─ 🐘 memory by consumer  (peak resident at once; rss double-counts shared pages)"
+    for (i = 1; i <= m && i <= top; i++) {
+      k = mo[i]; br = (i == m || i == top) ? "└─" : "├─"
+      printf "   │     %s %6.1f GB  at %s  %s\n", br, rpeak[k] / 1024, strftime("%H:%M", rpeak_t[k]), k
+    }
+
+    # the timeline, in up to 12 slices
+    print "   │"
+    print "   └─ 🕰️ timeline  (busy cores · load · forks/sec · top consumer)"
+    w = (last - first) / 12; if (w < 60) w = 60
+    for (s = 0; s < 12; s++) {
+      lo = first + s * w; hi = lo + w; sb = 0; sl = 0; sf = 0; sd = 0; c = 0
+      delete sc
+      for (i = 1; i <= nb; i++) if (bt[i] >= lo && (bt[i] < hi || (s == 11 && bt[i] <= hi))) {
+        sb += bbusy[i]; sf += bforks[i]; sd += bdt[i]; sl += bload[i]; c++
+        split(keys_at[bt[i]], ks, SUBSEP)
+        for (x in ks) if (ks[x] != "" && !(bt[i] SUBSEP ks[x] in seen)) { seen[bt[i] SUBSEP ks[x]] = 1; sc[ks[x]] += slice_cpu[bt[i] SUBSEP ks[x]] }
+      }
+      if (c == 0) continue
+      bestk = ""; bestv = 0; for (k in sc) if (sc[k] > bestv) { bestv = sc[k]; bestk = k }
+      printf "         %s  %5.1f · %5.1f · %5.0f  %s\n", strftime("%m-%d %H:%M", lo), cores(sb, sd), sl / c, cores(sf, sd),
+        bestk == "" ? "" : sprintf("%s (%.1f cores)", bestk, cores(bestv, sd))
+    }
+  }'

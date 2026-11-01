@@ -94,5 +94,49 @@ grove_provision_1_2_power_configure_verify() {
     echo "      LIVE with the declaration above cannot be observed from this run"
   fi
 
+  ####################################################################
+  # 5. the power profile follows the charger
+  #
+  # .why it asserts THREE facts, each one a way the rule goes dead in silence
+  #   - the installed copy matches this checkout — a stale copy runs an old rule
+  #   - the unit is ACTIVE — an enabled unit that crashed watches no charger
+  #   - no login-shell battery line is left in ~/.profile — a second writer that flips
+  #     the box to battery-saver at each new terminal, on the charger or off it
+  ####################################################################
+  local has_battery=0 d
+  for d in /sys/class/power_supply/*; do
+    [[ -r "$d/type" && "$(<"$d/type")" == Battery ]] && has_battery=1
+  done
+  if grep -qE 'system76-power profile battery' "$HOME/.profile" 2>/dev/null; then
+    echo "   ✋ ~/.profile still sets the battery profile at each login shell" >&2
+    echo "      ⇒ each new terminal undoes the charger switch" >&2
+    echo "      fix: rhx grove.provision --what 1.2.power --mode apply" >&2
+    failed=$(( failed + 1 ))
+  fi
+  if ! command -v system76-power >/dev/null 2>&1 || (( ! has_battery )); then
+    echo "   🌙 no battery or no system76-power here, so no profile follows a charger"
+  elif ! systemctl --user show-environment >/dev/null 2>&1; then
+    echo "   🌙 no user manager answers here, so no profile watch is owed"
+  else
+    local bin="$HOME/.local/bin/machine_power_profile_sync" src="$GROVE_SRC/machine/machine_power_profile_sync"
+    local unit=machine_power_profile_sync.service
+    if ! diff -q "$src" "$bin" >/dev/null 2>&1; then
+      echo "   ✋ the installed machine_power_profile_sync is absent or DIFFERS from this checkout" >&2
+      echo "      read the drift: diff $src $bin" >&2
+      echo "      fix: rhx grove.provision --what 1.2.power --mode apply" >&2
+      failed=$(( failed + 1 ))
+    elif ! diff -q "$GROVE_SRC/machine/$unit" "$HOME/.config/systemd/user/$unit" >/dev/null 2>&1; then
+      echo "   ✋ the installed $unit is absent or DIFFERS from this checkout" >&2
+      echo "      fix: rhx grove.provision --what 1.2.power --mode apply" >&2
+      failed=$(( failed + 1 ))
+    elif ! systemctl --user is-active --quiet "$unit"; then
+      echo "   ✋ $unit is not active — no charger edge is watched" >&2
+      echo "      read why: journalctl --user -u $unit -n 20" >&2
+      failed=$(( failed + 1 ))
+    else
+      echo "   • the power profile follows the charger ($unit active, current) ✔"
+    fi
+  fi
+
   [[ "$failed" -eq 0 ]] || return 1
 }

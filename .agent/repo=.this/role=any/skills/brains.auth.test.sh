@@ -766,6 +766,22 @@ _is 'shape.healthy-body-is-trusted' 'trusted' \
   "$(_shape_verdict '{"five_hour":{"utilization":24.5},"seven_day":{"utilization":48}}')"
 _is 'shape.zero-is-a-real-number' 'trusted' \
   "$(_shape_verdict '{"five_hour":{"utilization":0},"seven_day":{"utilization":0}}')"
+# a PRESENT null window means the plan has no such limit — never a drift.
+# 📜 2026-10-31: ultra plans (ex max 20x) dropped the 5h limit and read `"five_hour": null`,
+#   and the old gate read every such account as 💥. each window is checked alone, so a gate
+#   that only relaxed one would go red on the other
+_is 'shape.null-session-window-is-trusted' 'trusted' \
+  "$(_shape_verdict '{"five_hour":null,"seven_day":{"utilization":48}}')"
+_is 'shape.null-week-window-is-trusted' 'trusted' \
+  "$(_shape_verdict '{"five_hour":{"utilization":3},"seven_day":null}')"
+# a refusal names what it saw, as types — so the next drift is diagnosable from the node alone
+_is 'shape.refusal-names-what-it-saw' 'string' \
+  "$(_usage_node_body '{"five_hour":{"utilization":"n/a"},"seven_day":{"utilization":48}}' \
+     | jq -r '.seen.five_hour_utilization')"
+# … and never the values themselves
+_is 'shape.refusal-carries-no-values' 'absent' \
+  "$(_usage_node_body '{"five_hour":{"utilization":"n/a"},"seven_day":{"utilization":48}}' \
+     | jq -c . | awk 'index($0, "n/a") { print "LEAKED"; next } { print "absent" }')"
 
 # ---- the shared pre-flight verdict on a stored token
 # ⚠️ `use` and `usage` run the SAME two checks in the SAME order and diverge only in how they
@@ -1242,16 +1258,24 @@ esac
 #
 #   the defect: `_brains_auth_set` armed `trap 'rm -rf "$authdir"' INT` alone, while its
 #   comment promised a wipe on "every way out". a SIGTERM — a killed terminal, a logout, a
-#   reaped parent — left a LIVE, durable oauth refresh token on disk. RETURN is the wider
-#   half of the fix: it shreds on EVERY early return, so a future branch added above the
-#   eager `rm -rf` cannot strand the secret merely because its author did not think of it.
+#   reaped parent — left a LIVE, durable oauth refresh token on disk.
+#
+# 🛑 and RETURN must be ABSENT. this file is sourced by zsh as well as bash, and zsh has no
+#   RETURN signal: `trap … RETURN` fails there as `undefined signal: RETURN` and arms not
+#   one signal, INT/TERM/HUP included — so a RETURN arm silently disarms the whole trap on
+#   every zsh. the early returns between the arm and the eager shred each `rm -rf` the dir
+#   themselves instead.
 _arm="$(grep -n "trap 'rm -rf \"\$authdir\"'" "$ALIASES" | sed 's/.*authdir"'"'"'//')"
-for _sig in INT TERM HUP RETURN; do
+for _sig in INT TERM HUP; do
   case "$_arm" in
     *"$_sig"*) _is "trap.arms-${_sig}" 'armed' 'armed' ;;
     *)         _is "trap.arms-${_sig}" 'armed' "absent (arm reads:${_arm})" ;;
   esac
 done
+case "$_arm" in
+  *RETURN*) _is 'trap.no-RETURN-zsh-safe' 'absent' "present (arm reads:${_arm}) — zsh would arm none" ;;
+  *)        _is 'trap.no-RETURN-zsh-safe' 'absent' 'absent' ;;
+esac
 # and the disarm must name the SAME set. name a subset and the rest stay armed past the
 # eager shred, so the two lines drift apart with no signal that they have.
 # ⚠️ scoped to the arm's OWN signal list, not to a bare `trap - INT`. the file now holds a

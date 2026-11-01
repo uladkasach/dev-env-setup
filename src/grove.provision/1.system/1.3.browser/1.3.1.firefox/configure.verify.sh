@@ -60,7 +60,8 @@ grove_provision_1_3_1_firefox_configure_verify() {
   local pair
   for pair in \
     "autoconfig.js:$ext_dir/defaults/pref/autoconfig.js" \
-    "firefox.cfg:$ext_dir/firefox.cfg"
+    "firefox.cfg:$ext_dir/firefox.cfg" \
+    "gtk.css:$HOME/.var/app/org.mozilla.firefox/config/gtk-3.0/gtk.css"
   do
     local name="${pair%%:*}"
     local dst="${pair#*:}"
@@ -68,8 +69,8 @@ grove_provision_1_3_1_firefox_configure_verify() {
 
     if [[ ! -f "$dst" ]]; then
       echo "   ✋ $name is absent from $dst" >&2
-      echo "      ⇒ without BOTH files firefox keeps the linux default alt+N, so" >&2
-      echo "        ctrl+2 does not move a tab and reads as a broken keyboard" >&2
+      echo "      ⇒ without it firefox keeps a default the terminal contradicts:" >&2
+      echo "        alt+N tabs, ctrl+w close-tab, or ctrl+w that deletes no word" >&2
       echo "      fix: rhx grove.provision --what 1.3.browser --mode apply" >&2
       failed=$(( failed + 1 ))
     elif [[ ! -f "$src" ]]; then

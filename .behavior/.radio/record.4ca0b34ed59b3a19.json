@@ -1,0 +1,19 @@
+{
+  "key": "4ca0b34ed59b3a19",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-bhuild"
+  },
+  "exid": null,
+  "title": "perf(duct): reuse one ssh master per grove via ControlMaster + ControlPersist",
+  "description": "## .what\n\nreuse one ssh connection per remote grove for the duct pollers (OpenSSH `ControlMaster` / `ControlPersist` / `ControlPath`), instead of a full ssh handshake per poll.\n\n## .why\n\n- the duct pollers check remote state with repeated short ssh calls, e.g. `ssh -n -o ConnectTimeout=8 <grove> tmux has-session -t <name>`\n- measured on a dev box: a 10s churn sample saw **~100-140 distinct short-lived `ssh` processes**; each one pays a tcp connect, key exchange, and auth\n- `ssh_config(5)`:\n  - `ControlMaster` lets ssh listen for and share a master connection\n  - `ControlPersist` keeps the master open in the background after the first client closes — indefinitely, or until idle for a set time\n  - `ControlPath` names the control socket; the man page recommends at least `%h`, `%p`, `%r` (or `%C`) in a directory not writable by others\n\n## .proposed shape\n\n- the duct ssh calls (or the grove host entries they use) set `ControlMaster auto`, a per-host `ControlPath` such as `~/.ssh/cm-%C`, and a bounded `ControlPersist` (e.g. `10m`) so an idle grove releases its master\n- the poller's per-call `ConnectTimeout` stays, so a dead master falls back loud, never hangs\n\n## .acceptance\n\n- consecutive polls of one grove reuse one master connection (`ssh -O check <grove>` reports a live master)\n- measured before/after: distinct `ssh` processes and handshakes per 10s sample\n\n## .sources\n\n- https://man.openbsd.org/ssh_config",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 5,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "516"
+}
