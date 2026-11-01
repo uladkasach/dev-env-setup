@@ -1,0 +1,19 @@
+{
+  "key": "a9a1b6c2a7807c66",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-bhuild"
+  },
+  "exid": null,
+  "title": "init.behavior: gitignore the route .malfunctions dir",
+  "description": "## .what\n\n`init.behavior` should gitignore the route's `.malfunctions/` dir when it scaffolds the route.\n\n## .why\n\nthe route reminder daemon writes a crash log for every failed reach into\n`$route/.malfunctions/daemon.driveon._.crash.n<index>.log` (bhrain:\n`domain.operations/route/reminder/getRouteReminderCrashLogPath.js`). no init ignores that dir, so\nevery crash log is a tracked candidate, and they land in pull requests.\n\nmeasured on uladkasach/dev-env-setup#167: **96 crash logs** were committed into one route's\n`.malfunctions/`, about half of the route's 141 files. the commander's review asked for them gone and\nfor the dir ignored at the source.\n\n## .the shape of the fix\n\ninit.behavior already writes a per-dir ignore for the other runtime dirs, for example\n`review/self/.gitignore`:\n\n```\n# ignore all self-review files\n*\n!.gitignore\n```\n\ndo the same for `.malfunctions/` at init: findsert `$route/.malfunctions/.gitignore` with `*` and\n`!.gitignore`, so the dir exists, stays ignored, and a crash log can never be staged by `--unstaged include`.\n\n⚠️ the dir is written by bhrain's daemon and scaffolded by bhuild's init, so this needs the two to\nagree on the path. `getRouteReminderCrashLogPath` already owns it (one builder), so the init can\nimport it or match it.\n\n## .acceptance\n\n- a fresh `init.behavior` route holds `.malfunctions/.gitignore`\n- `git status` after a daemon crash shows no new file\n- a route scaffolded before the fix gets the ignore on its next init/bind (findsert, idempotent)\n\n## .origin\n\nuladkasach/dev-env-setup#167, review comment\nhttps://github.com/uladkasach/dev-env-setup/pull/167#discussion_r4436339742",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 5,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "629"
+}
