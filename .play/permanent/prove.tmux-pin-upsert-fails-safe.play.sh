@@ -227,6 +227,8 @@ _grade "W. no temp dir: ✋" "$rc" 1 "$out" "no temp dir for the tmux build" kep
 _reset
 printf 'not a dir\n' > "$FIX/home/.local"
 out="$( GROVE_UPGRADE_2_8_TMUX_SHA256="$(_bytes_digest)"; _upsert )"; rc=$?
+# the cause line quotes mkdir, whose words differ between GNU and uutils coreutils
+out="$(printf '%s\n' "$out" | sed "s/^\( *cause: \).*/\1<mkdir's own words>/")"
 _grade "G. no log dir: ✋" "$rc" 1 "$out" "no dir for the tmux build log" kept \
   || failed=$(( failed + 1 ))
 
@@ -368,9 +370,12 @@ grep -qx 'tmux' "$FIX/installed" 2>/dev/null \
 _arm_live() {
   _reset
   # a cp onto the extant stand-in keeps its 0644 mode, so the bait is placed fresh
+  # ⚠️ the bait is bash, never `sleep`: a multi-call coreutils (uutils) reads argv[0],
+  #    so a copy named `tmux` refuses to run. bash runs under any name, and its trap
+  #    takes its child down with it
   rm -f "$PRIOR"
-  install -m 0755 "$(command -v sleep)" "$PRIOR"
-  "$PRIOR" 600 &
+  install -m 0755 "$(command -v bash)" "$PRIOR"
+  "$PRIOR" -c 'trap "kill \$! 2>/dev/null; exit 0" TERM; sleep 600 & wait' &
   BAIT_PID=$!
   # the bait must have EXEC'd the prior binary, so it holds the text the swap
   # meets; a live pid alone proves only the fork. polled, never one fixed sleep
