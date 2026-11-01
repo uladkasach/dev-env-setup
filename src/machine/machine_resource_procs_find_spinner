@@ -27,6 +27,9 @@ MIN_ELAPSED=1800  # 30 minutes in seconds
 #         MIN_ELAPSED gate above is what keeps honest work out of the net.
 MIN_RATIO=15
 
+# .what = seconds of live cpu sampled per candidate; see pass 2 below
+WINDOW=3
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --kill)
@@ -45,16 +48,26 @@ while [[ $# -gt 0 ]]; do
       MIN_RATIO="$2"
       shift 2
       ;;
+    --window)
+      WINDOW="$2"
+      shift 2
+      ;;
     *)
-      echo "Usage: machine_resource_procs_find_spinner [--kill [<prefix>]] [--min-minutes N] [--min-ratio N]" >&2
+      echo "Usage: machine_resource_procs_find_spinner [--kill [<prefix>]] [--min-minutes N] [--min-ratio N] [--window SECONDS]" >&2
       exit 1
       ;;
   esac
 done
 
+[[ "$WINDOW" =~ ^[1-9][0-9]*$ ]] || {
+  echo "✋ ConstraintError: --window must be a whole number of seconds >= 1, got '$WINDOW'" >&2
+  exit 2
+}
+
 SPINNER_PIDS=""
 SPINNER_INFO=""
 HOST_INFO=""
+QUIET_INFO=""
 
 # .what = hosts: processes that CONTAIN other work, so a high burn ratio is the
 #         sum of their tenants, never a wedge of their own
@@ -72,7 +85,21 @@ __is_host() {
   esac
 }
 
-# get user processes with elapsed and cpu time
+# .what = a process's cpu ticks (utime + stime) from /proc/<pid>/stat
+# .note = comm sits in parens and may hold spaces, so the fields are read
+#         after the LAST `) `; utime and stime are then fields 12 and 13
+__ticks() {
+  local stat
+  stat=$(cat "/proc/$1/stat" 2>/dev/null) || return 1
+  stat=${stat##*) }
+  # shellcheck disable=SC2086
+  set -- $stat
+  echo $(( ${12} + ${13} ))
+}
+
+# pass 1: the lifetime ratio, a cheap prefilter over every user process
+CAND_PIDS=()
+declare -A CAND_LINE CAND_COMM CAND_T0
 while read -r pid etimes cputimes comm; do
   [[ -z "$pid" ]] && continue
   [[ "$etimes" -lt "$MIN_ELAPSED" ]] && continue
@@ -85,16 +112,42 @@ while read -r pid etimes cputimes comm; do
   fi
 
   if [[ "$ratio" -ge "$MIN_RATIO" ]]; then
-    elapsed_min=$(( etimes / 60 ))
-    cpu_min=$(( cputimes / 60 ))
-    if __is_host "$comm"; then
-      HOST_INFO+="$pid ($comm): ${ratio}% CPU over ${elapsed_min}m (${cpu_min}m CPU time)\n"
-      continue
-    fi
-    SPINNER_PIDS+="$pid "
-    SPINNER_INFO+="$pid ($comm): ${ratio}% CPU over ${elapsed_min}m (${cpu_min}m CPU time)\n"
+    CAND_PIDS+=("$pid")
+    CAND_COMM[$pid]="$comm"
+    CAND_LINE[$pid]="$pid ($comm): ${ratio}% CPU over $(( etimes / 60 ))m ($(( cputimes / 60 ))m CPU time)"
   fi
 done < <(ps -u "$USER" -o pid=,etimes=,cputimes=,comm=,args= 2>/dev/null | awk '{ c = $4; if ($4 == "tmux:" && $5 == "server") c = "tmux: server"; print $1, $2, $3, c }')
+
+# pass 2: the burn NOW, over a live window
+#
+# .why  = the lifetime ratio is an average since birth, so it cannot tell a
+#         process that spins now from one that spun days ago and is quiet.
+#         the tmux server read `48% CPU over 14498m` while it drew 8% of a
+#         core (2026-10-21): the 48 was a week of history. a spinner is a
+#         SUSTAINED burn, so it must clear the gate on both clocks — the
+#         lifetime ratio says it has burned long, the window says it still does
+HZ=$(getconf CLK_TCK 2>/dev/null || echo 100)
+for pid in "${CAND_PIDS[@]}"; do
+  CAND_T0[$pid]=$(__ticks "$pid" || echo "")
+done
+(( ${#CAND_PIDS[@]} > 0 )) && sleep "$WINDOW"
+for pid in "${CAND_PIDS[@]}"; do
+  t0="${CAND_T0[$pid]}"
+  t1=$(__ticks "$pid" || echo "")
+  [[ -z "$t0" || -z "$t1" ]] && continue  # exited within the window
+  now=$(( (t1 - t0) * 100 / (HZ * WINDOW) ))
+  line="${CAND_LINE[$pid]}, ${now}% over the last ${WINDOW}s"
+  if __is_host "${CAND_COMM[$pid]}"; then
+    HOST_INFO+="$line\n"
+    continue
+  fi
+  if [[ "$now" -lt "$MIN_RATIO" ]]; then
+    QUIET_INFO+="$line\n"
+    continue
+  fi
+  SPINNER_PIDS+="$pid "
+  SPINNER_INFO+="$line\n"
+done
 
 echo "🐈 lets prowl..."
 echo "└─🌕 spinner"
@@ -105,6 +158,13 @@ while IFS= read -r line; do
   echo "  ├─🏠 $line"
   echo "  │   ↳ host — its burn is the sum of its tenants; a kill ends them all, not the burn"
 done <<< "$(echo -e "$HOST_INFO")"
+
+# burned long, but quiet now: history, not a spinner — shown, never killed
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  echo "  ├─💤 $line"
+  echo "  │   ↳ quiet now — the lifetime ratio is history, not a live burn"
+done <<< "$(echo -e "$QUIET_INFO")"
 
 if [[ -z "$SPINNER_PIDS" ]]; then
   echo "  └─✨ none caught"

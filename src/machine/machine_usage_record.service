@@ -1,0 +1,10 @@
+[Unit]
+Description=Record one sample of where this box's cpu and memory went
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/machine_usage_record
+Nice=10
+IOSchedulingClass=idle
+StandardOutput=journal
+StandardError=journal

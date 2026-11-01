@@ -39,7 +39,8 @@ this patch is the sole home of every brain knob (`rule.require.brain-config-has-
 |---|---|---|
 | `DISABLE_AUTOUPDATER` | the one update kill-switch, cli and plugins (`ED6()`) | `j96()` |
 | `DISABLE_INSTALLATION_CHECKS` | the npm→native migration nag (#23683) | `$w6()`, `kFz()` |
-| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | auto-compact at 50%, not ~83%; cuts ITPM spikes | `et6()` |
+| `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | auto-compact at 50%, not ~83%; cuts ITPM spikes. ⚠️ scales a threshold, never switches one on — a context whose window source is `auto` ignores it (`gotcha.5-3-brains.a-pct-override-turns-on-no-compaction`) | `QSe()`, `D8()` |
+| `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | a 1M window from the `env` source, so threshold compaction runs in every context — subagents included — and the 50% lands at 500k | `ok()`, per call |
 | `CLAUDE_CODE_SUBAGENT_MODEL` | subagents on `claude-sonnet-5-5[1m]`, never the session's opus | `Ik6()` |
 | `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` | idle compaction fires past 450k tokens, not its 200k default | none in 2.1.280; idle compaction ships in 2.1.299. declared ahead of the pin bump |
 

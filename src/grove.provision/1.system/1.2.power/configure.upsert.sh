@@ -31,7 +31,80 @@
 #   - idempotent: otherwise it strips-then-declares, so a re-run converges to this text
 ######################################################################
 
+######################################################################
+# .what = the power profile follows the charger, by a user unit that watches it
+#           - charger connected and battery at or past 80% → performance
+#           - charger disconnected                         → battery
+#         (`machine_power_profile_sync` holds the rule and says why edges, never a level)
+#
+# .why a USER unit
+#   - `system76-power profile` asks the daemon over dbus as the session user, so no root
+#   - the zone it acts on lives in `$XDG_RUNTIME_DIR`, which only a user manager provides
+#
+# 🛑 .why the old `~/.profile` line is REMOVED, not kept beside the unit
+#   - it set `battery` at every login shell, and a terminal can open a login shell
+#   - ⇒ on the charger at 100%, each new terminal flipped the box back to battery-saver,
+#     the very undo the watch exists to prevent — two writers on one setting
+#     (`rule.forbid.two-writers-on-one-artifact`)
+#   - the unit covers what the line did: a session that starts off the charger enters the
+#     `battery` zone on its first read, and sets it
+#   - both shapes are removed: the `# grove:` marked block, and the pre-marker bare line
+#
+# .why a decline on a box with no battery
+#   - a battery is a physical fact; a desktop or a cloud grove has no charger edge, ever
+#   - ⇒ no unit is armed there, and `--watch` itself exits clean if one ever is
+######################################################################
+grove_provision_1_2_power_profile_sync() {
+  local profile_dst="$HOME/.profile"
+  if [[ -f "$profile_dst" ]] && grep -qE 'system76-power profile battery|^# (grove|devenv): start each login in the battery power profile' "$profile_dst"; then
+    sed -i -E '/^# (grove|devenv): start each login in the battery power profile/d; /system76-power profile battery/d' "$profile_dst" || return 1
+    echo "   • the login-shell battery line is removed from ~/.profile — the unit owns the profile now"
+  fi
+
+  if ! command -v system76-power >/dev/null 2>&1; then
+    echo "   🌙 system76-power is absent, so no profile follows the charger"
+    echo "      — it ships with pop-os; on another distro this is expected"
+    return 0
+  fi
+  local d has_battery=0
+  for d in /sys/class/power_supply/*; do
+    [[ -r "$d/type" && "$(<"$d/type")" == Battery ]] && has_battery=1
+  done
+  if (( ! has_battery )); then
+    echo "   🌙 no battery on this box, so no profile follows a charger"
+    return 0
+  fi
+  if ! systemctl --user show-environment >/dev/null 2>&1; then
+    echo "   🌙 the profile watch is declined — no user manager answers here"
+    echo "      run it by hand: machine_power_profile_sync --mode apply"
+    return 0
+  fi
+
+  local bin_dir="$HOME/.local/bin" unit_dir="$HOME/.config/systemd/user"
+  local unit=machine_power_profile_sync.service
+  local name
+  for name in machine_power_profile_sync "$unit"; do
+    [[ -f "$GROVE_SRC/machine/$name" ]] || { echo "   ✋ no $name at $GROVE_SRC/machine/$name" >&2; return 1; }
+  done
+  mkdir -p "$bin_dir" "$unit_dir" || return 1
+  cp "$GROVE_SRC/machine/machine_power_profile_sync" "$bin_dir/" && chmod +x "$bin_dir/machine_power_profile_sync" || return 1
+  cp "$GROVE_SRC/machine/$unit" "$unit_dir/$unit" || return 1
+
+  # ⚠️ daemon-reload, then RESTART — not only enable --now. a unit already active keeps the
+  #   old executable in memory, so a rewrite with no restart leaves the old rule live
+  systemctl --user daemon-reload || { echo "   ✋ systemctl --user daemon-reload failed" >&2; return 1; }
+  if systemctl --user enable "$unit" >/dev/null 2>&1 && systemctl --user restart "$unit"; then
+    echo "   • $unit armed — the profile now follows the charger"
+  else
+    echo "   ✋ could not arm $unit" >&2
+    echo "      ⇒ the profile stays wherever it was last set, plug or no plug" >&2
+    echo "      read why: journalctl --user -u $unit -n 20" >&2
+    return 1
+  fi
+}
+
 grove_provision_1_2_power_configure_upsert() {
+  local failed=0
   ####################################################################
   # logind — what happens when a trigger fires
   ####################################################################
@@ -112,58 +185,9 @@ EOF
   fi
 
   ####################################################################
-  # start each login in the battery power profile
-  #
-  # ⚠️ .why a power line lives in this bundle at all
-  #   - `system76-power` is pop-os's own governor and applies to this laptop
-  #   - it is the one power concern a login shell owns rather than logind
-  #
-  # 🛑 write it with a heredoc, never `echo '\n…'`
-  #   - bash's `echo` does NOT expand `\n` inside single quotes
-  #   - ⇒ `echo '\n# x\nsystem76-power profile battery' >> ~/.profile` writes ONE literal line
-  #   - `~/.profile` then gains a line the shell cannot run
-  #   - and a `grep -qxF` guard never matches that mangled line
-  #   - ⇒ every run appends another copy
-  #   - the guard looks like idempotence and delivers the opposite
-  #
-  # .why it is gated on the binary
-  #   - `system76-power` ships with pop-os only
-  #   - on another debian box the line prints "command not found" before every prompt
-  #   - `2.7.aliases` guards its sourced files against the same class of defect
+  # the power PROFILE follows the charger — see `grove_provision_1_2_power_profile_sync`
   ####################################################################
-  # 🛑 the guard greps a SLUG MARKER, never the command it writes
-  #   - a guard coupled to the COMMAND breaks on any edit to that command
-  #   - ⇒ it stops matching a healthy file, and every run appends another copy
-  #   - a `# grove: <slug>` marker couples the guard to the CLAIM, which is stable
-  #   - `5.1.node` uses this same shape on this same file
-  #
-  # ⚠️ keep the LEGACY content phrase beside the marker
-  #   - an extant box holds the pre-marker block
-  #   - 📜 2026-09-02: the fence word moved `# devenv:` → `# grove:`, so old boxes MISS `$profile_mark`
-  #   - `$profile_legacy` matches the CONTENT line, which neither change touched
-  #   - ⇒ an old box lands on the elif and is left alone, not handed a SECOND battery line
-  #   - it may be dropped only once no box predates the FENCE RENAME
-  if command -v system76-power >/dev/null 2>&1; then
-    local profile_dst="$HOME/.profile"
-    local profile_mark="# grove: start each login in the battery power profile"
-    local profile_legacy="system76-power profile battery"
-
-    if grep -qF "$profile_mark" "$profile_dst" 2>/dev/null; then
-      echo "   • battery profile already declared in ~/.profile"
-    elif grep -qF "$profile_legacy" "$profile_dst" 2>/dev/null; then
-      echo "   • battery profile already declared (pre-marker block; left as is)"
-    else
-      cat >> "$profile_dst" <<'EOF'
-
-# grove: start each login in the battery power profile (pop-os / system76-power)
-command -v system76-power >/dev/null 2>&1 && system76-power profile battery >/dev/null 2>&1
-EOF
-      echo "   • battery profile declared in ~/.profile"
-    fi
-  else
-    echo "   🌙 system76-power is absent, so no battery profile is declared"
-    echo "      — it ships with pop-os; on another distro this is expected"
-  fi
+  grove_provision_1_2_power_profile_sync || failed=1
 
   ####################################################################
   # .note = logind re-reads its config at start, so these take on the next login
@@ -178,4 +202,5 @@ EOF
   echo "   🌙 awaits a session restart — run 'machine.logout' or 'power.restart'"
   echo "      to apply. no restart is issued here: a logind restart kills the live"
   echo "      graphical session, and this run was launched from inside it"
+  return $failed
 }

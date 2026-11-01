@@ -47,7 +47,7 @@ grove_provision_1_3_1_firefox_configure_upsert() {
   local ext_dir="$HOME/.local/share/flatpak/extension/org.mozilla.firefox.systemconfig/x86_64/stable"
   local ff_assets="$GROVE_SRC/grove.provision/1.system/1.3.browser/1.3.1.firefox/firefox"
 
-  if [[ ! -f "$ff_assets/autoconfig.js" || ! -f "$ff_assets/firefox.cfg" ]]; then
+  if [[ ! -f "$ff_assets/autoconfig.js" || ! -f "$ff_assets/firefox.cfg" || ! -f "$ff_assets/gtk.css" ]]; then
     echo "   ✋ the firefox autoconfig assets are absent from this checkout" >&2
     echo "      looked in: $ff_assets" >&2
     echo "      ⇒ \$GROVE_SRC is this run's OWN src/, so an absent file here is" >&2
@@ -63,11 +63,25 @@ grove_provision_1_3_1_firefox_configure_upsert() {
 
   if cp "$ff_assets/autoconfig.js" "$ext_dir/defaults/pref/autoconfig.js" \
      && cp "$ff_assets/firefox.cfg" "$ext_dir/firefox.cfg"; then
-    echo "   • firefox ctrl+N tab keys declared (fully quit firefox to apply)"
+    echo "   • firefox ctrl+N tab keys + ctrl+q close-tab declared (fully quit firefox to apply)"
   else
     echo "   ✋ could not write the systemconfig channel into $ext_dir" >&2
     echo "      ⇒ without both files firefox keeps the linux default alt+N, so" >&2
     echo "        ctrl+2 does not move a tab and reads as a broken keyboard" >&2
+    return 1
+  fi
+
+  ####################################################################
+  # 0b. ctrl+w deletes a word in text fields — a gtk keybind scoped to the
+  #     flatpak's OWN config dir, so only firefox reads it. it reaches a field
+  #     only because firefox.cfg above frees ctrl+w from close-tab
+  ####################################################################
+  local gtk_dir="$HOME/.var/app/org.mozilla.firefox/config/gtk-3.0"
+  if mkdir -p "$gtk_dir" && cp "$ff_assets/gtk.css" "$gtk_dir/gtk.css"; then
+    echo "   • firefox ctrl+w delete-word declared in its gtk.css (fully quit firefox to apply)"
+  else
+    echo "   ✋ could not write firefox's gtk.css into $gtk_dir" >&2
+    echo "      ⇒ ctrl+w in a text field does naught, rather than delete a word" >&2
     return 1
   fi
 

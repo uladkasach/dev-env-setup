@@ -1,0 +1,203 @@
+#!/usr/bin/env bash
+######################################################################
+# .what = hold the power profile to the charger, at its two edges:
+#           - the charger is connected AND the battery reaches the threshold → performance
+#           - the charger is disconnected                                   → battery
+#
+# .why  = on the charger with a full battery, battery-saver only costs speed; off the
+#         charger, performance only costs hours. the two moments a human would flip the
+#         profile by hand are exactly these two edges, so the box flips it for them
+#
+# .why EDGES, never a level
+#   - the profile is set only when the box ENTERS a zone, never re-asserted each tick
+#   - ⇒ a profile a human picks by hand holds until the next edge; a level loop would
+#     undo it within seconds and leave no way to override it
+#   - the zones:
+#       battery   charger disconnected                    → set battery, on entry
+#       ac.low    charger connected, below the threshold  → no change (keeps what it had)
+#       ac.full   charger connected, at or past threshold → set performance, on entry
+#   - ac.full → ac.low (a heavy load drains the battery while plugged in) is NOT an
+#     edge to act on: the charger is still connected, so performance stays
+#
+# .why AT OR PAST, never strictly past
+#   - a pop laptop may cap its charge at the threshold itself (`system76-power
+#     charge-thresholds`), and a battery capped at 80 never reads 81
+#   - ⇒ a strict `>` would leave a capped laptop in battery-saver forever on the charger
+#
+# .why the zone is recorded only AFTER the profile is set
+#   - a failed set leaves the old zone on record, so the next event retries the edge
+#   - a zone recorded first would mark the edge as handled and never set it at all
+#
+# usage:
+#   machine_power_profile_sync                   # plan: read the charger + battery, say what would change
+#   machine_power_profile_sync --mode apply      # act once on an edge
+#   machine_power_profile_sync --watch           # act on every edge, wake on each upower event
+#   machine_power_profile_sync --threshold 90
+#
+# guarantee:
+#   - plan mode is read-only: it writes no profile and no state
+#   - a box with no battery (a desktop, a cloud grove) declines, exit 0
+#   - exit 0 = answered or acted; 1 = a profile set failed; 2 = bad input
+######################################################################
+set -uo pipefail
+
+MODE=plan
+THRESHOLD=80
+WATCH=0
+WAKE_MAX_S=30
+# ⚠️ the zone lives in the RUNTIME dir, cleared at logout and at boot, on purpose. a zone kept
+#   across a reboot would read `ac.full` on a box booted on the charger, see no edge, and
+#   leave whatever profile the boot chose. a fresh session starts at `none`, so its first
+#   read is always an entry
+STATE_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/machine.power"
+PSY=/sys/class/power_supply
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --mode)      MODE="$2"; shift 2 ;;
+    --threshold) THRESHOLD="$2"; shift 2 ;;
+    --watch)     WATCH=1; MODE=apply; shift ;;
+    --dir)       STATE_DIR="$2"; shift 2 ;;
+    --psy)       PSY="$2"; shift 2 ;;
+    --repo|--role|--skill) shift 2 ;;
+    -h|--help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print } !/^#/ && NR > 1 { exit }' "$0"; exit 0 ;;
+    *) echo "✋ ConstraintError: unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+[[ "$MODE" =~ ^(plan|apply)$ ]] || { echo "✋ ConstraintError: --mode takes plan or apply, got '$MODE'" >&2; exit 2; }
+[[ "$THRESHOLD" =~ ^[0-9]+$ ]] && (( THRESHOLD <= 100 )) || {
+  echo "✋ ConstraintError: --threshold takes a whole percent 0-100, got '$THRESHOLD'" >&2; exit 2; }
+
+# .what = does any external supply power the box? prints 1, 0, or "" when the box has none
+# .note = `Mains` is a barrel or dock adapter; `USB` is a usb-c pd port that reports online
+#   only while it SUPPLIES this box. a laptop on usb-c power often shows no Mains at all
+__power_ac_online() {
+  local d seen=0 on=0 t
+  for d in "$PSY"/*; do
+    [[ -r "$d/type" && -r "$d/online" ]] || continue
+    t="$(<"$d/type")"
+    [[ "$t" == Mains || "$t" == USB ]] || continue
+    seen=1
+    [[ "$(<"$d/online")" == 1 ]] && on=1
+  done
+  (( seen )) && echo "$on" || echo ""
+}
+
+# .what = the battery charge, as a whole percent — the mean across every battery
+__power_battery_pct() {
+  local d n=0 sum=0 c
+  for d in "$PSY"/*; do
+    [[ -r "$d/type" && "$(<"$d/type")" == Battery && -r "$d/capacity" ]] || continue
+    c="$(<"$d/capacity")"
+    [[ "$c" =~ ^[0-9]+$ ]] || continue
+    sum=$(( sum + c )); n=$(( n + 1 ))
+  done
+  (( n )) && echo $(( sum / n )) || echo ""
+}
+
+# .what = the active profile, lowercased (battery | balanced | performance), or "?"
+__power_profile_get() {
+  system76-power profile 2>/dev/null | awk -F': *' 'tolower($1) ~ /power profile/ { print tolower($2); exit }' \
+    | { read -r p; echo "${p:-?}"; }
+}
+
+# .what = which zone the box sits in now
+__power_zone_of() {
+  local ac="$1" pct="$2"
+  [[ "$ac" == 1 ]] || { echo battery; return; }
+  (( pct >= THRESHOLD )) && echo ac.full || echo ac.low
+}
+
+# .what = the profile an entry INTO this zone owes, or "" for a zone that owes none
+__power_profile_owed() {
+  case "$1" in
+    battery) echo battery ;;
+    ac.full) echo performance ;;
+    *)       echo "" ;;
+  esac
+}
+
+# .what = read the box, act on an edge, and report one tree
+__power_sync_once() {
+  local ac pct profile zone zone_prior owed verdict
+  ac="$(__power_ac_online)"
+  pct="$(__power_battery_pct)"
+
+  if [[ -z "$pct" ]]; then
+    echo "🌙 no battery on this box, so no profile is owed to a charger"
+    return 0
+  fi
+  if ! command -v system76-power >/dev/null 2>&1; then
+    echo "🌙 system76-power is absent, so there is no profile to set"
+    echo "   — it ships with pop-os; on another distro this is expected"
+    return 0
+  fi
+
+  profile="$(__power_profile_get)"
+  zone="$(__power_zone_of "${ac:-0}" "$pct")"
+  zone_prior="$(cat "$STATE_DIR/zone" 2>/dev/null || echo none)"
+  owed="$(__power_profile_owed "$zone")"
+
+  verdict="no edge — the profile is left as is"
+  if [[ "$zone" != "$zone_prior" ]]; then
+    verdict="crossed $zone_prior → $zone; owes no profile change"
+    [[ -n "$owed" ]] && verdict="crossed $zone_prior → $zone; owes $owed"
+  fi
+
+  # a watch wakes every 30s at most; a report per wake would put ~3k lines a day in the
+  #   journal to say "no edge". so --watch speaks on an edge alone; a one-shot always speaks
+  [[ "$WATCH" == 1 && "$zone" == "$zone_prior" ]] && return 0
+
+  echo "🔋 power profile sync --mode $MODE"
+  echo "   ├─ charger:   $([[ "${ac:-0}" == 1 ]] && echo connected || echo disconnected)"
+  echo "   ├─ battery:   ${pct}%  (threshold ${THRESHOLD}%)"
+  echo "   ├─ zone:      $zone  (was $zone_prior)"
+  echo "   ├─ profile:   $profile"
+  echo "   └─ verdict:   $verdict"
+
+  [[ "$MODE" == apply ]] || return 0
+  [[ "$zone" != "$zone_prior" ]] || return 0
+
+  if [[ -n "$owed" && "$owed" != "$profile" ]]; then
+    local err
+    if ! err="$(system76-power profile "$owed" 2>&1 >/dev/null)"; then
+      echo "   💥 MalfunctionError: system76-power refused the $owed profile" >&2
+      [[ -n "$err" ]] && echo "      it said: $(echo "$err" | tail -2)" >&2
+      echo "      ⇒ the zone stays $zone_prior on record, so the next event retries" >&2
+      return 1
+    fi
+    echo "      ✨ set $owed"
+  fi
+
+  mkdir -p "$STATE_DIR"
+  printf '%s\n' "$zone" > "$STATE_DIR/zone.tmp" && mv "$STATE_DIR/zone.tmp" "$STATE_DIR/zone"
+}
+
+[[ "$WATCH" == 1 ]] || { __power_sync_once; exit $?; }
+
+# --watch on a box with no battery or no profile daemon has no edge to wait for, ever, so
+#   it says why once and exits clean — a unit that loops on a desktop is a cost with no claim
+if [[ -z "$(__power_battery_pct)" ]] || ! command -v system76-power >/dev/null 2>&1; then
+  __power_sync_once
+  exit 0
+fi
+
+# --watch: act now, then on each upower event, with a bounded wake as the backstop
+# .why the backstop: an event can be lost (upower restart, a resume), and an edge
+#   that no event announced would otherwise wait forever
+__power_sync_once || true
+if command -v upower >/dev/null 2>&1; then
+  coproc UPOWER { exec upower --monitor 2>/dev/null; }
+  while :; do
+    # one read per wake; drain the burst a single change emits, so one plug acts once
+    read -r -t "$WAKE_MAX_S" _ <&"${UPOWER[0]}"
+    while read -r -t 1 _ <&"${UPOWER[0]}"; do :; done
+    __power_sync_once || true
+    # a dead monitor would make every read return at once — a hot loop. exit, and the unit restarts the watch
+    kill -0 "$UPOWER_PID" 2>/dev/null || { echo "💥 upower --monitor exited; the unit restarts the watch" >&2; exit 1; }
+  done
+fi
+while :; do
+  read -r -t "$WAKE_MAX_S" _ <> <(:) || true
+  __power_sync_once || true
+done

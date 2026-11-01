@@ -14,7 +14,7 @@
 #   - `rhx grove.provision --org <org>` names the org per run, and swaps no line
 #   - the durable fix for a repo that must address SEVERAL orgs is an allowlist:
 #     `.dream/2026_09_23.keyrack-manifest-org-allowlist.dream.md`
-org: aether
+org: ahbode
 extends:
   - .agent/repo=bhrain/role=reviewer/keyrack.yml
   - .agent/repo=bhuild/role=dispatcher/keyrack.yml
@@ -26,3 +26,6 @@ env.all: null
 env.camp:
   - AWS_PROFILE
   - GITHUB_TOKEN
+env.prep:
+  - EHMPATHY_SEATURTLE_GITHUB_TOKEN
+  - AWS_PROFILE

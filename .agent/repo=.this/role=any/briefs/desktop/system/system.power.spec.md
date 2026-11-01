@@ -25,6 +25,23 @@ all power state changes require explicit terminal commands.
 | idle timeout | ignored |
 | screen idle | never turns off |
 
+## .the power profile follows the charger
+
+| edge | profile |
+|------|---------|
+| charger connected, battery reaches 80% | performance |
+| charger disconnected | battery |
+
+- **edges, never a level.** the box sets a profile only as it ENTERS a zone, so a profile
+  picked by hand holds until the next plug or unplug
+- **at or past 80%**, never strictly past: a charge capped at 80% never reads 81
+- a battery that drains below 80% while still plugged in keeps performance
+- the rule lives in `src/machine/machine_power_profile_sync`; `1.2.power` arms it as the
+  user unit `machine_power_profile_sync.service`. `rhx machine.power.profile.sync` shows
+  what the box reads and what it would do
+- 🛑 no login-shell line sets a profile. the old `~/.profile` battery line flipped the
+  box to battery-saver at every new terminal, so the bundle removes it
+
 ## .explicit commands
 
 | command | action |

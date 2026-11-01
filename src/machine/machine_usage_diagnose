@@ -141,10 +141,61 @@ CENSUS=$(ps -eo comm=,rss= 2>/dev/null \
 #         terminal means a human is attached, and that human IS the progress
 #         the predicate cannot see. no tty, long-lived, still on cpu = a
 #         batch job that should have finished.
-WEDGED_LIST=$(ps -eo etimes=,pcpu=,pid=,tty=,comm= 2>/dev/null \
-  | awk '$1 > 86400 && $2 > 5.0 && $4 == "?" \
-         {printf "%s (pid %s) %dh at %s%% cpu\n", $5, $3, $1/3600, $2}' \
-  | awk 'NR<=3' || true)
+#
+# .note = a HOST is never wedged, and is never offered a kill. the tmux server
+#         is daemonized (tty `?`), alive for days, and on cpu — every clause
+#         above holds — yet its cpu is the sum of its tenants: it relays every
+#         pane's redraw. this report printed `🪤 wedged … tmux: (pid 19210) 241h
+#         at 48.1% cpu → kill -9`, and that kill ends every session at once
+#         (2026-10-21). the list is the one `machine_resource_procs_find_spinner`
+#         holds hosts out by; keep the two in step.
+# .note = comm may hold a space (`tmux: server`), so it is fields 5..NF, never $5
+#
+# .note = `pcpu` is a LIFETIME average (cpu time / elapsed), so on its own it
+#         reports a process that burned days ago and idles now as "still on
+#         cpu". it is the cheap prefilter; the verdict is the burn over a live
+#         window, read from /proc/<pid>/stat ticks. both must clear 5%
+WEDGED_CAND=$(ps -eo etimes=,pcpu=,pid=,tty=,comm= 2>/dev/null \
+  | awk 'BEGIN {
+           split("tmux: server|kitty|cosmic-comp|Xwayland|gnome-shell|systemd|pipewire|wireplumber", h, "|")
+           for (i in h) host[h[i]] = 1
+         }
+         {
+           c = $5; for (i = 6; i <= NF; i++) c = c " " $i
+           if ($1 > 86400 && $2 > 5.0 && $4 == "?" && !(c in host))
+             printf "%s\t%s (pid %s) %dh at %s%% lifetime cpu\n", $3, c, $3, $1/3600, $2
+         }' || true)
+
+# .what = a pid's cpu ticks (utime + stime); fields read after the last `) `,
+#         since comm sits in parens and may hold spaces
+__wedged_ticks() {
+  local stat
+  stat=$(cat "/proc/$1/stat" 2>/dev/null) || return 1
+  stat=${stat##*) }
+  # shellcheck disable=SC2086
+  set -- $stat
+  echo $(( ${12} + ${13} ))
+}
+
+WEDGED_LIST=""
+if [[ -n "$WEDGED_CAND" ]]; then
+  WEDGED_WINDOW=3
+  WEDGED_HZ=$(getconf CLK_TCK 2>/dev/null || echo 100)
+  declare -A WEDGED_T0
+  while IFS=$'\t' read -r wpid _; do
+    WEDGED_T0[$wpid]=$(__wedged_ticks "$wpid" || echo "")
+  done <<<"$WEDGED_CAND"
+  sleep "$WEDGED_WINDOW"
+  while IFS=$'\t' read -r wpid wline; do
+    t0="${WEDGED_T0[$wpid]:-}"
+    t1=$(__wedged_ticks "$wpid" || echo "")
+    [[ -z "$t0" || -z "$t1" ]] && continue  # exited within the window
+    wnow=$(( (t1 - t0) * 100 / (WEDGED_HZ * WEDGED_WINDOW) ))
+    (( wnow > 5 )) || continue  # quiet now: history, not a wedge
+    WEDGED_LIST+="${wline}, ${wnow}% now"$'\n'
+  done <<<"$WEDGED_CAND"
+  WEDGED_LIST=$(printf '%s' "$WEDGED_LIST" | awk 'NR<=3')
+fi
 WEDGED=$(printf '%s' "$WEDGED_LIST" | grep -c . || true)
 
 # .what = the nvim self-watchdog's own verdict on the nvim class

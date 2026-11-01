@@ -1,0 +1,15 @@
+[Unit]
+Description=Hold the power profile to the charger (plugged in past 80% → performance; unplugged → battery)
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/machine_power_profile_sync --watch
+# the watch exits when upower --monitor dies, so a restart re-arms it
+Restart=on-failure
+RestartSec=5
+Nice=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

@@ -71,6 +71,59 @@ grove_provision_1_7_usage_tools() {
   fi
 }
 
+######################################################################
+# .what = the recorder's two user units, and the timer armed
+#
+# .why  = a snapshot answers "how is it now"; only a record kept over time
+#         answers "what has cost the most" — and a spawn storm, whose
+#         children die in milliseconds, is visible to the record alone
+#         (`machine_usage_record`'s header says how)
+#
+# .why a USER timer
+#   - it reads the user's own processes, so it needs no root
+#   - and it writes under the user's own `~/.local/state`
+#
+# ⚠️ .why `daemon-reload` before `enable --now`
+#   - systemd caches unit files, so a rewrite with no reload leaves the OLD
+#     definition live (the same reason `1.6.2.monitor` gives)
+#
+# .why a decline where `systemctl --user` cannot answer
+#   - a box with no user manager has no scheduler to arm; the two commands
+#     still install, and `machine_usage_record` still runs by hand
+######################################################################
+grove_provision_1_7_usage_recorder() {
+  local unit_dir="$HOME/.config/systemd/user"
+  if ! systemctl --user show-environment >/dev/null 2>&1; then
+    echo "   🌙 the usage recorder timer is declined — no user manager answers here,"
+    echo "      so there is no scheduler to arm; machine_usage_record still runs by hand"
+    return 0
+  fi
+
+  mkdir -p "$unit_dir" || return 1
+  local unit
+  for unit in machine_usage_record.service machine_usage_record.timer; do
+    if [[ ! -f "$GROVE_SRC/machine/$unit" ]]; then
+      echo "   ✋ no $unit at $GROVE_SRC/machine/$unit" >&2
+      return 1
+    fi
+    cp "$GROVE_SRC/machine/$unit" "$unit_dir/$unit" || return 1
+  done
+
+  systemctl --user daemon-reload || {
+    echo "   ✋ systemctl --user daemon-reload failed" >&2
+    echo "      ⇒ the unit files are on disk and the OLD definitions stay live" >&2
+    return 1
+  }
+  if systemctl --user enable --now machine_usage_record.timer >/dev/null 2>&1; then
+    echo "   • machine_usage_record.timer enabled — one sample a minute"
+  else
+    echo "   ✋ could not enable machine_usage_record.timer" >&2
+    echo "      ⇒ no record is kept, so 'what made it slow' has only a moment's answer" >&2
+    echo "      read why: systemctl --user status machine_usage_record.timer" >&2
+    return 1
+  fi
+}
+
 grove_provision_1_7_usage_provision_upsert() {
   local dst_dir="$HOME/.local/bin"
   mkdir -p "$dst_dir" || return 1
@@ -83,7 +136,9 @@ grove_provision_1_7_usage_provision_upsert() {
   local name
   for name in \
     machine_resource_observe \
-    machine_usage_snapshot
+    machine_usage_snapshot \
+    machine_usage_record \
+    machine_usage_history
   do
     local src="$GROVE_SRC/machine/$name"
     if [[ ! -f "$src" ]]; then
@@ -98,6 +153,8 @@ grove_provision_1_7_usage_provision_upsert() {
     chmod +x "$dst_dir/$name" || { failed=1; continue; }
     echo "   • $name installed → $dst_dir/$name"
   done
+
+  grove_provision_1_7_usage_recorder || failed=1
 
   # ⚠️ the tool result is folded in HERE, at the end, never returned early above
   #   - ⇒ a box that cannot install sysstat still gets both payloads copied

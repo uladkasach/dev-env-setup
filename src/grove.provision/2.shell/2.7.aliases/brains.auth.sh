@@ -2421,9 +2421,29 @@ _brains_auth_node_via_access() {
   #   the present-but-unreadable half open. both halves now route to `unexpected_shape`.
   #   the null case rides along for free — `(null|type)` is "null", not "number" — so an
   #   endpoint that starts to omit the value is caught by this test rather than by `// 0`.
-  if ! jq -e '(.five_hour.utilization|type)=="number" and (.seven_day.utilization|type)=="number"' \
+  #
+  # ⚠️ a window that is PRESENT and null is a real answer, not a drift: the plan has no such
+  #   limit. 📜 2026-10-31 — max 20x plans were rebranded ultra, and some lost the 5h limit, so
+  #   their body reads `"five_hour": null`. the old test refused it and every such account read
+  #   💥. the key must still be PRESENT (`has`), so an endpoint that drops the field is caught
+  #   rather than read as "no limit"
+  if ! jq -e '
+       def window_ok(k): has(k) and ((.[k] == null) or ((.[k].utilization|type) == "number"));
+       type == "object" and window_ok("five_hour") and window_ok("seven_day")' \
        <<< "$body" >/dev/null 2>&1; then
-    _brains_auth_error_node 'unexpected_shape'
+    # ⚠️ the refusal names WHAT it saw, as types only — never the values. a bare
+    #   `unexpected_shape` threw the body away, so the one fact a repair needs (which field
+    #   drifted, and into what) was unrecoverable without a re-read by hand
+    jq -nc --arg b "$body" '
+      ($b | try fromjson catch null) as $j
+      | {error:"unexpected_shape",
+         seen: (if ($j|type) != "object" then {body:($j|type), bytes:($b|length)}
+                else {five_hour:($j.five_hour|type),
+                      five_hour_utilization:(try ($j.five_hour.utilization|type) catch "n/a"),
+                      seven_day:($j.seven_day|type),
+                      seven_day_utilization:(try ($j.seven_day.utilization|type) catch "n/a"),
+                      keys:($j|keys|.[:12])}
+                end)}' 2>/dev/null || _brains_auth_error_node 'unexpected_shape'
     return
   fi
   printf '%s' "$body"
@@ -2780,10 +2800,18 @@ _brains_auth_render() {
     #   when they had room, or charges ahead when they had none. the bar direction hints at
     #   it, but a hint is not a label. "used" is what the endpoint reports (`utilization`),
     #   so the word matches the source and no conversion sits between them to invert.
+    # two absences, two meanings — never "resets at ?, in ?":
+    #   - a window that is null: this PLAN has no such limit (ultra plans dropped the 5h one),
+    #     so its row is simply not drawn — a limit that does not exist earns no line
+    #   - a window present with no reset: the limit exists, and no window has opened yet
+    s_tail="no window open yet"
+    [[ -n "$s_reset" ]] && s_tail="resets at $(_brains_auth_when "$s_reset"), in $(_brains_auth_until "$s_reset")"
+    w_tail="no window open yet"
+    [[ -n "$w_reset" ]] && w_tail="resets at $(_brains_auth_when "$w_reset"), in $(_brains_auth_until "$w_reset")"
     printf '   ├─ %s%s\n' "$reach" "$mark"
-    printf '   │  ├─ session  %s %3d%% used  ·  resets at %s, in %s\n' \
-      "$(_brains_auth_bar "$s_pct")" "$s_pct" \
-      "$(_brains_auth_when "$s_reset")" "$(_brains_auth_until "$s_reset")"
+    [[ "$(jq -r '.five_hour != null' <<< "$node")" == true ]] && \
+      printf '   │  ├─ session  %s %3d%% used  ·  %s\n' \
+        "$(_brains_auth_bar "$s_pct")" "$s_pct" "$s_tail"
     # opus rides just after session (same 5h window) only when the account has one
     [[ -n "$o_used" ]] && printf '   │  ├─ opus     %s %3d%% used\n' \
       "$(_brains_auth_bar "$(_brains_auth_round "$o_used")")" "$(_brains_auth_round "$o_used")"
@@ -2791,9 +2819,14 @@ _brains_auth_render() {
     reset_txt="$(_brains_auth_reset_line "$node")"
     week_glyph='└─'
     [[ -n "$reset_txt" ]] && week_glyph='├─'
-    printf '   │  %s week     %s %3d%% used  ·  resets at %s, in %s\n' "$week_glyph" \
-      "$(_brains_auth_bar "$w_pct")" "$w_pct" \
-      "$(_brains_auth_when "$w_reset")" "$(_brains_auth_until "$w_reset")"
+    # the week row stays even when null: it closes the block, and with no session row either
+    #   an absent line would leave the account header bare and unexplained
+    if [[ "$(jq -r '.seven_day == null' <<< "$node")" == true ]]; then
+      printf '   │  %s week     no weekly limit on this plan\n' "$week_glyph"
+    else
+      printf '   │  %s week     %s %3d%% used  ·  %s\n' "$week_glyph" \
+        "$(_brains_auth_bar "$w_pct")" "$w_pct" "$w_tail"
+    fi
     [[ -n "$reset_txt" ]] && printf '   │  └─ reset    %s\n' "$reset_txt"
   done < <(jq -r 'keys[]' <<< "$combined")
   echo "   └─"
