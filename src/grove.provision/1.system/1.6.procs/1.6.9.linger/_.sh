@@ -22,13 +22,13 @@
 #   - a laptop's timers and crew scopes outlive its desktop session only with it
 #
 # usage:
-#   rhx grove.provision --what 1.6.7.linger --mode plan
-#   sudo -v && rhx grove.provision --what 1.6.7.linger --mode apply
+#   rhx grove.provision --what 1.6.9.linger --mode plan
+#   sudo -v && rhx grove.provision --what 1.6.9.linger --mode apply
 ######################################################################
 
 # .what = where logind records a linger grant, one empty file per seat
 # .why  = overridable, so a clamp can read a fixture dir rather than the box
-grove_provision_1_6_7_linger_dir() {
+grove_provision_1_6_9_linger_dir() {
   printf '%s' "${GROVE_LINGER_DIR:-/var/lib/systemd/linger}"
 }
 
@@ -36,18 +36,18 @@ grove_provision_1_6_7_linger_dir() {
 # .why  = derived from the box, so no seat is hardcoded (`5.8.docker`)
 #   - uid 1000..65533, and a shell that is neither nologin nor false
 #   - `GROVE_LINGER_PASSWD` names a passwd-shaped fixture file for a clamp
-grove_provision_1_6_7_linger_roster() {
+grove_provision_1_6_9_linger_roster() {
   local seat uid shell
   while IFS=: read -r seat _ uid _ _ _ shell; do
     [[ "$uid" =~ ^[0-9]+$ ]] || continue
     [[ "$uid" -ge 1000 && "$uid" -lt 65534 ]] || continue
     [[ "$shell" == *nologin* || "$shell" == *false ]] && continue
     printf '%s\n' "$seat"
-  done < <(grove_provision_1_6_7_linger_passwd)
+  done < <(grove_provision_1_6_9_linger_passwd)
 }
 
 # .what = the passwd rows the roster reads — a fixture file if one is named
-grove_provision_1_6_7_linger_passwd() {
+grove_provision_1_6_9_linger_passwd() {
   [[ -n "${GROVE_LINGER_PASSWD:-}" ]] && { cat "$GROVE_LINGER_PASSWD"; return; }
   getent passwd
 }
@@ -61,20 +61,20 @@ grove_provision_1_6_7_linger_passwd() {
 #    place; the fold is item 3 of `.dream/2026_10_23.grove-provision-shared-readers.dream.md`
 # ⚠️ the logind record, never `loginctl show-user` — that FAILS for a seat with
 #    no session, so it cannot tell "no linger" from "no session" for another seat
-grove_provision_1_6_7_linger_seat_lingers() {
-  [[ -e "$(grove_provision_1_6_7_linger_dir)/$1" ]]
+grove_provision_1_6_9_linger_seat_lingers() {
+  [[ -e "$(grove_provision_1_6_9_linger_dir)/$1" ]]
 }
 
 # .what = the seats that do NOT linger, one per line (empty = converged)
-grove_provision_1_6_7_linger_unlingered() {
+grove_provision_1_6_9_linger_unlingered() {
   local seat
   while read -r seat; do
     [[ -n "$seat" ]] || continue
-    grove_provision_1_6_7_linger_seat_lingers "$seat" || printf '%s\n' "$seat"
-  done < <(grove_provision_1_6_7_linger_roster)
+    grove_provision_1_6_9_linger_seat_lingers "$seat" || printf '%s\n' "$seat"
+  done < <(grove_provision_1_6_9_linger_roster)
 }
 
-grove_provision_1_6_7_linger() {
-  bundle.upgrade 1.6.7.linger.provision.upsert
-  bundle.upgrade 1.6.7.linger.provision.verify
+grove_provision_1_6_9_linger() {
+  bundle.upgrade 1.6.9.linger.provision.upsert
+  bundle.upgrade 1.6.9.linger.provision.verify
 }

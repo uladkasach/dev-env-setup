@@ -21,7 +21,7 @@
 #     moment the pane closes and the manager dies with the session
 #   - ⇒ a green `is-active` on a grove is a fact about the OBSERVER's session,
 #     never about the box. linger is what makes it a fact about the box, and
-#     `1.6.7.linger` proves it for every seat
+#     `1.6.9.linger` proves it for every seat
 #     (`gotcha.a-check-that-cries-wolf-gets-silenced`, q1)
 ######################################################################
 
@@ -88,7 +88,7 @@ grove_provision_1_6_4_keyrackd_provision_verify() {
   fi
 
   # 4. linger — the claim that makes the two above outlive this session — is
-  #    `1.6.7.linger`'s, made for every seat; one claim, one owner
+  #    `1.6.9.linger`'s, made for every seat; one claim, one owner
 
   [[ "$claims" -eq 0 ]]
 }

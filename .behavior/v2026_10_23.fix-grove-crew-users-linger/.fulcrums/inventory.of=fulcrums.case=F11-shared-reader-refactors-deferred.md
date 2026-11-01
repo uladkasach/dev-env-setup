@@ -3,7 +3,7 @@
 - fork: do r11's structural nitpicks on this route vs catch them with their shape and ship
   - split the pin into its own root-owned leaf bundle, so a failed build no longer skips tpm,
     plugins and conf
-  - fold `5.8.docker` and `5.18.openhours` onto `1.6.7.linger`'s readers
+  - fold `5.8.docker` and `5.18.openhours` onto `1.6.9.linger`'s readers
   - narrow `sysctl --system` to the coredump drop-in
   - mark a ✔ read through a fixture env seam
   - named flags in `pin_fetch`/`pin_build`/`pin_install`

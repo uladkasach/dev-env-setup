@@ -51,6 +51,9 @@ node_modules
 # of one machine's sessions, never of the repo, and this repo is public
 # (rule.forbid.dox-in-public-repo)
 .behavior/*/.malfunctions/*.crash.*.log
+
+# python bytecode — a play that imports a kitten writes it beside the source
+__pycache__/
 !.agent/.actors/actor.via.repo=ambient/
 
 # a route driver daemon writes crash logs here. each holds absolute paths of

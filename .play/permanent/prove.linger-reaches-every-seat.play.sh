@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = prove `1.6.7.linger` reads EVERY human seat, ✋s per unlingered one,
+# .what = prove `1.6.9.linger` reads EVERY human seat, ✋s per unlingered one,
 #         and grants linger seat by seat, read back before it reports ✔
 #
 # .why this play exists
@@ -45,7 +45,7 @@ _root_of() {
 }
 _root="$(_root_of)" || { echo "   ✋ ConstraintError: no checkout found" >&2; exit 2; }
 
-_dir="$_root/src/grove.provision/1.system/1.6.procs/1.6.7.linger"
+_dir="$_root/src/grove.provision/1.system/1.6.procs/1.6.9.linger"
 
 echo "🔎 prove.linger-reaches-every-seat"
 echo "   └─ root: $_root"
@@ -123,7 +123,7 @@ _ungranted() {
 ######################################################################
 # R. the roster
 ######################################################################
-roster="$(grove_provision_1_6_7_linger_roster | paste -sd' ')"
+roster="$(grove_provision_1_6_9_linger_roster | paste -sd' ')"
 # the reader prints bare names, so the snap labels them; the equality below grades the set
 _grade "R. roster holds only the human seats ($roster)" 0 0 "   • the human seats the roster names: $roster" "seatone seattwo" \
   || failed=$(( failed + 1 ))
@@ -134,53 +134,53 @@ _grade "R. roster holds only the human seats ($roster)" 0 0 "   • the human se
 # V1, V2. the verify
 ######################################################################
 _lingered seatone
-out="$(grove_provision_1_6_7_linger_provision_verify 2>&1)"; rc=$?
+out="$(grove_provision_1_6_9_linger_provision_verify 2>&1)"; rc=$?
 _grade "V1. verify, seattwo unlingered: ✋ names seattwo, and only it" "$rc" 1 "$out" \
   "seattwo does not linger" "seatone does not linger" || failed=$(( failed + 1 ))
 _grade "V1. verify, seattwo unlingered: ✋ names the fix" "$rc" 1 "$out" \
-  "fix: sudo -v && rhx grove.provision --what 1.6.7.linger --mode apply" || failed=$(( failed + 1 ))
+  "fix: sudo -v && rhx grove.provision --what 1.6.9.linger --mode apply" || failed=$(( failed + 1 ))
 
 _lingered seatone seattwo
-out="$(grove_provision_1_6_7_linger_provision_verify 2>&1)"; rc=$?
+out="$(grove_provision_1_6_9_linger_provision_verify 2>&1)"; rc=$?
 _grade "V2. verify, every seat lingers: the ✔ names each seat" "$rc" 0 "$out" \
   "every human seat lingers: seatone seattwo ✔" || failed=$(( failed + 1 ))
 
 _lingered
-out="$( GROVE_LINGER_PASSWD="$FIX/passwd.empty" grove_provision_1_6_7_linger_provision_verify 2>&1 )"; rc=$?
+out="$( GROVE_LINGER_PASSWD="$FIX/passwd.empty" grove_provision_1_6_9_linger_provision_verify 2>&1 )"; rc=$?
 _grade "V4. an empty roster: ✋, never a ✔ over zero seats" "$rc" 1 "$out" \
   "names no human seat" "lingers" || failed=$(( failed + 1 ))
 _grade "V1. the fix names the seat that holds sudo" 1 1 \
-  "$( _lingered seatone; grove_provision_1_6_7_linger_provision_verify 2>&1 )" \
+  "$( _lingered seatone; grove_provision_1_6_9_linger_provision_verify 2>&1 )" \
   "on a grove: run it on the ground seat" || failed=$(( failed + 1 ))
 
 ######################################################################
 # U1..U5. the upsert
 ######################################################################
 _lingered
-out="$(grove_provision_1_6_7_linger_provision_upsert 2>&1)"; rc=$?
+out="$(grove_provision_1_6_9_linger_provision_upsert 2>&1)"; rc=$?
 _grade "U1. upsert grants each seat, read back — and says it granted" "$rc" 0 "$out" \
   "seattwo lingers now — granted, read back" || failed=$(( failed + 1 ))
 [[ "$(_granted)" == "seatone seattwo " ]] \
   || { echo "   │  └─ U1: grants asked for '$(_granted)', want 'seatone seattwo'" >&2; failed=$(( failed + 1 )); }
 
 _lingered
-out="$( GROVE_LINGER_PASSWD="$FIX/passwd.empty" grove_provision_1_6_7_linger_provision_upsert 2>&1 )"; rc=$?
+out="$( GROVE_LINGER_PASSWD="$FIX/passwd.empty" grove_provision_1_6_9_linger_provision_upsert 2>&1 )"; rc=$?
 _grade "U6. upsert, an empty roster: no grant, no claim" "$rc" 0 "$out" "names no human seat" "lingers:" \
   && _ungranted U6 || failed=$(( failed + 1 ))
 
 _lingered seatone
-out="$( GRANT_LEAVES_NO_RECORD=yes grove_provision_1_6_7_linger_provision_upsert 2>&1 )"; rc=$?
+out="$( GRANT_LEAVES_NO_RECORD=yes grove_provision_1_6_9_linger_provision_upsert 2>&1 )"; rc=$?
 _grade "U2. a grant that leaves no record: ✋ names the seat" "$rc" 1 "$out" \
   "could not grant linger to seattwo" "could not grant linger to seatone" || failed=$(( failed + 1 ))
 
 _lingered seatone
-out="$( GROVE_ENV_SERVER=local@unix grove_provision_1_6_7_linger_provision_upsert 2>&1 )"; rc=$?
+out="$( GROVE_ENV_SERVER=local@unix grove_provision_1_6_9_linger_provision_upsert 2>&1 )"; rc=$?
 _grade "U3. a laptop: the same grant (parity)" "$rc" 0 "$out" "seattwo lingers" || failed=$(( failed + 1 ))
 [[ "$(_granted)" == "seattwo " ]] \
   || { echo "   │  └─ U3: grants asked for '$(_granted)', want 'seattwo'" >&2; failed=$(( failed + 1 )); }
 
 _lingered seatone
-out="$( GROVE_ENV_SERVER=local@unix grove_provision_1_6_7_linger_provision_verify 2>&1 )"; rc=$?
+out="$( GROVE_ENV_SERVER=local@unix grove_provision_1_6_9_linger_provision_verify 2>&1 )"; rc=$?
 _grade "V3. a laptop: the same ✋ (parity)" "$rc" 1 "$out" "seattwo does not linger" || failed=$(( failed + 1 ))
 
 # U4. the REAL decline a crew seat meets — the runtime's own `bundle.root.owns`, with sudo denied
@@ -189,7 +189,7 @@ out="$(
   # shellcheck source=/dev/null
   source "$_root/src/bundle.upgrade.sh"
   pkg_can_sudo() { return 1; }
-  grove_provision_1_6_7_linger_provision_upsert 2>&1
+  grove_provision_1_6_9_linger_provision_upsert 2>&1
 )"; rc=$?
 _grade "U4. no root: decline, and it names the verify for the run still owed" "$rc" 0 "$out" \
   "bundle's verify names the run" "none by a human" && _ungranted U4 || failed=$(( failed + 1 ))
@@ -198,7 +198,7 @@ _grade "U4. no root: decline, and it names the verify for the run still owed" "$
   || { echo "   │  └─ U4: the decline does not name its reason, 'this seat has no root'" >&2; failed=$(( failed + 1 )); }
 
 _lingered seatone seattwo
-out="$(grove_provision_1_6_7_linger_provision_upsert 2>&1)"; rc=$?
+out="$(grove_provision_1_6_9_linger_provision_upsert 2>&1)"; rc=$?
 _grade "U5. converged: no grant" "$rc" 0 "$out" "every human seat lingers" && _ungranted U5 \
   || failed=$(( failed + 1 ))
 

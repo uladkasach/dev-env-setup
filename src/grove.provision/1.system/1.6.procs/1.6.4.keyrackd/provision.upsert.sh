@@ -18,7 +18,7 @@
 #   - the units are USER units under `$HOME/.config/systemd/user`, and the
 #     daemons they prune are this seat's own, so a camper writes them unaided
 #   - LINGER, which this timer needs to outlive the duct, is owned by
-#     `1.6.7.linger`: it runs first in `1.6.procs` and grants it to every seat
+#     `1.6.9.linger`: it runs first in `1.6.procs` and grants it to every seat
 #     (`rule.require.seam-claims-have-an-owner`)
 #
 # guarantee:
