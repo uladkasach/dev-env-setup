@@ -6,7 +6,7 @@
 # .why
 #   - a USER timer, since the gate state lives under the human's home
 #   - `daemon-reload` runs before `enable --now`, since systemd caches unit files
-#   - no linger here: `1.6.7.linger` owns that fact for every human seat, and runs first
+#   - no linger here: `1.6.9.linger` owns that fact for every human seat, and runs first
 #   - each step's reason: `howdoes.the-openhours-gate-converges`
 ######################################################################
 

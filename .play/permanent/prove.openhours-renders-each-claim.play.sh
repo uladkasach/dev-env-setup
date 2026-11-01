@@ -4,7 +4,7 @@
 #         ✔ and ✋ alike, and snap every variant a human reads in `--mode plan`
 #
 # .why this play exists
-#   - this branch removed the phase's linger rows (`1.6.7.linger` owns that fact), and
+#   - this branch removed the phase's linger rows (`1.6.9.linger` owns that fact), and
 #     no other play drives the phase, so a row that vanished or drifted shipped unseen
 #
 # .the arms — a fixture $HOME, checkout, and reconciler cwd; `systemctl`, `rhx`,

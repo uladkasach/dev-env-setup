@@ -8,20 +8,20 @@
 #   - a failed grant is a ✋ that names the seat, never a 🌙
 ######################################################################
 
-grove_provision_1_6_7_linger_provision_upsert() {
+grove_provision_1_6_9_linger_provision_upsert() {
   local unlingered=() seat
   while read -r seat; do
     [[ -n "$seat" ]] && unlingered+=("$seat")
-  done < <(grove_provision_1_6_7_linger_unlingered)
+  done < <(grove_provision_1_6_9_linger_unlingered)
 
   # an empty roster grants naught and claims naught; the verify ✋s on it
-  if [[ -z "$(grove_provision_1_6_7_linger_roster)" ]]; then
+  if [[ -z "$(grove_provision_1_6_9_linger_roster)" ]]; then
     echo "   🌙 the passwd roster names no human seat — no grant to make; the verify says why"
     return 0
   fi
 
   if [[ ${#unlingered[@]} -eq 0 ]]; then
-    echo "   • every human seat lingers: $(grove_provision_1_6_7_linger_roster | tr '\n' ' ')✔"
+    echo "   • every human seat lingers: $(grove_provision_1_6_9_linger_roster | tr '\n' ' ')✔"
     return 0
   fi
 
@@ -30,7 +30,7 @@ grove_provision_1_6_7_linger_provision_upsert() {
 
   local failed=0
   for seat in "${unlingered[@]}"; do
-    grove_provision_1_6_7_linger_seat_grant "$seat" || failed=$(( failed + 1 ))
+    grove_provision_1_6_9_linger_seat_grant "$seat" || failed=$(( failed + 1 ))
   done
 
   [[ "$failed" -eq 0 ]]
@@ -38,9 +38,9 @@ grove_provision_1_6_7_linger_provision_upsert() {
 
 # .what = grant linger to one seat, then READ it back — the grant's own exit
 #   code is never the verdict; the logind record is
-grove_provision_1_6_7_linger_seat_grant() {
+grove_provision_1_6_9_linger_seat_grant() {
   local seat="$1"
-  if sudo loginctl enable-linger "$seat" && grove_provision_1_6_7_linger_seat_lingers "$seat"; then
+  if sudo loginctl enable-linger "$seat" && grove_provision_1_6_9_linger_seat_lingers "$seat"; then
     echo "   • $seat lingers now — granted, read back from the logind record ✔"
     echo "     ⇒ its crews outlive its last logout"
     return 0
