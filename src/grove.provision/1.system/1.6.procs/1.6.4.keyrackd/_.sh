@@ -12,7 +12,7 @@
 #   - 🛑 the TIMER is an asset and the SERVICE is generated, from one reader
 #     both halves ask, since its ExecStart names this box's checkout
 #   - 🛑 a grove needs LINGER — its user manager dies when the duct closes, and
-#     an enabled timer cannot see that. `1.6.7.linger` owns that claim, for
+#     an enabled timer cannot see that. `1.6.9.linger` owns that claim, for
 #     every seat; this bundle no longer restates it
 #   - ⚠️ an absent skill (a `--from src` push) is a 🌙, never a ✋
 # .refs = howdoes.the-keyrackd-prune-stays-bounded.md — every .why, measured

@@ -7,7 +7,7 @@
 #   - ⚠️ the timer needs BOTH `is-enabled` (next boot) and `is-active` (this one)
 #   - 🛑 SKILL REACH is its own claim — every other row was ✔ on a box whose
 #     cwd linked no role, so only an ask from that cwd proves the gate can move
-#   - ⚠️ the live gate is reported, never failed; linger is `1.6.7.linger`'s claim
+#   - ⚠️ the live gate is reported, never failed; linger is `1.6.9.linger`'s claim
 #   - 🛑 the CONVERGE leg is unproven on a box with no drift, by design
 # .refs = howdoes.the-openhours-gate-converges.md — how the verify proves the gate
 #

@@ -10,7 +10,7 @@
 # .why
 #   - a population of small orphans is never one process earlyoom would pick
 #   - an age-based reap clears it before memory pressure exists
-#   - every box runs it, and `1.6.7.linger` runs first and grants the linger it rides on
+#   - every box runs it, and `1.6.9.linger` runs first and grants the linger it rides on
 #   - the measurement and the design: `gotcha.earlyoom-kills-the-session-not-the-hog`
 #
 # usage:

@@ -19,9 +19,9 @@
   refuted the guess twice
 - verdict: ruled by the director — concede; the reviewer is right. every error row this route
   touches now opens with a qualified header: `✋ ConstraintError:` or `💥 MalfunctionError:`,
-  in the bundles `2.8.tmux`, `1.6.4.keyrackd`, `1.6.7.linger`, `1.6.8.coredump` and the
+  in the bundles `2.8.tmux`, `1.6.4.keyrackd`, `1.6.9.linger`, `1.6.8.coredump` and the
   route's plays. glyph and class stay paired; every edited play re-ran green
 - rework: clean — a header rewrite is a text edit; a repo-wide dialect change is its own route
 - confidence 75%, low because the rule's text says "every human-read error", and a phase row
   IS human-read; the case rests on "row vs header", which the rule does not draw
-- where: every `✋` row in `2.8.tmux`, `1.6.7.linger`, `1.6.8.coredump`, and the route's plays
+- where: every `✋` row in `2.8.tmux`, `1.6.9.linger`, `1.6.8.coredump`, and the route's plays

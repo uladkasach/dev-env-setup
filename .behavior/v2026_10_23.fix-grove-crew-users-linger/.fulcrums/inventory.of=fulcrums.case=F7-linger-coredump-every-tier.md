@@ -1,6 +1,6 @@
 # F7 — linger and coredump reach every tier; only the tmux pin stays cloud-only
 
-- fork: keep `1.6.7.linger` and `1.6.8.coredump` cloud-only (their first draft) vs apply them
+- fork: keep `1.6.9.linger` and `1.6.8.coredump` cloud-only (their first draft) vs apply them
   on every tier, the laptop included
 - taken: every tier — `rule.forbid.divergence-without-a-physical-reason`. linger is a logind
   record and logind runs on every kind; systemd-coredump is an apt package and core_pattern a
@@ -17,7 +17,7 @@
   and let a laptop's verify name the apport choice as a human's
 - confidence 60%, low because the laptop's apport release changes a collector a human may have
   chosen, and a laptop's verify ✋s until a human runs the root apply once
-- where: `1.6.7.linger/provision.{upsert,verify}.sh`, `1.6.8.coredump/provision.{upsert,verify}.sh`;
+- where: `1.6.9.linger/provision.{upsert,verify}.sh`, `1.6.8.coredump/provision.{upsert,verify}.sh`;
   laptop parity clamped by U5, U10 (coredump) and U3, V3 (linger)
 - re-asked i004 (r10 blocker.5), i008 (r10 blocker.3, r11 nitpick.5): the record had said the
   upsert ✋s rather than override apport — true before the i006 boot-claim repair, false after.
