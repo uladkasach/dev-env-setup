@@ -27,3 +27,6 @@ case=5.
 ci clamps the box-half pieces (users, loopback sshd); the identity play runs on the box. a ci
 identity check would ride a runner's own trust, never the house grove's cert, so it proves naught
 about the house path. the ci clamp covers the house-specific pieces, never a full converge.
+
+## .risk: low
+the ci clamp runs on a throwaway runner with a throwaway key it mints and shreds, and it holds no house cert or AWS trust by design: the identity play stays off ci. no real credential and no prod write.

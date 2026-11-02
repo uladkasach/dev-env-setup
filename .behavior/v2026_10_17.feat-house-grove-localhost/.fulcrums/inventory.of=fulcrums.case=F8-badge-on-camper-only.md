@@ -26,3 +26,6 @@ seat holds no badge, by design"* — and a clamp that each reads 🌙, never ✋
 
 ## .where
 case=4.
+
+## .risk: risky
+it decides which seat holds the AWS badge, and so which uid can act in the prep account. a wrong call puts the badge on the root seat.

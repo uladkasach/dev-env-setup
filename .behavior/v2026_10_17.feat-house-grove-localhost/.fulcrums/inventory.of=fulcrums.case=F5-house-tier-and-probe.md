@@ -30,3 +30,6 @@ remote laptop too, since both are unix. left as `unix`.
 
 ## .where
 case=2.
+
+## .risk: low
+a tier name and a root-owned marker file. it decides which bundles run, but writes no key, cert, or grant, and no prod account. the aws.params gate on *@aws.ec2 fails closed for house@*, so a wrong tier cannot write a credential to ssm.

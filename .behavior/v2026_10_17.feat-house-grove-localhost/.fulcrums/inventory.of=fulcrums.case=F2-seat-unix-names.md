@@ -23,3 +23,6 @@ from the marker (F5) rather than the username — a cost the execution stone mus
 
 ## .where
 case=1 stdout; case=3.
+
+## .risk: low
+a unix username is a label. the grants and keys that ride on each seat are graded in F3, F4, F12; the name itself touches no credential and no prod write. a rename after mint is dirty rework, not an exposure.

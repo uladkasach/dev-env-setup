@@ -26,3 +26,6 @@ rule.**
 
 ## .where
 case=1 `[t0]`; case=2 `[t0]`.
+
+## .risk: risky
+a NOPASSWD sudo grant is root on the human laptop, the box that holds the rack, the sso cache, and the ssh keys. whoever holds the ground seat reaches every credential there. F12 bounds who holds it; the grant itself is a credential-grade power.
