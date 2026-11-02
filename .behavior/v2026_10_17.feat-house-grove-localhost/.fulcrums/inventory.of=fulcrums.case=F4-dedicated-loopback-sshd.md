@@ -45,3 +45,6 @@ clean — the unit and the mask are new; the verify gains a branch.
 
 ## .where
 case=1 `[t0]` `[t3]` and stdout; case=3 `[t3]` `[t4]`; inventory row 44.
+
+## .risk: risky
+it puts an ssh server and its authorized_keys on the human laptop: a login door and the keys that open it. a misstep here is the 2026-09-03 incident, a password port on the box that holds the rack. loopback only, key only, and the mask order are the guards.

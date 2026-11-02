@@ -36,3 +36,6 @@ clean — one line in one `authorized_keys`.
 
 ## .where
 case=1 `[t0]`; case=3 `[t2]`; F3.
+
+## .risk: risky
+it decides the custody of the root seat key: the human yubikey-held key, a touch per use. a wrong call hands the agent root on the laptop.

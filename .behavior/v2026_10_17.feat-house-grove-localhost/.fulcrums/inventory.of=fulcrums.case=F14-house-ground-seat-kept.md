@@ -34,3 +34,6 @@ B is a sound blast-radius call on the human's own machine, and the wisher's quot
 
 ## .where
 yield `.the contract` (the seats row); case=1, case=2, case=3 `[t2]`, case=8; F3, F12.
+
+## .risk: risky
+to keep the ground seat is to keep a root seat on the human laptop, with its sudo grant (F3) and its key custody (F12). option B removes the risk; A carries it.

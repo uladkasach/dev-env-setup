@@ -27,3 +27,6 @@ fork inside C, left to #18; a uri that carries the kind may duplicate the row's 
 
 ## .where
 `1.vision.yield.md` `.the contract`; case=3 `[t1]`.
+
+## .risk: low
+the uri is a name in a registry row and a duct address. it carries no key, cert, or grant, and writes to no prod account. a rename after nheuron#18 parses it is dirty rework, not a credential exposure.

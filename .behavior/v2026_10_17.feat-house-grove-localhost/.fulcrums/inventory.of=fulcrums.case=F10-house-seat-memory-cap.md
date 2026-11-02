@@ -35,3 +35,6 @@ case=9; case=1 `[t0]`; inventory row 43.
 the cap stays in this stone, at the proposed values. the metric it serves: local crews do not
 freeze the desktop, and case=9 rests on it. option D (a shared `house.slice`) stays a later
 call, since it only matters for N house groves on one box.
+
+## .risk: low
+a systemd slice cap on the laptop. it bounds memory, holds no key or grant, and writes no prod account. its harm if wrong is a paged or killed crew, which is availability, not exposure.

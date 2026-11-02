@@ -28,3 +28,6 @@ a research row on the helper's TPM support is owed before execution.
 
 ## .where
 yield `.cons`, `.edges`; case=4; case=7 `[t2]`.
+
+## .risk: risky
+it accepts that a copied cert works off the box for up to its lifetime in the prep account. that is a credential exposure window, recorded on purpose.

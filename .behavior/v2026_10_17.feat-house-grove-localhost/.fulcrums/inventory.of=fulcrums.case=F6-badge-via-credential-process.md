@@ -36,3 +36,6 @@ case=4, case=6, case=7.
 - https://docs.aws.amazon.com/rolesanywhere/latest/userguide/credential-helper.html — modes,
   `serve` caveat, 12h max session, cert file reload since 1.2.0
 - https://docs.aws.amazon.com/privateca/latest/userguide/short-lived-certificates.html — 7-day max
+
+## .risk: risky
+this is the AWS badge itself: a cert and private key on disk, signed into live sessions in the prep account. its file modes are the whole per-user wall (F15 holds the copy risk).

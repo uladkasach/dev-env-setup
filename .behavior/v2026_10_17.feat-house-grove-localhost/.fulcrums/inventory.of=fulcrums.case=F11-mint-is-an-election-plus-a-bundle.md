@@ -32,3 +32,6 @@ clean — no code exists yet.
 
 ## .where
 case=1 `[t0]`; F5.
+
+## .risk: risky
+the host bundle the mint drives writes the users, the sudoers drop-in, the sshd unit, and the seat authorized_keys onto the human laptop. those are credentials and a root grant (F3, F4), so the mint path carries their grade.
