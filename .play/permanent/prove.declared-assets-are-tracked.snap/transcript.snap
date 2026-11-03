@@ -22,9 +22,10 @@
    ├─ ✔ src/grove.provision/4.terminal/4.6.pqiv/pqivrc
    ├─ ✔ src/grove.provision/5.devtools/5.6.aws/aws-cli-team.pgp
    ├─ ✔ src/grove.provision/5.devtools/5.6.aws/ssm-plugin-signer.pgp
+   ├─ ✔ src/machine/machine_power_profile_sync
    │
-   ├─ assets named:  20 (literal, de-duplicated)
-   ├─ runtime-built: 20 — out of this reader's reach, see below
+   ├─ assets named:  21 (literal, de-duplicated)
+   ├─ runtime-built: 27 — out of this reader's reach, see below
    └─ untracked:     0
 
 🧪 bite — a planted untracked asset must move the count by one
@@ -34,17 +35,17 @@
    ├─ restore: ✔ src/grove.provision/1.system/1.4.sysctl/configure.verify.sh matches its pre-probe copy
    └─ 🌴 the reader bites — the plant moved the count 0 → 1
 
-⚠️ residue — 20 runtime-built reference(s), in 19 file(s), name no path a grep expands
+⚠️ residue — 27 runtime-built reference(s), in 23 file(s), name no path a grep expands
    ├─ src/grove.provision/1.system/1.11.wifi/_.sh
    ├─ src/grove.provision/1.system/1.11.wifi/provision.upsert.sh
    ├─ src/grove.provision/1.system/1.11.wifi/provision.verify.sh
+   ├─ src/grove.provision/1.system/1.2.power/configure.upsert.sh
+   ├─ src/grove.provision/1.system/1.2.power/configure.verify.sh
    ├─ src/grove.provision/1.system/1.6.procs/1.6.1.finders/provision.upsert.sh
    ├─ src/grove.provision/1.system/1.6.procs/1.6.1.finders/provision.verify.sh
    ├─ src/grove.provision/1.system/1.6.procs/1.6.2.monitor/provision.upsert.sh
-   ├─ src/grove.provision/1.system/1.6.procs/1.6.2.monitor/provision.verify.sh
-   ├─ src/grove.provision/1.system/1.6.procs/1.6.4.keyrackd/provision.upsert.sh
-   ├─ … the first 8 files shown, of 19
+   ├─ … the first 8 files shown, of 23
    └─ ⇒ they are neither passed nor failed below
 
-🌲 assets: all 20 literal asset(s) a bundle names are tracked ✔
+🌲 assets: all 21 literal asset(s) a bundle names are tracked ✔
 
