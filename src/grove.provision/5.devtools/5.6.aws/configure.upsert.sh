@@ -3,9 +3,9 @@
 # .what = declare the `ambient` aws profile on a cloud grove — the one
 #         that names the box's OWN ec2 instance role
 #
-# .a cloud grove already HAS an identity, and could not say so
-#   - every CLOUD grove is ec2 for now, so IMDS answers there — and ONLY there.
-#     a local or house grove has no instance role (`rule.forbid.aws-params-off-ec2`)
+# .an ec2 grove already HAS an identity, and could not say so
+#   - an EC2 grove answers IMDS — and ONLY an ec2 grove. a local, house, or
+#     hetzner grove has no instance role (`rule.forbid.aws-params-off-ec2`)
 #   - 📜 traced on grove-1, 2026-08-07:
 #
 #       IMDS                          ✔ role <camp-grove-role>

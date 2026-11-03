@@ -4,13 +4,14 @@
 
 **a key is read from, or written to, `aws.params` on an ec2 box ONLY.**
 
-a local grove and a house grove have no ec2 identity. there, every key lives in
+a local grove, a house grove, and a hetzner grove have no ec2 identity. there, every key lives in
 `os.secure` (or a human's own login, as `gh auth login`), and **no command may write a key
 into `aws.params`** — not a bundle, not a skill, not a fix-text.
 
 | box | ec2 identity (IMDS) | vault for a key |
 |---|---|---|
-| cloud grove | ✔ — every cloud grove is ec2, for now | `aws.params` |
+| cloud grove, ec2 (`cloud@aws.ec2`) | ✔ | `aws.params` |
+| cloud grove, hetzner (`cloud@hetzner.hetzbot`) | ✋ never | `os.secure` |
 | local grove | ✋ never | `os.secure` |
 | house grove | ✋ never | `os.secure` |
 

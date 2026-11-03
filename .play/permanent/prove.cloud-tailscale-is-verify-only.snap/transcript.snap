@@ -1,0 +1,73 @@
+## cloud@aws.ec2 · provision_upsert · bin.with
+rc=0
+   🌙 a grove's tailscale is its provisioner's, never installed here — the verify below checks it
+writes: none
+
+## cloud@aws.ec2 · configure_upsert · bin.with
+rc=0
+   🌙 a grove is joined by its provisioner, never here — the verify below checks it
+writes: none
+
+## cloud@aws.ec2 · provision_upsert · bin.without
+rc=0
+   🌙 a grove's tailscale is its provisioner's, never installed here — the verify below checks it
+writes: none
+
+## cloud@aws.ec2 · configure_upsert · bin.without
+rc=0
+   🌙 tailscale is absent, so there is no node to join — see provision above
+writes: none
+
+## cloud@hetzner.hetzbot · provision_upsert · bin.with
+rc=0
+   🌙 a grove's tailscale is its provisioner's, never installed here — the verify below checks it
+writes: none
+
+## cloud@hetzner.hetzbot · configure_upsert · bin.with
+rc=0
+   🌙 a grove is joined by its provisioner, never here — the verify below checks it
+writes: none
+
+## cloud@hetzner.hetzbot · provision_upsert · bin.without
+rc=0
+   🌙 a grove's tailscale is its provisioner's, never installed here — the verify below checks it
+writes: none
+
+## cloud@hetzner.hetzbot · configure_upsert · bin.without
+rc=0
+   🌙 tailscale is absent, so there is no node to join — see provision above
+writes: none
+
+## cloud@aws.ec2 · provision_upsert · bin.nojq
+rc=0
+   • jq installed — every tailscale read here parses json
+   🌙 a grove's tailscale is its provisioner's, never installed here — the verify below checks it
+writes: pkg_install jq
+
+## cloud@aws.ec2 · provision_verify · bin.without
+rc=1
+   ✋ ConstraintError: tailscale is not on PATH
+      ⇒ the one package brings the client and tailscaled, so the daemon is not read apart
+      ⇒ this grove's provisioner did not install or start tailscale
+      ⇒ a grove's join is its provisioner's (ahbode/infrastructure):
+          rhx tailscale.authkey.mint --grove <this grove> --mode apply
+        then the provision path's join, as root, with --advertise-tags=tag:camp
+writes: none
+
+## cloud@aws.ec2 · configure_verify · bin.with
+rc=1
+   ✋ ConstraintError: not joined — the daemon reads 'NeedsLogin'
+      ⇒ a grove's join is its provisioner's (ahbode/infrastructure):
+          rhx tailscale.authkey.mint --grove <this grove> --mode apply
+        then the provision path's join, as root, with --advertise-tags=tag:camp
+writes: none
+
+## local@unix · provision_upsert · bin.without
+rc=1
+   💥 MalfunctionError: could not fetch tailscale's package repository key for '<codename>'
+      ⇒ apt would report the source unsigned, and the error reads
+        'NO_PUBKEY' rather than 'the key was never fetched'
+      read why: curl -sSI https://pkgs.tailscale.com/stable/ubuntu/<codename>.noarmor.gpg
+      fix: once the url answers, rerun — no write was made, so a rerun is safe:
+        sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: bundle.root.owns tailscale · web_tempdir · web_fetch https://pkgs.tailscale.com/stable/ubuntu/<codename>.noarmor.gpg --into <fixture>/tmp/tailscale.gpg

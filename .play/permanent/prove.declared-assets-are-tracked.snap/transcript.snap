@@ -1,0 +1,51 @@
+🌲 prove.declared-assets-are-tracked
+   └─ root: <checkout>
+
+🔭 census — each literal asset a bundle names, asked of the index
+   ├─ ✔ assets/kitty-icon.png
+   ├─ ✔ codium/sync.settings.yml
+   ├─ ✔ src/grove.provision/1.system/1.3.browser/1.3.1.firefox/firefox
+   ├─ ✔ src/grove.provision/1.system/1.6.procs/1.6.3.earlyoom/earlyoom.default
+   ├─ ✔ src/grove.provision/1.system/1.6.procs/1.6.5.usermanager/user@.revive.conf
+   ├─ ✔ src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh
+   ├─ ✔ src/grove.provision/2.shell/2.5.zsh
+   ├─ ✔ src/grove.provision/2.shell/2.6.starship/starship.toml
+   ├─ ✔ src/grove.provision/2.shell/2.7.aliases
+   ├─ ✔ src/grove.provision/2.shell/2.8.tmux/tmux.conf
+   ├─ ✔ src/grove.provision/2.shell/2.9.emoji
+   ├─ ✔ src/grove.provision/2.shell/2.9.emoji/emoji.index.build.sh
+   ├─ ✔ src/grove.provision/2.shell/2.9.emoji/emoji.zsh
+   ├─ ✔ src/grove.provision/2.shell/2.9.emoji/provision.upsert.sh
+   ├─ ✔ src/grove.provision/3.cosmic/3.2.theme/cosmic.theme.ron
+   ├─ ✔ src/grove.provision/4.terminal/4.3.kitty/4.3.2.emulator
+   ├─ ✔ src/grove.provision/4.terminal/4.5.nvim
+   ├─ ✔ src/grove.provision/4.terminal/4.6.pqiv/pqivrc
+   ├─ ✔ src/grove.provision/5.devtools/5.6.aws/aws-cli-team.pgp
+   ├─ ✔ src/grove.provision/5.devtools/5.6.aws/ssm-plugin-signer.pgp
+   ├─ ✔ src/machine/machine_power_profile_sync
+   │
+   ├─ assets named:  21 (literal, de-duplicated)
+   ├─ runtime-built: 27 — out of this reader's reach, see below
+   └─ untracked:     0
+
+🧪 bite — a planted untracked asset must move the count by one
+   ├─ planted in: src/grove.provision/1.system/1.4.sysctl/configure.verify.sh
+   ├─ before: 0 untracked
+   ├─ after:  1 untracked
+   ├─ restore: ✔ src/grove.provision/1.system/1.4.sysctl/configure.verify.sh matches its pre-probe copy
+   └─ 🌴 the reader bites — the plant moved the count 0 → 1
+
+⚠️ residue — 27 runtime-built reference(s), in 23 file(s), name no path a grep expands
+   ├─ src/grove.provision/1.system/1.11.wifi/_.sh
+   ├─ src/grove.provision/1.system/1.11.wifi/provision.upsert.sh
+   ├─ src/grove.provision/1.system/1.11.wifi/provision.verify.sh
+   ├─ src/grove.provision/1.system/1.2.power/configure.upsert.sh
+   ├─ src/grove.provision/1.system/1.2.power/configure.verify.sh
+   ├─ src/grove.provision/1.system/1.6.procs/1.6.1.finders/provision.upsert.sh
+   ├─ src/grove.provision/1.system/1.6.procs/1.6.1.finders/provision.verify.sh
+   ├─ src/grove.provision/1.system/1.6.procs/1.6.2.monitor/provision.upsert.sh
+   ├─ … the first 8 files shown, of 23
+   └─ ⇒ they are neither passed nor failed below
+
+🌲 assets: all 21 literal asset(s) a bundle names are tracked ✔
+

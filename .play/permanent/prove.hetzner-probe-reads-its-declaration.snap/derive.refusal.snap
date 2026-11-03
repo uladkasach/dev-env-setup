@@ -1,0 +1,29 @@
+✋ ConstraintError: cannot tell which machine this is — no platform probe answered
+
+   asked, in order (each name is grove_env_probe_<name>):
+     aws_ec2          (dmi vendor · systemd-detect-virt · cloud-init · xen uuid)   → no
+     hetzner_hetzbot  (the platform declaration == hetzner.hetzbot)                → no
+     desktop          (WAYLAND_DISPLAY · DISPLAY · XDG_SESSION_TYPE, not over ssh) → no
+     aws_ec2_imds     (169.254.169.254, capped at 1s)                              → no
+
+   why this is an error and not a guess:
+     a guess here would be 'local@unix', which every interactive step
+     reads as 'a human is at a keyboard'. on a headless box that opens
+     a prompt nobody can answer. so it refuses instead.
+
+   fix — name the box yourself:
+     GROVE_ENV_SERVER=local@unix            grove.provision   # a laptop
+     GROVE_ENV_SERVER=cloud@aws.ec2         grove.provision   # an ec2 grove
+     GROVE_ENV_SERVER=cloud@hetzner.hetzbot grove.provision   # a hetzner grove
+
+   on a hetzner grove, the durable fix is its bootstrap: it writes one
+   line, 'hetzner.hetzbot', into the platform declaration:
+     <fixture>/platform
+   infra's hetzner bootstrap owns that write — ask 3 of this repo's
+     .behavior/v2026_10_25.feat-tailscale-on-every-machine/handoff.infra.grove-tailnet-join.md
+   the override above serves one run until that file lands.
+   on your laptop over ssh: the desktop rung declines an ssh seat, so
+   name it local@unix, or run at the laptop's own keyboard.
+
+   and if this box is one we own, the probe is what is wrong, not the box.
+   each probe above is one command; run them by hand and read which lies.

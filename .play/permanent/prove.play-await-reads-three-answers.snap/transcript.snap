@@ -1,0 +1,183 @@
+🌲 prove.play-await-reads-three-answers
+
+## --help
+rc=0
+usage:
+  rhx git.grove.play.await grove-1 --play <name>               # ✔ accurate — names the play, an answer
+  rhx git.grove.play.await grove-1 --play <name> --within 3600 # a longer bound
+  rhx git.grove.play.await grove-1 --play <name> --lines 80    # how much tail to print
+  rhx git.grove.play.await grove-1 --play <name> --quiet       # exit code only; errors still print
+  rhx git.grove.play.await --grove grove-2 --play <name>       # --grove still works
+  rhx git.grove.play.await grove-1                             # 🌙 coarse — names no play, a guess
+
+guarantee:
+  - READ-ONLY on the grove. per poll, with `--play`, it runs two ssh asks — a
+    reachability `true`, then one `pgrep` — and without it, one pane read. it
+    types no key into the pane and changes no state
+  - BOUNDED. `--within` caps the polls, each ssh is capped at 30s, and a
+    malformed flag refuses at once rather than loop
+  - it prints ONE progress line per state CHANGE, so a long wait is legible
+
+exit:
+  0 = a verdict: the play finished (or, coarse, the pane is back at a non-bash
+      shell); tail printed
+  1 = a malfunction: the grove could not be asked, or this checkout lacks the
+      ductwork the ask rides on — either way, no state was observed
+  2 = the call was malformed — an absent value, an unknown flag, two groves
+  3 = no verdict: `--within` elapsed with the play still busy, or the coarse
+      read saw `bash` and cannot tell done from busy. the tail is printed anyway
+
+## a value flag with no value
+rc=2
+✋ ConstraintError: git.grove.play.await: --play needs a value
+   fix: rhx git.grove.play.await <grove> --play <name> --within 600
+
+## a zero interval
+rc=2
+✋ ConstraintError: git.grove.play.await: --every must be a whole number of seconds ≥ 1, got '0'
+   fix: rhx git.grove.play.await <grove> --play <name> --every 15 --within 600
+
+## two groves named
+rc=2
+✋ ConstraintError: git.grove.play.await: two groves named: 'grove-1' and 'grove-2'
+   fix: rhx git.grove.play.await <grove> --play <name> --within 600
+
+## a --grove and a bare grove
+rc=2
+✋ ConstraintError: git.grove.play.await: two groves named: 'grove-1' and 'grove-2'
+   fix: rhx git.grove.play.await <grove> --play <name> --within 600
+
+## a --timeout, which is no flag
+rc=2
+✋ ConstraintError: git.grove.play.await: unknown arg '--timeout'
+   the bound is --within, in seconds — there is no --timeout
+   fix: rhx git.grove.play.await <grove> --play <name> --within 600
+
+## an unknown flag
+rc=2
+✋ ConstraintError: git.grove.play.await: unknown arg '--wait'
+   the flags are --grove --play --every --within --lines --quiet
+   fix: rhx git.grove.play.await <grove> --play <name> --within 600
+
+## --play · pgrep finds none → finished
+rc=0
+⏳ git.grove.play.await --grove grove-1 --every 15s --within 1800s
+   ├─ duct: duct://grove-1/main/mechanic
+   ├─ play: x.play.sh (matched by its filename)
+   └─ waits for that play's process to exit
+
+   ✔ the play finished after 0s
+
+[stub] rhx git.grove.read grove-1 --lines 40
+
+## --play · pgrep finds the play → bound hit
+rc=3
+⏳ git.grove.play.await --grove grove-1 --every 5s --within 2s
+   ├─ duct: duct://grove-1/main/mechanic
+   ├─ play: x.play.sh (matched by its filename)
+   └─ waits for that play's process to exit
+
+   • 0s — the play runs (pid 4242)
+
+   🌙 still busy after 2s — the play may simply need longer
+      ⇒ this is a bound, not a verdict: raise it with --within
+
+[stub] rhx git.grove.read grove-1 --lines 40
+
+## --play · --quiet → exit code only, no output
+rc=0
+
+
+## --play · --quiet, bound hit → rc 3, no output
+rc=3
+
+
+## --play · pgrep cannot be asked → no verdict
+rc=1
+⏳ git.grove.play.await --grove grove-1 --every 15s --within 1800s
+   ├─ duct: duct://grove-1/main/mechanic
+   ├─ play: x.play.sh (matched by its filename)
+   └─ waits for that play's process to exit
+
+   💥 MalfunctionError: the grove could not be asked whether the play runs
+      ⇒ ssh, its time bound, or pgrep failed; that is no answer, so this
+        refuses to call the play finished
+      fix: rhx git.grove.wake grove-1, then await again
+
+## --play · --quiet, cannot be asked → rc 1, the error still prints
+rc=1
+   💥 MalfunctionError: the grove could not be asked whether the play runs
+      ⇒ ssh, its time bound, or pgrep failed; that is no answer, so this
+        refuses to call the play finished
+      fix: rhx git.grove.wake grove-1, then await again
+
+## --play · the grove does not answer
+rc=1
+⏳ git.grove.play.await --grove grove-1 --every 15s --within 1800s
+   ├─ duct: duct://grove-1/main/mechanic
+   ├─ play: x.play.sh (matched by its filename)
+   └─ waits for that play's process to exit
+
+   💥 MalfunctionError: the grove did not answer, so the play's state is unknown
+      ⇒ empty output from an unreachable box looks exactly like a
+        finished play, so this refuses to guess between them
+      fix: rhx git.grove.wake grove-1
+
+## --play · the pattern is exact for prove.x
+rc=0
+⏳ git.grove.play.await --grove grove-1 --every 15s --within 1800s
+   ├─ duct: duct://grove-1/main/mechanic
+   ├─ play: prove.x.play.sh (matched by its filename)
+   └─ waits for that play's process to exit
+
+   ✔ the play finished after 0s
+
+[stub] rhx git.grove.read grove-1 --lines 40
+
+## coarse · pane at bash → a guess
+rc=3
+⏳ git.grove.play.await --grove grove-1 --every 15s --within 1800s
+   ├─ duct: duct://grove-1/main/mechanic
+   └─ waits for the pane to return to a shell
+
+   🌙 no --play given, so this is the coarse read: a play runs as
+      'bash <script>', and 'bash' is indistinguishable from an idle
+      shell. it may report done while the play still runs.
+      ⇒ for an accurate wait, name it: --play <name>
+
+   🌙 the pane reports 'bash' after 0s — this may mean done,
+      or a play still running, and this probe cannot tell them apart
+      ⇒ re-run with --play <name> for an answer rather than a guess
+
+[stub] rhx git.grove.read grove-1 --lines 40
+
+## coarse · pane at zsh → idle
+rc=0
+⏳ git.grove.play.await --grove grove-1 --every 15s --within 1800s
+   ├─ duct: duct://grove-1/main/mechanic
+   └─ waits for the pane to return to a shell
+
+   🌙 no --play given, so this is the coarse read: a play runs as
+      'bash <script>', and 'bash' is indistinguishable from an idle
+      shell. it may report done while the play still runs.
+      ⇒ for an accurate wait, name it: --play <name>
+
+   ✔ idle after 0s — the pane is back at 'zsh'
+
+[stub] rhx git.grove.read grove-1 --lines 40
+
+## coarse · pane unreadable
+rc=1
+⏳ git.grove.play.await --grove grove-1 --every 15s --within 1800s
+   ├─ duct: duct://grove-1/main/mechanic
+   └─ waits for the pane to return to a shell
+
+   🌙 no --play given, so this is the coarse read: a play runs as
+      'bash <script>', and 'bash' is indistinguishable from an idle
+      shell. it may report done while the play still runs.
+      ⇒ for an accurate wait, name it: --play <name>
+
+   💥 MalfunctionError: tmux did not answer, so the pane's state is unknown
+      ⇒ the tunnel may be down, or the session gone
+      fix: rhx git.grove.wake grove-1
+

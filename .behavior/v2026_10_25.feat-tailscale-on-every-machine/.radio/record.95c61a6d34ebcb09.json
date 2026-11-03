@@ -1,0 +1,19 @@
+{
+  "key": "95c61a6d34ebcb09",
+  "kind": "create",
+  "repo": {
+    "owner": "uladkasach",
+    "name": "dev-env-setup"
+  },
+  "exid": null,
+  "title": "fix(play): prove.codediff-single-pane-keeps-the-view is red — its red control no longer bites",
+  "description": "# 🌙 dream: `prove.codediff-single-pane-keeps-the-view` is red — its red control no longer bites\n\nkind: repair · owner: this repo · caught 2026-10-30, in 5.3.verification of #174 · red main\n\n## .the cue that fired\na full `rhx play.run --all` on the tailscale branch: `💥 prove.codediff-single-pane-keeps-the-view\n— failed (exit 1)`. the tailscale pr touches no nvim file.\n\n## .the gap, precisely\nthe play's `old-single-pane` arm is a red control: it replays the old defect and must see the\nsession die. it reads `session_after_deleted=alive, expected dead` — the old defect no longer\noccurs, so the play cannot show its clamp bites, and it fails.\n\n📌 the cause is unverified. the likeliest is an upstream change in the codediff plugin, so the old\ncode path no longer kills the session; the pinned plugin version in\n`4.terminal/4.5.nvim/lazy-lock.json` against the version the control was written for would confirm it.\n\n## .the shape of the fix\n1. bisect the plugin: run the control against the `lazy-lock.json` codediff commit, then the one\n   the play was written against, and name the commit where the defect stops\n2. if the plugin fixed it upstream: retire the local repair and its control together, and say so\n   in the play's header; a clamp for a defect that cannot occur proves naught\n3. if the local repair still matters: rebuild the red control on the new defect shape, then prove\n   it bites — revert the repair, see red; restore, see green (`rule.require.clamp-edge-cases`)\n\n## .why it is not done in the round that found it\nthe tailscale tree touches no nvim file; the work is a plugin bisect in its own domain.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": "as-human",
+  "idem": null,
+  "heldSeq": 4,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "177"
+}

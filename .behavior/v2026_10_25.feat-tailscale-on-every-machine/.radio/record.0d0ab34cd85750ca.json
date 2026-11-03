@@ -1,0 +1,19 @@
+{
+  "key": "0d0ab34cd85750ca",
+  "kind": "create",
+  "repo": {
+    "owner": "uladkasach",
+    "name": "dev-env-setup"
+  },
+  "exid": null,
+  "title": "fix(play): prove.brief-pointers-reach is red — two stale paths in the actor settings",
+  "description": "# 🌙 dream: `prove.brief-pointers-reach` is red — two stale paths in the actor's settings\n\nkind: repair · owner: this repo (a human's edit) · caught 2026-10-30, in 5.3.verification of #174 · red main\n\n## .the cue that fired\na full `rhx play.run --all` on the tailscale branch: `✋ 2 of 1175 brief pointer(s) reach no\nfile`. the tailscale pr does not touch the file that holds them.\n\n## .the gap, precisely\n`.agent/.actors/actor.via.repo=ambient/brain/.claude/settings.local.json`, tracked, holds two\npermission entries that name pre-move paths:\n\n| line | names | lives now at |\n|---|---|---|\n| 34 | `src/init.lua` | `src/grove.provision/4.terminal/4.5.nvim/init.lua` |\n| 67 | `src/emoji.test.zsh` | `src/grove.provision/2.shell/2.9.emoji/emoji.test.zsh` |\n\nthe cause: the move of single-owner artifacts into their bundle dirs (`repo.overview`, \"where the\nsingle-owner artifacts moved\") rewrote every reader but these two allow entries.\n\n## .the shape of the fix\n1. a human edits lines 34 and 67 to the live paths above. they are permission grants, so a clone\n   does not write them\n2. while there, a human may retire the 🌙 rows the same play lists for that file (lines 22, 30, 68\n   name `install_env.*` scripts that no longer exist), since an allow for an absent file grants\n   naught\n3. done when `rhx play.run --play prove.brief-pointers-reach` exits 0\n\n## .why it is not done in the round that found it\nthe edit is a permission grant, a human's to make, and the tailscale tree does not touch that file.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": "as-human",
+  "idem": null,
+  "heldSeq": 3,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "176"
+}

@@ -50,6 +50,9 @@ always:
       - briefs/grove/reach/howto.add-a-new-grove.md
       - briefs/grove/reach/howto.grove-ready-test.md
       - briefs/grove/reach/howto.adopt-a-replacement-grove.md
+      # a grove's tailscale is its provisioner's; this repo only verifies it
+      - briefs/grove/reach/rule.require.the-provisioner-joins-the-tailnet.md
+      - briefs/grove/reach/define.invariant.grove-tailscale-has-one-owner.md
       # how a box is made current — and why `pnpm install` is NOT that
       - briefs/shell/howto.rhx-upgrade.md
       # the proof loop, in full
@@ -110,5 +113,4 @@ always:
       - skills/**/*.snap
     say:
       - skills/machine.diagnose.lag.sh
-      - skills/nvim.diagnose.runaway.sh
       - skills/use.apikeys.sh

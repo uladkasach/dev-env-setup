@@ -2,53 +2,11 @@
 ######################################################################
 # .what = declare the remap itself — keyd's `default.conf` + `apple.conf`, and keynav's autostart
 #
-# .where the conf text lives
-#   - `_.sh` renders both confs (`keybinds_keyd_conf`), so upsert and verify share one source
-#   - the lines below explain what that rendered text does
-#
-# .the remap, line by line
-#   - `capslock = overload(control, esc)` — held is ctrl, tapped is escape
-#   - capslock is the largest key nearest the pinky and its stock function is used by nobody
-#   - `overload_tap_timeout = 200` drops the tap-escape after 200ms of hold
-#   - without it a slow ctrl+click emits a stray escape that nvim reads as a mode change
-#   - `coffee / sleep / suspend / power = noop` — these sit near the arrow cluster
-#   - a misfire there suspends the box mid-work
-#   - `1.2.power` blocks the same acts at the systemd layer, this blocks them at the DEVICE layer
-#   - ⇒ only the device layer catches a key that never reaches logind
-#   - `rightalt / rightcontrol / rightmeta = layer(vimarrows)` — three keys, one layer
-#   - rightalt on a laptop, rightcontrol on the hhkb, rightmeta on an apple magic keyboard
-#   - all three are declared because one human moves between all three boards
-#
-# .why TWO confs — the alt/super swap is per keyboard
-#   - the key beside the spacebar should be super on every board
-#   - a pc board (the builtin) puts alt there, so `default.conf` swaps leftalt ⇄ leftmeta
-#   - an apple board already puts cmd (meta) there, so `apple.conf` must NOT swap
-#   - 📜 the swap once lived in cosmic's xkb options, which apply to EVERY keyboard
-#     at once — so it was right for the builtin and backwards for the apple board
-#   - ⇒ the swap moved to keyd, the one layer that sees which device a key came from
-#   - the shared remap is declared once below and composed into both files,
-#     since keyd applies exactly ONE conf per device
-#
-# .why the two confs cannot fight
-#   - `default.conf` matches `*` and EXCLUDES the apple ids (`-vendor:product`)
-#   - `apple.conf` names exactly those ids
-#   - ⇒ each device matches one file, and read order decides naught
-#
-# .why every prior *.conf is removed first
-#   - keyd reads EVERY `.conf` in `/etc/keyd/`
-#   - a stray file that also matches `*` would fight `default.conf` by read order
-#   - a rename of this file in a past revision would leave its old copy live
-#   - ⇒ the dir is emptied and re-declared (rule.require.judge-declared-state-not-live-state)
-#
-# .why the xkb swap is stripped here
-#   - `altwin:swap_lalt_lwin` in cosmic's xkb options stacks on keyd's swap
-#   - stacked, the builtin double-swaps back to stock and the apple board swaps
-#   - ⇒ keyd owns the swap, so this phase removes the xkb one (user-level, no root)
-#
-# .why the keynav hook is in `~/.profile`, not a systemd user unit
-#   - keynav needs a live X/wayland session to attach to
-#   - `~/.profile` is read at login, when that session exists
-#   - a boot-time unit would start before it and exit
+# .why
+#   - the key beside the spacebar is super on every board, so the swap is per device
+#   - keyd is the one layer that sees which device a key came from
+#   - the dir is emptied first, so a stray conf cannot fight by read order
+#   - the remap line by line, the two confs, the xkb strip, and keynav: `keyboard.alt-super-per-board`
 #
 # guarantee:
 #   - idempotent: the conf is re-declared from this file's text

@@ -8,8 +8,9 @@ machine state, with no duplicate effect and no harm. whatever the phase is named
 `src/grove.provision._.sh` is the one entrypoint, and it is meant to be re-run: that re-run
 IS the upgrade path. so idempotency is the contract of every phase it drives.
 
-**the entrypoint's NAME depends on this rule.** it is called `upgrade` because every
-step converges; one step that does not makes the word a lie. see
+**the runtime's NAME depends on this rule.** the entrypoint is `grove.provision`, and every
+bundle it drives runs through `bundle.upgrade` — called `upgrade` because every step converges;
+one step that does not makes the word a lie. see
 `rule.require.grove-provision-as-the-only-entrypoint`, which binds the two together.
 
 ## .why
@@ -20,7 +21,7 @@ step converges; one step that does not makes the word a lie. see
 - **the runtime leans on it.** `src/bundle.upgrade.sh` names each phase's outcome and
   carries on past a failure, so a partial run is normal. the fix for a partial run is
   to re-run — which only works if every phase tolerates a re-run.
-- **a bake is a re-run too.** an AMI bake, then a later config refresh onto the same
+- **a bake is a re-run too.** an ami bake, then a later config refresh onto the same
   box, hits the same procedures twice by design.
 - **stacked appends are the classic defect.** an unguarded `>>` into an rc file adds
   its line on every run, so the tenth run has ten copies and a slow shell.
@@ -32,13 +33,13 @@ step converges; one step that does not makes the word a lie. see
 | install a package | `pkg_install <name>` — the package manager is already idempotent |
 | install a pinned binary | fetch + verify + overwrite the same path; a re-fetch converges |
 | copy a config | `cp src dest` — an unconditional overwrite IS an upsert |
-| append a line to an rc file | **guard it**: `grep -q <line> <file> \|\| printf ... >> <file>` |
+| append a line to an rc file | **guard it on a marker, never on the line**: `grep -qF '# devenv: <slug>' <file> \|\| printf ... >> <file>`, and only into a file no other bundle byte-owns (`rule.forbid.two-writers-on-one-artifact`) |
 | clone a repo | guard on the dir: `[[ -d <dir> ]] \|\| git clone ...` |
 | write a systemd unit | write the file, then `systemctl enable --now` (both idempotent) |
 | switch the login shell | check the current shell first, or tolerate a no-op |
 | create a dir | `mkdir -p` |
 
-## .the shapes that are NOT
+## .the shapes that are NOT idempotent
 
 - `printf '...' >> ~/.zshrc` with no guard — stacks a line per run
 - `git clone` with no dir guard — fails on the second run
@@ -64,7 +65,8 @@ step converges; one step that does not makes the word a lie. see
 ```sh
 # the whole tree, twice
 rhx grove.provision --for cloud --mode apply
-rhx grove.provision --for cloud --mode apply   # must report 0 failed
+rhx grove.provision --for cloud --mode apply   # the same gaps as the first run, no new ✋
+                                               #   (the verdict: rule.require.prove-each-bundle-plan-apply-apply)
 
 # one bundle, twice
 rhx grove.provision --what 2.5.zsh --mode apply
@@ -78,9 +80,8 @@ whether a second mutation is safe. it would pass on a bundle that is wildly non-
 ## .the stronger form — plan / apply / apply
 
 the real proof is a **fixed point**: plan, apply, apply again, then plan once more and
-require it to report no work owed. a `prove.bundles.plan-apply-apply` probe drives
-exactly this across every leaf — see
-`rule.require.prove-each-bundle-plan-apply-apply`.
+require it to report no work owed. `rule.require.prove-each-bundle-plan-apply-apply` names the
+runs, one `git.grove.send --what` each, and holds their pass conditions.
 
 ## .the caveat — tolerated absence is not idempotency
 
@@ -99,6 +100,8 @@ success, so the roll would claim coverage the box does not have
 
 - a phase that fails on a second run = **blocker**
 - an unguarded append into an rc file, unit file, or config = **blocker**
+- an append guarded on its own line rather than a `# devenv: <slug>` marker, or an append into a
+  file another bundle byte-owns = **blocker** (`rule.forbid.two-writers-on-one-artifact`)
 - an unguarded `git clone`, `ln -s`, or create-shaped call = **blocker**
 
 ## .see also

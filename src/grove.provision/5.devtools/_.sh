@@ -46,10 +46,13 @@ grove_provision_5_devtools() {
   bundle.upgrade 5.20.xvfb
   bundle.upgrade 5.22.waypipe
 
-  # 🛑 LAST, and the order is load-bear — it asks the rack for keys addressed
-  #   through the profiles `5.12.rack` names and `5.13.reach` fills in. asked
-  #   any earlier it measures a box mid-provision and blames a human for a key
-  #   that was fine
+  # it reads no key: a grove's join is the provisioner's
+  #   (`rule.require.the-provisioner-joins-the-tailnet`)
+  bundle.upgrade 5.23.tailscale
+
+  # 🛑 AFTER `5.12.rack` and `5.13.reach`: it reads keys through the profiles
+  #   those two name and fill. any earlier, it blames a human for a key that
+  #   is merely not placed yet. `5.18.openhours` reads no key, so it may follow
   bundle.upgrade 5.16.keys
 
   # .why AFTER 5.3.brains: its reconciler drives `rhx git.commit.uses` and

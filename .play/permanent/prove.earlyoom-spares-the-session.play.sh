@@ -59,9 +59,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# refuse a subject we would have to invent
-command -v earlyoom >/dev/null || { echo "✋ no earlyoom on PATH — this play measures the real binary"; exit 1; }
-[[ -r "$POLICY" ]] || { echo "✋ no declared policy at $POLICY"; exit 1; }
+# a box without earlyoom holds no subject: decline, never fail (play.run reads 2 as "proved no claim")
+if ! command -v earlyoom >/dev/null; then
+  echo "🌙 earlyoom is not on this box, so no claim is proven"
+  echo "   └─ to measure it here: sudo -v && rhx grove.provision --what 1.6.3.earlyoom --mode apply"
+  exit 2
+fi
+# the policy is this repo's own file: its absence is a defect, never a decline
+[[ -r "$POLICY" ]] || { echo "💥 MalfunctionError: no declared policy at $POLICY"; exit 1; }
 EARLYOOM_BIN="$(command -v earlyoom)"
 
 # the bait: copies of sleep, so each process's comm IS its file name

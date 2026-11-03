@@ -1,0 +1,5 @@
+✋ ConstraintError: cannot tell which machine this is — <fixture>/platform exists but is not a readable file
+   ⇒ that path declares this box's platform, and the ec2 rung did not answer,
+     so no later probe may answer for it
+   fix: sudo chmod 644 <fixture>/platform
+        (a dir sits there? replace it with the one-line file its bootstrap writes)

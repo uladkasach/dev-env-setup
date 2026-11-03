@@ -4,15 +4,15 @@
 # untracked one must not kill the diff view
 #
 # .what = drives `prove.codediff-single-pane-keeps-the-view.probe.lua` against
-#         the SHIPPED nvim config, in two arms, and judges three rows:
-#           session_after_deleted  — alive on control, dead on old-single-pane
+#         the SHIPPED nvim config, in two arms, and judges four rows:
+#           session_after_deleted  — alive on control, dead on forced-teardown
 #           session_after_modified — alive on control
 #           panes_after_modified   — 2 on control
 #
-# .why  = codediff closes one pane for a deleted / added / untracked file. two
-#         such selects of opposite kinds closed the last diff window, the session
-#         was torn down, and no later select opened any diff — silently. fixed by
-#         the side_by_side wrapper in init.lua, which restores both panes first
+# .why  = codediff closes one pane for a deleted / added / untracked file. in
+#         2.41.1 two such selects of opposite kinds closed the last pane and tore
+#         the session down. the pinned codediff keeps the view with no local
+#         wrapper, and this play is the guard that a bump never brings it back
 #
 # .the write — `rule.forbid.repair-plays` exception 2. the break lives inside a
 #   headless nvim over a temp git repo, both gone on exit; the rows land in a
@@ -89,7 +89,7 @@ arm control && {
   judge control session_after_modified alive
   judge control panes_after_modified 2
 }
-arm old-single-pane && judge old-single-pane session_after_deleted dead
+arm forced-teardown && judge forced-teardown session_after_deleted dead
 
 echo ""
 if [[ "$FAILED" -eq 0 ]]; then

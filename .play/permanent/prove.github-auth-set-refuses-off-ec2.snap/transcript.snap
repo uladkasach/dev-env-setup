@@ -1,0 +1,82 @@
+
+## --help
+rc=0
+git.grove.auth.github.set — put a github token on a grove's rack, securely
+
+usage:
+  rhx git.grove.auth.github.set <grove> [--mode plan|apply] [--refresh]
+
+options:
+  --mode     plan (default) or apply
+  --refresh  re-set a slug that already answers (rotated or expired pat)
+  --env      keyrack env; default camp
+  --owner    keyrack owner; default ehmpath
+  --org      org sigil for the slug; default @all (every org reads it)
+
+an ec2 grove only: off ec2 the token lives in os.secure, set on the box.
+
+the value is TYPED on the box over an interactive ssh tty — never passed
+as an argument, never sent down a duct. see the header for why.
+
+## a grove with no ec2 identity → refused at rung 0b
+rc=2
+🐢 heres the wave...
+
+🔑 git.grove.auth.github.set grove-x --mode plan
+   ├─ slug:  owner=ehmpath  @all.camp.GITHUB_TOKEN
+   ├─ vault: aws.params  (central; an ec2 grove's IMDS answers it)
+   └─ drive
+      ├─ box  reachable at 'grove-x'
+      └─ ✋ ConstraintError: grove 'grove-x' has no ec2 identity — IMDS does not answer there
+
+  why: this skill stores the token in aws.params, and only an ec2 box can
+       read that vault. a local, house, or hetzner grove would get a value
+       it can never read back, written into whatever account its shell holds
+  fix: keep the token in os.secure instead — run this ON that grove, at a tty:
+    cd ~/git/more/dev-env-setup && rhx keyrack set \
+      --owner ehmpath --key GITHUB_TOKEN --org @all --env camp --vault os.secure
+    (or, on a box with a human: gh auth login)
+
+## the control · an ec2 grove → passes rung 0b, plan only
+rc=0
+🐢 heres the wave...
+
+🔑 git.grove.auth.github.set grove-x --mode plan
+   ├─ slug:  owner=ehmpath  @all.camp.GITHUB_TOKEN
+   ├─ vault: aws.params  (central; an ec2 grove's IMDS answers it)
+   └─ drive
+      ├─ box  reachable at 'grove-x'
+      ├─ ec2  the box holds an instance identity, so aws.params is readable
+      ├─ rhx  present
+      ├─ rhx  runs (keyrack answered)
+      └─ ✔ the rack already answers for GITHUB_TOKEN — no work
+
+🔑 already set!
+   ├─ to replace a rotated or expired pat: --refresh
+   └─ to prove gh accepts it:
+      rhx git.grove.send grove-x --what 'gh auth status'
+
+## a grove that does not answer → rc 1, names the wake
+rc=1
+🐢 heres the wave...
+
+🔑 git.grove.auth.github.set grove-x --mode plan
+   ├─ slug:  owner=ehmpath  @all.camp.GITHUB_TOKEN
+   ├─ vault: aws.params  (central; an ec2 grove's IMDS answers it)
+   └─ drive
+      └─ 💥 MalfunctionError: grove 'grove-x' does not answer at ssh alias 'grove-x'
+
+  why: the box is asleep, or its tunnel is not bound
+  fix: wake it — a wake is idempotent
+    rhx git.grove.wake grove-x
+
+## a grove never registered → refused
+rc=2
+✋ ConstraintError: grove 'grove-none' is not registered
+   list them: rhx git.grove.list
+
+## no grove named → the usage
+rc=2
+✋ ConstraintError: usage: rhx git.grove.auth.github.set <grove> [--mode apply]
+   list them: rhx git.grove.list
+

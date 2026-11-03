@@ -3,24 +3,11 @@
 # .what = install the open-hours reconciler, the linked cwd it stands in, and
 #         the systemd user unit + timer that drive it
 #
-# .a USER timer, not a system one
-#   the gate state lives under the HUMAN's `~/.rhachet/storage`, and a system
-#   unit fires as root, whose `$HOME` is `/root` — so it would run correctly
-#   and gate the wrong account.
-#
-# ⚠️ .`daemon-reload` before `enable --now`
-#   systemd caches unit files, so a rewrite alone leaves the OLD one live: the
-#   fix lands on disk and the box keeps its prior behavior.
-#
-# .the files are COPIED from `$GROVE_SRC/machine/`, never heredoc'd here
-#   a heredoc makes this phase the only place the text exists, so a verify
-#   could assert presence and never CURRENCY.
-#
-# ⚠️ .why LINGER is attempted and never asserted
-#   `systemctl --user` units live in the user's session manager, which exits
-#   with the last session — so a headless box needs linger and a laptop with a
-#   live session does not. one claim cannot be true of both, so this attempts
-#   the grant and reports; the verify reads it back and names which box it is.
+# .why
+#   - a USER timer, since the gate state lives under the human's home
+#   - `daemon-reload` runs before `enable --now`, since systemd caches unit files
+#   - linger is attempted and reported, never asserted
+#   - each step's reason: `howdoes.the-openhours-gate-converges`
 ######################################################################
 
 grove_provision_5_18_openhours_provision_upsert() {
@@ -61,17 +48,7 @@ grove_provision_5_18_openhours_provision_upsert() {
     else
       echo "   🌙 openhours is opted out — no gate installed"
     fi
-    ##################################################################
-    # ⚠️ the fix names the SKILL, never a hand-rolled `mkdir` + redirect. this
-    #   bundle must not write the marker (see the reader's note), so a human
-    #   places it — and the family that wraps that write is the one surface they
-    #   should reach for (`rule.require.reach-for-the-skill-before-adhoc-shell`).
-    #
-    #   📜 this hint DID spell the two raw commands until 2026-10-01, and the
-    #     path they aimed at is the half nobody recalls: a redirect one character
-    #     off writes a marker this bundle never reads, so the next apply tears
-    #     the gate down and reports success
-    ##################################################################
+    # ⚠️ the fix names the SKILL, never a raw `mkdir` + redirect (`rule.require.reach-for-the-skill-before-adhoc-shell`)
     echo "      this box has not elected the gate; the default is off"
     echo "      opt in: rhx machine.openhours.optin.set --mode apply"
     echo "              rhx grove.provision --what 5.18.openhours --mode apply"
@@ -104,16 +81,8 @@ grove_provision_5_18_openhours_provision_upsert() {
   chmod +x "$bin_dir/machine_openhours_reconcile" || return 1
   echo "   • the open-hours reconciler and its two units declared"
 
-  ####################################################################
-  # 2. the cwd the reconciler stands in — see the bundle header for why
-  #    this is BUILT rather than borrowed from a checkout
-  #
-  # ⚠️ the guard is the shared THREE-valued reader, never `[[ -d ]]`. a build
-  #   cut partway leaves a dir that passes a presence test and resolves no
-  #   skill, so a presence guard would skip it on every apply thereafter and
-  #   the box would be unrepairable by this command
-  #   (`define.provision-defect-shapes`, shape 6)
-  ####################################################################
+  # 2. the cwd the reconciler stands in, BUILT rather than borrowed
+  # ⚠️ the guard is the shared three-valued reader, never `[[ -d ]]` (shape 6)
   local cwd_state
   cwd_state="$(grove_provision_5_18_openhours_cwd_state)"
 
@@ -194,14 +163,7 @@ grove_provision_5_18_openhours_provision_upsert() {
   fi
   echo "     $GROVE_OPENHOURS_CWD"
 
-  ####################################################################
-  # 2.5 the schedule the payload reads
-  #
-  # ⚠️ RENDERED, never hand-placed. the payload runs from `~/.local/bin`,
-  #   outside any checkout, so it cannot source the bundle's declaration — this
-  #   is how that one declaration reaches it, and the verify diffs a fresh
-  #   render against what sits here to prove it CURRENT
-  ####################################################################
+  # 2.5 the schedule the payload reads — RENDERED, so the verify can diff it
   mkdir -p "$(dirname "$GROVE_OPENHOURS_SCHEDULE")" || return 1
   grove_provision_5_18_openhours_schedule_render > "$GROVE_OPENHOURS_SCHEDULE" || {
     echo "   ✋ could not write the schedule to $GROVE_OPENHOURS_SCHEDULE" >&2
@@ -246,13 +208,7 @@ grove_provision_5_18_openhours_provision_upsert() {
     echo "        sudo loginctl enable-linger $USER"
   fi
 
-  ####################################################################
-  # 5. converge once, now, rather than wait out the interval
-  #
-  # .why: an apply that installs a gate un-converged reports success over a box
-  #   whose gate is whatever it was — on a first apply, "open", inside open
-  #   hours. that is the wrong direction to be wrong in.
-  ####################################################################
+  # 5. converge once, now: an un-converged gate on a first apply reads "open"
   if "$bin_dir/machine_openhours_reconcile"; then
     echo "   • the gate converged to the policy for right now"
   else

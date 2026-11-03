@@ -6,10 +6,10 @@ every bundle you write or change must be RUN, three times, **against a grove**, 
 called done:
 
 ```sh
-# on the grove — reached through its duct (rule.require.reach-a-grove-through-its-duct)
-grove.provision --what <slug> --mode plan     # 1. writes no state
-grove.provision --what <slug> --mode apply    # 2. does the work
-grove.provision --what <slug> --mode apply    # 3. proves idempotency
+# on the grove — each sent down its duct (rule.require.reach-a-grove-through-its-duct)
+rhx grove.provision --what <slug> --mode plan     # 1. writes no state
+rhx grove.provision --what <slug> --mode apply    # 2. does the work
+rhx grove.provision --what <slug> --mode apply    # 3. proves idempotency
 ```
 
 per bundle. not per section, not per session, not once at the end. `--what <slug>` is the unit.
@@ -104,10 +104,15 @@ run each of the three and READ the output. the pass conditions:
 1. **plan** — the bundle appears in the tree output; every `*.upsert` reports `would run (plan)`;
    every `*.verify` runs and reports real facts about the box. exit 0, or an exit whose failures are
    verify claims the box genuinely does not yet satisfy.
-2. **apply (1st)** — every phase runs; exit 0. any ✋ is a real defect to fix, not a note to carry.
-3. **apply (2nd)** — exit 0 AND the output shows convergence: the upserts report "already …" /
-   "no work" where they should, and **no prompt opens, no error is printed, and no state is
-   duplicated**.
+2. **apply (1st)** — every phase runs; exit 0, or an exit whose every ✋ is a **gap**: it names
+   what only a human or a credential can supply, and names that handoff. a ✋ that names work the
+   bundle itself owed is a **defect** — fix it, never carry it as a note.
+3. **apply (2nd)** — the same exit as the first, with the same gaps and no new ✋, AND the output
+   shows convergence: the upserts report "already …" / "no work" where they should, and **no
+   prompt opens and no state is duplicated**.
+
+⇒ this is the ONE verdict for a non-zero apply. `howto.prove-bundles-plan-apply-apply` and
+`rule.require.idempotent-install-procedures` cite it; neither restates it.
 
 if the second apply differs from the first in any way other than "already present" messages,
 the bundle is not idempotent (`rule.require.idempotent-install-procedures`).
@@ -131,29 +136,40 @@ after the first makes the diagnosis harder.
   safe before the box is touched)
 - a run whose output was not read = **blocker**; an exit code alone is not the report, since each
   body names its own outcome in its own output
-- a change to a bundle that writes a file in `$HOME`, merged without a `prove.tree.fixed-point`
-  run = **blocker** — the per-bundle runs above cannot see the one defect that class of change
+- a change to a bundle that writes a file in `$HOME`, merged without the tree-scale
+  run (below) = **blocker** — the per-bundle runs above cannot see the one defect that class of change
   causes (see *these three runs are not sufficient*, below)
 
 ## .the paved path
 
-do not type 3N commands. `prove.bundles.plan-apply-apply` runs all three per bundle, diffs the
-two applies to judge idempotency mechanically, and keeps every run's output on the grove:
+one `--what` per run, through the duct, and read each run's output:
 
 ```sh
+rhx git.grove.wake grove-1
 rhx git.grove.push grove-1 --from . --into git/more/dev-env-setup.wip --mode apply
-rhx git.grove.send grove-1 --play prove.bundles.plan-apply-apply
+rhx git.grove.send grove-1 --what 'rhx grove.provision --what <slug> --mode plan'
+rhx git.grove.read grove-1 --lines 40
+rhx git.grove.send grove-1 --what 'rhx grove.provision --what <slug> --mode apply'
+rhx git.grove.read grove-1 --lines 40
+rhx git.grove.send grove-1 --what 'rhx grove.provision --what <slug> --mode apply'
 rhx git.grove.read grove-1 --lines 40
 ```
+
+`howto.prove-bundles-plan-apply-apply` walks the same loop, and says how to read each verdict.
+
+⚠️ **no tracked play paves this.** `prove.bundles.plan-apply-apply` once ran all three and diffed
+the two applies, but it lived under the gitignored `.play/temporary/`, so no checkout carries
+it and `--play` finds no file. until a tracked play replaces it, the idempotency verdict is your
+read of the two apply outputs side by side.
 
 read `howto.prove-bundles-plan-apply-apply.md` first — it covers how to read each verdict, and
 in particular which ones need your judgment rather than a rule.
 
 ## ⚠️ .these three runs are NECESSARY and they are NOT SUFFICIENT
 
-every run above is `--what <slug>` — **one bundle, alone**. so this rule, and the play that
-paves it, are blind by construction to whatever happens when two bundles meet. a bundle can
-pass all three perfectly and still be broken by a neighbor.
+every run above is `--what <slug>` — **one bundle, alone**. so this rule is blind by
+construction to whatever happens when two bundles meet. a bundle can pass all three perfectly
+and still be broken by a neighbor.
 
 ### the measurement, grove-1 2026-07-31
 
@@ -170,8 +186,13 @@ no per-bundle run could have caught that, however many times it ran.
 ### so there is a SECOND gate, at tree scale
 
 ```sh
-rhx git.grove.send grove-1 --play prove.tree.fixed-point
+rhx git.grove.send grove-1 --what 'rhx grove.provision --mode apply'
+rhx git.grove.send grove-1 --what 'rhx grove.provision --mode apply'
+rhx git.grove.send grove-1 --what 'rhx grove.provision --mode plan'
 ```
+
+⚠️ `prove.tree.fixed-point` named this gate as a play, and no checkout carries it — it was a
+scratch play under the gitignored `.play/temporary/`. the three sends above are the gate itself.
 
 it applies the whole tree twice, plans it, and demands that every bundle which still claims is
 one a grove genuinely cannot clear (a credential). that is the human's actual question —
@@ -184,7 +205,7 @@ about state the tree itself just left is the defect, whatever produced it.
 ## .see also
 
 - `rule.forbid.two-writers-on-one-artifact` — the defect the tree-scale gate exists to catch
-- `howto.prove-bundles-plan-apply-apply` — the play that does all this, and how to read it
+- `howto.prove-bundles-plan-apply-apply` — how to run the three and read each verdict
 - `rule.require.reach-a-grove-through-its-duct` — the three runs go through the duct, never raw ssh
 - `rule.require.idempotent-install-procedures` — the property the second apply proves
 - `rule.require.upgrade-entries-verify-themselves` — why a bundle carries its own verify

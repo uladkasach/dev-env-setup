@@ -1,0 +1,67 @@
+
+## --all · a pass, a decline, a failure → 1
+rc=1
+🎭 play.run --all --within 30
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      ├─ 🌙 prove.b-declines — declined or timed out
+      ├─ 💥 prove.c-fails — failed (exit 1)
+      └─ 1 passed · 1 declined · 1 failed
+
+   💥 MalfunctionError: 1 play(s) failed — read each log under .log/role=mechanic/skill=play.run/what=all/<stamp>
+
+## --all · a pass and a decline → 2
+rc=2
+🎭 play.run --all --within 30
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      ├─ 🌙 prove.b-declines — declined or timed out
+      └─ 1 passed · 1 declined · 0 failed
+
+   🌙 1 play(s) declined or timed out, so proved no claim — read each log under .log/role=mechanic/skill=play.run/what=all/<stamp>
+
+## --all · every play passes → 0
+rc=0
+🎭 play.run --all --within 30
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      └─ 1 passed · 0 declined · 0 failed
+
+🌲 every play passed
+
+## --all with --play → two subjects, refused
+rc=2
+   ✋ ConstraintError: --all and --play name two subjects; pick one
+
+## an unknown flag → refused, names the valid
+rc=2
+   ✋ ConstraintError: unknown flag: --every
+      valid: --play <slug>  --list  --all  --within <secs>  --help
+
+## --help → the usage
+rc=0
+usage:
+  rhx play.run --list
+  rhx play.run --play prove.nvim-fetches-no-unpinned-plugin
+  rhx play.run --play prove.git-alias-seam --within 600
+  rhx play.run --all
+
+options:
+  --play SLUG    the play to run. the `.play.sh` suffix is optional
+  --list         name every play this box can run, then exit
+  --all          run every play --list names, one verdict line each; each
+                 play's full output lands in a log dir the summary names
+  --within SECS  bound per play, in seconds (default 900)
+  --skill NAME   absorbed + ignored — rhachet injects this when invoked as
+                 `rhx play.run …`. same for --repo / --role
+  -h, --help     show this header
+
+exit:
+  0 = the play passed (--all: every play passed)
+  1 = the play failed, or malfunctioned (--all: at least one did)
+  2 = a constraint: bad args, no such play, a forbidden verb, or a timeout
+      (--all: none failed, and at least one declined or timed out)
+

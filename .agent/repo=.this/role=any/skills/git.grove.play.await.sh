@@ -74,23 +74,29 @@
 #        and labelled. see `gotcha.a-check-that-cries-wolf-gets-silenced`
 #
 # usage:
-#   rhx git.grove.play.await grove-1 --play prove.svc-chat-integration  # ✔ accurate
-#   rhx git.grove.play.await grove-1 --play prove.bundles.plan-apply-apply --within 3600
-#   rhx git.grove.play.await grove-1 --play <name> --lines 80   # how much tail to print
-#   rhx git.grove.play.await grove-1 --play <name> --quiet      # exit code only, no tail
-#   rhx git.grove.play.await --grove grove-2 --play <name>      # --grove still works
-#   rhx git.grove.play.await grove-1                            # 🌙 COARSE — a guess, not an answer
+#   rhx git.grove.play.await grove-1 --play <name>               # ✔ accurate — names the play, an answer
+#   rhx git.grove.play.await grove-1 --play <name> --within 3600 # a longer bound
+#   rhx git.grove.play.await grove-1 --play <name> --lines 80    # how much tail to print
+#   rhx git.grove.play.await grove-1 --play <name> --quiet       # exit code only; errors still print
+#   rhx git.grove.play.await --grove grove-2 --play <name>       # --grove still works
+#   rhx git.grove.play.await grove-1                             # 🌙 coarse — names no play, a guess
 #
 # guarantee:
-#   - READ-ONLY on the grove. it asks questions and sends no command
-#   - BOUNDED. `--within` caps the total wait; it never blocks forever
+#   - READ-ONLY on the grove. per poll, with `--play`, it runs two ssh asks — a
+#     reachability `true`, then one `pgrep` — and without it, one pane read. it
+#     types no key into the pane and changes no state
+#   - BOUNDED. `--within` caps the polls, each ssh is capped at 30s, and a
+#     malformed flag refuses at once rather than loop
 #   - it prints ONE progress line per state CHANGE, so a long wait is legible
 #
 # exit:
-#   0 = the play finished (or, in fallback, the pane fell idle); tail printed
-#   1 = the grove could not be asked, so its state could not be observed
-#   2 = `--within` elapsed with the play still busy — the tail is printed anyway,
-#       and the play may simply need longer
+#   0 = a verdict: the play finished (or, coarse, the pane is back at a non-bash
+#       shell); tail printed
+#   1 = a malfunction: the grove could not be asked, or this checkout lacks the
+#       ductwork the ask rides on — either way, no state was observed
+#   2 = the call was malformed — an absent value, an unknown flag, two groves
+#   3 = no verdict: `--within` elapsed with the play still busy, or the coarse
+#       read saw `bash` and cannot tell done from busy. the tail is printed anyway
 #
 # ⚠️ .how to see this skill BITE, after any change to how it decides busy
 #         this skill's whole job is to report BUSY, and the one verdict it can
@@ -147,34 +153,62 @@ PLAY=""
 #      they had raised the bound had raised none, and the silence is what let
 #      the mistake repeat (rule.require.errors-name-the-fix)
 ######################################################################
+# a value flag with no value refuses. `shift 2` past the last arg fails and
+#   shifts naught, so the loop would see the same flag forever
+# $1 = what is wrong · $2 = a hint (optional) · $3 = the flags the fix names (optional)
+__await_refuse() {
+  echo "✋ ConstraintError: git.grove.play.await: $1" >&2
+  [[ -n "${2:-}" ]] && echo "   $2" >&2
+  echo "   fix: rhx git.grove.play.await <grove> --play <name> ${3:---within 600}" >&2
+  exit 2
+}
+__await_value() {
+  [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || __await_refuse "$1 needs a value"
+}
+GROVE_BARE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --grove)  GROVE="${2:-}"; shift 2 ;;
-    --play)   PLAY="${2:-}"; shift 2 ;;
-    --every)  EVERY="${2:-}"; shift 2 ;;
-    --within) WITHIN="${2:-}"; shift 2 ;;
-    --lines)  LINES="${2:-}"; shift 2 ;;
+    --grove)  __await_value "$@"
+              [[ -z "$GROVE_BARE" ]] || __await_refuse "two groves named: '$GROVE_BARE' and '$2'"
+              GROVE_BARE="$2"; GROVE="$2"; shift 2 ;;
+    --play)   __await_value "$@"; PLAY="$2"; shift 2 ;;
+    --every)  __await_value "$@"; EVERY="$2"; shift 2 ;;
+    --within) __await_value "$@"; WITHIN="$2"; shift 2 ;;
+    --lines)  __await_value "$@"; LINES="$2"; shift 2 ;;
     --quiet)  QUIET=1; shift ;;
     --help|-h)
-      sed -n '/^# usage:/,/^#####/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//;$d'
+      # usage, guarantee, and exit — the maintainer's notes below them stay out
+      sed -n '/^# usage:/,/^# ⚠️ .how to see this skill BITE/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//;$d'
       exit 0
       ;;
     # rhx injects --repo/--role/--skill; step over them
     --repo|--role|--skill) shift 2 ;;
+    --timeout*)
+      __await_refuse "unknown arg '$1'" "the bound is --within, in seconds — there is no --timeout"
+      ;;
     -*)
-      echo "✋ git.grove.play.await: unknown arg '$1'" >&2
-      echo "   the bound is --within (seconds), not --timeout" >&2
-      echo "   fix: rhx git.grove.play.await <grove> --play <name> --within 600" >&2
-      exit 2
+      __await_refuse "unknown arg '$1'" "the flags are --grove --play --every --within --lines --quiet"
       ;;
     *)
-      # the first bare word is the grove, as every sibling skill takes it
-      GROVE="$1"; shift ;;
+      # the first bare word is the grove, as every sibling skill takes it.
+      #   a second grove — bare or by --grove — would silently replace it, so it refuses
+      [[ -z "$GROVE_BARE" ]] || __await_refuse "two groves named: '$GROVE_BARE' and '$1'"
+      GROVE_BARE="$1"; GROVE="$1"; shift ;;
   esac
 done
 
+# a zero or non-numeric interval never advances WAITED, so the bound never bites
+[[ "$EVERY" =~ ^[1-9][0-9]*$ ]]  || __await_refuse "--every must be a whole number of seconds ≥ 1, got '$EVERY'" "" "--every 15 --within 600"
+[[ "$WITHIN" =~ ^[1-9][0-9]*$ ]] || __await_refuse "--within must be a whole number of seconds ≥ 1, got '$WITHIN'"
+[[ "$LINES" =~ ^[1-9][0-9]*$ ]]  || __await_refuse "--lines must be a whole number ≥ 1, got '$LINES'" "" "--within 600 --lines 40"
+
+# --quiet means the exit code alone: stdout goes, stderr (the errors) stays
+# --quiet drops stdout — the banner, progress, verdict, and tail. stderr stays, so a
+#   malfunction still names its cause and its fix
+[[ "$QUIET" -eq 1 ]] && exec 1>/dev/null
+
 ######################################################################
-# ductwork is the owner of both the URI grammar and the idle definition.
+# ductwork is the owner of both the uri grammar and the idle definition.
 # it is SOURCED rather than reimplemented so this skill cannot answer a
 # different question than `duct.send --await` does
 ######################################################################
@@ -183,9 +217,9 @@ _repo_root="$(cd -- "$_skill_dir/../../../.." && pwd)"
 _ductwork="$_repo_root/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
 
 if [[ ! -r "$_ductwork" ]]; then
-  echo "✋ ductwork is absent from this checkout" >&2
+  echo "💥 MalfunctionError: ductwork is absent from this checkout" >&2
   echo "   looked at: $_ductwork" >&2
-  echo "   ⇒ it owns the duct URI grammar and the idle definition, so without" >&2
+  echo "   ⇒ it owns the duct uri grammar and the idle definition, so without" >&2
   echo "     it this skill would have to guess at both" >&2
   exit 1
 fi
@@ -195,7 +229,7 @@ source "$_ductwork"
 
 URI="duct://$GROVE/main/mechanic"
 if ! __duct_parse_uri "$URI"; then
-  echo "✋ could not parse $URI" >&2
+  echo "💥 MalfunctionError: could not parse $URI" >&2
   exit 1
 fi
 
@@ -250,19 +284,22 @@ fi
 #      pane whose busyness is the question — it would land in the play's stdin.
 #      the ask must go around the pane, never through it.
 #
-# ⚠️ .why the pattern excludes the pgrep itself
-#      `pgrep -f` matches the FULL command line of every process, and the ssh
-#      command that carries the pattern contains the pattern. without `-x`-style
-#      care the probe matches itself and reports busy forever. the bracket trick
-#      makes the pattern unable to match its own text — it brackets the play
-#      name's FIRST CHARACTER, since there is no fixed prefix to reach for.
+# ⚠️ .the pattern is exact, and belt-and-braces against a self-match
+#      - dots are escaped, so `prove.x` never matches `proveax`
+#      - it is anchored: a `/` or line start before, a space or line end after,
+#        so `x` never matches `prex.play.sh`
+#      - `-u` scopes it to the ssh user — the seat that owns the duct — so
+#        another account's same-named play never reads as busy
+#      - pgrep excludes itself, and the wrapper shell's argv carries base64, not
+#        the pattern. the bracket on the first character stays as a guard should
+#        a later edit ever put the decoded text on an argv
 #
-# echoes: the matched pids, or empty when the play is done
+# returns: 0 + the pids = busy · 1 = no such play · 2 = the box was not asked
 ######################################################################
 __grove_play_pids() {
   local name="${1:?}"
-  # the bracket makes the literal string differ from the pattern it matches
-  local pattern="[${name:0:1}]${name:1}.play.sh"
+  local rest="${name:1}"
+  local pattern="(^|/)[${name:0:1}]${rest//./\\.}\\.play\\.sh( |\$)"
   ####################################################################
   # ⚠️ the pattern is base64'd, because ssh takes NO ARGV
   #    it joins its arguments into one string and hands that to a login shell,
@@ -279,21 +316,32 @@ __grove_play_pids() {
   #    is a terminal that obeys escapes. pgrep prints pids on a healthy box;
   #    on a compromised one it prints whatever that box wants
   ####################################################################
-  local b64
+  local b64 out rc
   b64="$(printf '%s' "$pattern" | base64 | tr -d '\n')"
-  ssh "$DUCT_HOST" "pgrep -f -- \"\$(printf %s '$b64' | base64 -d)\"" 2>/dev/null \
-    | __duct_strip_escapes
+  # bounded: a hung ssh would otherwise outlive --within
+  out="$(timeout 30 ssh -o BatchMode=yes -o ConnectTimeout=10 "$DUCT_HOST" \
+    "pgrep -u \"\$(id -u)\" -f -- \"\$(printf %s '$b64' | base64 -d)\"" 2>/dev/null)"
+  rc=$?
+  ####################################################################
+  # 🛑 three answers, never two. pgrep says 0 = a match, 1 = no match; every
+  #    other code — ssh's 255, timeout's 124, pgrep's 2 or 3 — means the box
+  #    was NOT asked. read as "no match", that would report a play finished
+  #    that was never observed (rule.forbid.failhide)
+  ####################################################################
+  [[ "$rc" -eq 1 ]] && return 1
+  [[ "$rc" -eq 0 ]] || return 2
+  printf '%s' "$out" | __duct_strip_escapes
 }
 
 echo "⏳ git.grove.play.await --grove $GROVE --every ${EVERY}s --within ${WITHIN}s"
 echo "   ├─ duct: $URI"
 if [[ -n "$PLAY" ]]; then
-  echo "   ├─ play: ${PLAY}.play.sh  (matched by FILENAME — see __grove_play_pids)"
-  echo "   └─ waits for THAT play's process to exit"
+  echo "   ├─ play: ${PLAY}.play.sh (matched by its filename)"
+  echo "   └─ waits for that play's process to exit"
 else
   echo "   └─ waits for the pane to return to a shell"
   echo ""
-  echo "   🌙 no --play given, so this is the COARSE read: a play runs as"
+  echo "   🌙 no --play given, so this is the coarse read: a play runs as"
   echo "      'bash <script>', and 'bash' is indistinguishable from an idle"
   echo "      shell. it may report done while the play still runs."
   echo "      ⇒ for an accurate wait, name it: --play <name>"
@@ -301,6 +349,22 @@ fi
 echo ""
 
 WAITED=0
+
+# one nap, never past the bound: the last one is cut to what --within has left
+__await_nap() {
+  local nap="$EVERY"
+  (( WITHIN - WAITED < nap )) && nap=$(( WITHIN - WAITED ))
+  sleep "$nap"
+  WAITED=$(( WAITED + nap ))
+}
+
+# the tail is a courtesy beside a verdict already reached, so a failed read
+#   warns and never changes the exit code the verdict earned
+__await_tail() {
+  [[ "$QUIET" -eq 1 ]] && return 0
+  rhx git.grove.read "$GROVE" --lines "$LINES" \
+    || echo "   🌙 the tail could not be read; the verdict above stands" >&2
+}
 LAST=""
 
 while [[ "$WAITED" -lt "$WITHIN" ]]; do
@@ -312,28 +376,35 @@ while [[ "$WAITED" -lt "$WITHIN" ]]; do
     #    play does. so reachability is asked SEPARATELY — to conflate them would
     #    report a play complete that was never observed (rule.forbid.failhide)
     if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "$DUCT_HOST" true 2>/dev/null; then
-      echo "   ✋ the grove did not answer, so the play's state is unknown" >&2
+      echo "   💥 MalfunctionError: the grove did not answer, so the play's state is unknown" >&2
       echo "      ⇒ empty output from an unreachable box looks exactly like a" >&2
       echo "        finished play, so this refuses to guess between them" >&2
       echo "      fix: rhx git.grove.wake $GROVE" >&2
       exit 1
     fi
 
-    PIDS="$(__grove_play_pids "$PLAY")"
-    if [[ -z "$PIDS" ]]; then
+    PIDS_RC=0
+    PIDS="$(__grove_play_pids "$PLAY")" || PIDS_RC=$?
+    if [[ "$PIDS_RC" -eq 2 ]]; then
+      echo "   💥 MalfunctionError: the grove could not be asked whether the play runs" >&2
+      echo "      ⇒ ssh, its time bound, or pgrep failed; that is no answer, so this" >&2
+      echo "        refuses to call the play finished" >&2
+      echo "      fix: rhx git.grove.wake $GROVE, then await again" >&2
+      exit 1
+    fi
+    if [[ "$PIDS_RC" -eq 1 ]]; then
       echo "   ✔ the play finished after ${WAITED}s"
       echo ""
-      [[ "$QUIET" -eq 1 ]] && exit 0
-      exec rhx git.grove.read "$GROVE" --lines "$LINES"
+      __await_tail
+      exit 0
     fi
 
     if [[ "$LAST" != "busy" ]]; then
-      echo "   • ${WAITED}s — the play runs (pid $(printf '%s' "$PIDS" | tr '\n' ' '))"
+      echo "   • ${WAITED}s — the play runs (pid ${PIDS//$'\n'/ })"
       LAST="busy"
     fi
 
-    sleep "$EVERY"
-    WAITED=$(( WAITED + EVERY ))
+    __await_nap
     continue
   fi
 
@@ -347,7 +418,7 @@ while [[ "$WAITED" -lt "$WITHIN" ]]; do
   #    complete that never ran (rule.forbid.failhide). ductwork's own read makes
   #    the same distinction at src/grove.provision/2.shell/2.7.aliases/ductwork.sh:533
   if [[ -z "$RUNNING" ]]; then
-    echo "   ✋ tmux did not answer, so the pane's state is unknown" >&2
+    echo "   💥 MalfunctionError: tmux did not answer, so the pane's state is unknown" >&2
     echo "      ⇒ the tunnel may be down, or the session gone" >&2
     echo "      fix: rhx git.grove.wake $GROVE" >&2
     exit 1
@@ -361,12 +432,15 @@ while [[ "$WAITED" -lt "$WITHIN" ]]; do
       echo "   🌙 the pane reports '$RUNNING' after ${WAITED}s — this may mean done,"
       echo "      or a play still running, and this probe cannot tell them apart"
       echo "      ⇒ re-run with --play <name> for an answer rather than a guess"
-    else
-      echo "   ✔ idle after ${WAITED}s — the pane is back at '$RUNNING'"
+      echo ""
+      # a guess is no verdict, so it never exits 0
+      __await_tail
+      exit 3
     fi
+    echo "   ✔ idle after ${WAITED}s — the pane is back at '$RUNNING'"
     echo ""
-    [[ "$QUIET" -eq 1 ]] && exit 0
-    exec rhx git.grove.read "$GROVE" --lines "$LINES"
+    __await_tail
+    exit 0
   fi
 
   # one line per poll, and only when the answer CHANGES, so a ten-minute wait
@@ -376,13 +450,12 @@ while [[ "$WAITED" -lt "$WITHIN" ]]; do
     LAST="$RUNNING"
   fi
 
-  sleep "$EVERY"
-  WAITED=$(( WAITED + EVERY ))
+  __await_nap
 done
 
 echo ""
-echo "   🌙 still busy after ${WITHIN}s — the play may simply need longer" >&2
-echo "      ⇒ this is a bound, not a verdict: raise it with --within" >&2
+echo "   🌙 still busy after ${WAITED}s — the play may simply need longer"
+echo "      ⇒ this is a bound, not a verdict: raise it with --within"
 echo ""
-[[ "$QUIET" -eq 1 ]] || rhx git.grove.read "$GROVE" --lines "$LINES"
-exit 2
+__await_tail
+exit 3

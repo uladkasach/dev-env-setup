@@ -1,0 +1,19 @@
+{
+  "key": "27bb460b308186c7",
+  "kind": "create",
+  "repo": {
+    "owner": "uladkasach",
+    "name": "dev-env-setup"
+  },
+  "exid": null,
+  "title": "fix(play): prove.earlyoom-spares-the-session fails where it should decline",
+  "description": "# 🌙 dream: `prove.earlyoom-spares-the-session` fails where it should decline\n\nkind: repair · owner: this repo · caught 2026-10-30, in 5.3.verification of #174 · red main\n\n## .the cue that fired\na full `rhx play.run --all` on the tailscale branch: `💥 prove.earlyoom-spares-the-session —\nfailed (exit 1)`. the tailscale pr touches no earlyoom file.\n\n## .the gap, precisely\ntwo facts, and the second is the defect:\n1. this laptop has no earlyoom: the binary is absent and the unit reads `not-found`, since\n   `1.6.3.earlyoom` was never applied here\n2. the play reports that absence as a FAILURE, exit 1. this repo's suite contract is that a play\n   whose subject is absent DECLINES with exit 2 and says so (`play.run` reads 2 as \"proved no\n   claim\"). so a box that simply lacks earlyoom reads as red, which is the cry-wolf shape\n   (`gotcha.a-check-that-cries-wolf-gets-silenced`)\n\n## .the shape of the fix\n1. the play: read the subject first — `command -v earlyoom` and the unit's load state. absent →\n   print `🌙 … earlyoom is not on this box, so no claim is proven`, name the apply, exit 2. present\n   and the claim fails → exit 1, as now\n2. clamp it: one fixture row with the binary hidden from PATH must exit 2, and one with it present\n   must still reach the real claim\n3. this laptop, separately and by a human: `sudo -v && rhx grove.provision --what 1.6.3.earlyoom\n   --mode apply`, then the play runs its real claim here\n\n## .why it is not done in the round that found it\nthe tailscale tree touches neither the play nor the bundle; the apply needs a human's root.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": "as-human",
+  "idem": null,
+  "heldSeq": 5,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "178"
+}

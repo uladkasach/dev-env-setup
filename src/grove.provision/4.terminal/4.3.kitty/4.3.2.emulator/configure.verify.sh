@@ -149,46 +149,8 @@ print(o.repaint_delay, o.input_delay)
     echo "     ⚠️ an open kitty keeps the delays it started with; a new one reads these"
   fi
 
-  # 2c. the DECLARED window size wins over `remember_window_size`, per the loader — and
-  #     2d. that override is STATED, not defaulted, the same split as 2b (m11)
-  local rws=""
-  if command -v kitty >/dev/null 2>&1; then
-    rws="$(timeout -k 5 20 kitty +runpy "
-from kitty.config import load_config
-print(load_config('$conf').remember_window_size)
-" 2>/dev/null | tail -1 | tr -d '[:space:]')"
-  fi
-  if [[ -z "$rws" ]]; then
-    echo "   🌙 kitty's loader did not answer, so whether the DECLARED window"
-    echo "      size wins is UNREAD on this box"
-  else
-    case "$rws" in
-      no|false|n|False)
-        echo "   • the declared window size wins ✔ ($rws, per kitty's own loader)"
-        ;;
-      *)
-        _kitty_verify_fail "kitty RESOLVES remember_window_size to '$rws'" \
-          "⇒ it overrides initial_window_*, so every new window inherits the geometry of" \
-          "  the last one CLOSED, and the size declared here is ignored" \
-          "⇒ measured 2026-09-03: a 6-tree fleet, zero windows at the declared size, worst" \
-          "  27 cols — narrow enough to wrap claude's modal chrome, so a stall detector" \
-          "  keyed on it read a live modal as an idle box" \
-          "⚠️ the line at fault may sit in an included file — kitty resolves 'include' in" \
-          "  place: grep -n 'remember_window_size\\|include' $conf" \
-          "fix: rhx grove.provision --what 4.3.2.emulator --mode apply" \
-          "⚠️ an open window keeps its size; this reaches the NEXT one opened"
-        ;;
-    esac
-  fi
-
-  if grep -Eq '^[[:space:]]*remember_window_size[[:space:]]+' "$conf"; then
-    echo "   • the size-override policy is stated, not defaulted ✔"
-  else
-    _kitty_verify_fail "kitty.conf states no remember_window_size policy" \
-      "⇒ kitty defaults it to yes, which overrides the two size lines below it — so a" \
-      "  conf that declares a size and omits this one has declared no size at all" \
-      "fix: rhx grove.provision --what 4.3.2.emulator --mode apply"
-  fi
+  # 2c + 2d. the DECLARED window size wins, and that override is STATED (m11) — in _.sh
+  _kitty_verify_window_size "$conf"
 
   # 3. every file kitty.conf NAMES exists, and the theme is included (m10)
   if [[ ${#named_absent[@]} -eq 0 ]]; then

@@ -100,12 +100,15 @@
 #      ⇒ so a pipe is legal wherever there is a source to read from. this skill
 #        has none, which is the whole reason it asks for a tty.
 #
-# .why `--vault aws.params` — a CENTRAL store, and this skill only ever targets a grove
-#         a grove is exclusively ec2, so IMDS is always there — and IMDS is the one
-#         identity `aws.params` accepts for an `@all` slug
-#         (`asKeyrackAwsParamIdentity.js:17`). a laptop has no IMDS, but a laptop
-#         is human-backed and authed itself with `gh auth login` on the way past,
-#         so it never reaches this skill at all.
+# .why `--vault aws.params` — a CENTRAL store, and only on an EC2 grove
+#         an ec2 grove answers IMDS, and IMDS is the one identity `aws.params`
+#         accepts for an `@all` slug (`asKeyrackAwsParamIdentity.js:17`). a grove
+#         is NOT always ec2: a local, house, or hetzner grove has no IMDS, so rung 0b
+#         probes the far box and refuses it before any prompt
+#         (`rule.forbid.aws-params-off-ec2`). such a grove keeps its token in
+#         `os.secure`, set on the box itself — `5.4.gh`'s fix-text names the
+#         command. a laptop authed itself with `gh auth login`, so it never
+#         reaches this skill at all.
 #
 #         ⇒ the alternative, `os.secure`, is an age-encrypted file ON the box: it
 #           beats gh's plaintext `hosts.yml` and is still a REPLICA, so every grove
@@ -127,11 +130,10 @@
 #   --mode     plan (default) or apply
 #   --refresh  re-set a slug that already answers (a rotated or expired pat).
 #              set is an upsert, so this flag only lifts the early no-op exit
-#   --env      keyrack env for the slug; default prep
+#   --env      keyrack env for the slug; default camp
 #   --owner    keyrack owner; default ehmpath
-#   --org      org sigil for the slug; @this (default) or @all. ⚠️ @all can be
-#              written and never read — `keyrack unlock` takes no --org, so a
-#              value stored there is unreachable forever. see the header
+#   --org      org sigil for the slug; default @all, the one slug every org's
+#              consumer reads (`rule.require.github-token-at-all-camp`)
 #
 # guarantee:
 #   - idempotent: a grove whose rack already answers for this slug is a no-op
@@ -155,10 +157,11 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "options:"
   echo "  --mode     plan (default) or apply"
   echo "  --refresh  re-set a slug that already answers (rotated or expired pat)"
-  echo "  --env      keyrack env; default prep"
+  echo "  --env      keyrack env; default camp"
   echo "  --owner    keyrack owner; default ehmpath"
-  echo "  --org      org sigil for the slug: @this (default) or @all"
-  echo "             ⚠️ @all stores but never reads — unlock takes no --org"
+  echo "  --org      org sigil for the slug; default @all (every org reads it)"
+  echo ""
+  echo "an ec2 grove only: off ec2 the token lives in os.secure, set on the box."
   echo ""
   echo "the value is TYPED on the box over an interactive ssh tty — never passed"
   echo "as an argument, never sent down a duct. see the header for why."
@@ -173,7 +176,7 @@ KR_OWNER="ehmpath"
 KR_ORG="@all"
 KR_KEY="GITHUB_TOKEN"
 # central, not a replica — safe only on an ec2 box, which holds the IMDS identity
-# aws.params wants. rung 0b PROBES that before any write; a local or house grove is
+# aws.params wants. rung 0b PROBES that before any write; a local, house, or hetzner grove is
 # refused there (`rule.forbid.aws-params-off-ec2`). see the `.why --vault aws.params`
 # block in the header
 KR_VAULT="aws.params"
@@ -189,15 +192,15 @@ while [[ $# -gt 0 ]]; do
     --org)     KR_ORG="$2"; shift 2 ;;
     --skill|--repo|--role) shift 2 ;;
     --) shift ;;
-    -*) echo "✋ unknown flag '$1'" >&2; exit 2 ;;
+    -*) echo "✋ ConstraintError: unknown flag '$1'" >&2; exit 2 ;;
     *) [[ -z "$GROVE" ]] && GROVE="$1"; shift ;;
   esac
 done
 
-[[ "$MODE" == "plan" || "$MODE" == "apply" ]] || { echo "✋ invalid --mode: $MODE (plan|apply)" >&2; exit 2; }
+[[ "$MODE" == "plan" || "$MODE" == "apply" ]] || { echo "✋ ConstraintError: invalid --mode: $MODE (plan|apply)" >&2; exit 2; }
 
 if [[ -z "$GROVE" ]]; then
-  echo "✋ usage: rhx git.grove.auth.github.set <grove> [--mode apply]" >&2
+  echo "✋ ConstraintError: usage: rhx git.grove.auth.github.set <grove> [--mode apply]" >&2
   echo "   list them: rhx git.grove.list" >&2
   exit 2
 fi
@@ -233,7 +236,7 @@ if ! command -v __duct_strip_escapes >/dev/null 2>&1; then
     # shellcheck disable=SC1090
     source "$_auth_gh_ductwork"
   else
-    echo "✋ ductwork is absent from this checkout, so grove bytes cannot be stripped" >&2
+    echo "✋ ConstraintError: ductwork is absent from this checkout, so grove bytes cannot be stripped" >&2
     echo "   looked at: $_auth_gh_ductwork" >&2
     echo "   ⇒ it owns __duct_strip_escapes, the one sink between a grove's" >&2
     echo "     output and a terminal that OBEYS what it is sent" >&2
@@ -243,7 +246,7 @@ fi
 
 REGISTRY="${GIT_FOREST_DIR:-$HOME/.git.forest}/groves/$GROVE.json"
 if [[ ! -f "$REGISTRY" ]]; then
-  echo "✋ grove '$GROVE' is not registered" >&2
+  echo "✋ ConstraintError: grove '$GROVE' is not registered" >&2
   echo "   list them: rhx git.grove.list" >&2
   exit 2
 fi
@@ -274,7 +277,7 @@ SSH_ALIAS=$(jq -r '.sshAlias // .name' "$REGISTRY")
 if command -v __term_as_ssh_host >/dev/null 2>&1; then
   SSH_ALIAS="$(__term_as_ssh_host "$SSH_ALIAS")" || exit 2
 elif [[ -z "$SSH_ALIAS" || "$SSH_ALIAS" == -* || "$SSH_ALIAS" == *[!A-Za-z0-9._@-]* ]]; then
-  echo "✋ grove '$GROVE' names an ssh alias that is not a host: '$SSH_ALIAS'" >&2
+  echo "✋ ConstraintError: grove '$GROVE' names an ssh alias that is not a host: '$SSH_ALIAS'" >&2
   echo "   └─ ssh reads a '-' at the front as an option, and one of them" >&2
   echo "      (-oProxyCommand=) runs a command on THIS box" >&2
   echo "   fix: rhx git.grove.set $GROVE --at <user>@<host>" >&2
@@ -285,7 +288,7 @@ echo "🐢 heres the wave..."
 echo ""
 echo "🔑 git.grove.auth.github.set $GROVE --mode $MODE"
 echo "   ├─ slug:  owner=$KR_OWNER  ${KR_ORG}.${KR_ENV}.${KR_KEY}"
-echo "   ├─ vault: $KR_VAULT  (central; a grove is ec2, so IMDS is always there)"
+echo "   ├─ vault: $KR_VAULT  (central; an ec2 grove's IMDS answers it)"
 echo "   └─ drive"
 
 # .what = run one command on the grove, non-interactive, and hand back its output
@@ -324,7 +327,7 @@ _ask_loud() {
 
 # 0. is the box reachable at all? a woken grove relays on its tunnel
 if ! _ask true; then
-  echo "      └─ 💥 grove '$GROVE' does not answer at ssh alias '$SSH_ALIAS'" >&2
+  echo "      └─ 💥 MalfunctionError: grove '$GROVE' does not answer at ssh alias '$SSH_ALIAS'" >&2
   echo "" >&2
   echo "  why: the box is asleep, or its tunnel is not bound" >&2
   echo "  fix: wake it — a wake is idempotent" >&2
@@ -336,26 +339,28 @@ echo "      ├─ box  reachable at '$SSH_ALIAS'"
 # 0b. does the box hold an ec2 identity? only then is aws.params readable
 #
 # 🛑 `rule.forbid.aws-params-off-ec2`. this rung used to be a comment — "a grove is
-#    always ec2" — and that is true of a CLOUD grove only. a local or house grove
+#    always ec2" — and that is true of an EC2 grove only. a local, house, or hetzner grove
 #    has no instance role, so a set there writes into whatever account its shell
 #    holds, and no read on that box ever gets the value back
 # ⇒ PROBED, never claimed: the same IMDS token ask `5.6.aws` makes. `-f` so an http
 #    refusal fails too, `-m 3` so a box with no route to IMDS answers in seconds
 if ! _ask 'curl -fsS -m 3 -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60"'; then
-  echo "      └─ ✋ grove '$GROVE' has no ec2 identity — IMDS does not answer there" >&2
+  echo "      └─ ✋ ConstraintError: grove '$GROVE' has no ec2 identity — IMDS does not answer there" >&2
   echo "" >&2
   echo "  why: this skill stores the token in aws.params, and only an ec2 box can" >&2
-  echo "       read that vault. a local or house grove would get a value it can" >&2
-  echo "       never read back, written into whatever account its shell holds" >&2
-  echo "  fix: on a box with a human, reach github by hand —" >&2
-  echo "    gh auth login" >&2
+  echo "       read that vault. a local, house, or hetzner grove would get a value" >&2
+  echo "       it can never read back, written into whatever account its shell holds" >&2
+  echo "  fix: keep the token in os.secure instead — run this ON that grove, at a tty:" >&2
+  echo "    cd ~/$KR_REPO && rhx keyrack set \\" >&2
+  echo "      --owner $KR_OWNER --key $KR_KEY --org $KR_ORG --env $KR_ENV --vault os.secure" >&2
+  echo "    (or, on a box with a human: gh auth login)" >&2
   exit 2
 fi
 echo "      ├─ ec2  the box holds an instance identity, so aws.params is readable"
 
 # 1. is keyrack even ON the box? it ships inside rhachet, which 5.3.brains installs
 if ! _ask 'command -v rhx'; then
-  echo "      ├─ ✋ rhx is not on the grove's PATH, so it has no keyrack to fill" >&2
+  echo "      ├─ ✋ ConstraintError: rhx is not on the grove's PATH, so it has no keyrack to fill" >&2
   echo "" >&2
   echo "  why: keyrack ships INSIDE rhachet; 5.3.brains is what puts it on a box" >&2
   echo "  fix: drive the bundle that owns it, then re-run this —" >&2
@@ -382,7 +387,7 @@ echo "      ├─ rhx  present"
 #      — a probe that cannot tell "no" from "could not ask" must not answer at
 #      all (term=probe: one question, answered from evidence)
 if ! RHX_RUNS="$(_ask_loud "cd \$HOME/$KR_REPO && rhx keyrack list --owner $KR_OWNER")"; then
-  echo "      ├─ ✋ rhx is on PATH but does NOT run" >&2
+  echo "      ├─ ✋ ConstraintError: rhx is on PATH but does NOT run" >&2
   echo "" >&2
   echo "  the box's own error:" >&2
   # printf, never echo — `$RHX_RUNS` is a GROVE's answer (`term=relay`, property 2).
@@ -495,7 +500,7 @@ REMOTE_STEPS+="rhx keyrack set --owner $KR_OWNER --key $KR_KEY --org $KR_ORG --e
 
 if ! ssh -t "$SSH_ALIAS" "bash -lc $(printf '%q' "$REMOTE_STEPS")"; then
   echo "" >&2
-  echo "💥 the rack was not filled" >&2
+  echo "💥 MalfunctionError: the rack was not filled" >&2
   echo "   ⇒ keyrack refused, or the prompt was declined" >&2
   echo "   read the box's own view —" >&2
   echo "     rhx git.grove.send $GROVE --what 'rhx keyrack list --owner $KR_OWNER'" >&2
@@ -528,7 +533,7 @@ echo "🔑 stored. now: does github accept it?"
 PROVE_ONE_BUNDLE="cd \$HOME/$KR_REPO && bash src/grove.provision._.sh --what 5.4.gh --mode apply"
 if ! ssh -o BatchMode=yes "$SSH_ALIAS" "bash -lc $(printf '%q' "$PROVE_ONE_BUNDLE")" 2>&1 \
      | __duct_strip_escapes; then
-  echo "💥 the token stored, but 5.4.gh could not auth gh with it" >&2
+  echo "💥 MalfunctionError: the token stored, but 5.4.gh could not auth gh with it" >&2
   echo "   ⇒ a SET token is not an ACCEPTED token: an expired or under-scoped pat" >&2
   echo "     passes storage and fails at the first api call" >&2
   echo "   fix: mint a fresh pat with 'repo' + 'read:org', then —" >&2

@@ -7,17 +7,29 @@ a change to this repo is **unproven** until it has RUN on a grove. not parsed �
 ```sh
 rhx git.grove.wake grove-1
 rhx git.grove.push grove-1 --from . --into git/more/dev-env-setup.wip --mode apply
-rhx git.grove.send grove-1 --play prove.bundles.plan-apply-apply
+rhx git.grove.send grove-1 --what 'rhx grove.provision --what <slug> --mode plan'
+rhx git.grove.read grove-1 --lines 40     # a send's output is its report
+rhx git.grove.send grove-1 --what 'rhx grove.provision --what <slug> --mode apply'
+rhx git.grove.read grove-1 --lines 40
+rhx git.grove.send grove-1 --what 'rhx grove.provision --what <slug> --mode apply'
 rhx git.grove.read grove-1 --lines 40
 ```
 
 per bundle: `plan`, `apply`, `apply` — the third run is the idempotency proof and is the
-one most often skipped. then the tree-scale gate, which is the only run that sees two
-bundles interact:
+one most often skipped. then the tree-scale check, the only run that sees two bundles
+interact: the whole tree applied twice, then planned. every bundle that still claims must be
+one a grove cannot clear itself (a credential):
 
 ```sh
-rhx git.grove.send grove-1 --play prove.tree.fixed-point
+rhx git.grove.send grove-1 --what 'rhx grove.provision --mode apply'
+rhx git.grove.read grove-1 --lines 80
+rhx git.grove.send grove-1 --what 'rhx grove.provision --mode apply'
+rhx git.grove.read grove-1 --lines 80
+rhx git.grove.send grove-1 --what 'rhx grove.provision --mode plan'
+rhx git.grove.read grove-1 --lines 80
 ```
+
+no tracked play paves these; one `--what` per run is the path.
 
 ## .why a GROVE and never the laptop
 
@@ -50,25 +62,23 @@ this has now happened twice, a day apart, in this repo:
   the session kept building anyway.
 - **2026-07-31** — a plan run was declined once, early. that one denial was generalized
   into "execute none of it", and six bundles were written, changed, and reported with only
-  `bash -n` and `diff` behind them. the denial had been about the human's LAPTOP — which
-  is the very objection a grove answers. the tool to proceed was in reach the whole time.
+  `bash -n` and `diff` behind them. the denial had been about the human's LAPTOP — the
+  very objection a grove answers.
 
-the second is the more instructive: the rule that forbids this was in the repo, and was
-booted as neither `say` nor `ref`, so it was never in context. that is why THIS brief is
-say-level and short — a rule that is not loaded is a rule that does not exist.
+the rule that forbade this was booted as neither `say` nor `ref`, so it was never in
+context. hence THIS brief is say-level and short: a rule not loaded does not exist.
 
 ## .the tell
 
 before you report a change as done, ask: **what did I actually run, and where?**
 
-if the answer names no grove, the change is unproven — say so in those words, and do not
-let a static check stand in for the sentence.
+no grove named → the change is unproven. say so, and let no static check stand in.
 
 ## .see also
 
 - `rule.require.prove-each-bundle-plan-apply-apply` — the full rule: the four reasons a
   laptop cannot prove a bundle, how to read each verdict, and why the second apply matters
-- `howto.prove-bundles-plan-apply-apply` — how to run the play and read its output
+- `howto.prove-bundles-plan-apply-apply` — how to run the three and read each verdict
 - `rule.require.reach-a-grove-through-its-duct` — `--play`, never raw ssh
 - `rule.require.wake-the-grove-freely` — waking one is cheap; reach for it
 - `rule.require.trust-but-verify` — the general form of the same failure
