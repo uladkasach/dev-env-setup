@@ -46,3 +46,11 @@ node_modules
 # either lies to the next machine or blocks it
 .claude/scheduled_tasks.lock
 !.agent/.actors/actor.via.repo=ambient/
+
+# a route driver daemon writes crash logs here. each holds absolute paths of
+# the machine it ran on, so a commit of one leaks a home dir into a public repo
+.behavior/**/.malfunctions/
+
+# the radio symlink each clone makes to its own local radio dir. its target is
+# an absolute path that names a home dir, so it stays untracked
+/.radio

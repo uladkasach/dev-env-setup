@@ -75,8 +75,49 @@ battery on every laptop to fix one chipset. the list scopes the cost to cards th
 ⇒ the bar for a new row is a **measured stall**, never a hunch. a driver added without one
 spends that card's battery for no defect (`rule.forbid.divergence-without-a-physical-reason`).
 
+## .the first measurement — a QCA6390 (`ath11k_pci`)
+
+- the card stalls under power-save. it stays associated, its transmit queue jams, DHCP renewals
+  never leave, and the link goes silent until a human reconnects
+- measured 2026-10-03..05 by `rhx network.wifi.probe`: no deauth from the AP, no beacon loss, no
+  suspend. traffic simply stops, and at the reconnect ath11k reports it could not flush its
+  transmit queue. the drops continued with battery saver off, so the power profile was not it
+- pop-os ships `default-wifi-powersave-on.conf` (`wifi.powersave = 3`), which holds in every
+  power profile
+
+## .why the bundle writes a NEW file, and never edits pop's
+
+- pop's file belongs to its package. an edit is two writers on one artifact, and the next package
+  upgrade puts it back (`rule.forbid.two-writers-on-one-artifact`)
+- a named `[connection-…]` section outranks the plain `[connection]` section pop's file sets, which
+  NetworkManager always consults last
+
+## .why the bundle declines, or reads `iw` without an install
+
+- a box with no NetworkManager has no reader for the file. a cloud grove and a cicd runner have none
+- `iw` belongs to `2.1.toolkit`, which runs AFTER `1.11.wifi`. so the live read is three-valued, and
+  `unread` is never a failure there (`define.provision-defect-shapes`, shape 7)
+- the watchdog asks `iw` at run time only, for the bssid and the record. without it, the watchdog
+  still probes and reconnects, and the record lacks the iw rows
+
+## .the stall watchdog — why it exists beside power-save off
+
+- the same QCA6390 stalled twice on 2026-10-12 with power-save OFF. the DHCPv6 renewal stopped, with
+  no deauth, no beacon loss, and no kernel line, and a reconnect restored traffic in 2s
+- the cause is unproven. the old ath11k firmware and a DFS channel are both candidates
+- the state that would name it is readable only DURING the stall, and a human reconnect erased it
+  each time. so the watchdog records first, then reconnects (`src/machine/machine_wifi_link_watchdog`)
+- it runs on every box with NetworkManager and a radio. it holds no driver list: it probes the
+  gateway, so it catches a stall on any card. on a healthy link it costs one probe per 15s
+- it declares a stall only after a gateway that HAS answered goes silent four probes in a row, so a
+  router that drops icmp never trips it
+- it is a SYSTEM unit. `nmcli connection up` from a user service depends on polkit to treat it as an
+  active session, which a background service is not reliably. the watch must also hold with no
+  human logged in
+- read it: `rhx network.wifi.watchdog.get`
+
 ## .see also
 
 - `network.wifi.probe` — the read-only diagnosis
-- `1.11.wifi` — the bundle; its header holds the first measurement
+- `1.11.wifi` — the bundle
 - `system.power.howto` — battery saver, a separate switch from wifi power-save

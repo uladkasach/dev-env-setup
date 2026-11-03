@@ -30,7 +30,7 @@ GROVE_GH_AUTH_PROBE_SECONDS=15
 
 grove_provision_5_4_gh_configure_verify() {
   if ! command -v gh >/dev/null 2>&1; then
-    echo "   ✋ gh is absent, so it can hold no credential" >&2
+    echo "   ✋ ConstraintError: gh is absent, so it can hold no credential" >&2
     echo "      ⇒ the provision phase above owns that claim; repair it first" >&2
     return 1
   fi
@@ -56,7 +56,7 @@ grove_provision_5_4_gh_configure_verify() {
     return 0
   fi
 
-  echo "   ✋ gh holds no credential github will accept" >&2
+  echo "   ✋ ConstraintError: gh holds no credential github will accept" >&2
   echo "      ⇒ a SET GH_TOKEN is not enough: an expired or under-scoped token" >&2
   echo "        passes a presence test and fails at the first api call, inside" >&2
   echo "        whichever skill made it — never here" >&2
@@ -64,10 +64,13 @@ grove_provision_5_4_gh_configure_verify() {
   if [[ "$GROVE_ENV_SERVER" == "local@unix" ]]; then
     echo "      fix: gh auth login" >&2
   else
+    # 🛑 the vault follows the platform — one choice, shared with the upsert (`_.sh`)
+    local vault
+    vault="$(grove_provision_5_4_gh_keyrack_vault)"
     echo "      fix (this box confirms no human, so a login cannot be answered):" >&2
     echo "        1. cd ~/git/more/dev-env-setup && rhx keyrack set \\" >&2
     echo "             --owner ehmpath --key GITHUB_TOKEN \\" >&2
-    echo "             --org @all --env camp --vault aws.params" >&2
+    echo "             --org @all --env camp --vault ${vault}" >&2
     echo "           answer its two prompts: mechanism 1, then paste the pat" >&2
     echo "      ⚠️ the pat needs BOTH scopes: 'repo' to clone, 'read:org' so gh" >&2
     echo "         can enumerate. one with only 'repo' clones every repo you" >&2
@@ -78,7 +81,7 @@ grove_provision_5_4_gh_configure_verify() {
     echo "         once. gh holds a STORED LOGIN taken here, so its copy stays" >&2
     echo "         stale until this bundle re-reads the rack. measured 2026-08-05:" >&2
     echo "         git went green on a rescoped pat while gh stayed refused" >&2
-    echo "      the value is typed on a tty and stored age-encrypted — never pass" >&2
+    echo "      the value is typed on a tty and stored encrypted by its vault — never pass" >&2
     echo "      it as an argument, and never export it into a duct pane" >&2
     echo "      ⚠️ one set, no fill: set stores the value itself, and fill re-drives" >&2
     echo "         its prompts, so a chained fill takes the pat as a mechanism answer" >&2

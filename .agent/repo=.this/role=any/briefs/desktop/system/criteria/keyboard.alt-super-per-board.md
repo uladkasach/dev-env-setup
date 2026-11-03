@@ -56,6 +56,34 @@ given('a board whose id is not yet declared')
   - stacked on keyd's swap, it would double-swap the builtin back to stock
 - the apple ids are declared once, in `1.1.keybinds/_.sh`; the skill and both phases read it
 
+## the shared remap, line by line
+
+`_.sh` renders both confs (`keybinds_keyd_conf`), so the upsert and the verify share one source.
+
+- `capslock = overload(control, esc)`: held is ctrl, tapped is escape. capslock is the largest key
+  nearest the pinky, and its stock function is used by nobody
+- `overload_tap_timeout = 200` drops the tap-escape after 200ms of hold. without it, a slow
+  ctrl+click emits a stray escape that nvim reads as a mode change
+- `coffee / sleep / suspend / power = noop`: these sit near the arrow cluster, and a misfire there
+  suspends the box mid-work. `1.2.power` blocks the same acts at the systemd layer. this blocks them
+  at the DEVICE layer, the only layer that catches a key that never reaches logind
+- `rightalt / rightcontrol / rightmeta = layer(vimarrows)`: rightalt on a laptop, rightcontrol on
+  the hhkb, rightmeta on an apple magic keyboard. all three are declared because one human moves
+  between all three boards
+
+## why the upsert empties `/etc/keyd/` first
+
+- keyd reads EVERY `.conf` in `/etc/keyd/`
+- a stray file that also matches `*` would fight `default.conf` by read order
+- a rename of the conf in a past revision would leave its old copy live
+- ⇒ the dir is emptied and re-declared (`rule.require.judge-declared-state-not-live-state`)
+
+## why keynav starts from `~/.profile`, never a systemd user unit
+
+- keynav needs a live X/wayland session to attach to
+- `~/.profile` is read at login, when that session exists
+- a boot-time unit would start before it and exit
+
 ## see also
 
 - `rhx input.keyboard.ids` — list boards, their ids, and which conf claims each

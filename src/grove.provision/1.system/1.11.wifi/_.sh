@@ -8,62 +8,10 @@
 #             firmware state at the stall, then reconnects
 #
 # .why
-#   - a QCA6390 (`ath11k_pci`) stalls under power-save: it stays associated,
-#     its transmit queue jams, DHCP renewals never leave, and the link goes
-#     silent until a human reconnects
-#   - measured 2026-10-03..05 by `rhx network.wifi.probe`: no deauth from the
-#     AP, no beacon loss, no suspend — traffic simply stops, and at the
-#     reconnect ath11k reports it could not flush its transmit queue. the
-#     drops continued with battery saver off, so the power profile was not it
-#   - pop-os ships `default-wifi-powersave-on.conf` (`wifi.powersave = 3`),
-#     which holds in every power profile
-#
-# .why an ALLOWLIST of drivers, not a box-wide off
-#   - power-save is free battery on a card whose driver wakes it correctly;
-#     to turn it off there costs battery for no defect
-#   - so the off is scoped with NetworkManager's `match-device=driver:…`,
-#     and a laptop with another card keeps the distro default
-#   - a driver joins the list only with a measured stall behind it
-#
-# .why a NEW file and not an edit of pop's
-#   - pop's file belongs to its package; an edit is two writers on one
-#     artifact, and the next package upgrade puts it back
-#     (`rule.forbid.two-writers-on-one-artifact`)
-#   - a named `[connection-…]` section outranks the plain `[connection]`
-#     section pop's file sets, which NetworkManager always consults last
-#
-# .why it declines where NetworkManager is absent
-#   - a box with no NetworkManager has no reader for this file. a cloud grove
-#     and a cicd runner have none
-#
-# .why `iw` is read, never installed, here
-#   - `iw` belongs to `2.1.toolkit`, which runs AFTER this bundle. so the live
-#     read is three-valued and `unread` is never a failure here
-#     (`define.provision-defect-shapes`, shape 7)
-#   - the watchdog asks `iw` at RUN time only, for the bssid and the record.
-#     absent, it still probes and reconnects; the record lacks the iw rows
-#
-# .why the watchdog, when power-save is already off
-#   - the same QCA6390 stalled twice on 2026-10-12 with power-save OFF: the
-#     DHCPv6 renewal stopped, no deauth, no beacon loss, no kernel line, and a
-#     reconnect restored traffic in 2s. the cause is unproven — the old ath11k
-#     firmware and a DFS channel are both candidates
-#   - the state that would name it is readable only DURING the stall, and a
-#     human reconnect erased it each time. so the watchdog records first, then
-#     reconnects (`src/machine/machine_wifi_link_watchdog`)
-#
-# .why the watchdog runs on EVERY box with NetworkManager and a radio
-#   - it holds no driver list: it probes the gateway, so it catches a stall on
-#     any card, and on a healthy link it does naught but one probe per 15s
-#   - it declares a stall only after a gateway that HAS answered goes silent
-#     four probes in a row, so a router that drops icmp never trips it
-#
-# .why a SYSTEM unit, not a user one
-#   - `nmcli connection up` from a user service depends on polkit to treat it
-#     as an active session, which a background service is not reliably
-#   - and the watch must hold with no human logged in
-#
-# read it: rhx network.wifi.watchdog.get
+#   - a QCA6390 (`ath11k_pci`) goes silent under power-save until a human reconnects
+#   - power-save stays on for any card whose driver wakes it correctly
+#   - the watchdog records the state a stall erases, then reconnects
+#   - the measurements and the design: `howto.allowlist-a-wifi-driver-for-powersave-off`
 #
 # usage:
 #   rhx grove.provision --what 1.11.wifi --mode apply

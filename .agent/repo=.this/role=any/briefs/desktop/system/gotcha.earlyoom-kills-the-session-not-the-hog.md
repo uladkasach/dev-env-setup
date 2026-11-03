@@ -54,6 +54,24 @@ box with 89 GB of RAM+swap. that is why 254 orphans of a few hundred MB each nev
 died with the session, so it could not be attributed. the reap log names each victim's argv,
 so the next origin is attributable from the log alone — read it before you blame a tool.
 
+## .the reaper bundle — `1.6.6.abandoned`
+
+- "abandoned" is four rules, declared once in `src/machine/machine_resource_procs_reap_abandoned`:
+  ours · spawner dead · not its cgroup's oldest process · older than 24h
+- why a timer: no extant reader watched the population
+  - `1.6.4.keyrackd` reaps ONE population, the keyrack daemons
+  - `machine.usage.diagnose` runs only when a human asks
+  - earlyoom kills ONE process by score, as measured above
+  - ⇒ the population has to be reaped by age, before memory pressure exists
+- every box, no decline: a grove leaks the same tool subprocesses, and has no human to notice
+- no linger claim: `1.6.4.keyrackd` runs first and grants linger to every human seat, and the
+  timer rides on the same user manager. a second claim would be a second declaration of one fact
+- the service is generated and the timer is an asset, the same split as `1.6.4.keyrackd`
+  - the ExecStart names the checkout's executable, so it comes from one reader both halves ask
+  - the timer holds no path, so it is a tracked file the verify can `cmp`
+  - ⇒ apply `--from main`. a `--from tree` apply binds the timer to a worktree that
+    `git worktree remove` can delete
+
 ## .see also
 
 - `hazard.idle-process-leak-crosses-the-swap-cliff` — the same orphan class, measured before

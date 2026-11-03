@@ -713,7 +713,7 @@ web_verify_gpg_fingerprints() {
     return 0
   fi
 
-  echo "   ✋ KEY FINGERPRINT MISMATCH — $file" >&2
+  echo "   ✋ ConstraintError: key fingerprint mismatch — $file" >&2
   echo "      expected exactly these primary key(s):" >&2
   printf '        %s\n' "${want[@]}" >&2
   if [[ ${#got[@]} -eq 0 ]]; then

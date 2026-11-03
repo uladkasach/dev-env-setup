@@ -1,0 +1,26 @@
+# F015 — peer claims refuted on evidence, at 5.1 i001
+
+- **fork:** concede each and change the code · refute each with the file that disproves it
+- **taken, why:** refute. each claim reads a fact the code already settles:
+  - **the laptop's `TAILSCALE_AUTH_KEY` row** (r8 n1, r9 n4): the row binds the laptop on purpose. `git.grove.auth.keys.set` copies a grove's keys FROM the laptop's rack, and it reads the laptop's required rows to know which (`git.grove.auth.keys.set.sh:262` calls `grove_provision_5_16_keys_required`). a ⚠️ comment beside the row says so
+  - **`git.grove.provision boot` is unshown** (r9 n3): it exists — `.agent/repo=.this/role=any/skills/git.grove.provision.boot.sh`
+  - **one file, many functions** (r4 n1): a bundle's `_.sh` holds its own leaves by repo convention (`repo.overview` — "operations shared by this leaf's phases")
+  - **`/etc/grove/platform` is a cross-domain read** (r5 n1): it is the declared contract of F005; infra's hetzner bootstrap writes it, and `grove_env_platform_file` is its one seam
+- added at i002:
+  - **a flat `&& pass` / `&& fail` pair, never `if/else`** (r4 n1, r6 n5, r9 n4): `rule.forbid.else-branches`. the new plays wrap the pair in one `expect` where the arm allows
+  - **`✋ ConstraintError:` / `💥 MalfunctionError:` lack a documented taxonomy** (r9 n2): `rule.require.qualified-error-headers` is it — caller fixes vs system fixes
+  - **`awsprofile_rows` is silent on an unset org** (r6 n1, r7 b2): both callers say it aloud — `configure.upsert.sh:184` and `configure.verify.sh:145` print 🌙 and `grove_org_absent_say`
+  - **the rack's "AFTER 5.6.aws, BEFORE 5.4.gh" contradicts its slot** (r8 n1): `5.devtools/_.sh` dispatches `5.6.aws → 5.12.rack → 5.4.gh`; digits are names, never order (`repo.overview`)
+  - **the per-org `TAILSCALE_AUTH_KEY` row** (r1 n2): ruled per-org by the director (F012); clean rework to `@all.camp`
+  - **the idempotency verdict is read by eye** (r9 n6): owed as a tracked play — `.dream/2026_10_26.track-the-plan-apply-apply-play.dream.md`
+- added at i003, on `git.grove.auth.github.set.sh`:
+  - **`source ~/.bash_aliases 2>/dev/null || true` swallows** (r2 n3, r6 n1, r7 n3): it is optional by design — it loads only `__term_as_ssh_host`, whose absence the clamp's own fallback branch covers. the sink no longer depends on it: the checkout's ductwork is sourced after it, always
+  - **help is matched anywhere in the arg vector** (r6 n3, r7 n4): deliberate — rhachet injects `--skill <slug>` ahead of the caller's args, so a `$1` test never fires (the comment above the match). no grove is named `help`
+  - **`--mode plan` opens ssh** (r7 n5): a plan is a survey here — it runs every probe and skips only the write (`repo.overview`, `--mode plan`). its "say what it would do" includes whether the rack already answers
+  - **the brief pushes into `….wip`, the skill drives `dev-env-setup`** (r1 n8): two checkouts, two jobs. `.wip` is the scratch tree an unmerged change is proven in; the auth skill operates the box's live checkout, whose `5.4.gh` is the one that must accept the pat
+  - **the brief narrates two dated sessions** (r6 n6): each is a dated, sourced measurement, the shortest form of the claim — the false-positive row of `rule.require.timeless-lessons`
+  - **`<slug>` in the brief's commands** (r9 n6): the rule is stated for any bundle; the slug is the reader's
+- **rework:** clean — each is a one-line change if the council disagrees
+- **risk:** low|safe
+- **confidence 85%, why not higher:** the laptop row costs a signed-in laptop one `5.16.keys` ask for a key its own join never reads; a council may prefer a cloud-only row
+- **where:** 5.1 peer round i001

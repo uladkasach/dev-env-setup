@@ -46,19 +46,23 @@
 #   rhx play.run --list
 #   rhx play.run --play prove.nvim-fetches-no-unpinned-plugin
 #   rhx play.run --play prove.git-alias-seam --within 600
+#   rhx play.run --all
 #
 # options:
 #   --play SLUG    the play to run. the `.play.sh` suffix is optional
 #   --list         name every play this box can run, then exit
-#   --within SECS  total bound, in seconds (default 900)
+#   --all          run every play --list names, one verdict line each; each
+#                  play's full output lands in a log dir the summary names
+#   --within SECS  bound per play, in seconds (default 900)
 #   --skill NAME   absorbed + ignored — rhachet injects this when invoked as
 #                  `rhx play.run …`. same for --repo / --role
 #   -h, --help     show this header
 #
 # exit:
-#   0 = the play passed
-#   1 = the play failed, or malfunctioned
+#   0 = the play passed (--all: every play passed)
+#   1 = the play failed, or malfunctioned (--all: at least one did)
 #   2 = a constraint: bad args, no such play, a forbidden verb, or a timeout
+#       (--all: none failed, and at least one declined or timed out)
 ######################################################################
 
 set -uo pipefail
@@ -75,6 +79,7 @@ PLAYDIR="$ROOT/.play/permanent"
 PLAY=""
 WITHIN=900
 LIST=0
+ALL=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -84,27 +89,28 @@ while [[ $# -gt 0 ]]; do
       shift; [[ $# -gt 0 ]] && shift ;;
     --play)
       shift
-      [[ $# -gt 0 ]] || { echo "   ✋ --play needs a value" >&2; exit 2; }
+      [[ $# -gt 0 ]] || { echo "   ✋ ConstraintError: --play needs a value" >&2; exit 2; }
       PLAY="$1"; shift ;;
     --within)
       shift
-      [[ $# -gt 0 ]] || { echo "   ✋ --within needs a value" >&2; exit 2; }
+      [[ $# -gt 0 ]] || { echo "   ✋ ConstraintError: --within needs a value" >&2; exit 2; }
       WITHIN="$1"; shift ;;
     --list) LIST=1; shift ;;
+    --all)  ALL=1; shift ;;
     -h|--help)
       sed -n '/^# usage:/,/^#####/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//;$d'
       exit 0 ;;
     # ⚠️ an unknown flag HALTS. a swallowed narrowing flag returns a verdict
     #    about a subject the caller never named
     *)
-      echo "   ✋ unknown flag: $1" >&2
-      echo "      valid: --play <slug>  --list  --within <secs>  --help" >&2
+      echo "   ✋ ConstraintError: unknown flag: $1" >&2
+      echo "      valid: --play <slug>  --list  --all  --within <secs>  --help" >&2
       exit 2 ;;
   esac
 done
 
 if [[ -z "$ROOT" || ! -d "$PLAYDIR" ]]; then
-  echo "   ✋ no tracked play dir at ${PLAYDIR:-<no checkout>}" >&2
+  echo "   ✋ ConstraintError: no tracked play dir at ${PLAYDIR:-<no checkout>}" >&2
   echo "      ⇒ an empty set would report as a pass, so this halts instead" >&2
   exit 2
 fi
@@ -149,8 +155,50 @@ if [[ "$LIST" -eq 1 ]]; then
   exit 0
 fi
 
+######################################################################
+# --all. the suite, one verdict per play
+#
+# ⚠️ .why each play goes back through THIS runner, by slug
+#      the index check and the verb check are this file's contract. a loop that
+#      ran `bash <file>` would skip both, so it calls `--play` and inherits them
+#
+# ⚠️ .why a declined play is never folded into "passed"
+#      a decline proved no claim. three counts, never two
+######################################################################
+if [[ "$ALL" -eq 1 ]]; then
+  [[ -z "$PLAY" ]] || { echo "   ✋ ConstraintError: --all and --play name two subjects; pick one" >&2; exit 2; }
+  # the suite's logs land in the checkout's gitignored `.log/`, where a ship report reads the
+  #   full-suite verdict — never a random /tmp dir no reader knows to look in
+  logdir="$ROOT/.log/role=mechanic/skill=play.run/what=all/$(date -u +%Y-%m-%dT%H-%M-%SZ).pid$$"
+  mkdir -p "$logdir" || { echo "   💥 MalfunctionError: could not create the log dir $logdir" >&2; exit 1; }
+  summary="$logdir/summary.log"
+  # every verdict line goes to stdout and to the summary, so the log holds what the human saw
+  say() { echo "$1"; echo "$1" >> "$summary"; }
+  say "🎭 play.run --all --within $WITHIN"
+  say "   ├─ logs: ${logdir#"$ROOT"/}"
+  say "   └─ verdicts"
+  passed=0; declined=0; failed=0
+  while IFS= read -r f; do
+    [[ -n "$f" ]] || continue
+    slug="$(basename "$f" .play.sh)"
+    prc=0
+    bash "${BASH_SOURCE[0]}" --play "$slug" --within "$WITHIN" > "$logdir/$slug.log" 2>&1 || prc=$?
+    case "$prc" in
+      0) passed=$(( passed + 1 ));     say "      ├─ ✔ $slug" ;;
+      2) declined=$(( declined + 1 )); say "      ├─ 🌙 $slug — declined or timed out" ;;
+      *) failed=$(( failed + 1 ));     say "      ├─ 💥 $slug — failed (exit $prc)" ;;
+    esac
+  done < <(git -C "$ROOT" ls-files -- '.play/permanent/*.play.sh' 2>/dev/null)
+  say "      └─ $passed passed · $declined declined · $failed failed"
+  echo ""
+  [[ "$failed" -gt 0 ]] && { echo "   💥 MalfunctionError: $failed play(s) failed — read each log under ${logdir#"$ROOT"/}" >&2; exit 1; }
+  [[ "$declined" -gt 0 ]] && { echo "   🌙 $declined play(s) declined or timed out, so proved no claim — read each log under ${logdir#"$ROOT"/}" >&2; exit 2; }
+  echo "🌲 every play passed"
+  exit 0
+fi
+
 [[ -n "$PLAY" ]] || {
-  echo "   ✋ name a play: rhx play.run --play <slug>   (or --list)" >&2
+  echo "   ✋ ConstraintError: name a play: rhx play.run --play <slug>   (or --list, or --all)" >&2
   exit 2
 }
 
@@ -163,7 +211,7 @@ fi
 ######################################################################
 case "$PLAY" in
   */*|..*|-*)
-    echo "   ✋ a play is named by SLUG, never by path: '$PLAY'" >&2
+    echo "   ✋ ConstraintError: a play is named by SLUG, never by path: '$PLAY'" >&2
     echo "      ⇒ every play lives in $PLAYDIR, so a path adds no reach and" >&2
     echo "        would let this runner become a general shell" >&2
     echo "      read what exists: rhx play.run --list" >&2
@@ -175,7 +223,7 @@ PLAY="${PLAY%.sh}"
 TARGET="$PLAYDIR/$PLAY.play.sh"
 
 if [[ ! -r "$TARGET" ]]; then
-  echo "   ✋ no play named '$PLAY'" >&2
+  echo "   ✋ ConstraintError: no play named '$PLAY'" >&2
   echo "      looked for: $TARGET" >&2
   echo "      read what exists: rhx play.run --list" >&2
   exit 2
@@ -211,7 +259,7 @@ fi
 #   silenced (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.13)
 ######################################################################
 if ! git -C "$ROOT" ls-files --error-unmatch -- "$TARGET" >/dev/null 2>&1; then
-  echo "   ✋ '$PLAY' is on disk and NOT in this repo's index" >&2
+  echo "   ✋ ConstraintError: '$PLAY' is on disk and NOT in this repo's index" >&2
   echo "      ⇒ this runner executes only what the repo PUBLISHES, because a" >&2
   echo "        pulled tree can place a file here — .play/permanent is not in" >&2
   echo "        GROVE_BOUNDARY_EXCLUDES, and .play/temporary is" >&2
@@ -227,13 +275,13 @@ fi
 case "$PLAY" in
   prove.*|verify.*|diagnose.*|await.*|hibernate.*) : ;;
   repair.*)
-    echo "   ✋ '$PLAY' is a repair play, and this repo has no such verb" >&2
+    echo "   ✋ ConstraintError: '$PLAY' is a repair play, and this repo has no such verb" >&2
     echo "      ⇒ a play that moves a box FORWARD toward the declared state is" >&2
     echo "        a BUNDLE (rule.forbid.repair-plays)" >&2
     echo "      fix: rhx grove.provision --what <slug> --mode apply" >&2
     exit 2 ;;
   *)
-    echo "   ✋ '$PLAY' does not name a verb this runner drives" >&2
+    echo "   ✋ ConstraintError: '$PLAY' does not name a verb this runner drives" >&2
     echo "      ⇒ allowed: prove.* verify.* diagnose.* await.* hibernate.*" >&2
     echo "      ⇒ the verb says what the play may do to the box, so an unnamed" >&2
     echo "        one carries no such promise" >&2
@@ -262,14 +310,14 @@ echo ""
 if [[ "$rc" -eq 0 ]]; then
   echo "🌲 $PLAY ✔"
 elif [[ "$rc" -eq 124 || "$rc" -eq 137 ]]; then
-  echo "   ✋ $PLAY did not finish within ${WITHIN}s, so it proved no claim" >&2
+  echo "   ✋ ConstraintError: $PLAY did not finish within ${WITHIN}s, so it proved no claim" >&2
   echo "      ⇒ a bound that elapses is not a verdict about the subject" >&2
   echo "      read it wider: rhx play.run --play $PLAY --within 3600" >&2
   exit 2
 elif [[ "$rc" -eq 2 ]]; then
-  echo "   ✋ $PLAY declined — its subject is absent, so it proved no claim" >&2
+  echo "   ✋ ConstraintError: $PLAY declined — its subject is absent, so it proved no claim" >&2
   exit 2
 else
-  echo "   ✋ $PLAY failed (exit $rc)" >&2
+  echo "   💥 MalfunctionError: $PLAY failed (exit $rc)" >&2
   exit 1
 fi

@@ -74,13 +74,13 @@ the whole tree holds five appends. none targets a byte-owned file:
 | `~/.profile` | none | `1.1.keybinds`, `1.2.power`, `5.1.node` — distinct markers ✔ |
 | `~/.bash_profile` | none | `2.5.zsh` ✔ |
 
-two appenders on one file is **fine** — distinct markers coexist, and each findserts
+two or more appenders on one file is **fine** — distinct markers coexist, and each findserts
 its own block. it is the byte-owner beside an appender that cannot settle.
 
 > ⚠️ this table counted FOUR appends and named two writers on `~/.profile` until
 > 2026-07-31. `1.2.power` was the third, and it was invisible here because it is
 > gated on `command -v system76-power`, so it appends on a pop-os laptop and
-> declines everywhere else — the grove where the audit ran among them. **an audit
+> declines everywhere else — the grove where this audit ran included. **an audit
 > run on one box counts the appends that box takes, not the appends the tree
 > declares.** the roll to trust is the source, not a run.
 
@@ -122,8 +122,8 @@ before you add a write to a file in `$HOME`, ask:
 
 ## .why the per-bundle proof cannot catch this
 
-`prove.bundles.plan-apply-apply` runs each bundle with `--what <slug>` ALONE, so it
-never sees two bundles meet. `2.5.zsh` in isolation converges its rc perfectly. the
+the per-bundle proof runs each bundle with `--what <slug>` ALONE, so it never sees two
+bundles meet. `2.5.zsh` in isolation converges its rc perfectly. the
 defect exists only in the sequence a real run performs.
 
 two checks cover it, at two grains:
@@ -131,7 +131,7 @@ two checks cover it, at two grains:
 | play | asks | scope |
 |---|---|---|
 | `prove.rc-ownership` | owner applies, neighbor applies, owner is **re-planned** | the ONE measured pair — a regression test |
-| `prove.tree.fixed-point` | full apply, then full plan — does any bundle complain? | **every** bundle, no list at all |
+| the tree-scale run (`rule.require.prove-each-bundle-plan-apply-apply`) | full apply twice, then full plan — does any bundle complain? | **every** bundle, no list at all |
 
 the second is the one that catches the NEXT instance. it names no bundle and no
 file: it drives the tree, asks the tree, and any slug that claims about state the
@@ -142,8 +142,8 @@ keeps this rule enforced without a roster to maintain
 ⚠️ the audit table above is a **snapshot, not a register**. do not treat it as the
 list to append to — a list that must be hand-updated is the defect this repo kills
 repeatedly, and it would go stale on the first bundle added by someone who did not
-read this file. it is here to show the shape, and `prove.tree.fixed-point` is what
-actually holds the line.
+read this file. it is here to show the shape, and the tree-scale run is what actually
+holds the line.
 
 ## .enforcement
 
@@ -151,7 +151,7 @@ actually holds the line.
 - a byte-owner added for a file that already has marker-appenders = **blocker**
 - an append with no marker (so a re-run doubles it) = **blocker**
 - a bundle that claims under `--mode plan` after a full-tree apply, and is not a
-  credential claim = **blocker** — that is `prove.tree.fixed-point`'s whole verdict
+  credential claim = **blocker** — that is the tree-scale run's whole verdict
 
 ## .see also
 

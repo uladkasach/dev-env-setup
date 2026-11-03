@@ -5,20 +5,21 @@
 --           1. after the deleted select, the diff session is still alive
 --           2. after the modified select, both diff panes are live windows
 --
--- .why  = measured 2026-10-07: codediff shows a deleted / added / untracked file
---         in ONE pane and closes the other. two such selects of opposite kinds in
---         a row closed the last diff window, the session was torn down, and every
---         later select did naught, silently (init.lua, the side_by_side wrapper)
+-- .why  = codediff shows a deleted / added / untracked file in ONE pane. a mix of
+--         such selects must never lose the diff view: no torn-down session, and a
+--         later modified file back in two panes
 --
 -- .the contract with its driver (`rhx nvim.test.headless --probe`)
---   PROBE_ARM  control | old-single-pane
+--   PROBE_ARM  control | forced-teardown
 --   PROBE_OUT  where to write the rows; never a fixed path
 --
 -- .the arms
---   control          the config as shipped
---   old-single-pane  codediff's own show_* functions put back (the fix off)
---                    → the session must die. if it lives, this probe cannot see
---                      the defect, and control's green proves naught (term=bite)
+--   control          the config as shipped: codediff's own show_* functions
+--   forced-teardown  after the deleted select, both diff panes are closed — the end
+--                    state codediff 2.41.1 reached on its own
+--                    → the session must read dead. if it reads alive, this probe
+--                      cannot see a lost view, and control's green proves naught
+--                      (term=bite)
 --
 -- .the rows
 --   world=<present|absent> [reason=...]
@@ -53,16 +54,16 @@ if not (status:find(' M mod.txt', 1, true) and status:find(' D del.txt', 1, true
 end
 vim.cmd('cd ' .. vim.fn.fnameescape(root))
 
--- wait on the FIX itself, never a clock: it lands inside codediff's lazy config
+-- wait on the module the selects reach, never a clock: it loads inside codediff's lazy config
 pcall(require, 'codediff')
-if not vim.wait(20000, function() return type(_G.codediff_single_pane_upstream) == 'table' and _G.codediff_single_pane_upstream.show_deleted_file ~= nil end, 20) then
-  say('world=absent reason=single_pane_wrapper_never_installed')
+local sbs
+if not vim.wait(20000, function()
+  local ok, mod = pcall(require, 'codediff.ui.view.side_by_side')
+  sbs = ok and mod or nil
+  return sbs ~= nil and type(sbs.show_deleted_file) == 'function'
+end, 20) then
+  say('world=absent reason=side_by_side_never_loaded')
   return quit()
-end
-
-if arm == 'old-single-pane' then
-  local sbs = require('codediff.ui.view.side_by_side')
-  for name, shipped in pairs(_G.codediff_single_pane_upstream) do sbs[name] = shipped end
 end
 
 vim.cmd('CodeDiff')
@@ -102,6 +103,14 @@ if not alive() then
 end
 ex.on_file_select(nnew.data); settle()
 ex.on_file_select(ndel.data); settle()
+-- forced-teardown: close both diff panes, the end state of the 2.41.1 chain
+if arm == 'forced-teardown' then
+  local s = lc.get_session(tab)
+  for _, w in ipairs({ s and s.original_win, s and s.modified_win }) do
+    if w and vim.api.nvim_win_is_valid(w) then pcall(vim.api.nvim_win_close, w, true) end
+  end
+  settle()
+end
 say(('session_after_deleted=%s'):format(alive() and 'alive' or 'dead'))
 
 ex.on_file_select(nmod.data); settle()

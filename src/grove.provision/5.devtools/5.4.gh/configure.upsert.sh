@@ -60,14 +60,12 @@ grove_provision_5_4_gh_configure_upsert() {
   local GH_KEYRACK_KEY="GITHUB_TOKEN"
   local GH_KEYRACK_ORG="@all"
   local GH_KEYRACK_ENV="camp"
-  # ⚠️ `aws.params`, never `os.secure` — shipped on purpose, never an interim
-  #   - every box that reaches THIS halt is a grove, and a grove is ec2
-  #   - IMDS is the one identity `aws.params` accepts for an `@all` slug
-  #   - a LOCAL box never arrives here, since `gh auth login` ran on the way past
-  #   - ⇒ a laptop's absence of IMDS costs this bundle no capability
-  #   - `os.secure` is a REPLICA, so a rotation must reach each holder
-  #   - 📜 `aws.params` proven live on grove-1 2026-08-05
-  local GH_KEYRACK_VAULT="aws.params"
+  # .the vault follows the PLATFORM — `grove_provision_5_4_gh_keyrack_vault` (`_.sh`)
+  #   - the read below names no vault: `keyrack get` reads the entry this box
+  #     holds, and off ec2 `5.12.rack` never wires an aws.params one. only the
+  #     fix-texts name a vault, so only they follow this choice
+  local GH_KEYRACK_VAULT
+  GH_KEYRACK_VAULT="$(grove_provision_5_4_gh_keyrack_vault)"
 
   ####################################################################
   # 0. already authed? then the declaration holds
@@ -118,7 +116,7 @@ grove_provision_5_4_gh_configure_upsert() {
       fi
 
       unset token
-      echo "   ✋ the rack HELD a github token and github refused it" >&2
+      echo "   ✋ ConstraintError: the rack HELD a github token and github refused it" >&2
       echo "      ⇒ this is not an absent credential — it is a rejected one, so a" >&2
       echo "        'keyrack set' would repair no part of it" >&2
       echo "      ⇒ usual cause: the pat expired, was revoked, or lacks the scopes" >&2
@@ -161,7 +159,7 @@ grove_provision_5_4_gh_configure_upsert() {
   #   - (`rule.forbid.tty-as-a-proxy-for-a-human`)
   ####################################################################
   if [[ "$GROVE_ENV_SERVER" != "local@unix" || ! -t 0 ]]; then
-    echo "   ✋ gh is unauthed, and the rack holds no '$GH_KEYRACK_KEY' to give it" >&2
+    echo "   ✋ ConstraintError: gh is unauthed, and the rack holds no '$GH_KEYRACK_KEY' to give it" >&2
     if [[ "$GROVE_ENV_SERVER" == "local@unix" ]]; then
       echo "      ⇒ this box CAN hold a human, and no terminal is attached to THIS" >&2
       echo "        run — a cron, a unit, or a detached job. 'gh auth login' blocks" >&2
@@ -206,7 +204,7 @@ grove_provision_5_4_gh_configure_upsert() {
     echo "         a mechanism — and keyrack rejects it with expected: \"1-2\"." >&2
     echo "" >&2
     echo "      the value is never an argument, so it reaches neither 'ps' nor the" >&2
-    echo "      shell history; keyrack writes it age-encrypted" >&2
+    echo "      shell history; keyrack writes it encrypted, in the vault named above" >&2
     echo "" >&2
     echo "      mint the pat at https://github.com/settings/tokens with 'repo' +" >&2
     echo "      'read:org'. see grove.auth.github.roadmap.md — the pat is phase 1," >&2
@@ -218,7 +216,7 @@ grove_provision_5_4_gh_configure_upsert() {
   # 3. the interactive login, where a human can answer it
   ####################################################################
   if ! gh auth login; then
-    echo "   ✋ gh auth login did not complete" >&2
+    echo "   ✋ ConstraintError: gh auth login did not complete" >&2
     echo "      ⇒ gh holds no credential, so every github reach fails on auth" >&2
     echo "      read why: gh auth status" >&2
     return 1

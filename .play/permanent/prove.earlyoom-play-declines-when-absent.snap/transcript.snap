@@ -1,0 +1,22 @@
+
+## earlyoom absent → declines
+rc=2
+🌙 earlyoom is not on this box, so no claim is proven
+   └─ to measure it here: sudo -v && rhx grove.provision --what 1.6.3.earlyoom --mode apply
+
+   🧹 restored: bait gone, no residue
+
+## earlyoom present → reaches both arms
+rc=0
+🔭 does earlyoom pick a leaked runtime over the session's own daemons?
+   ├─ bait systemd pid <pid>, oom_score <n>
+   ├─ bait node    pid <pid>, oom_score <n>
+   ├─ arm 'control'
+   │  ✔ victim=node — a --prefer name, and the systemd bait was spared
+   └─ arm 'old-default'
+      ✔ victim=systemd — the old args kill the session manager, so this play bites
+
+🌲 earlyoom spares the session, and the clamp is seen to bite
+
+   🧹 restored: bait gone, no residue
+

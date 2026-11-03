@@ -1,0 +1,377 @@
+## laptop · joined + shields up · upsert → no work, no write
+rc=0
+   • this node already joined the tailnet — no join owed
+   • shields up — this laptop refuses inbound tailnet traffic ✔
+writes: none
+
+## laptop · joined + shields up · verify → ✔
+rc=0
+   ✔ joined as a member · no tags · shields up · a camp grove is a peer
+writes: none
+
+## laptop · shields down · upsert → sets shields up
+rc=0
+   • this node already joined the tailnet — no join owed
+   • shields up — inbound tailnet traffic now refused ✔
+writes: sudo timeout 10 tailscale set --shields-up
+
+## laptop · shields down, the set does not take · upsert → 💥, never 'up'
+rc=1
+   • this node already joined the tailnet — no join owed
+   💥 MalfunctionError: shields-up was set, but the daemon does not report it
+      ⇒ check by hand: tailscale debug prefs | jq .ShieldsUp
+writes: sudo timeout 10 tailscale set --shields-up
+
+## laptop · shields down · verify → ✋
+rc=1
+   ✋ ConstraintError: this laptop accepts inbound tailnet traffic (shields down)
+      ⇒ a laptop reaches out and is never reached in; any service it listens on is open to the tailnet
+      fix: sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: none
+
+## laptop · prefs unread · verify → 💥, never 'up'
+rc=1
+   💥 MalfunctionError: could not read whether this laptop's shields are up
+      ⇒ an unread shield is never reported as up
+      read why: tailscale debug prefs
+writes: none
+
+## laptop · tagged · verify → ✋ (a laptop never takes tag:camp)
+rc=1
+   ✋ ConstraintError: this laptop carries tags 'tag:camp'
+      ⇒ the invariant 'a laptop never takes tag:camp' is broken
+      ⇒ log it out and sign in as yourself:
+          sudo tailscale logout && sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: none
+
+## laptop · no camp peer · verify → ✋
+rc=1
+   ✋ ConstraintError: joined as a member, but no camp grove (tag:camp) is a peer
+      ⇒ three causes: no camp grove is a node of this tailnet yet (none joined
+        by its provisioner, or each one removed); this laptop signed in to
+        another tailnet; or the camp's acl does not grant this login a camp grove
+      ⇒ none joined yet: the provisioner's join is owed (ahbode/infrastructure)
+      ⇒ another tailnet: sudo tailscale logout, then rerun and sign in to the camp's tailnet:
+          sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: none
+
+## laptop · Stopped · upsert → left as it is, no write
+rc=0
+   🌙 this node is joined and was taken down on purpose — left as it is
+      ⇒ to restore it: sudo tailscale up --shields-up
+writes: none
+
+## laptop · Stopped · verify → ✋ with the restore
+rc=1
+   ✋ ConstraintError: not joined — the daemon reads 'Stopped'
+      ⇒ the node was taken down; restore it: sudo tailscale up --shields-up
+writes: none
+
+## laptop · Starting · upsert → no join, no write
+rc=0
+   🌙 the daemon has not settled yet — no join owed; the verify below rereads it
+writes: none
+
+## laptop · Starting · verify → ✋, rerun in a moment
+rc=1
+   ✋ ConstraintError: not joined — the daemon reads 'Starting'
+      ⇒ the daemon has not settled (after a boot or a resume); rerun in a moment
+      fix: sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: none
+
+## laptop · NeedsMachineAuth · upsert → ✋, no write
+rc=1
+   ✋ ConstraintError: this node is joined and waits on a tailnet admin to approve it
+      ⇒ approve it in the tailscale admin console, then rerun
+writes: none
+
+## laptop · InUseOtherUser · upsert → ✋, no write
+rc=1
+   ✋ ConstraintError: another login on this machine holds tailscale
+      ⇒ tailscale serves one OS user at a time; that user must log it out
+      read why: tailscale status
+writes: none
+
+## laptop · NeedsLogin, no root · upsert → declines, no write
+rc=0
+   🌙 the tailnet sign-in is a BOX-WIDE fact, and this seat has no root
+      ⇒ this laptop is not on the tailnet yet
+      ⇒ on a laptop the seat with root is its human. run this ONCE, from a
+        terminal — the sudo -v is what lets the rhx run below reach root:
+        sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: none
+
+## laptop · NeedsLogin over ssh · upsert → ✋, no url, no write
+rc=1
+   ✋ ConstraintError: a member join is a laptop's own sign-in, and this seat reads as remote
+      ⇒ SSH_CONNECTION is set: this shell came in over ssh
+      ⇒ on a grove: its tier is wrong, so no url was minted. check /etc/grove/platform
+      ⇒ on your laptop: run it at the laptop's own keyboard, not over ssh
+writes: none
+
+## laptop · sign-in owed, url held · verify → ✋ and shows the held url
+rc=1
+   ✋ ConstraintError: not joined — the daemon reads 'NeedsLogin'
+      ⇒ the sign-in is owed — open this url in your browser, as yourself, then rerun:
+          https://login.example.com/a/held
+      fix: sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: none
+
+## laptop · sign-in owed, no url yet · verify → ✋, names the fix that mints one
+rc=1
+   ✋ ConstraintError: not joined — the daemon reads 'NeedsLogin'
+      ⇒ the sign-in is owed, and no url is minted yet — the fix below mints one
+      fix: sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: none
+
+## laptop · NeedsLogin · upsert → one shielded up, prints the minted url
+rc=0
+   🙋 sign in — open this url in your browser, as yourself:
+      https://login.example.com/a/minted
+      then rerun: sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: sudo timeout 20 tailscale up --shields-up
+
+## laptop · NeedsLogin, the up joins at once · upsert → joined as a member, shields up
+rc=0
+   • joined as a member
+   • shields up — this laptop refuses inbound tailnet traffic ✔
+writes: sudo timeout 20 tailscale up --shields-up
+
+## laptop · NeedsLogin, no url offered · upsert → 💥 with the client's words
+rc=1
+   💥 MalfunctionError: tailscale offered no login url
+      ⇒ the daemon reads 'NeedsLogin' and holds no AuthURL
+      ⇒ the client said:
+        backend error: the control server refused the stub's key
+      read why: systemctl status tailscaled; tailscale status
+writes: sudo timeout 20 tailscale up --shields-up
+
+## laptop · sign-in owed, url held · upsert → shows the held url, no second up
+rc=0
+   🙋 sign in — open this url in your browser, as yourself:
+      https://login.example.com/a/held
+      then rerun: sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: none
+
+## journey 1 · an agent shell · upsert → declines, no write
+rc=0
+   🌙 the tailnet sign-in is a BOX-WIDE fact, and this seat has no root
+      ⇒ this laptop is not on the tailnet yet
+      ⇒ on a laptop the seat with root is its human. run this ONCE, from a
+        terminal — the sudo -v is what lets the rhx run below reach root:
+        sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: none
+
+## journey 2 · the human, with root · upsert → mints the url
+rc=0
+   🙋 sign in — open this url in your browser, as yourself:
+      https://login.example.com/a/minted
+      then rerun: sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: sudo timeout 20 tailscale up --shields-up
+
+## journey 3 · after the sign-in · upsert → no work, no second up
+rc=0
+   • this node already joined the tailnet — no join owed
+   • shields up — this laptop refuses inbound tailnet traffic ✔
+writes: none
+
+## journey 4 · after the sign-in · verify → ✔
+rc=0
+   ✔ joined as a member · no tags · shields up · a camp grove is a peer
+writes: none
+
+## laptop · key differs from the pin · upsert → ✋, source not declared
+rc=1
+   ✋ ConstraintError: key fingerprint mismatch — <fixture>/tmp/tailscale.gpg
+      expected exactly these primary key(s):
+        2596A99EAAB33821893C0A79458CA832957F5868
+      received:
+        00000000000000000000000000000000DEADBEEF
+      ⇒ do NOT install this key. it is the trust anchor for every
+        package apt will take from that source, so a wrong key here is
+        not one bad install — it is every future one, each with a clean
+        signature check against the wrong anchor
+      ⇒ an EXTRA key is as bad as a wrong one: the pin is a set, so a
+        keyring holding the right key plus another still fails, and
+        that is deliberate
+      ⇒ if upstream genuinely rotated, source the new fingerprint from
+        their published documentation — never from the download you are
+        trying to verify
+      ⇒ tailscale is NOT installed, and its source is NOT declared. a box
+        with no tailscale beats a box whose apt trusts an unvouched anchor
+      ⇒ the pin's source: keyserver.ubuntu.com, uid info@tailscale.com.
+        a real rotation is confirmed from two channels before the pin moves
+writes: web_fetch
+
+## laptop · daemon state unread · upsert → 💥, never 'up'
+rc=1
+   💥 MalfunctionError: could not read the tailscale daemon's state (got '?')
+      ⇒ an unread state is never treated as 'not joined' — a second `up`
+        on a joined node rewrites it
+      read why: systemctl status tailscaled; tailscale status
+writes: none
+
+## laptop · tailscale from another source · upsert → declares the signed source
+rc=0
+   • tailscale's release key verified against its pinned fingerprint ✔
+   • apt source: pkgs.tailscale.com/stable/ubuntu <codename>
+   • tailscaled enabled at boot, active
+writes: web_fetch · sudo dd if=<fixture>/tmp/tailscale.gpg of=<fixture>/tailscale.gpg status=none · sudo chmod go+r <fixture>/tailscale.gpg · sudo tee <fixture>/tailscale.list · pkg_refresh · sudo systemctl enable --now tailscaled
+
+## laptop · tailscaled masked or down · verify → ✋, names systemctl status
+rc=1
+   • tailscale present (0.0.0-stub) ✔
+   • apt source declared, signed by the pinned key ✔
+   ✋ ConstraintError: tailscaled is not both enabled and active
+      read why: systemctl status tailscaled
+      fix: sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: none
+
+## laptop · source declared, package absent · upsert → refreshes, installs, names the version
+rc=0
+   • tailscale installed (0.0.0-stub)
+   • tailscaled enabled at boot, active
+writes: pkg_refresh · pkg_install tailscale · sudo systemctl enable --now tailscaled
+
+## laptop · the install lands no client · upsert → 💥, never 'installed ()'
+rc=1
+   💥 MalfunctionError: apt reports tailscale installed, yet `tailscale version` answers naught
+      read why: command -v tailscale; dpkg -L tailscale
+writes: pkg_refresh · pkg_install tailscale
+
+## case 2 · all present · provision upsert → no work, no write
+rc=0
+   • tailscale already installed — no work
+writes: none
+
+## case 2 · all present · provision verify → ✔
+rc=0
+   • tailscale present (0.0.0-stub) ✔
+   • apt source declared, signed by the pinned key ✔
+   • tailscaled enabled and active ✔
+writes: none
+
+## case 3 [t0] · bare laptop, agent shell, no root · upsert → declines, no fetch, no write
+rc=0
+   🌙 tailscale is a BOX-WIDE fact, and this seat has no root
+      ⇒ source declared: no · package: no · tailscaled up: no
+      ⇒ on a laptop the seat with root is its human. run this ONCE, from a
+        terminal — the sudo -v is what lets the rhx run below reach root:
+        sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: none
+
+## case 3 [t0] · bare laptop, no client, no source · verify → ✋, names the fix
+rc=1
+   ✋ ConstraintError: tailscale is not on PATH
+      ⇒ the one package brings the client and tailscaled, so the daemon is not read apart
+   ✋ ConstraintError: tailscale's signed apt source is not declared as this bundle writes it
+      want: deb [signed-by=<fixture>/tailscale.gpg] https://pkgs.tailscale.com/stable/ubuntu <codename> main in <fixture>/tailscale.list
+      and:  <fixture>/tailscale.gpg with primary 2596A99EAAB33821893C0A79458CA832957F5868
+      ⇒ a commented-out line, a stale codename, or a swapped key all read here:
+        without the exact source, `apt upgrade` never brings tailscale current
+      fix: sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+writes: none
+
+## cloud@aws.ec2 · joined tag:camp · upsert → no write
+rc=0
+   • this node already joined the tailnet — no join owed
+writes: none
+
+## cloud@aws.ec2 · joined tag:camp · verify → ✔
+rc=0
+   ✔ joined · tags = tag:camp
+writes: none
+
+## cloud@aws.ec2 · client and unit present · provision verify → ✔
+rc=0
+   • tailscale present (0.0.0-stub) ✔
+   • tailscaled enabled and active ✔
+writes: none
+
+## cloud@aws.ec2 · joined untagged · verify → ✋ (a grove never joins as a member)
+rc=1
+   ✋ ConstraintError: this grove is joined untagged, as a USER — never as tag:camp
+      ⇒ the invariant 'a remote grove never joins as a member' is broken
+      ⇒ log it out (sudo tailscale logout), then its provisioner rejoins it:
+      ⇒ a grove's join is its provisioner's (ahbode/infrastructure):
+          rhx tailscale.authkey.mint --grove <this grove> --mode apply
+        then the provision path's join, as root, with --advertise-tags=tag:camp
+writes: none
+
+## cloud@aws.ec2 · other tags · verify → ✋
+rc=1
+   ✋ ConstraintError: this grove carries tags 'tag:other', not exactly 'tag:camp'
+      ⇒ the camp's acl names tag:camp; another tag set reaches other doors
+      ⇒ the provisioner's tailnet policy retags it (ahbode/infrastructure, declastruct)
+writes: none
+
+## cloud@aws.ec2 · Starting · verify → ✋
+rc=1
+   ✋ ConstraintError: not joined — the daemon reads 'Starting'
+      ⇒ the daemon has not settled (after a boot or a resume); rerun in a moment
+writes: none
+
+## cloud@aws.ec2 · not joined · upsert → no up, no write
+rc=0
+   🌙 a grove is joined by its provisioner, never here — the verify below checks it
+writes: none
+
+## cloud@aws.ec2 · not joined · verify → ✋, names the provisioner's join
+rc=1
+   ✋ ConstraintError: not joined — the daemon reads 'NeedsLogin'
+      ⇒ a grove's join is its provisioner's (ahbode/infrastructure):
+          rhx tailscale.authkey.mint --grove <this grove> --mode apply
+        then the provision path's join, as root, with --advertise-tags=tag:camp
+writes: none
+
+## cloud@hetzner.hetzbot · joined tag:camp · upsert → no write
+rc=0
+   • this node already joined the tailnet — no join owed
+writes: none
+
+## cloud@hetzner.hetzbot · joined tag:camp · verify → ✔
+rc=0
+   ✔ joined · tags = tag:camp
+writes: none
+
+## cloud@hetzner.hetzbot · client and unit present · provision verify → ✔
+rc=0
+   • tailscale present (0.0.0-stub) ✔
+   • tailscaled enabled and active ✔
+writes: none
+
+## cloud@hetzner.hetzbot · joined untagged · verify → ✋ (a grove never joins as a member)
+rc=1
+   ✋ ConstraintError: this grove is joined untagged, as a USER — never as tag:camp
+      ⇒ the invariant 'a remote grove never joins as a member' is broken
+      ⇒ log it out (sudo tailscale logout), then its provisioner rejoins it:
+      ⇒ a grove's join is its provisioner's (ahbode/infrastructure):
+          rhx tailscale.authkey.mint --grove <this grove> --mode apply
+        then the provision path's join, as root, with --advertise-tags=tag:camp
+writes: none
+
+## cloud@hetzner.hetzbot · other tags · verify → ✋
+rc=1
+   ✋ ConstraintError: this grove carries tags 'tag:other', not exactly 'tag:camp'
+      ⇒ the camp's acl names tag:camp; another tag set reaches other doors
+      ⇒ the provisioner's tailnet policy retags it (ahbode/infrastructure, declastruct)
+writes: none
+
+## cloud@hetzner.hetzbot · Starting · verify → ✋
+rc=1
+   ✋ ConstraintError: not joined — the daemon reads 'Starting'
+      ⇒ the daemon has not settled (after a boot or a resume); rerun in a moment
+writes: none
+
+## cloud@hetzner.hetzbot · not joined · upsert → no up, no write
+rc=0
+   🌙 a grove is joined by its provisioner, never here — the verify below checks it
+writes: none
+
+## cloud@hetzner.hetzbot · not joined · verify → ✋, names the provisioner's join
+rc=1
+   ✋ ConstraintError: not joined — the daemon reads 'NeedsLogin'
+      ⇒ a grove's join is its provisioner's (ahbode/infrastructure):
+          rhx tailscale.authkey.mint --grove <this grove> --mode apply
+        then the provision path's join, as root, with --advertise-tags=tag:camp
+writes: none

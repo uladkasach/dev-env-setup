@@ -43,6 +43,12 @@ a fact about the HARDWARE, never by a judgment about what a box "probably needs"
 binary reaches both kinds; the login does not. that is a third, correct shape — do not read
 their `local@unix` test as a decline of the tool.
 
+⚠️ `5.23.tailscale` is a fourth shape: **the tool reaches both kinds; only its WRITER differs.**
+on `cloud@*` the provisioner installs and joins it, and the bundle verifies — a ✋ where it is
+absent. no divergence exists to approve, so it takes no row above. the ownership boundary is a
+choice (`nurture`, in the nature/nurture sense: chosen, never forced by the box), recorded in
+`define.invariant.grove-tailscale-has-one-owner`.
+
 ## 🛑 .the test — approved, or a miss?
 
 > **what does the decline NAME, and can that subject exist on the other kind?**

@@ -340,7 +340,9 @@ for f in "${FILES[@]}"; do
           |.behavior/*/0.tasklist.md|.route/*/0.tasklist.md \
           |.behavior/*/[0-9]*.blueprint*.md|.route/*/[0-9]*.blueprint*.md \
           |.behavior/*/[0-9]*.execution*.md|.route/*/[0-9]*.execution*.md \
-          |.behavior/*/[0-9]*.verification*.md|.route/*/[0-9]*.verification*.md)
+          |.behavior/*/[0-9]*.verification*.md|.route/*/[0-9]*.verification*.md \
+          |.behavior/*/.radio/*|.route/*/.radio/*)
+            # a .radio record holds a dispatched task's body as sent: a dated record, never acted on
             echo "   │  🌙 $f:$lineno — '$raw' sits in a route RECORD; read as evidence" >&2
             vague=$(( vague + 1 ))
             continue

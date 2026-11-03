@@ -28,9 +28,9 @@ grove_provision_5_12_rack_slug_env()   { printf 'camp'; }
 grove_provision_5_12_rack_slug_vault() { printf 'aws.params'; }
 
 # .what = is this box on the ec2 PLATFORM — the only place `aws.params` may be written
-# 🛑 `rule.forbid.aws-params-off-ec2`. a local or house grove has no ec2 identity,
-#   so an `aws.params` write there reads ssm as whatever credential the human's
-#   shell holds, rewires the entry, and PUTs the value back into that account
+# 🛑 `rule.forbid.aws-params-off-ec2`. a local, house, or hetzner grove has no ec2
+#   identity, so an `aws.params` write there reads ssm as whatever credential the
+#   human's shell holds, rewires the entry, and puts the value back into that account
 # .why the PLATFORM half of the tag, never the tier — `cloud` names who reaches the
 #   box, `aws.ec2` names the fact this depends on, and any tag this repo does not
 #   know yet (a house grove) fails CLOSED
@@ -38,9 +38,9 @@ grove_provision_5_12_rack_platform_is_ec2() { [[ "${GROVE_ENV_SERVER:-}" == *@aw
 
 # .what = the aws-profile slug, and the ONE value it ever holds
 # .why
-#   - every CLOUD grove is ec2 for now, so IMDS answers `5.6.aws`'s `ambient`
-#     role there. a local or house grove has no ec2 identity, so this slug
-#     declines on it (`rule.forbid.aws-params-off-ec2`)
+#   - an ec2 grove answers `5.6.aws`'s `ambient` role over imds. a local, house,
+#     or hetzner grove has no ec2 identity, so this slug declines on it
+#     (`rule.forbid.aws-params-off-ec2`)
 #   - no secret is stored: `ambient` names an identity, and an instance
 #     role's keys rotate on aws's clock, so a stored copy would go stale
 #   - ONLY `camp`. every other env is a REACH — a hop out of camp into another
@@ -116,7 +116,9 @@ grove_provision_5_12_rack_declared() {
   printf '%s' "$envs"
 }
 
-# .what = the ssm parameter name, computed the same way keyrack computes it
+# .what = the ssm parameter name of this bundle's ONE aws.params slug — the
+#   `_slug_*` github token — computed the same way keyrack computes it. no other
+#   slug is addressed through it
 # .why reproduces keyrack's own contract, so read and write address the same
 #   parameter; substitutes `_all_` for `@all`, outside ssm's charset
 grove_provision_5_12_rack_param_name() {
@@ -132,7 +134,8 @@ grove_provision_5_12_rack_param_name() {
 
 # .what = a directory that IS a git repo, for keyrack's cli to run from
 # .why rhachet's cli calls getGitRepoRoot first, and a pushed checkout has no
-#   .git by design — this names a throwaway empty `git init` dir instead
+#   .git by design — this names a throwaway empty dir instead, and
+#   `configure.upsert`'s first step runs its `git init` (idempotent)
 grove_provision_5_12_rack_gitroot() { printf '%s/.local/state/keyrack.gitroot' "$HOME"; }
 
 # .what = declare ONE org in the scratch keyrack.yml
@@ -143,8 +146,16 @@ grove_provision_5_12_rack_gitroot() { printf '%s/.local/state/keyrack.gitroot' "
 #     against org A's declaration answers EMPTY
 #   - .refs = gotcha.5-12-rack.demo=entry-vs-value
 grove_provision_5_12_rack_declare_org() {
-  local gitroot="$1" org="$2" key e
+  local gitroot="$1" org="$2" key e envs
   key="$(grove_provision_5_12_rack_awsprofile_key)"
+  # an undeclared org refuses HERE, before the file is written — a `for` over the
+  #   bare substitution would lose that rc and write `org:` with no envs
+  if ! envs="$(grove_provision_5_12_rack_declared "$org")"; then
+    echo "   ✋ ConstraintError: org '$org' has no declared rack table, and is not this grove's own (GROVE_ORG='${GROVE_ORG:-}')" >&2
+    echo "      ⇒ a grove reaches its own org only (rule.require.a-grove-reaches-its-own-org-only)" >&2
+    echo "      fix: declare the org's envs in grove_provision_5_12_rack_declared, in 5.12.rack/_.sh" >&2
+    return 1
+  fi
   mkdir -p "$gitroot/.agent" || return 1
   {
     printf '# .written by 5.12.rack — a scratch git root, NOT a checkout\n'
@@ -154,7 +165,7 @@ grove_provision_5_12_rack_declare_org() {
     printf '#   - it declares MORE envs than this org sets, since a declaration\n'
     printf '#     is a legal name and not a value — see `_.sh`, `_declared`\n'
     printf 'org: %s\n' "$org"
-    for e in $(grove_provision_5_12_rack_declared "$org"); do
+    for e in $envs; do
       printf 'env.%s:\n' "$e"
       printf '  - %s\n' "$key"
     done

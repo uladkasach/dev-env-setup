@@ -3262,27 +3262,6 @@ local PLUGIN_SPEC = {
         end
       end)()
 
-      -- .what = before codediff shows a ONE-pane file (deleted, added, untracked),
-      --         put both diff panes back, so the pane it then closes is never the last
-      --
-      -- .why  = measured 2026-10-07: one deleted file after an untracked one (or the
-      --         reverse) and the diff view vanished, and no later select opened any
-      --         diff. the chain, in codediff 2.41.1:
-      --           - show_single_file (ui/view/side_by_side.lua:717-727) closes the
-      --             side it does not keep. a deleted file keeps the ORIGINAL pane;
-      --             an untracked or added one keeps the MODIFIED pane
-      --           - after one single-pane select, the other side is already gone.
-      --             so the next select of the OPPOSITE kind finds its keep-side dead
-      --             and closes the one live pane left
-      --           - the WinClosed hook (ui/lifecycle/cleanup.lua:144-170) counts zero
-      --             diff windows and tears the session down
-      --           - every later select returns at `if not session then return`
-      --             (side_by_side.lua:398-401, 694-697), and no caller reads that
-      --             return — a silent dead end
-      --         ⇒ restore the pair first, with the one restore codediff's own
-      --           update uses (get_codediff_diff_wins). the close then always
-      --           leaves the kept pane alive
-      --
       -- .what = re-render the explorer ONCE after a resize burst, never once per step
       --
       -- .why  = measured 2026-10-07 at 1000 changed files: codediff hooks WinResized
@@ -3351,25 +3330,6 @@ local PLUGIN_SPEC = {
         --    measured: the clamp read 0 renders in both arms until this line
         local ex_ok, explorer_mod = pcall(require, 'codediff.ui.explorer')
         if ex_ok then explorer_mod.create = render_mod.create end
-      end)()
-
-      -- clamp: prove.codediff-single-pane-keeps-the-view
-      ;(function()
-        local ok, side_by_side = pcall(require, 'codediff.ui.view.side_by_side')
-        if not ok then return end
-        local names = { 'show_untracked_file', 'show_deleted_file', 'show_added_virtual_file', 'show_deleted_virtual_file' }
-        -- the shipped functions, exposed so the clamp can re-break the fix
-        _G.codediff_single_pane_upstream = _G.codediff_single_pane_upstream or {}
-        for _, name in ipairs(names) do
-          local shipped = side_by_side[name]
-          if type(shipped) == 'function' and not _G.codediff_single_pane_upstream[name] then
-            _G.codediff_single_pane_upstream[name] = shipped
-            side_by_side[name] = function(tabpage, ...)
-              pcall(get_codediff_diff_wins, tabpage)
-              return shipped(tabpage, ...)
-            end
-          end
-        end
       end)()
 
 

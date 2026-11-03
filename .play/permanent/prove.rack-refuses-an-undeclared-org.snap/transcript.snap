@@ -1,0 +1,31 @@
+🌲 prove.rack-refuses-an-undeclared-org
+   ├─ an undeclared org, not this grove's own → ✋, no file
+   │  ├─ GROVE_ORG=aether · org=nobody
+   │  ├─ rc=1 · keyrack.yml written: no
+   │  │     ✋ ConstraintError: org 'nobody' has no declared rack table, and is not this grove's own (GROVE_ORG='aether')
+   │  │        ⇒ a grove reaches its own org only (rule.require.a-grove-reaches-its-own-org-only)
+   │  │        fix: declare the org's envs in grove_provision_5_12_rack_declared, in 5.12.rack/_.sh
+   │  └─ ✔
+   │
+   ├─ a declared org → writes org + its envs
+   │  ├─ GROVE_ORG=aether · org=aether
+   │  ├─ rc=0 · keyrack.yml written: yes
+   │  │  yml: org: aether
+   │  │  yml: env.camp:
+   │  │  yml:   - AWS_PROFILE
+   │  │  yml: env.test:
+   │  │  yml:   - AWS_PROFILE
+   │  │  yml: env.prep:
+   │  │  yml:   - AWS_PROFILE
+   │  │  yml: env.prod:
+   │  │  yml:   - AWS_PROFILE
+   │  └─ ✔
+   │
+   └─ this grove's own org, with no table → camp only
+      ├─ GROVE_ORG=newco · org=newco
+      ├─ rc=0 · keyrack.yml written: yes
+      │  yml: org: newco
+      │  yml: env.camp:
+      │  yml:   - AWS_PROFILE
+      └─ ✔
+

@@ -2,80 +2,63 @@
 
 ## .what
 
-how to run `prove.bundles.plan-apply-apply` — the play that satisfies
-`rule.require.prove-each-bundle-plan-apply-apply` for a whole set of bundles at once, on a
-grove, and judges each one mechanically.
+how to run the three proofs `rule.require.prove-each-bundle-plan-apply-apply` demands — `plan`,
+`apply`, `apply`, per bundle, on a grove, output read — and how to read each verdict.
 
-the rule says: three runs per bundle (`plan`, `apply`, `apply`), on a grove, output read. this
-play is how you do that without 3N hand-typed commands and without a human who compares two
-long outputs by eye.
+## 🛑 .no tracked play paves this today
 
-## .why a play rather than the three commands by hand
-
-the three commands run by hand, and lose three things:
-
-| by hand | with the play |
-|---|---|
-| the idempotency verdict is a human eyeball over two ~40-line outputs | the two applies are DIFFED, with a named allow-list of lines permitted to differ |
-| the outputs live in one scrollback and then are gone | every run is kept on the grove under `~/.grove.proof/` |
-| "which bundles did we prove?" is a memory | the set under proof is a list in a tracked file, so it is a fact in git |
-
-it also catches what an eye slides past — see `.the false positive` below, where its flag was
-wrong AND its lesson was real.
+`prove.bundles.plan-apply-apply` ran the three per bundle and diffed the two applies. it lived
+under the gitignored `.play/temporary/`, so no checkout carries it: `--play` with that name
+finds no file, on any box. the three runs below are the paved path until a tracked play under
+`.play/permanent/` replaces it (`.what a tracked play owes`, below).
 
 ## .the loop
 
-three commands, always in this order:
+always in this order:
 
 ```sh
 # 1. wake it, if the tunnel is down (rule.require.wake-the-grove-freely)
 rhx git.grove.wake grove-1
 
-# 2. land THIS worktree on the grove — the play runs what you pushed, not main
+# 2. land THIS worktree on the grove — the sends run what you pushed, not main
 #    ⚠️ `--from .`, never `--from src`: `5.1.node` reads the package.json BESIDE
 #       src/, so a .wip that holds only src/ raises a 5-claim cascade off one
 #       absent manifest (howto.add-a-new-grove, `.the push USED to be partial`)
 rhx git.grove.push grove-1 --from . --into git/more/dev-env-setup.wip --mode apply
 
-# 3. run the proof, through the duct
-rhx git.grove.send grove-1 --play prove.bundles.plan-apply-apply
+# 3. run the three, through the duct — one step per send, and read each
+rhx git.grove.send grove-1 --what 'rhx grove.provision --what <slug> --mode plan'
+rhx git.grove.read grove-1 --lines 40
+rhx git.grove.send grove-1 --what 'rhx grove.provision --what <slug> --mode apply'
+rhx git.grove.read grove-1 --lines 40
+rhx git.grove.send grove-1 --what 'rhx grove.provision --what <slug> --mode apply'
 rhx git.grove.read grove-1 --lines 40
 ```
 
-step 3 is a `--play`, never a chained `--what`, and **never a raw ssh**
-(`rule.require.reach-a-grove-through-its-duct` — `Bash(ssh:*)` is denied in
+step 3 is one step per `--what` — `git.grove.send` refuses a chained one — and **never a raw
+ssh** (`rule.require.reach-a-grove-through-its-duct` — `Bash(ssh:*)` is denied in
 `.claude/settings.json` for exactly this reason).
 
-step 2 is not optional. the play runs the checkout that is ON the grove. skip the push and you
+step 2 is not optional. the sends run the checkout that is ON the grove. skip the push and you
 will confidently prove the previous revision.
 
 ## .how to read the verdict
 
-each bundle gets one line. a pass is unambiguous:
+each bundle owes four claims, and each run's output is where you read them:
 
-```
-── 2.5.zsh
-   ✔ plan=0 apply=0 reapply=0 · converged · no prompt
-```
-
-a failure names which of four claims broke:
-
-| verdict | what it means | is it a real defect? |
+| claim breaks | what it means | is it a real defect? |
 |---|---|---|
-| `plan-mutated` | an `*.upsert` ran during `--mode plan` | **always** — plan is the run a human makes first *because* it is safe |
-| `not-idempotent` | the second apply differs from the first | **always** — read the `.4.drift.txt` diff |
-| `prompt-opened` | a question was asked on a headless box | **always** — on a duct the question eats the next command sent |
-| `apply-nonzero(1/1)` | both applies exited non-zero | **it depends — you must judge** |
+| plan mutated | an upsert line in the plan run lacks `— would run (plan)` | **always** — plan is the run a human makes first *because* it is safe |
+| not idempotent | the second apply's output differs from the first in any line but a timestamp or a duration | **always** — the difference is the answer |
+| prompt opened | a question was asked on a headless box | **always** — on a duct the question eats the next command sent |
+| apply non-zero, both runs | both applies exited non-zero | **a gap or a defect — read each ✋** |
 
 ### the one verdict that needs your judgment
 
-`apply-nonzero(1/1)` is deliberately NOT auto-failed, because the rule's own pass condition
-allows it:
-
-> exit 0, **or an exit whose failures are verify claims the box genuinely does not yet
-> satisfy**
-
-so read the output and decide which you have:
+an apply that exits non-zero on both runs is NOT auto-failed. the rule's apply conditions
+(`rule.require.prove-each-bundle-plan-apply-apply`, `.how`, items 2 and 3) pass it when every ✋
+is a **gap** — what only a human or a credential can supply — and fail it on any **defect**.
+read the output and decide which you have:
 
 - **a genuine gap the box cannot close by itself** → the bundle is fine. `2.3.ssh` exits 1 on a
   grove because it holds no ssh key and correctly REFUSES to generate an unprotected one;
@@ -86,33 +69,17 @@ so read the output and decide which you have:
 the tell: does the ✋ name something only a **human or a credential** can supply? then it is a
 gap. does it name something the **bundle itself** was supposed to do? then it is a defect.
 
-```sh
-rhx git.grove.send grove-1 --what 'cat /home/camper/.grove.proof/2.3.ssh.3.reapply.txt'
-rhx git.grove.read grove-1 --lines 40
-```
+## .what a tracked play owes, when one is written
 
-## .the evidence it leaves
+the scratch play kept three properties the by-hand loop lacks. a replacement under
+`.play/permanent/` owes all three:
 
-four files per bundle, on the grove, under `~/.grove.proof/`:
-
-| file | what |
-|---|---|
-| `<slug>.1.plan.txt` | the plan run |
-| `<slug>.2.apply.txt` | the first apply |
-| `<slug>.3.reapply.txt` | the second apply — the state every future run will find |
-| `<slug>.4.drift.txt` | the diff of the two applies; empty on a converged bundle |
-
-`.4.drift.txt` is the one to read first on a `not-idempotent` verdict. it is the answer, not a
-hint toward it.
-
-## .how to add a bundle to the proof set
-
-edit `WHAT_ALL` in the play. that edit is the point — it makes the scope of a proof a reviewed
-diff rather than an argument someone typed once.
-
-do **not** replace the list with a walk of the bundle tree. a walk proves whatever sits on
-disk, so the set under proof would change silently as bundles are added, and "what did we claim
-to prove?" would stop being answerable from git.
+- **the runs kept** — plan, apply, reapply, and their diff, per bundle, on the grove
+- **the diff mechanized** — the two applies diffed, with a named allow-list of lines permitted
+  to differ, so idempotency is a computed verdict rather than an eyeball
+- **the set declared** — the bundles under proof as a list in the tracked play, never a walk of
+  the tree. a walk proves whatever sits on disk, so the set would change silently as bundles are
+  added, and "what did we claim to prove?" would stop being answerable from git
 
 ## .the caveat that limits every proof
 
@@ -130,8 +97,9 @@ narrower than it looks, and it should be reported as what it is.
 
 ## .the false positive worth knowing about
 
-🛑 **never detect `plan-mutated` by a word search.** a grep for `declared|installed|set |
-removed` fires on `2.2.git`, whose plan run writes not one byte — what it matches is the
+🛑 **never detect a mutated plan by a word search** — by eye, or in the tracked play that
+replaces the scratch one. a grep for
+`declared|installed|set |removed` fires on `2.2.git`, whose plan run writes not one byte — what it matches is the
 **verify's** success report:
 
 ```
@@ -152,7 +120,7 @@ looks.
 
 ## .see also
 
-- `rule.require.prove-each-bundle-plan-apply-apply` — the rule this play satisfies, and why a grove is the only valid target
-- `rule.require.reach-a-grove-through-its-duct` — why `--play`, never raw ssh
+- `rule.require.prove-each-bundle-plan-apply-apply` — the rule these runs satisfy, and why a grove is the only valid target
+- `rule.require.reach-a-grove-through-its-duct` — why the duct, never raw ssh
 - `rule.require.idempotent-install-procedures` — the property the second apply proves
 - `howto.provision-a-grove.md` — the wider grove loop this sits inside

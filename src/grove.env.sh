@@ -24,10 +24,11 @@
 #         `server` carries two independent facts in `$tier@$platform`, and a
 #         provisioner needs both:
 #
-#           local@unix     a laptop       screen: yes   human: yes
-#           cloud@aws.ec2  a grove        screen: no    human: no
+#           local@unix              a laptop         screen: yes   human: yes
+#           cloud@aws.ec2           an ec2 grove     screen: no    human: no
+#           cloud@hetzner.hetzbot   a hetzner grove  screen: no    human: no
 #
-#         those two are the WHOLE detected set — see `.the CLOSED SET` below.
+#         those three are the WHOLE detected set — see `.the CLOSED SET` below.
 #
 #         a bare `local` test would still be the wrong shape even so, because
 #         tier alone cannot express "local tier, no human" — the ci-runner case
@@ -72,11 +73,17 @@
 ######################################################################
 
 ######################################################################
-# ⚠️ .the CLOSED SET — this repo detects exactly two platforms
+# ⚠️ .the CLOSED SET — this repo detects exactly three platforms
 #
-#      `aws.ec2` (a grove) and `unix` (a laptop). that is the whole set. we own
-#      every machine this runs on, so the set is not a guess about the world — it
-#      is a list of boxes we can name.
+#      `aws.ec2` (an ec2 grove), `hetzner.hetzbot` (a hetzner grove), and `unix`
+#      (a laptop). that is the whole set. we own every machine this runs on, so
+#      the set is not a guess about the world — it is a list of boxes we can name.
+#
+# .why the platform names the box LIFECYCLE, never the reach
+#      `aws.ec2` is where imds, hibernate, and ssm live; `hetzner.hetzbot` is where
+#      hetzner's robot reset and rescue live. the tier (`cloud`) is what every
+#      reach and every "is a human here?" gate reads, so two cloud platforms share
+#      every one of those answers (uladkasach/dev-env-setup#172).
 #
 # .why probes for `aws.lambda` and `cicd` were REMOVED, 2026-07-30
 #      both existed, both were correct, and neither had a machine to run on. a
@@ -272,36 +279,89 @@ grove_env_probe_aws_ec2_imds() {
 }
 
 ######################################################################
-# .what = is this a DESKTOP — a machine with a screen a human is sat at?
+# .what = is this a hetzner grove? — a DECLARED fact, read from one file
 #
-# .why  = it is the one positive fact that distinguishes a laptop AT ITS OWN
-#         KEYBOARD from a headless box. it declines for a laptop reached over
-#         ssh, which is why the last resort below still hands out `local`
+# .why  a declaration and not an inference
+#       a hetzner dedicated box answers no hardware question the way ec2 does:
+#       its dmi names the BOARD maker, never hetzner, so a dmi rung would read
+#       the motherboard and call it a platform (#172). the box's builder knows
+#       what it built, so the bootstrap that makes a hetzner grove WRITES the fact:
 #
-# ⚠️ .why it tests the VALUE of XDG_SESSION_TYPE and not merely its presence
-#         `[[ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}${XDG_SESSION_TYPE:-}" ]]` —
-#         a non-empty test across all three concatenated — answers YES on a
-#         real grove. 📜 measured 2026-07-30:
+#         /etc/grove/platform    one line: `hetzner.hetzbot`
 #
-#           WAYLAND_DISPLAY     （unset）
-#           DISPLAY             （unset）
-#           XDG_SESSION_TYPE    tty        ← non-empty, so the test passed
+#       a file the bootstrap writes cannot be present on a laptop or an ec2 grove
+#       by accident, which is what makes it a discriminator. it is mode 644 under
+#       /etc, so a non-root seat reads it, and it costs no network call.
 #
-#         a `tty` session is the OPPOSITE of a desktop one. so such a probe
-#         names one fact and checks another, and on a headless box it claims a
-#         screen.
+# ⚠️ .why the EXACT value, never the file's presence
+#       a future platform may declare itself through the same file. a test of
+#       presence would call that box a hetzner grove; a test of the value cannot.
 #
-#         it does not bite while `grove_env_probe_aws_ec2` answers first on
-#         that box. that is the whole hazard: a wrong probe hidden behind a
-#         right one. it surfaces the moment the ec2 probe declines — which is
-#         what happened on 2026-07-30, and the path that ended with a
-#         passphrase prompt on a duct.
+# .the evidence
+#       logic: `prove.hetzner-probe-reads-its-declaration` drives the probe and its
+#         rung against a fixture file — absent, wrong value, hit, unreadable — and
+#         proves the order — ec2 first, then the declaration, then desktop — and a
+#         mode-000 declaration halts the real derivation (its text is snapped)
+#       laptop (dell, pop-os): /etc/grove absent → declines (measured 2026-10-26)
+#       hetzner grove: the live read is owed — the box sits behind the tailnet,
+#         and this repo's `5.23.tailscale` gives the laptop its route. so the read
+#         is measured on the hetzner grove, once the laptop has joined
 #
-#         found only because the probes are callable one at a time. an
-#         end-to-end check of `$server` reports `cloud@aws.ec2` and passes.
+# ⚠️ .a hetzner box whose bootstrap has NOT written the file answers no probe
+#       here. it reaches the desktop rung, which declines any ssh seat, so the
+#       derivation REFUSES it by name (no fallback). an unnamed hetzner box read
+#       over ssh is an error that names this file, never a laptop
+#       ⚠️ the one seat that guard cannot see: a graphical session at the box's
+#       own console, with no ssh. a server built headless has none; the file
+#       is the only signal that covers it, which is why bootstrap must write it
+#
+# 🛑 .three answers, never two
+#       rc 0 = declared hetzner · rc 1 = no hetzner declaration · rc 2 = a
+#       declaration present but unreadable, or present and not a regular file
+#       (a dir at the path). rc 2 is a permission FAULT, never a
+#       decline: read as "no declaration", it would let a later rung answer for a
+#       box that declared itself. so the derivation HALTS on rc 2, and owns the one
+#       message a human reads
+######################################################################
+grove_env_probe_hetzner_hetzbot() {
+  local declared
+  declared="$(grove_env_platform_file)"
+  [[ -e "$declared" ]] || return 1
+  [[ -f "$declared" && -r "$declared" ]] || return 2
+  [[ "$(head -n 1 "$declared")" == "hetzner.hetzbot" ]]
+}
+
+# .what = where a box's builder declares its platform
+# .why a function, not an inline path: the play above redefines it to point at a
+#   fixture, so the probe's read is driven without root and without a runtime
+#   override a human could set by accident
+grove_env_platform_file() { printf '/etc/grove/platform'; }
+
+######################################################################
+# .what = is this a DESKTOP — a screen with a human at its own keyboard?
+#
+# .why  = the one positive fact that names a laptop. `local@unix` is what
+#         every interactive gate, and the tailnet member join, read as "a
+#         human is here", so this rung must not answer for a remote seat
+#
+# 🛑 .why an ssh seat is refused before any display is read
+#   - `ssh -X` and waypipe forward a display, so a remote headless box
+#     carries DISPLAY or WAYLAND_DISPLAY like a laptop does
+#   - a hetzner auction box has no platform signal of its own (no metadata
+#     service; dmi names the board maker). if its declaration is absent, this
+#     rung is the one left, and it would hand that box the human's identity
+#   - ⇒ over ssh it declines, and the ladder refuses the box by name
+#   - cost: provision on a laptop over ssh needs GROVE_ENV_SERVER=local@unix
+#
+# ⚠️ .why XDG_SESSION_TYPE is read by VALUE
+#   - 📜 2026-07-30, a real grove: displays unset, XDG_SESSION_TYPE=tty. a
+#     presence test called it a desktop. `tty` names the opposite
 ######################################################################
 grove_env_probe_desktop() {
-  # a display socket is unambiguous: something is there to draw on
+  # an ssh seat is remote, whatever display it forwards
+  [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]] && return 1
+
+  # a display socket is unambiguous: a screen is there to draw on
   [[ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]] && return 0
 
   # else the session type must NAME a graphical session. `tty` must not qualify,
@@ -339,7 +399,7 @@ grove_env_derive() {
   export GROVE_ENV_ACCESS="${GROVE_ENV_ACCESS:-prep}"
   case "$GROVE_ENV_ACCESS" in
     test|prep|prod) ;;
-    *) echo "✋ GROVE_ENV_ACCESS must be test|prep|prod (got '$GROVE_ENV_ACCESS')" >&2
+    *) echo "✋ ConstraintError: GROVE_ENV_ACCESS must be test|prep|prod (got '$GROVE_ENV_ACCESS')" >&2
        echo "   └─ the values come from sdk-environment; 'dev' is not among them" >&2
        return 2 ;;
   esac
@@ -370,9 +430,12 @@ grove_env_derive() {
     #
     # .the order, and why
     #      1. ec2      — four FREE rungs, no network call (see the probe)
-    #      2. desktop  — a session envvar, free
-    #      3. ec2/imds — aws's own authoritative answer, and the ONLY probe that
-    #                    costs. it runs last because the two above are free, and
+    #      2. hetzner  — one declared file, free. ahead of desktop because a
+    #                    hetzner grove is headless, and a declaration outranks
+    #                    a session envvar
+    #      3. desktop  — a session envvar, free
+    #      4. ec2/imds — aws's own authoritative answer, and the ONLY probe that
+    #                    costs. it runs last because the three above are free, and
     #                    it runs AT ALL because it covers the one hole the free
     #                    rungs cannot: an ec2 box whose dmi does not answer
     ####################################################################
@@ -382,8 +445,28 @@ grove_env_derive() {
     #    so an override cannot produce a new box class, only a contradicted pair
     #    (`cloud@unix`, `local@aws.ec2`). the driver refuses those on an apply
     local tier_natural=""
+
+    # the hetzner rung answers three ways (see its probe). it reads one file and
+    #   costs naught, so it is asked once, up front, and the ladder reads its rc
+    local hetzner_rc=0
+    grove_env_probe_hetzner_hetzbot || hetzner_rc=$?
+
+    # the ec2 dmi rung answers first, as it does beside a READABLE declaration:
+    #   it reads the hardware, so no file on disk can contradict it
     if grove_env_probe_aws_ec2; then
       platform="aws.ec2";  tier_natural="cloud"
+    # 🛑 rc 2 — a declaration present but unreadable — HALTS the derivation, before
+    #   any LATER rung. read as "absent", it would let one answer: the desktop rung
+    #   on a box with a display, as `local@unix`, the member join's identity
+    elif [[ "$hetzner_rc" -eq 2 ]]; then
+      echo "✋ ConstraintError: cannot tell which machine this is — $(grove_env_platform_file) exists but is not a readable file" >&2
+      echo "   ⇒ that path declares this box's platform, and the ec2 rung did not answer," >&2
+      echo "     so no later probe may answer for it" >&2
+      echo "   fix: sudo chmod 644 $(grove_env_platform_file)" >&2
+      echo "        (a dir sits there? replace it with the one-line file its bootstrap writes)" >&2
+      return 2
+    elif [[ "$hetzner_rc" -eq 0 ]]; then
+      platform="hetzner.hetzbot";  tier_natural="cloud"
     elif grove_env_probe_desktop; then
       platform="unix";     tier_natural="local"
     elif grove_env_probe_aws_ec2_imds; then
@@ -407,10 +490,11 @@ grove_env_derive() {
     #      offered an `ssh-keygen` passphrase prompt onto a duct.
     #
     # .why a fallback is not needed at all
-    #      we own every machine this runs on. the set is two: a grove and a
-    #      laptop. a fallback exists to cover boxes you cannot enumerate — and
-    #      there are none. so the honest response to "no probe fired" is not to
-    #      pick the likelier of two; it is to say so, and name the fix.
+    #      we own every machine this runs on, and each kind has a probe above:
+    #      an ec2 grove, a hetzner grove, a laptop. a fallback exists to cover
+    #      boxes you cannot enumerate — and there are none. so the honest
+    #      response to "no probe fired" is not to guess a kind; it is to say so,
+    #      and name the fix.
     #
     # .what a human does about it
     #      the error names both escapes, because both are one word
@@ -419,12 +503,15 @@ grove_env_derive() {
     #      way past an undetected box, rather than a courtesy beside a guess.
     ####################################################################
     if [[ -z "$platform" ]]; then
-      echo "✋ cannot tell which machine this is — no platform probe answered" >&2
+      echo "✋ ConstraintError: cannot tell which machine this is — no platform probe answered" >&2
       echo "" >&2
-      echo "   asked, in order:" >&2
-      echo "     aws_ec2       (dmi vendor · systemd-detect-virt · cloud-init · xen uuid)  → no" >&2
-      echo "     desktop       (WAYLAND_DISPLAY · DISPLAY · XDG_SESSION_TYPE)              → no" >&2
-      echo "     aws_ec2_imds  (169.254.169.254, capped at 1s)                             → no" >&2
+      echo "   asked, in order (each name is grove_env_probe_<name>):" >&2
+      # every cell here is a literal, so the `→` column holds whatever path a
+      #   play points the declaration at; the path itself prints below
+      echo "     aws_ec2          (dmi vendor · systemd-detect-virt · cloud-init · xen uuid)   → no" >&2
+      echo "     hetzner_hetzbot  (the platform declaration == hetzner.hetzbot)                → no" >&2
+      echo "     desktop          (WAYLAND_DISPLAY · DISPLAY · XDG_SESSION_TYPE, not over ssh) → no" >&2
+      echo "     aws_ec2_imds     (169.254.169.254, capped at 1s)                              → no" >&2
       echo "" >&2
       echo "   why this is an error and not a guess:" >&2
       echo "     a guess here would be 'local@unix', which every interactive step" >&2
@@ -432,8 +519,18 @@ grove_env_derive() {
       echo "     a prompt nobody can answer. so it refuses instead." >&2
       echo "" >&2
       echo "   fix — name the box yourself:" >&2
-      echo "     GROVE_ENV_SERVER=local@unix    grove.provision   # a laptop" >&2
-      echo "     GROVE_ENV_SERVER=cloud@aws.ec2 grove.provision   # a grove" >&2
+      echo "     GROVE_ENV_SERVER=local@unix            grove.provision   # a laptop" >&2
+      echo "     GROVE_ENV_SERVER=cloud@aws.ec2         grove.provision   # an ec2 grove" >&2
+      echo "     GROVE_ENV_SERVER=cloud@hetzner.hetzbot grove.provision   # a hetzner grove" >&2
+      echo "" >&2
+      echo "   on a hetzner grove, the durable fix is its bootstrap: it writes one" >&2
+      echo "   line, 'hetzner.hetzbot', into the platform declaration:" >&2
+      echo "     $(grove_env_platform_file)" >&2
+      echo "   infra's hetzner bootstrap owns that write — ask 3 of this repo's" >&2
+      echo "     .behavior/v2026_10_25.feat-tailscale-on-every-machine/handoff.infra.grove-tailnet-join.md" >&2
+      echo "   the override above serves one run until that file lands." >&2
+      echo "   on your laptop over ssh: the desktop rung declines an ssh seat, so" >&2
+      echo "   name it local@unix, or run at the laptop's own keyboard." >&2
       echo "" >&2
       echo "   and if this box is one we own, the probe is what is wrong, not the box." >&2
       echo "   each probe above is one command; run them by hand and read which lies." >&2
@@ -451,8 +548,8 @@ grove_env_derive() {
 
   case "$GROVE_ENV_SERVER" in
     local@*|cloud@*) ;;
-    *) echo "✋ GROVE_ENV_SERVER must be \$tier@\$platform with tier local|cloud" >&2
-       echo "   └─ got '$GROVE_ENV_SERVER'; this repo knows two: local@unix, cloud@aws.ec2" >&2
+    *) echo "✋ ConstraintError: GROVE_ENV_SERVER must be \$tier@\$platform with tier local|cloud" >&2
+       echo "   └─ got '$GROVE_ENV_SERVER'; the probes detect three: local@unix, cloud@aws.ec2, cloud@hetzner.hetzbot" >&2
        return 2 ;;
   esac
 
@@ -532,7 +629,7 @@ grove_env_derive() {
 # .what = the tier half of $server — `local` or `cloud`
 grove_env_server_tier() { echo "${GROVE_ENV_SERVER%%@*}"; }
 
-# .what = the platform half of $server — `unix` or `aws.ec2`
+# .what = the platform half of $server — `unix`, `aws.ec2`, or `hetzner.hetzbot`
 grove_env_server_platform() { echo "${GROVE_ENV_SERVER#*@}"; }
 
 ######################################################################

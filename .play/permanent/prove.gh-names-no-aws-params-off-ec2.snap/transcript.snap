@@ -1,0 +1,163 @@
+## cloud@hetzner.hetzbot · grove_provision_5_4_gh_configure_upsert
+rc=1
+   ✋ ConstraintError: gh is unauthed, and the rack holds no 'GITHUB_TOKEN' to give it
+      ⇒ this box is 'cloud@hetzner.hetzbot'; only 'local@unix' confirms a
+        human at a keyboard, so no login prompt may open here
+      ⇒ a login prompt is deliberately NOT opened: a duct is tmux, so
+        the question would sit on the pane and then consume the next
+        command sent down the duct as its answer
+      ⇒ until a token lands, every github reach fails on auth: the org
+        clone, the issue read, the pr open — most of what a grove does
+
+      🙋 A HUMAN IS OWED HERE — run this ON THIS BOX, from the checkout:
+
+        cd ~/git/more/dev-env-setup && rhx keyrack set \
+          --owner ehmpath --key GITHUB_TOKEN \
+          --org @all --env camp --vault os.secure
+
+      it asks two questions, in this order:
+        1. which mechanism?  → 1 (PERMANENT_VIA_REPLICA)
+        2. enter secret      → paste the pat
+
+      ⚠️ ANSWER BOTH AT THE PROMPTS. do not pipe them in: the secret
+         prompt masks its echo, so it reads the terminal, not stdin. fed
+         a pipe, set takes the mechanism answer, SKIPS the secret, stores
+         an EMPTY value, and prints '✔ set' regardless — and the blank
+         only surfaces later, as a token github rejects
+
+      ⚠️ there is NO second 'keyrack fill' step. set stores the value
+         itself; fill re-drives the very same prompts, so a set-then-fill
+         chain sends the pat into fill's FIRST question — which asks for
+         a mechanism — and keyrack rejects it with expected: "1-2".
+
+      the value is never an argument, so it reaches neither 'ps' nor the
+      shell history; keyrack writes it encrypted, in the vault named above
+
+      mint the pat at https://github.com/settings/tokens with 'repo' +
+      'read:org'. see grove.auth.github.roadmap.md — the pat is phase 1,
+      and phase 2 replaces it with a per-org app token that mints itself
+
+## cloud@hetzner.hetzbot · grove_provision_5_4_gh_configure_verify
+rc=1
+   ✋ ConstraintError: gh holds no credential github will accept
+      ⇒ a SET GH_TOKEN is not enough: an expired or under-scoped token
+        passes a presence test and fails at the first api call, inside
+        whichever skill made it — never here
+      ⇒ so this asks github, and github said no
+      fix (this box confirms no human, so a login cannot be answered):
+        1. cd ~/git/more/dev-env-setup && rhx keyrack set \
+             --owner ehmpath --key GITHUB_TOKEN \
+             --org @all --env camp --vault os.secure
+           answer its two prompts: mechanism 1, then paste the pat
+      ⚠️ the pat needs BOTH scopes: 'repo' to clone, 'read:org' so gh
+         can enumerate. one with only 'repo' clones every repo you
+         name and cannot tell you what there is to name
+        2. rhx grove.provision --what 5.4.gh --mode apply
+      ⚠️ step 2 is NOT optional after a scope change on the same pat.
+         git asks the rack on every fetch, so it picks a rescope up at
+         once. gh holds a STORED LOGIN taken here, so its copy stays
+         stale until this bundle re-reads the rack. measured 2026-08-05:
+         git went green on a rescoped pat while gh stayed refused
+      the value is typed on a tty and stored encrypted by its vault — never pass
+      it as an argument, and never export it into a duct pane
+      ⚠️ one set, no fill: set stores the value itself, and fill re-drives
+         its prompts, so a chained fill takes the pat as a mechanism answer
+      see grove.auth.github.roadmap.md
+      read why: gh auth status
+
+## local@house · grove_provision_5_4_gh_configure_upsert
+rc=1
+   ✋ ConstraintError: gh is unauthed, and the rack holds no 'GITHUB_TOKEN' to give it
+      ⇒ this box is 'local@house'; only 'local@unix' confirms a
+        human at a keyboard, so no login prompt may open here
+      ⇒ a login prompt is deliberately NOT opened: a duct is tmux, so
+        the question would sit on the pane and then consume the next
+        command sent down the duct as its answer
+      ⇒ until a token lands, every github reach fails on auth: the org
+        clone, the issue read, the pr open — most of what a grove does
+
+      🙋 A HUMAN IS OWED HERE — run this ON THIS BOX, from the checkout:
+
+        cd ~/git/more/dev-env-setup && rhx keyrack set \
+          --owner ehmpath --key GITHUB_TOKEN \
+          --org @all --env camp --vault os.secure
+
+      it asks two questions, in this order:
+        1. which mechanism?  → 1 (PERMANENT_VIA_REPLICA)
+        2. enter secret      → paste the pat
+
+      ⚠️ ANSWER BOTH AT THE PROMPTS. do not pipe them in: the secret
+         prompt masks its echo, so it reads the terminal, not stdin. fed
+         a pipe, set takes the mechanism answer, SKIPS the secret, stores
+         an EMPTY value, and prints '✔ set' regardless — and the blank
+         only surfaces later, as a token github rejects
+
+      ⚠️ there is NO second 'keyrack fill' step. set stores the value
+         itself; fill re-drives the very same prompts, so a set-then-fill
+         chain sends the pat into fill's FIRST question — which asks for
+         a mechanism — and keyrack rejects it with expected: "1-2".
+
+      the value is never an argument, so it reaches neither 'ps' nor the
+      shell history; keyrack writes it encrypted, in the vault named above
+
+      mint the pat at https://github.com/settings/tokens with 'repo' +
+      'read:org'. see grove.auth.github.roadmap.md — the pat is phase 1,
+      and phase 2 replaces it with a per-org app token that mints itself
+
+## local@house · grove_provision_5_4_gh_configure_verify
+rc=1
+   ✋ ConstraintError: gh holds no credential github will accept
+      ⇒ a SET GH_TOKEN is not enough: an expired or under-scoped token
+        passes a presence test and fails at the first api call, inside
+        whichever skill made it — never here
+      ⇒ so this asks github, and github said no
+      fix (this box confirms no human, so a login cannot be answered):
+        1. cd ~/git/more/dev-env-setup && rhx keyrack set \
+             --owner ehmpath --key GITHUB_TOKEN \
+             --org @all --env camp --vault os.secure
+           answer its two prompts: mechanism 1, then paste the pat
+      ⚠️ the pat needs BOTH scopes: 'repo' to clone, 'read:org' so gh
+         can enumerate. one with only 'repo' clones every repo you
+         name and cannot tell you what there is to name
+        2. rhx grove.provision --what 5.4.gh --mode apply
+      ⚠️ step 2 is NOT optional after a scope change on the same pat.
+         git asks the rack on every fetch, so it picks a rescope up at
+         once. gh holds a STORED LOGIN taken here, so its copy stays
+         stale until this bundle re-reads the rack. measured 2026-08-05:
+         git went green on a rescoped pat while gh stayed refused
+      the value is typed on a tty and stored encrypted by its vault — never pass
+      it as an argument, and never export it into a duct pane
+      ⚠️ one set, no fill: set stores the value itself, and fill re-drives
+         its prompts, so a chained fill takes the pat as a mechanism answer
+      see grove.auth.github.roadmap.md
+      read why: gh auth status
+
+## cloud@aws.ec2 · grove_provision_5_4_gh_configure_verify
+rc=1
+   ✋ ConstraintError: gh holds no credential github will accept
+      ⇒ a SET GH_TOKEN is not enough: an expired or under-scoped token
+        passes a presence test and fails at the first api call, inside
+        whichever skill made it — never here
+      ⇒ so this asks github, and github said no
+      fix (this box confirms no human, so a login cannot be answered):
+        1. cd ~/git/more/dev-env-setup && rhx keyrack set \
+             --owner ehmpath --key GITHUB_TOKEN \
+             --org @all --env camp --vault aws.params
+           answer its two prompts: mechanism 1, then paste the pat
+      ⚠️ the pat needs BOTH scopes: 'repo' to clone, 'read:org' so gh
+         can enumerate. one with only 'repo' clones every repo you
+         name and cannot tell you what there is to name
+        2. rhx grove.provision --what 5.4.gh --mode apply
+      ⚠️ step 2 is NOT optional after a scope change on the same pat.
+         git asks the rack on every fetch, so it picks a rescope up at
+         once. gh holds a STORED LOGIN taken here, so its copy stays
+         stale until this bundle re-reads the rack. measured 2026-08-05:
+         git went green on a rescoped pat while gh stayed refused
+      the value is typed on a tty and stored encrypted by its vault — never pass
+      it as an argument, and never export it into a duct pane
+      ⚠️ one set, no fill: set stores the value itself, and fill re-drives
+         its prompts, so a chained fill takes the pat as a mechanism answer
+      see grove.auth.github.roadmap.md
+      read why: gh auth status
+
+
