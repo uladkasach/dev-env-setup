@@ -86,6 +86,24 @@ grove_provision_1_3_1_firefox_configure_upsert() {
   fi
 
   ####################################################################
+  # 0c. the fleet board — a READ-ONLY grant of ONE dir into the sandbox
+  #     the flatpak sees none of $HOME by default, so a file:// url to
+  #     ~/.rhachet/fleet/fleet.board.html opens as "file not found"
+  # 🛑 the grant is `~/.rhachet/fleet:ro`, never `~/.rhachet`: its siblings
+  #    hold keyrack state, and a browser is the widest attack surface on the
+  #    box (rule.require.narrowest-terminal-grant)
+  # ⚠️ an override is read at sandbox START — a live firefox must fully quit
+  ####################################################################
+  local fleet_grant='~/.rhachet/fleet:ro'
+  if flatpak override --user --filesystem="$fleet_grant" org.mozilla.firefox 2>/dev/null; then
+    echo "   • firefox may read the fleet board: $fleet_grant (fully quit firefox to apply)"
+  else
+    echo "   ✋ could not grant firefox $fleet_grant" >&2
+    echo "      ⇒ file:///…/.rhachet/fleet/fleet.board.html reads as absent in firefox" >&2
+    return 1
+  fi
+
+  ####################################################################
   # 1. find the profile — it is generated, so it must be read
   ####################################################################
   local profile_dir
