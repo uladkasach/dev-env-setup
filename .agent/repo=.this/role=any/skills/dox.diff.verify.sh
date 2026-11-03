@@ -32,6 +32,7 @@
 #
 # usage:
 #   rhx dox.diff.verify                                # the staged diff vs HEAD
+#   rhx dox.diff.verify --since origin/main            # every line the branch adds
 #   rhx dox.diff.verify --message .log/ship/commit.message.md --message <file>
 #
 # exit:
@@ -42,11 +43,13 @@
 set -uo pipefail
 
 MESSAGES=()
+SINCE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --message) MESSAGES+=("${2:?--message needs a path}"); shift 2 ;;
+    --since) SINCE="${2:?--since needs a ref}"; shift 2 ;;
     --repo|--role|--skill) shift 2 ;;   # rhx passes these through
-    --help|-h) sed -n '2,40p' "$0"; exit 0 ;;
+    --help|-h) sed -n '2,41p' "$0"; exit 0 ;;
     *) echo "✋ ConstraintError: unknown option: $1" >&2; echo "   └─ see: rhx dox.diff.verify --help" >&2; exit 2 ;;
   esac
 done
@@ -98,8 +101,15 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 : > "$WORK/where"; : > "$WORK/text"
 
-# the staged diff: the file and the new-side line number of each added line
-git diff --cached HEAD -U0 --no-color --no-ext-diff | awk -v W="$WORK/where" -v T="$WORK/text" '
+# the diff to judge: the branch since its merge base with --since, else the staged set
+DIFF_ARGS=(--cached HEAD)
+if [[ -n "$SINCE" ]]; then
+  git rev-parse --verify --quiet "$SINCE^{commit}" > /dev/null || { echo "✋ ConstraintError: --since names no commit: $SINCE" >&2; exit 2; }
+  DIFF_ARGS=("$SINCE...HEAD")
+fi
+
+# the file and the new-side line number of each added line
+git diff "${DIFF_ARGS[@]}" -U0 --no-color --no-ext-diff | awk -v W="$WORK/where" -v T="$WORK/text" '
   /^\+\+\+ b\// { file = substr($0, 7); next }
   /^\+\+\+ /    { file = ""; next }
   /^@@ /        { split($3, a, ","); line = substr(a[1], 2) + 0; next }
