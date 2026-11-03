@@ -90,6 +90,17 @@ grove_provision_1_3_1_firefox_configure_verify() {
   echo "   🌙 unverified — whether a LIVE firefox has read them. autoconfig is"
   echo "      read once at start, so a full quit is what makes the rebind take"
 
+  # 0c. the fleet board grant — read from the override file, the declaration itself
+  local overrides="$HOME/.local/share/flatpak/overrides/org.mozilla.firefox"
+  if grep -qF '~/.rhachet/fleet:ro' "$overrides" 2>/dev/null; then
+    echo "   • firefox may read the fleet board (~/.rhachet/fleet:ro) ✔"
+  else
+    echo "   ✋ firefox holds no read grant on ~/.rhachet/fleet" >&2
+    echo "      ⇒ the fleet board's file:// url reads as absent inside the sandbox" >&2
+    echo "      fix: rhx grove.provision --what 1.3.1.firefox --mode apply" >&2
+    failed=$(( failed + 1 ))
+  fi
+
   ####################################################################
   # 1. the profile must exist before its contents can be checked at all
   ####################################################################

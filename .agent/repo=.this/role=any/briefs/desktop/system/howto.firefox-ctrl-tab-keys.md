@@ -103,8 +103,9 @@ fully quit to re-read them (see gotchas). for an immediate reload, use
 ## .gotchas
 
 - **must fully quit firefox to apply.** a live flatpak does not re-read
-  autoconfig; a plain window-close is insufficient. use `ctrl+q` or
-  `flatpak kill org.mozilla.firefox`, then relaunch.
+  autoconfig; a plain window-close is insufficient. use ☰ → Quit (NOT ctrl+q —
+  this payload makes ctrl+q close a tab) or `flatpak kill org.mozilla.firefox`,
+  then relaunch.
 - **do not import `Services.jsm`.** that module was removed from modern firefox
   (~130). in the autoconfig sandbox `Services` is already a global; an import
   throws, and the autoconfig error is easy to miss — the config loads and the
@@ -113,7 +114,28 @@ fully quit to re-read them (see gotchas). for an immediate reload, use
   genuinely reserved firefox shortcut (zoom reset) and is left unbound. use
   ctrl+9 for last tab (the standard firefox convention).
 
-## .extending
+## .ctrl+q closes a tab, ctrl+w deletes a word
+
+ctrl+w is delete-word in the terminal, so in firefox it must never close a tab.
+two files carry that, and they only work as a pair:
+
+| key | where | how |
+|-----|-------|-----|
+| ctrl+q | `firefox.cfg` | `key_quitApplication` is removed; `key_close` moves from W to Q. quit stays in ☰ → Quit |
+| ctrl+w | `firefox/gtk.css` → `~/.var/app/org.mozilla.firefox/config/gtk-3.0/gtk.css` | a gtk keybind set maps ctrl+w to `delete-from-cursor (word-ends, -1)` on `entry` + `textview` |
+
+- **the gtk keybind reaches a text field ONLY because `firefox.cfg` freed ctrl+w.**
+  firefox routes text-field edits through gtk's native keybinds, but a browser
+  shortcut claims its key first — which is why ctrl+w via gtk.css "never works"
+  in bug reports (bugzilla 1437379). drop the `key_close` move and the gtk
+  keybind goes dead with no error.
+- **`key_close` loses its `data-l10n-id`.** fluent owns the key letter; with the
+  id left on, a re-translate can restore "W".
+- **the gtk.css sits in the flatpak's OWN config dir**, so no other gtk app sees
+  the keybind. a host `~/.config/gtk-3.0/gtk.css` would change every gtk app.
+- measured 2026-10-31: ctrl+q closes a tab, ctrl+w deletes a word in a page field.
+
+## .to extend
 
 the systemconfig channel is reusable for any firefox system config that
 `user.js` cannot do (locked prefs, enterprise `policies.json`, chrome-level
@@ -130,3 +152,4 @@ for ordinary about:config prefs, prefer the `user.js` block in the same
 - [customizing firefox using autoconfig](https://support.mozilla.org/en-US/kb/customizing-firefox-using-autoconfig)
 - [autoconfig in flatpak (bugzilla 1785278)](https://bugzilla.mozilla.org/show_bug.cgi?id=1785278)
 - [pocketblue/firefox-systemconfig (reference for the extension-point trick)](https://github.com/pocketblue/firefox-systemconfig)
+- [gtk key-bindings ignored for ctrl+w / ctrl+q (bugzilla 1437379)](https://bugzilla.mozilla.org/show_bug.cgi?id=1437379)
