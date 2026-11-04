@@ -1,2 +1,1 @@
-   ✋ ConstraintError: name a play: rhx play.run --play <slug>
-      or: rhx play.run --list, rhx play.run --all
+   ✋ ConstraintError: name a play: rhx play.run --play <slug>   (or --list, or --all)

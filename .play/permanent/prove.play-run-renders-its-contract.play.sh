@@ -11,8 +11,8 @@
 # .the arms — a fixture repo of stub plays, never this repo's own tree
 #   - H. --help                    → the usage block, exit 0
 #   - L. --list                    → every tracked stub, exit 0
-#   - A. --all --within 2          → the tally: 1 passed, 1 failed, 2 declined or timed out,
-#     2 refused by verb (never run), exit 1
+#   - A. --all --within 2          → the tally: 1 passed, 1 failed, and 4 declined — two
+#     declines and timeouts, two refused by verb (never run) — exit 1
 #   - P1/P2/P3. one play passes / fails / declines → exit 0 / 1 / 2
 #   - T. a play past its bound     → a timeout row, exit 2
 #   - R. a repair.* play           → refused by verb, exit 2
@@ -85,6 +85,8 @@ _arm() {
   local out rc=0
   # this play's own --resnap must not reach the runner under proof: each inner run sets its own
   out="$(env -u PLAY_RESNAP bash "$RUNNER" "$@" 2>&1)" || rc=$?
+  # the --all log dir is named by the run's clock and pid, so the snap holds a placeholder
+  out="$(printf '%s\n' "$out" | sed -E 's#(what=all/)[0-9TZ:-]+\.pid[0-9]+#\1<run>#g')"
   if [[ "$rc" -ne "$want_rc" ]]; then
     echo "   ✋ $arm: play.run $* exited $rc, wanted $want_rc" >&2; FAILED=1; return
   fi
@@ -97,7 +99,7 @@ _arm() {
 
 _arm H  0 "usage:"                              --help
 _arm L  0 "6 play(s)"                           --list
-_arm A  1 "passed: 1 of 6"                      --all --within 2
+_arm A  1 "1 passed · 4 declined · 1 failed"    --all --within 2
 _arm P1 0 "🌲 prove.stub-passes ✔"              --play prove.stub-passes
 _arm P2 1 "prove.stub-fails failed (exit 1)"    --play prove.stub-fails
 _arm P3 2 "prove.stub-declines declined"        --play prove.stub-declines
