@@ -1,0 +1,19 @@
+{
+  "key": "b99704093a6ec7fc",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet"
+  },
+  "exid": null,
+  "title": "fix(clone.say): a labelled top rule reads as no rule, so an empty box reads dirty",
+  "description": "## symptom\n\n`rhx clone say @:<slug>` withholds every say with `input-region-dirty` while the target clone's\nreal input row is empty (`❯` alone). seen twice in a row on 2026-11-05 (rhachet 1.51.0), target a\nclaude session mid-turn, in auto mode.\n\n## cause, at the line\n\n`dist/domain.operations/clone/screen/computeCloneInputState.js:43-46`\n\n```js\nconst isRuleRow = (line) => {\n    const trimmed = line.trim();\n    return /^─+$/.test(trimmed) && trimmed.length >= 20;\n};\n```\n\nclaude draws the box's TOP rule with the session label inside it:\n\n```\n────────────────────────────────── mechanic ─\n❯\n─────────────────────────────────────────────\n```\n\nthe labelled row fails `^─+$`, so `getInputBand` (same file, :216) picks the LAST two rule rows =\nan earlier rule far up the screen + the box's bottom rule. the band then holds ~25 rows of the\nbrain's own bright tool output, `contentBright` is non-empty, and `region` reads `dirty` (:330).\n\n## the worse form — `focus-unrecognized`, never force-able\n\nonce the earlier plain rule scrolls off the viewport, only ONE row passes `isRuleRow` (the box's\nbottom rule). `getInputBand` returns null at `ruleRows.length < 2`, so the verdict becomes\n`focus-unrecognized`, which `--force` cannot override, and whose hint says to tear the clone\ndown and re-enroll — a destructive remedy for a healthy clone whose box sits plainly at the foot\n(`── mechanic ─` / `❯` / `────`). measured 2026-11-07 on the same clone.\n\n## evidence\n\n`clone get --what buffer` returned a 27-row \"input box\" that ends at the `── mechanic ─` row and\nholds the brain's tool output, not human text. the debug log's screen shows the true box at the\nfoot: labelled rule, empty `❯`, plain rule.\n\n## fix\n\naccept a rule row that carries an embedded label: a row whose trimmed form is `─` runs plus at\nmost one short label, e.g. `/^─{3,}(\\s+\\S.{0,40}\\S\\s+─+)?$/` with the length floor kept. the\nbottom rule stays the plain form.\n\n## clamp\n\na unit case for `computeCloneInputState` over a captured screen with a labelled top rule, an\nempty `❯`, and bright tool output above it: expect `input: 'clear'`. red on 1.51.0, green with\nthe fix. a second case with typed text after `❯` must still read `dirty`, so the gate still\nrefuses what it must.\n\n## false hint\n\nthe refusal says \"a human mid-type\"; here no human typed. the hint sends a caller to `--force`,\nwhich is safe only when the true box is empty — a caller cannot tell that from the message.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": null,
+  "heldSeq": 8,
+  "recordStatus": "QUEUED",
+  "reason": "upstream:auth",
+  "deliveredExid": null
+}
