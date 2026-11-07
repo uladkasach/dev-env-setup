@@ -75,14 +75,8 @@ except SyntaxError as e:
   fi
 
   # 2. kitty's loader RESOLVES remote control to a disabled value — an allowlist (m2-m6)
-  local rc_policy="" rc_source=""
-  if command -v kitty >/dev/null 2>&1; then
-    rc_policy="$(timeout -k 5 20 kitty +runpy "
-from kitty.config import load_config
-print(load_config('$conf').allow_remote_control)
-" 2>/dev/null | tail -1 | tr -d '[:space:]')"
-    [[ -n "$rc_policy" ]] && rc_source="kitty's own loader"
-  fi
+  local rc_policy rc_source="kitty's own loader"
+  rc_policy="$(_kitty_loader_get "$conf" 'o.allow_remote_control')"
   if [[ -z "$rc_policy" ]]; then
     echo "   🌙 kitty's config loader did not answer, so the effective"
     echo "      allow_remote_control is UNREAD on this box"
@@ -134,14 +128,8 @@ print(load_config('$conf').allow_remote_control)
 
   # 2e. the render delays kitty READS — a delay felt as no change can mean either "no
   #     felt cost" or "never read", and only the loader parts the two
-  local delays=""
-  if command -v kitty >/dev/null 2>&1; then
-    delays="$(timeout -k 5 20 kitty +runpy "
-from kitty.config import load_config
-o = load_config('$conf')
-print(o.repaint_delay, o.input_delay)
-" 2>/dev/null | tail -1)"
-  fi
+  local delays
+  delays="$(_kitty_loader_get "$conf" "'%s %s' % (o.repaint_delay, o.input_delay)")"
   if [[ -z "$delays" ]]; then
     echo "   🌙 kitty's loader did not answer, so the render delays are UNREAD on this box"
   else
@@ -154,13 +142,8 @@ print(o.repaint_delay, o.input_delay)
 
   # 2f. a BEL requests no focus, per the loader — the default does, and on wayland cosmic
   #     grants it, so two windows that beep steal focus from each other without end
-  local wab=""
-  if command -v kitty >/dev/null 2>&1; then
-    wab="$(timeout -k 5 20 kitty +runpy "
-from kitty.config import load_config
-print(load_config('$conf').window_alert_on_bell)
-" 2>/dev/null | tail -1 | tr -d '[:space:]')"
-  fi
+  local wab
+  wab="$(_kitty_loader_get "$conf" 'o.window_alert_on_bell')"
   if [[ -z "$wab" ]]; then
     echo "   🌙 kitty's loader did not answer, so whether a bell steals focus is UNREAD"
   else
