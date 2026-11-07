@@ -1,0 +1,17 @@
+# .what = fire the grove backup each hour
+#
+# .why Persistent=true: an ec2 grove hibernates and a hetzner grove reboots; a run
+#   missed while the box was down fires on wake or boot, never an hour later
+#   (inventory b12)
+# .why hourly and not per commit: a commit trigger needs a hook in every clone,
+#   which no bundle owns; an hour is the window a dead grove can still lose
+
+[Unit]
+Description=Back up this grove each hour
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
