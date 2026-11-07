@@ -24,3 +24,5 @@ yield `.for the wisher to rule`; case=4 `[t5]`; case=5 `[t3]`.
 
 ## .risk: low
 this tree writes no AWS-side trust and no credential; the call only says the box half waits on infra#36. the trust anchor #36 places is a credential and a prod write, and it is graded there, not here.
+## .verdict: ruled yes, at the lean
+the director, 2026-11-06 (seed S4): the box half needs no AWS-side change; the identity play waits on infra#36 trust.

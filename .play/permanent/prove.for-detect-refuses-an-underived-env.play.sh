@@ -90,6 +90,10 @@ arm "cloud@hetzner.hetzbot"  cloud
 # arm 2 — a local tier
 arm "local@unix"             local
 
+# arm 2b — a house tier: a grove seat on a box we own. read as 'local', it would
+#   open every gate that means a human is at a keyboard
+arm "house@unix"             house
+
 ####################################################################
 # .what = arm 3 — the one this probe exists for
 #

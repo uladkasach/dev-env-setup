@@ -37,3 +37,5 @@ yield `.the contract` (the seats row); case=1, case=2, case=3 `[t2]`, case=8; F3
 
 ## .risk: risky
 to keep the ground seat is to keep a root seat on the human laptop, with its sudo grant (F3) and its key custody (F12). option B removes the risk; A carries it.
+## .verdict: ruled keep, at the lean
+the director, 2026-11-06 (seed S4): the house grove keeps its own ground seat; the wish names the split as the test bed.

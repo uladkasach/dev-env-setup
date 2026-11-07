@@ -35,3 +35,5 @@ case=1 `[t0]`; F5.
 
 ## .risk: risky
 the host bundle the mint drives writes the users, the sudoers drop-in, the sshd unit, and the seat authorized_keys onto the human laptop. those are credentials and a root grant (F3, F4), so the mint path carries their grade.
+## .verdict: ruled yes, at the lean
+the director, 2026-11-06 (seed S4): one election file + a host bundle; the skill writes no `/etc` itself.

@@ -1,10 +1,13 @@
 # domain.term: --for
 
 term.chosen   = --for
-term.kind     = noun (a flag: an axis, whose values are the adjs `local` and `cloud`)
+term.kind     = noun (a flag: an axis, whose values are the adjs `local`, `house`, and `cloud`)
 term.values:
 - local   — a machine with a screen and a human at its keyboard
-- cloud   — a grove: a headless box reached over ssh/ssm, no screen, no human
+- house   — a house grove seat: a user on a box we own, reached over loopback ssh, no
+            screen, no human. read off a root-owned election, never off the hardware
+            (`src/grove.env.sh`, `grove_env_probe_house`)
+- cloud   — a cloud grove: a headless box reached over ssh/ssm, no screen, no human
 term.synonyms.forbidden:
 - scope
 - target
@@ -61,7 +64,7 @@ copy of the detection or the tag rule.
 - `src/grove.for.sh` — `grove_for_detect`, `grove_for_valid`, `grove_for_applies`
 
 two operations ask it, and neither holds a copy:
-- `src/grove.provision._.sh` — `--for cloud|local`, passed down the bundle tree
+- `src/grove.provision._.sh` — `--for cloud|house|local`, passed down the bundle tree
 - `src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh`     — `grove.provision --for cloud|local`
 
 ⚠️ the per-step `step any|local|cloud` tag this list once named is GONE, deleted with the
