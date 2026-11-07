@@ -36,6 +36,40 @@ grove_provision_5_12_rack_slug_vault() { printf 'aws.params'; }
 #   know yet (a house grove) fails CLOSED
 grove_provision_5_12_rack_platform_is_ec2() { [[ "${GROVE_ENV_SERVER:-}" == *@aws.ec2 ]]; }
 
+# .what = the vault this seat's rack names for the github slug — empty if no entry
+# .why a box provisioned before 2026-09-27 (#149) holds an `aws.params` entry off
+#   ec2, which no unlock there can ever read; the heal and its verify both ask this
+# exit: 0 = answered (empty is an answer) | 1 = the rack could not be read
+grove_provision_5_12_rack_slug_vault_held() {
+  local gitroot="$1" json
+  # .why captured first — a failed list must not read as "no entry" (rule.forbid.failhide)
+  json="$(env -C "$gitroot" rhx keyrack list \
+            --owner "$(grove_provision_5_12_rack_slug_owner)" \
+            --org "$(grove_provision_5_12_rack_slug_org)" \
+            --env "$(grove_provision_5_12_rack_slug_env)" --json 2>/dev/null)" || return 1
+  printf '%s' "$json" | jq -r --arg s \
+    "$(grove_provision_5_12_rack_slug_org).$(grove_provision_5_12_rack_slug_env).$(grove_provision_5_12_rack_slug_key)" \
+    '[.[] | select(.slug == $s) | .vault] | first // empty'
+}
+
+# .what = run a command with every route to an aws identity CUT
+# 🛑 the stale-entry heal writes to a rack entry whose old vault is the fleet's
+#   SHARED github token in ssm. keyrack's del reaches into the vault, and a human's
+#   live sso session may hold creds for that account (ehmpathy/rhachet#697)
+#   - ⇒ the writes run here, where the sdk's whole default chain finds naught:
+#     env keys, profile, shared config + credentials files (and so sso), the
+#     container endpoint, and imds
+#   - the upsert PROVES the cut with an sts call before it writes
+grove_provision_5_12_rack_without_aws() {
+  env -u AWS_PROFILE -u AWS_DEFAULT_PROFILE \
+      -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
+      -u AWS_WEB_IDENTITY_TOKEN_FILE -u AWS_ROLE_ARN \
+      -u AWS_CONTAINER_CREDENTIALS_FULL_URI -u AWS_CONTAINER_CREDENTIALS_RELATIVE_URI \
+      AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null \
+      AWS_EC2_METADATA_DISABLED=true \
+      "$@"
+}
+
 # .what = the aws-profile slug, and the ONE value it ever holds
 # .why
 #   - an ec2 grove answers `5.6.aws`'s `ambient` role over imds. a local, house,

@@ -207,6 +207,30 @@ grove_provision_1_3_1_firefox_configure_verify() {
   fi
 
   ####################################################################
+  # 3b. 1password's options, read from its storage.local (read-only plan)
+  #   - drift while firefox is live is OWED a quit, not a defect: the upsert
+  #     declines to write under a live extension, so a ✋ there would cry wolf
+  #   - drift with firefox quit IS a defect: the apply could have written it
+  ####################################################################
+  local op_out op_code
+  op_out="$(grove_provision_1_3_1_firefox_onepassword_options "$profile" plan 2>&1)"
+  op_code=$?
+  if [[ "$op_code" -eq 0 ]]; then
+    echo "   • 1password options hold: inline fill + save offer on, universal sign in off ✔"
+  elif [[ "$op_code" -eq 5 ]]; then
+    echo "   🌙 1password has no storage here yet — its options are not observable"
+  elif [[ "$op_code" -eq 3 || "$op_code" -eq 4 ]] && pgrep -f '/app/lib/firefox/firefox' >/dev/null; then
+    echo "   🌙 1password options owed — firefox is live, so the write waits for a quit"
+    echo "$op_out" | sed 's/^/      /'
+    echo "      fix: quit firefox (☰ → Quit), then rhx grove.provision --what 1.3.1.firefox --mode apply"
+  else
+    echo "   ✋ 1password options drift from the declaration" >&2
+    echo "$op_out" | sed 's/^/      /' >&2
+    echo "      fix: rhx grove.provision --what 1.3.1.firefox --mode apply" >&2
+    failed=$(( failed + 1 ))
+  fi
+
+  ####################################################################
   # 4. the extensions — named when owed, never failed
   ####################################################################
   local addons="$profile/extensions.json" owed=()

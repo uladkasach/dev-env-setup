@@ -86,6 +86,33 @@ if command -v machine_resource_procs_find_runaway &>/dev/null; then
 fi
 
 #############################
+# loop check (every run)
+#############################
+# a spawn loop holds the box at thousands of forks/sec while load and memory
+# read fine, so the runaway check above never fires on it. the finder's gate
+# reads the usage log first (no sample) and samples only when ≥100 forks/sec
+# held for 3 straight minutes. it names the loop; it never kills — a fleet of
+# loops is often a human's open tabs, and the cut is theirs
+LOOP_COOLDOWN_FILE="$STATE_DIR/runaway_monitor.loop.cooldown"
+if command -v machine_resource_procs_find_loop &>/dev/null; then
+  LOOP_MSG=$(timeout 60 machine_resource_procs_find_loop --gate --secs 3 --sweeps 12 2>/dev/null)
+  if [[ "$LOOP_MSG" == "🌀"* ]]; then
+    SHOULD_ALERT=1
+    last_alert=$(cat "$LOOP_COOLDOWN_FILE" 2>/dev/null)
+    if [[ "$last_alert" =~ ^[0-9]+$ ]] && (( $(date +%s) - last_alert < COOLDOWN_SECONDS )); then
+      SHOULD_ALERT=0
+    fi
+    if [[ $SHOULD_ALERT -eq 1 ]]; then
+      notify-send -u critical "🌀 Spawn Loop" "$LOOP_MSG"
+      date +%s > "$LOOP_COOLDOWN_FILE"
+      logger -t runaway_monitor "LOOP_ALERT: ${LOOP_MSG%%$'\n'*}"
+    fi
+  else
+    rm -f "$LOOP_COOLDOWN_FILE"
+  fi
+fi
+
+#############################
 # orphan check (1/hr)
 #############################
 ORPHAN_COUNT=$(cat "$ORPHAN_RUN_COUNTER" 2>/dev/null || echo 0)

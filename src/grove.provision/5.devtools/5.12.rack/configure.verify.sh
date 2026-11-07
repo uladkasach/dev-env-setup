@@ -35,6 +35,22 @@ grove_provision_5_12_rack_configure_verify() {
   #   did right (`rule.forbid.aws-params-off-ec2`, `gotcha.a-check-that-cries-wolf-gets-silenced`)
   if ! grove_provision_5_12_rack_platform_is_ec2; then
     echo "   • declined — ${org}.${env}.${key} is an aws.params slug, and '${GROVE_ENV_SERVER:-unset}' has no ec2 identity"
+
+    # 🛑 but a STALE entry off ec2 is a defect: no unlock here can read it, and
+    #   rhachet fails the whole unlock on it (pre-#149 boxes; the upsert's heal)
+    local held
+    if ! held="$(grove_provision_5_12_rack_slug_vault_held "$(grove_provision_5_12_rack_gitroot)")"; then
+      echo "   🌙 unverified — this seat's rack could not be read, so a stale entry is UNREAD"
+      echo "      read why: rhx keyrack list --owner $(grove_provision_5_12_rack_slug_owner) --org $org --env $env"
+    elif [[ "$held" == "aws.params" ]]; then
+      echo "   ✋ this seat's rack still names ${org}.${env}.${key} in aws.params" >&2
+      echo "      ⇒ no unlock off ec2 can read it, so every unlock on this box fails on it" >&2
+      echo "      fix: rhx grove.provision --what 5.12.rack --mode apply" >&2
+      return 1
+    else
+      echo "   • no stale aws.params entry for ${org}.${env}.${key} ✔"
+    fi
+
     grove_provision_5_12_rack_verify_awsprofile
     return $?
   fi

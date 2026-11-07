@@ -1,0 +1,16 @@
+{
+  "kai@example.com": {
+    "seven_day": {
+      "resets_at": "2099-06-19T17:00:00+00:00",
+      "utilization": 64.0
+    },
+    "ts": "2020-01-02T09:30:00Z"
+  },
+  "moana@example.com": {
+    "seven_day": {
+      "resets_at": "2020-01-01T00:00:00+00:00",
+      "utilization": 77.0
+    },
+    "ts": "2020-01-01T08:00:00Z"
+  }
+}

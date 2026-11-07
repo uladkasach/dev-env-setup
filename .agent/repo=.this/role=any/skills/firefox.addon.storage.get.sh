@@ -1,28 +1,44 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = dump what one firefox extension has saved in its storage:
-#         storage.local (indexeddb) and storage.sync (storage-sync-v2)
+# .what = map what one firefox extension has saved in its storage:
+#         storage.local and every indexeddb the extension owns, plus
+#         storage.sync (storage-sync-v2)
 #
-# .why  = an extension like firefox-color keeps its state (the applied
-#         theme) in storage no file exposes as text. to ask "did the
-#         saved state survive?" the two stores must be decoded, and no
-#         sqlite3 cli is on the box, so python's stdlib does it
+# .why  = an extension keeps its state (a theme, its settings) in storage
+#         no file exposes as text. to ask "where is X persisted?" the
+#         stores must be decoded, and no sqlite3 cli is on the box, so
+#         python's stdlib does it
+#
+# 🛑 .why values are NOT printed by default
+#   - a password manager keeps account secrets in the SAME storage as its
+#     settings (measured 2026-11-03: 1password's idb held the account's
+#     secret key in plain structured-clone text)
+#   - a dump of every value puts those secrets into a terminal, a log, and
+#     any tool that captures stdout
+#   - ⇒ the default is a MAP: db → object store → key → size, no values
+#   - ⇒ one value is shown only on request (--key), and secret-shaped text
+#     inside it is redacted even then
 #
 # usage:
-#   firefox.addon.storage.get.sh --id FirefoxColor@mozilla.com
+#   firefox.addon.storage.get.sh --id FirefoxColor@mozilla.com                  # the map
+#   firefox.addon.storage.get.sh --id FirefoxColor@mozilla.com --key theme      # one value
+#   firefox.addon.storage.get.sh --id <id> --store <name> --key <key>           # scoped
 #
 # guarantee:
 #   - read-only: opens each sqlite in immutable mode, never writes
+#   - never prints a value unless --key names it; redacts secret-shaped text
 #   - exit 0 = answered, 1 = malfunction, 2 = bad input or no profile
 ######################################################################
 
 set -uo pipefail
 
-# parse --id; rhx injects its own flags, so scan every arg
-addon_id=""
+# parse flags; rhx injects its own flags, so scan every arg
+addon_id=""; want_key=""; want_store=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --id) addon_id="${2:-}"; shift 2 ;;
+    --key) want_key="${2:-}"; shift 2 ;;
+    --store) want_store="${2:-}"; shift 2 ;;
     *) shift ;;
   esac
 done
@@ -40,15 +56,16 @@ if [[ -z "$profile_dir" ]]; then
   exit 2
 fi
 
-echo "🦊 firefox.addon.storage.get --id $addon_id"
+echo "🦊 firefox.addon.storage.get --id $addon_id${want_store:+ --store $want_store}${want_key:+ --key $want_key}"
 echo "   ├─ profile: $profile_dir"
 
-# decode both stores; python stdlib only (sqlite3 + a raw snappy decoder)
-PROFILE="$ff_root/$profile_dir" ADDON_ID="$addon_id" python3 - <<'PY'
-import os, re, json, glob, sqlite3, datetime
+PROFILE="$ff_root/$profile_dir" ADDON_ID="$addon_id" WANT_KEY="$want_key" WANT_STORE="$want_store" python3 - <<'PY'
+import os, re, json, glob, struct, sqlite3, datetime
 
 profile = os.environ["PROFILE"]
 addon = os.environ["ADDON_ID"]
+want_key = os.environ["WANT_KEY"]
+want_store = os.environ["WANT_STORE"]
 
 def ro(path):
     # immutable=1: read without a lock or a write, safe while firefox runs
@@ -56,10 +73,9 @@ def ro(path):
 
 def snappy(buf):
     # raw snappy block decoder (firefox compresses idb values with it)
-    i, n, shift = 0, 0, 0
+    i, shift = 0, 0
     while True:
-        b = buf[i]; i += 1
-        n |= (b & 0x7f) << shift; shift += 7
+        b = buf[i]; i += 1; shift += 7
         if b < 0x80: break
     out = bytearray()
     while i < len(buf):
@@ -78,62 +94,92 @@ def snappy(buf):
         for _ in range(ln): out.append(out[-off])
     return bytes(out)
 
+def idb_key(raw):
+    # decode firefox's idb key encoder: 0x10 number, 0x20 date, 0x30 string, 0x50 array
+    if not raw: return "∅"
+    t = raw[0]
+    if t in (0x10, 0x20):
+        b = bytearray(raw[1:9].ljust(8, b"\0"))
+        bits = int.from_bytes(b, "big")
+        bits = bits ^ (1 << 63) if bits & (1 << 63) else ~bits & ((1 << 64) - 1)
+        n = struct.unpack(">d", bits.to_bytes(8, "big"))[0]
+        return str(int(n)) if n == int(n) else str(n)
+    if t == 0x30:
+        out, i = [], 1
+        while i < len(raw) and raw[i] != 0:
+            c = raw[i]
+            if c < 0x80: out.append(chr(c - 1)); i += 1
+            else: out.append("?"); i += 2
+        return "".join(out)
+    return "0x" + raw.hex()
+
+SECRET = re.compile(
+    r"A3-[A-Z0-9]{5,}(?:-[A-Z0-9]{4,})+"     # 1password secret key
+    r"|[A-Za-z0-9_\-+/=]{40,}"                # long tokens, keys, ciphertext
+    r"|[\w.+-]+@[\w-]+\.[\w.]+"               # emails
+)
+def redact(text):
+    return SECRET.sub("‹redacted›", text)
+
 def readable(raw):
-    # pull the printable runs out of a structured-clone blob
-    txt = raw.decode("latin-1")
-    runs = re.findall(r"[\x20-\x7e]{3,}", txt)
-    return " | ".join(runs)
+    runs = re.findall(r"[\x20-\x7e]{3,}", raw.decode("latin-1"))
+    return redact(" | ".join(runs))
+
+def value_of(data):
+    try: return snappy(data)
+    except Exception: return data
 
 # map the addon id to its moz-extension uuid
 uuids = {}
-with ro(os.path.join(profile, "prefs.js")) if False else open(os.path.join(profile, "prefs.js")) as f:
+with open(os.path.join(profile, "prefs.js")) as f:
     for line in f:
         if "extensions.webextensions.uuids" in line:
-            raw = line.split(",", 1)[1].rsplit(")", 1)[0].strip()
-            uuids = json.loads(json.loads(raw))
+            uuids = json.loads(json.loads(line.split(",", 1)[1].rsplit(")", 1)[0].strip()))
 uuid = uuids.get(addon)
 print(f"   ├─ uuid: {uuid or '(none — addon never started)'}")
 
-# storage.local — indexeddb under storage/default/moz-extension+++<uuid>^userContextId=...
-print("   ├─ storage.local (indexeddb)")
-found = False
-if uuid:
-    for db in sorted(glob.glob(os.path.join(profile, "storage/default", f"moz-extension+++{uuid}*", "idb", "*.sqlite"))):
-        found = True
-        mtime = datetime.datetime.fromtimestamp(os.path.getmtime(db)).isoformat(" ", "seconds")
-        print(f"   │  ├─ {os.path.relpath(db, profile)}  (written {mtime})")
-        con = ro(db)
-        rows = con.execute("select key, data, file_ids from object_data").fetchall()
-        print(f"   │  │  └─ {len(rows)} row(s)")
-        for key, data, file_ids in rows:
-            try:
-                val = snappy(data)
-            except Exception:
-                val = data
-            text = readable(val)
-            print(f"   │  │     ├─ key={readable(key) or key.hex()}  bytes={len(val)}{'  (external file)' if file_ids else ''}")
-            print(f"   │  │     │  {text[:600]}")
-if not found:
-    print("   │  └─ (no indexeddb for this addon)")
+# every indexeddb under storage/default/moz-extension+++<uuid>*: storage.local
+# lives in the ^userContextId=4294967295 origin; the extension's OWN dbs in the bare one
+print("   ├─ indexeddb")
+dbs = sorted(glob.glob(os.path.join(profile, "storage/default", f"moz-extension+++{uuid}*", "idb", "*.sqlite"))) if uuid else []
+if not dbs:
+    print("   │  └─ (none)")
+for db in dbs:
+    mtime = datetime.datetime.fromtimestamp(os.path.getmtime(db)).isoformat(" ", "seconds")
+    con = ro(db)
+    dbname = (con.execute("select name from database").fetchone() or ["?"])[0]
+    origin = os.path.basename(os.path.dirname(os.path.dirname(db)))
+    kind = "storage.local" if "userContextId=4294967295" in origin else "the extension's own idb"
+    print(f"   │  ├─ db '{dbname}' ({kind}, written {mtime})")
+    stores = con.execute("select id, name from object_store order by name").fetchall()
+    for sid, sname in stores:
+        if want_store and sname != want_store: continue
+        rows = con.execute("select key, length(data) from object_data where object_store_id = ?", (sid,)).fetchall()
+        keys = [idb_key(k) for k, _ in rows]
+        # a store of opaque/numeric keys is a record table; show count + a few keys only
+        sample = ", ".join(keys[:12]) + (f", … (+{len(keys)-12})" if len(keys) > 12 else "")
+        print(f"   │  │  ├─ store '{sname}': {len(rows)} row(s)")
+        print(f"   │  │  │  └─ keys: {sample or '(empty)'}")
+        if want_key:
+            for k, data in con.execute("select key, data from object_data where object_store_id = ?", (sid,)):
+                if idb_key(k) != want_key: continue
+                print(f"   │  │  │     └─ {want_key} = {readable(value_of(data))[:1200]}")
 
-# storage.sync — storage-sync-v2.sqlite, plain json keyed by ext_id
+# storage.sync — plain json keyed by ext_id
 print("   └─ storage.sync (storage-sync-v2.sqlite)")
 sync = os.path.join(profile, "storage-sync-v2.sqlite")
 if os.path.exists(sync):
     con = ro(sync)
-    for table in ("storage_sync_data", "storage_sync_mirror"):
-        try:
-            rows = con.execute(f"select data from {table} where ext_id = ?", (addon,)).fetchall()
-        except sqlite3.Error as e:
-            print(f"      ├─ {table}: unreadable ({e})"); continue
-        print(f"      ├─ {table}: {len(rows)} row(s)")
-        for (data,) in rows:
-            print(f"      │  {(data or '')[:600]}")
+    for (data,) in con.execute("select data from storage_sync_data where ext_id = ?", (addon,)):
+        obj = json.loads(data or "{}")
+        print(f"      ├─ keys: {', '.join(sorted(obj)) or '(empty)'}")
+        if want_key in obj:
+            print(f"      │  └─ {want_key} = {redact(json.dumps(obj[want_key]))[:1200]}")
+    print("      └─ (end)")
 else:
     print("      └─ (no storage-sync-v2.sqlite)")
 PY
-status=$?
-if [[ $status -ne 0 ]]; then
+if [[ $? -ne 0 ]]; then
   echo "💥 MalfunctionError: could not decode the storage for $addon_id" >&2
   exit 1
 fi
