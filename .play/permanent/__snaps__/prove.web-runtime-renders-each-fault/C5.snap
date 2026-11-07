@@ -1,0 +1,5 @@
+   💥 MalfunctionError: the clone TIMED OUT after 30s — https://example.com/x.tgz
+      ⇒ it stalled or never spoke. that is a wire fault, NOT a bad url
+      ⇒ a grove reaches the wire through its nat, so a stalled flow
+        there is the ordinary failure of that path — retry first
+      ⇒ removed the partial clone at <fixture>/clone, so a re-run refetches it

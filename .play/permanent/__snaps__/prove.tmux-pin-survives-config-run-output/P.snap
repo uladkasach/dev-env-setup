@@ -1,0 +1,7 @@
+   • pinned build: /usr/local/bin/tmux
+   • arm echo: alive 3.5a
+   • arm real: alive 3.5a
+   • arm client: alive 3.5a
+   • distro arm echo: <the reproduction's verdict, which varies by run>
+   • distro arm real: <the reproduction's verdict, which varies by run>
+   • distro arm client: <the reproduction's verdict, which varies by run>

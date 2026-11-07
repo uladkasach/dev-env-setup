@@ -1,0 +1,6 @@
+🎭 play.run --play prove.stub-passes --within 900
+   └─ <fixture>/.play/permanent/prove.stub-passes.play.sh
+
+   • stub holds ✔
+
+🌲 prove.stub-passes ✔

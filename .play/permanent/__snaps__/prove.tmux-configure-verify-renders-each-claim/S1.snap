@@ -1,0 +1,4 @@
+   • ~/.tmux.conf matches the checkout ✔
+   • ~/.tmux.conf is the only conf tmux loads ✔ (<fixture>/home/.tmux.conf)
+   • all 2 declared tmux plugins present, each at its pin ✔ (<fixture>/home/.tmux/plugins)
+   • default-terminal 'tmux-256color' — terminfo holds it ✔

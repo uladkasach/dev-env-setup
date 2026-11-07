@@ -10,7 +10,7 @@
 # .why
 #   - a population of small orphans is never one process earlyoom would pick
 #   - an age-based reap clears it before memory pressure exists
-#   - every box runs it, and `1.6.4.keyrackd` already grants the linger it rides on
+#   - every box runs it, and `1.6.9.linger` runs first and grants the linger it rides on
 #   - the measurement and the design: `gotcha.earlyoom-kills-the-session-not-the-hog`
 #
 # usage:
@@ -36,6 +36,19 @@ Description=Reap processes abandoned for over 24h
 Type=oneshot
 ExecStart=$(grove_provision_1_6_6_abandoned_bin) --mode apply --min-age 86400
 SERVICE
+}
+
+# .what = whether the unit at $1 holds the declared service bytes, exact
+# .why  = a pipe into `cmp -s -` leaves its writer on EPIPE when cmp exits before it reads
+#         (an absent unit); where SIGPIPE is ignored, as on a CI runner, the writer prints
+#         `write error: Broken pipe` into the phase's own output. each side is read whole,
+#         a sentinel keeps the final newlines, and no pipe is left to break
+grove_provision_1_6_6_abandoned_service_matches() {
+  local unit="$1" want got
+  [[ -f "$unit" ]] || return 1
+  want="$(grove_provision_1_6_6_abandoned_service_text; printf x)"
+  got="$(cat -- "$unit"; printf x)"
+  [[ "$want" == "$got" ]]
 }
 
 grove_provision_1_6_6_abandoned() {

@@ -1,0 +1,6 @@
+   • tmux.conf declared (~/.tmux.conf)
+   ✋ ConstraintError: could not start an isolated tmux server to install the plugins
+      ⇒ tpm reads its plugin list from a server that has LOADED the conf,
+        so with no such server the install finds an empty list and
+        reports success with no plugins fetched
+      read why: tmux -L grove_tpm -f ~/.tmux.conf new-session -d -s tpm_init

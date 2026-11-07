@@ -1,0 +1,2 @@
+   💥 MalfunctionError: the host could not be RESOLVED (curl 6) — https://example.com/x.tgz
+      ⇒ dns, not the far end. check the box's resolver first

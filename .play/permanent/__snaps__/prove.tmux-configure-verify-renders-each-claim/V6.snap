@@ -1,0 +1,10 @@
+   • ~/.tmux.conf matches the checkout ✔
+   🌙 no tmux server answered, so which confs tmux loads cannot be observed
+      ⇒ either none runs, or none that runs replied within 5s
+   • all 2 declared tmux plugins present, each at its pin ✔ (<fixture>/home/.tmux/plugins)
+   ✋ ConstraintError: the conf declares no default-terminal
+      ⇒ tmux falls back to 'screen' — 8 colours — and every pane
+        inherits it at spawn, so apps EMIT only 8-colour codes
+      ⇒ INVISIBLE beside a correct terminal-features line: the outward
+        path renders a truecolor no app ever sends
+      fix: declare it in this bundle's tmux.conf, then re-apply this bundle

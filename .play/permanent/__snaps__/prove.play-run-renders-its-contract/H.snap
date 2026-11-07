@@ -1,0 +1,23 @@
+usage:
+  rhx play.run --list
+  rhx play.run --play prove.nvim-fetches-no-unpinned-plugin
+  rhx play.run --play prove.git-alias-seam --within 600
+  rhx play.run --all
+
+options:
+  --play SLUG    the play to run. the `.play.sh` suffix is optional
+  --list         name every play this box can run, then exit
+  --all          run every play --list names, one verdict line each; each
+                 play's full output lands in a log dir the summary names
+  --resnap       rewrite each snap a play holds (`__snaps__/<play>/`) from
+                 this run. review the diff before you commit it
+  --within SECS  bound per play, in seconds (default 900)
+  --skill NAME   absorbed + ignored — rhachet injects this when invoked as
+                 `rhx play.run …`. same for --repo / --role
+  -h, --help     show this header
+
+exit:
+  0 = the play passed (--all: every play passed)
+  1 = the play failed, or malfunctioned (--all: at least one did)
+  2 = a constraint: bad args, no such play, a forbidden verb, or a timeout
+      (--all: none failed, and at least one declined or timed out)

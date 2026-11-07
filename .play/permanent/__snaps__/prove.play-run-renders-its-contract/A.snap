@@ -1,0 +1,12 @@
+🎭 play.run --all --within 2
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<run>
+   └─ verdicts
+      ├─ 🌙 lint.stub-reads — declined or timed out
+      ├─ 🌙 prove.stub-declines — declined or timed out
+      ├─ 💥 prove.stub-fails — failed (exit 1)
+      ├─ 🌙 prove.stub-hangs — declined or timed out
+      ├─ ✔ prove.stub-passes
+      ├─ 🌙 repair.stub-mends — declined or timed out
+      └─ 1 passed · 4 declined · 1 failed
+
+   💥 MalfunctionError: 1 play(s) failed — read each log under .log/role=mechanic/skill=play.run/what=all/<run>

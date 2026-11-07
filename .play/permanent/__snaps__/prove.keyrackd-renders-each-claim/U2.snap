@@ -1,0 +1,2 @@
+   • keyrack_daemon_prune.service and keyrack_daemon_prune.timer declared
+   • keyrack_daemon_prune.timer enabled and started (every 15m, --min-age 10)

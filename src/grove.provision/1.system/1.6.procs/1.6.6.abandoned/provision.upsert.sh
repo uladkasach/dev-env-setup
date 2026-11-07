@@ -30,7 +30,7 @@ grove_provision_1_6_6_abandoned_provision_upsert() {
   # what is already true — read before any write
   local converged=1
   cmp -s "$timer_src" "$unit_dir/$timer_name" || converged=0
-  grove_provision_1_6_6_abandoned_service_text | cmp -s - "$unit_dir/$service_name" || converged=0
+  grove_provision_1_6_6_abandoned_service_matches "$unit_dir/$service_name" || converged=0
   systemctl --user is-enabled "$timer_name" >/dev/null 2>&1 || converged=0
   systemctl --user is-active  "$timer_name" >/dev/null 2>&1 || converged=0
   if [[ "$converged" -eq 1 ]]; then

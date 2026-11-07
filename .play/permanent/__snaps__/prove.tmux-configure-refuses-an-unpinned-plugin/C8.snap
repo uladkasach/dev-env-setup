@@ -1,0 +1,7 @@
+   • tmux.conf declared (~/.tmux.conf)
+   ✋ ConstraintError: ~/.tmux.conf does not parse, so tmux loads none of it
+      cause: <fixture>/home/.tmux.conf:2: unknown command: this-is-not-a-tmux-command
+      ⇒ a server still starts on it, with every option and every @plugin
+        dropped, so tpm would find an empty list and report success
+      fix: repair the line named above in the checkout's tmux.conf, then
+        rhx grove.provision --what 2.8.tmux --mode apply

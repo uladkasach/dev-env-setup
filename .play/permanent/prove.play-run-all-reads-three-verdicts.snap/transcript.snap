@@ -39,7 +39,7 @@ rc=2
 ## an unknown flag → refused, names the valid
 rc=2
    ✋ ConstraintError: unknown flag: --every
-      valid: --play <slug>  --list  --all  --within <secs>  --help
+      valid: --play <slug>  --list  --all  --resnap  --within <secs>  --help
 
 ## --help → the usage
 rc=0
@@ -54,6 +54,8 @@ options:
   --list         name every play this box can run, then exit
   --all          run every play --list names, one verdict line each; each
                  play's full output lands in a log dir the summary names
+  --resnap       rewrite each snap a play holds (`__snaps__/<play>/`) from
+                 this run. review the diff before you commit it
   --within SECS  bound per play, in seconds (default 900)
   --skill NAME   absorbed + ignored — rhachet injects this when invoked as
                  `rhx play.run …`. same for --repo / --role

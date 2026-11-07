@@ -1,0 +1,1 @@
+   ✋ ConstraintError: web_verify_gpg_fingerprints: needs --file AND at least one --fpr

@@ -1,0 +1,2 @@
+   • bait pid <pid>, sent SIGSEGV
+   • coredumpctl holds it: signal=SIGSEGV core=present exe=prove-coredump-bait ✔

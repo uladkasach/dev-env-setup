@@ -1,0 +1,9 @@
+   ✋ ConstraintError: ~/.tmux.conf DIFFERS from the checkout
+      ⇒ the live conf is an older revision — invisible to a file test,
+        since it exists and loads. the symptom is 'my keybind change had
+        no effect', which a human blames on tmux
+      read why: diff <fixture>/src/grove.provision/2.shell/2.8.tmux/tmux.conf <fixture>/home/.tmux.conf
+   🌙 no tmux server answered, so which confs tmux loads cannot be observed
+      ⇒ either none runs, or none that runs replied within 5s
+   • all 2 declared tmux plugins present, each at its pin ✔ (<fixture>/home/.tmux/plugins)
+   • default-terminal 'tmux-256color' — terminfo holds it ✔

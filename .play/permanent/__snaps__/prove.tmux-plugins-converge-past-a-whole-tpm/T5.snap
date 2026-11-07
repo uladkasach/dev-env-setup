@@ -1,0 +1,9 @@
+   ✋ ConstraintError: could not clone tpm to <fixture>/home/.tmux/plugins/tpm
+      ⇒ ~/.tmux.conf names that exact path in its 'run' line, so tmux
+        will start with NO plugins and print a run-shell error on every
+        session — which reads as a broken conf rather than an absent tool
+      ⇒ the path is part of the contract; do not move it elsewhere
+      ⇒ git_clone named the fault above, and it already removed the
+        partial dir. a kill it cannot observe would leave one — and the
+        guard above reads state rather than presence, so a re-run moves
+        that carcass aside instead of a report of ✔ over it

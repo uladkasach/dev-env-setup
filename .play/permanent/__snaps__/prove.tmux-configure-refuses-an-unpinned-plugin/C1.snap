@@ -1,0 +1,3 @@
+   ✋ ConstraintError: the checkout has no tmux.conf at <fixture>/nosrc/grove.provision/2.shell/2.8.tmux/tmux.conf
+      ⇒ $GROVE_SRC is this run's own checkout, so an absent file here
+        means the checkout is incomplete rather than that the path is wrong
