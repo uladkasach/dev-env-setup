@@ -42,6 +42,11 @@ node_modules
 #   rhx play.run --play <name>            # tracked plays, on THIS box
 .play/temporary/
 
+# route crash logs — the route reminder daemon writes one per failed reach into
+# `$route/.malfunctions/`. each is one machine's runtime record, so it belongs in no
+# commit. upstream: init.behavior to ignore it per route (ehmpathy/rhachet-roles-bhuild#629)
+.malfunctions/
+
 # a RUNTIME lock — it names one machine's live process, so a commit of it
 # either lies to the next machine or blocks it
 .claude/scheduled_tasks.lock

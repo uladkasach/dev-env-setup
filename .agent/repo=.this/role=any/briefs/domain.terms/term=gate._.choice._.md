@@ -27,6 +27,7 @@ report in another — what makes it a gate is that a caller skips work on its ve
 | `configure.verify` | a claim is printed, and no phase is skipped | no — a report |
 | `[[ tier == local@unix && -t 0 ]]` | whether an interactive prompt may open | **yes** |
 | `git.grove.provision test` | whether a grove may be declared ready | **yes** |
+| the `5.3.brains` boot gate | whether an apply that locks home may pass, once an init has run against the lock | **yes** |
 
 ⇒ so *"is this a gate?"* is answered by what happens NEXT, never by the check itself.
 
@@ -69,6 +70,7 @@ used to judge its GUARANTEE half, and a check condemned nine correct sites.
 - src/grove.provision/5.devtools/5.4.gh/configure.upsert.sh       # a prompt gate
 - src/grove.provision/5.devtools/5.15.identity/configure.upsert.sh
 - src/grove.provision/2.shell/2.3.ssh/configure.upsert.sh
+- src/grove.provision/5.devtools/5.3.brains/configure.upsert.sh   # the boot gate: the lock is proven only once an init survives it; one it halts is named, never lifted. a bounded tie to rhachet's init (define.5-3-brains.declared-keys)
 - .agent/repo=.this/role=any/briefs/grove/provision/rule.require.upgrade-entries-verify-themselves.md
 - .agent/repo=.this/role=any/briefs/evidence/rule.forbid.tty-as-a-proxy-for-a-human.md
 

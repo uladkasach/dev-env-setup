@@ -1,0 +1,19 @@
+{
+  "key": "5233f4a994c5237c",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-bhrain"
+  },
+  "exid": null,
+  "title": "feat(route): name why a guard lane is held, and await a round, in the route stdouts",
+  "description": "## .what\n\ntwo gaps in the guard round stdout, each paved locally in uladkasach/dev-env-setup (PR #167) as a repo skill. build both into the extant route stdouts, then the local skills retire.\n\n### 1. a held lane names no reason — local skill `route.guard.lanes.get`\n\na guard round that pours no lane prints only the held verdicts. it never says WHY each lane was held. the local skill replays the guard inputs, read-only, per peer lane:\n\n- the artifact hash, and the givens at that hash (`iN:exitClass` per lane)\n- the latest given at the hash vs the cached given the guard reads (`getAllCachedPassedReviews` → `getOneCacheSafePeerReviewArtifact`)\n- the meter (rounds/budget) and the level latch (`getStoneGuardLevelsPoured`)\n- the pre-gate verdict (`computeReviewPeerVerdict`)\n\nit is how #711 was found: a lane whose latest given refused was served an older passed verdict, so the judge held it on a residual no stance could clear.\n\nfix shape: `route.stone.set --as arrived` and `route.drive` print, per held lane, `cached iN vs latest iM` and the verdict cause — or add `route.guard.lanes.get` to the driver role.\n\n### 2. no bounded wait for a round — local skill `route.guard.round.await`\n\na round with expensive lanes (an l3 `rhx enroll`) runs many minutes, and givens land only as each lane ends. a driver polls by hand and spends turns. the local skill waits once, bounded (default 1200s), for N givens at iteration I, and names which slugs landed; exit 2 names the ones that landed if the bound passes first.\n\nfix shape: an `--await` on `route.stone.set --as arrived`, or a driver skill `route.guard.round.await`.\n\n## .source\n\n- https://github.com/uladkasach/dev-env-setup/pull/167 (review comment on `route.guard.lanes.get.sh`)\n- `.agent/repo=.this/role=any/skills/route.guard.lanes.get.sh` and `route.guard.round.await.sh` in that repo\n- related: #711 (the cache defect skill 1 surfaced)",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": null,
+  "heldSeq": 4,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "730"
+}
