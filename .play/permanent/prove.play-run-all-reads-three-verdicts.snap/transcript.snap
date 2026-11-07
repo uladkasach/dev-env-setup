@@ -2,35 +2,85 @@
 ## --all · a pass, a decline, a failure → 1
 rc=1
 🎭 play.run --all --within 30
-   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
    └─ verdicts
       ├─ ✔ prove.a-passes
       ├─ 🌙 prove.b-declines — declined or timed out
       ├─ 💥 prove.c-fails — failed (exit 1)
       └─ 1 passed · 1 declined · 1 failed
 
-   💥 MalfunctionError: 1 play(s) failed — read each log under .log/role=mechanic/skill=play.run/what=all/<stamp>
+   💥 MalfunctionError: 1 play(s) failed — read each log under .log/role=mechanic/skill=play.run/what=all/<stamp>/
+
+## the mixed run's receipt · what=all/<stamp>.stdout.log
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      ├─ 🌙 prove.b-declines — declined or timed out
+      ├─ 💥 prove.c-fails — failed (exit 1)
+      └─ 1 passed · 1 declined · 1 failed
+
+## the mixed run's receipt · the tree of what=all/
+├─ <stamp>/
+│  ├─ prove.a-passes.log
+│  ├─ prove.b-declines.log
+│  └─ prove.c-fails.log
+└─ <stamp>.stdout.log
+
+## the mixed run's receipt · what=all/<stamp>/prove.c-fails.log
+🎭 play.run --play prove.c-fails --within 30
+   └─ <fixture>/mixed/.play/permanent/prove.c-fails.play.sh
+
+stub prove.c-fails says exit 1
+
+   💥 MalfunctionError: prove.c-fails failed (exit 1)
 
 ## --all · a pass and a decline → 2
 rc=2
 🎭 play.run --all --within 30
-   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
    └─ verdicts
       ├─ ✔ prove.a-passes
       ├─ 🌙 prove.b-declines — declined or timed out
       └─ 1 passed · 1 declined · 0 failed
 
-   🌙 1 play(s) declined or timed out, so proved no claim — read each log under .log/role=mechanic/skill=play.run/what=all/<stamp>
+   ✋ ConstraintError: 1 play(s) declined or timed out, so proved no claim — read each log under .log/role=mechanic/skill=play.run/what=all/<stamp>/
+
+## --all · a timeout, no verb, a vanished play → each declined
+rc=2
+🎭 play.run --all --within 1
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ 🌙 bogus.b-noverb — declined or timed out
+      ├─ 🌙 prove.a-hangs — declined or timed out
+      ├─ 🌙 prove.c-vanished — declined or timed out
+      ├─ ✔ prove.d-passes
+      └─ 1 passed · 3 declined · 0 failed
+
+   ✋ ConstraintError: 3 play(s) declined or timed out, so proved no claim — read each log under .log/role=mechanic/skill=play.run/what=all/<stamp>/
 
 ## --all · every play passes → 0
 rc=0
 🎭 play.run --all --within 30
-   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
    └─ verdicts
       ├─ ✔ prove.a-passes
       └─ 1 passed · 0 declined · 0 failed
 
 🌲 every play passed
+
+## the green run's receipt · what=all/<stamp>.stdout.log
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      └─ 1 passed · 0 declined · 0 failed
 
 ## --all with --play → two subjects, refused
 rc=2
@@ -52,16 +102,419 @@ usage:
 options:
   --play SLUG    the play to run. the `.play.sh` suffix is optional
   --list         name every play this box can run, then exit
-  --all          run every play --list names, one verdict line each; each
-                 play's full output lands in a log dir the summary names
+  --all          run every play --list names, one verdict line each.
+                 it names its own set, so it takes no --play. it writes:
+                   .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+                     the verdict tree; its last line is the tally
+                   .log/role=mechanic/skill=play.run/what=all/<stamp>/
+                     one log per play, its full output
   --within SECS  bound per play, in seconds (default 900)
   --skill NAME   absorbed + ignored — rhachet injects this when invoked as
                  `rhx play.run …`. same for --repo / --role
   -h, --help     show this header
 
 exit:
-  0 = the play passed (--all: every play passed)
-  1 = the play failed, or malfunctioned (--all: at least one did)
-  2 = a constraint: bad args, no such play, a forbidden verb, or a timeout
-      (--all: none failed, and at least one declined or timed out)
+  0 = passed
+        --play: the play passed
+        --all:  every play passed
+  1 = failed
+        --play: the play failed, or malfunctioned
+        --all:  at least one play failed
+        --all:  the runner could not read the index or write a log; no tally lands
+  2 = a constraint
+        any:    bad args, no such play, a forbidden verb
+        --play: the play declined, or ran past --within
+        --all:  none failed, and at least one declined or ran past --within
+        --all:  no log written — the index tracks no play, or a .play.sh sits outside it
+
+## --list with --all → two subjects, refused
+rc=2
+   ✋ ConstraintError: --list names the set and runs none, so it takes no --all or --play; pick one
+
+## --list with --play → two subjects, refused
+rc=2
+   ✋ ConstraintError: --list names the set and runs none, so it takes no --all or --play; pick one
+
+## --all under rhx's injected flags → 0
+rc=0
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      └─ 1 passed · 0 declined · 0 failed
+
+🌲 every play passed
+
+## --all · an empty index → refused, no log
+rc=2
+   ✋ ConstraintError: no tracked play under .play/permanent, so --all has no suite to run
+      ⇒ an empty run would pass and prove no claim
+      read the index: git -C <fixture>/empty ls-files .play/permanent
+      fix: git -C <fixture>/empty add .play/permanent/<slug>.play.sh, then rerun
+
+## --all · red after green, run 1 → 0
+rc=0
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      └─ 1 passed · 0 declined · 0 failed
+
+🌲 every play passed
+
+## --all · red after green, run 2 → 1
+rc=1
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      ├─ 💥 prove.b-fails — failed (exit 1)
+      └─ 1 passed · 0 declined · 1 failed
+
+   💥 MalfunctionError: 1 play(s) failed — read each log under .log/role=mechanic/skill=play.run/what=all/<stamp>/
+
+## --all · a play nested below the suite → not in it
+rc=0
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      └─ 1 passed · 0 declined · 0 failed
+
+🌲 every play passed
+
+## --all · a non-ascii play name → in the suite
+rc=0
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      ├─ ✔ prove.ü-passes
+      └─ 2 passed · 0 declined · 0 failed
+
+🌲 every play passed
+
+## --all --within 0 → refused, no log
+rc=2
+   ✋ ConstraintError: --within takes whole seconds, at least 1 — got '0'
+      fix: --within 900
+
+## --all · an untracked play → refused, no log
+rc=2
+   ✋ ConstraintError: 1 untracked .play.sh file(s) sit in .play/permanent, outside the index
+      ⇒ this runner refuses each of them. if one is yours, git add it;
+        if it is not, read it — a pulled tree can write here
+      read them: git -C <fixture>/untracked status --short .play/permanent
+
+## --all · every stamp taken → 💥, no overwrite
+rc=1
+   💥 MalfunctionError: no free stamp under .log/role=mechanic/skill=play.run/what=all after 5 tries, one per second
+      ⇒ every stamp in that window was taken, and a taken log is never overwritten
+      fix: read that dir, then rerun — a peer run may write there in a loop, or stale logs
+        with no dir beside them may hold each stamp, and are yours to remove:
+        ls -la <fixture>/stamps/.log/role=mechanic/skill=play.run/what=all
+
+## --all · a taken stamp → the next free second
+rc=0
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      └─ 1 passed · 0 declined · 0 failed
+
+🌲 every play passed
+
+## --all · 4 runs at once → each its own stamp (the first racer's output)
+rc=0
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      └─ 1 passed · 0 declined · 0 failed
+
+🌲 every play passed
+
+## --all · every stamp held by an orphan log → 💥, no overwrite
+rc=1
+   💥 MalfunctionError: no free stamp under .log/role=mechanic/skill=play.run/what=all after 5 tries, one per second
+      ⇒ every stamp in that window was taken, and a taken log is never overwritten
+      fix: read that dir, then rerun — a peer run may write there in a loop, or stale logs
+        with no dir beside them may hold each stamp, and are yours to remove:
+        ls -la <fixture>/orphans/.log/role=mechanic/skill=play.run/what=all
+
+## --all · a log dir it cannot write → 💥, no log
+rc=1
+   💥 MalfunctionError: the log dir .log/role=mechanic/skill=play.run/what=all cannot be written, so no verdict can land
+      fix: make it writable by <user>, then rerun:
+        chmod u+w <fixture>/locked/.log/role=mechanic/skill=play.run/what=all
+
+## --all · a stamp claim refused for a fault → 💥 at once
+rc=1
+   💥 MalfunctionError: could not claim .log/role=mechanic/skill=play.run/what=all/<stamp>/, and no other run holds that name
+      fix: read the disk, the dir's mode, and the path limit, then rerun:
+        df -h <fixture>/unsearch/.log/role=mechanic/skill=play.run/what=all; ls -ld <fixture>/unsearch/.log/role=mechanic/skill=play.run/what=all; getconf PATH_MAX <fixture>/unsearch/.log/role=mechanic/skill=play.run/what=all
+
+## --all · a log create refused after the dir claim → 💥 at once
+rc=1
+   💥 MalfunctionError: could not create .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log after its dir claim won, and no other run holds that name
+      fix: read the disk, the dir's mode, and the path limit, then rerun:
+        df -h <fixture>/deep/.log/role=mechanic/skill=play.run/what=all; ls -ld <fixture>/deep/.log/role=mechanic/skill=play.run/what=all; getconf PATH_MAX <fixture>/deep/.log/role=mechanic/skill=play.run/what=all
+
+## --all · its own claim will not come off → 💥 at once
+rc=1
+   💥 MalfunctionError: could not remove this run's own claim .log/role=mechanic/skill=play.run/what=all/<stamp>/
+      rmdir said: failed to remove '<fixture>/deep/.log/role=mechanic/skill=play.run/what=all/<stamp>': Device or resource busy
+      fix: read the disk, the dir's mode, and the path limit, then rerun:
+        df -h <fixture>/deep/.log/role=mechanic/skill=play.run/what=all; ls -ld <fixture>/deep/.log/role=mechanic/skill=play.run/what=all; getconf PATH_MAX <fixture>/deep/.log/role=mechanic/skill=play.run/what=all
+
+## --all · the verdict log stops a write mid-run → 💥, its tree left open at the fault
+rc=1
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ ✔ prove.a-locks-the-log
+
+   💥 MalfunctionError: could not append to .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log, so it ends short of its tally
+      fix: read the disk and the log's mode, then rerun:
+        df -h <fixture>/truncated/.log/role=mechanic/skill=play.run/what=all; ls -l <fixture>/truncated/.log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+
+## the truncated run's receipt · what=all/<stamp>.stdout.log, no tally
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+
+## --all · a run killed midway → its tree ends at the verdicts
+rc=143
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+
+## the killed run's receipt · what=all/<stamp>.stdout.log, no tally
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+
+## --all · a file holds the log dir's name → 💥, no log
+rc=1
+   💥 MalfunctionError: could not make the log dir .log/role=mechanic/skill=play.run/what=all, so no verdict can land
+      fix: read that path and its parents — a file may hold the name, or a parent be read-only:
+        ls -ld <fixture>/squat/.log/role=mechanic/skill=play.run/what=all <fixture>/squat/.log/role=mechanic/skill=play.run
+
+## --all · a play's log cannot be written → 💥, its tree left open at the fault
+rc=1
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ ✔ prove.a-locks-the-plays
+
+   💥 MalfunctionError: could not write .log/role=mechanic/skill=play.run/what=all/<stamp>/prove.b-passes.log, so prove.b-passes never ran
+      fix: read the disk and the dir's mode, then rerun:
+        df -h <fixture>/playlock/.log/role=mechanic/skill=play.run/what=all; ls -ld <fixture>/playlock/.log/role=mechanic/skill=play.run/what=all/<stamp>
+
+## the playlock run's receipt · what=all/<stamp>.stdout.log, no tally
+🎭 play.run --all --within 30
+   ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
+   ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
+   └─ verdicts
+      ├─ ✔ prove.a-locks-the-plays
+
+## --all · git cannot read the index → 💥, no log
+rc=1
+   💥 MalfunctionError: git could not read the index at <fixture>/badindex, so no set of plays can be named
+      git said: <git, in its own words>
+      read it: git -C <fixture>/badindex ls-files .play/permanent
+
+## --list · the tracked set
+rc=0
+🎭 play.run --list
+   ├─ <fixture>/green/.play/permanent
+   └─ store: git ls-files (the INDEX, not the disk)
+      prove.a-passes
+
+   1 play(s)
+
+## --list · an empty index
+rc=0
+🎭 play.run --list
+   ├─ <fixture>/empty/.play/permanent
+   └─ store: git ls-files (the INDEX, not the disk)
+      (none)
+
+   0 play(s)
+
+## --list · an untracked play → refused
+rc=2
+🎭 play.run --list
+   ├─ <fixture>/untracked/.play/permanent
+   └─ store: git ls-files (the INDEX, not the disk)
+      prove.a-passes
+
+   1 play(s)
+
+   ✋ ConstraintError: 1 untracked .play.sh file(s) sit in .play/permanent, outside the index
+      ⇒ this runner refuses each of them. if one is yours, git add it;
+        if it is not, read it — a pulled tree can write here
+      read them: git -C <fixture>/untracked status --short .play/permanent
+
+## --list · git cannot read the index → 💥
+rc=1
+   💥 MalfunctionError: git could not read the index at <fixture>/badindex, so no set of plays can be named
+      git said: <git, in its own words>
+      read it: git -C <fixture>/badindex ls-files .play/permanent
+
+## --play · a passed play → 0
+rc=0
+🎭 play.run --play prove.a-passes --within 30
+   └─ <fixture>/green/.play/permanent/prove.a-passes.play.sh
+
+stub prove.a-passes says exit 0
+
+🌲 prove.a-passes ✔
+
+## --play · a failed play → 1
+rc=1
+🎭 play.run --play prove.c-fails --within 30
+   └─ <fixture>/mixed/.play/permanent/prove.c-fails.play.sh
+
+stub prove.c-fails says exit 1
+
+   💥 MalfunctionError: prove.c-fails failed (exit 1)
+
+## --play · a declined play → 2
+rc=2
+🎭 play.run --play prove.b-declines --within 30
+   └─ <fixture>/mixed/.play/permanent/prove.b-declines.play.sh
+
+stub prove.b-declines says exit 2
+
+   ✋ ConstraintError: prove.b-declines declined — its subject is absent, so it proved no claim
+
+## --play · no such play → refused
+rc=2
+   ✋ ConstraintError: no play named 'prove.zz-absent'
+      looked for: <fixture>/green/.play/permanent/prove.zz-absent.play.sh
+      read what exists: rhx play.run --list
+
+## --play --within 0 → refused
+rc=2
+   ✋ ConstraintError: --within takes whole seconds, at least 1 — got '0'
+      fix: --within 900
+
+## --play · a hung play → timed out, 2
+rc=2
+🎭 play.run --play prove.a-hangs --within 1
+   └─ <fixture>/unproven/.play/permanent/prove.a-hangs.play.sh
+
+stub prove.a-hangs sleeps past its bound
+
+   ✋ ConstraintError: prove.a-hangs did not finish within 1s, so it proved no claim
+      ⇒ a bound that elapses is not a verdict about the subject
+      read it wider: rhx play.run --play prove.a-hangs --within 3600
+
+## --play · a play with no verb → refused
+rc=2
+   ✋ ConstraintError: 'bogus.b-noverb' does not name a verb this runner drives
+      ⇒ allowed: prove.* verify.* diagnose.* await.* hibernate.*
+      ⇒ the verb says what the play may do to the box, so an unnamed
+        one carries no such promise
+
+## --play · a repair play → refused
+rc=2
+   ✋ ConstraintError: 'repair.a-fixes' is a repair play, and this repo has no such verb
+      ⇒ a play that moves a box FORWARD toward the declared state is
+        a BUNDLE (rule.forbid.repair-plays)
+      fix: rhx grove.provision --what <slug> --mode apply
+
+## --play · a path, not a slug → refused
+rc=2
+   ✋ ConstraintError: a play is named by SLUG, never by path or flag: '../escape'
+      ⇒ every play lives in <fixture>/green/.play/permanent, so a path adds no reach and
+        would let this runner become a general shell
+      read what exists: rhx play.run --list
+
+## --play · a flag, not a slug → refused
+rc=2
+   ✋ ConstraintError: a play is named by SLUG, never by path or flag: '-x'
+      ⇒ every play lives in <fixture>/green/.play/permanent, so a path adds no reach and
+        would let this runner become a general shell
+      read what exists: rhx play.run --list
+
+## --play · an untracked play → refused
+rc=2
+   ✋ ConstraintError: 'prove.z-stray' is on disk and NOT in this repo's index
+      ⇒ this runner executes only what the repo PUBLISHES, because a
+        pulled tree can place a file here — .play/permanent is not in
+        GROVE_BOUNDARY_EXCLUDES, and .play/temporary is
+      ⇒ if you just wrote it, that is this check at work:
+           git add .play/permanent/prove.z-stray.play.sh
+      ⇒ if you did NOT write it, read it before you do aught else
+
+## --play with no value → refused
+rc=2
+   ✋ ConstraintError: --play needs a value
+
+## --within with no value → refused
+rc=2
+   ✋ ConstraintError: --within needs a value
+
+## --within 'abc' → refused
+rc=2
+   ✋ ConstraintError: --within takes whole seconds, at least 1 — got 'abc'
+      fix: --within 900
+
+## --within '-5' → refused
+rc=2
+   ✋ ConstraintError: --within takes whole seconds, at least 1 — got '-5'
+      fix: --within 900
+
+## --within '1.5' → refused
+rc=2
+   ✋ ConstraintError: --within takes whole seconds, at least 1 — got '1.5'
+      fix: --within 900
+
+## --within '007' → refused
+rc=2
+   ✋ ConstraintError: --within takes whole seconds, at least 1 — got '007'
+      fix: --within 900
+
+## --within '' → refused
+rc=2
+   ✋ ConstraintError: --within takes whole seconds, at least 1 — got ''
+      fix: --within 900
+
+## --list · git answers and warns → its words labeled
+rc=0
+   git said: <git, in its own words>
+🎭 play.run --list
+   ├─ <fixture>/green/.play/permanent
+   └─ store: git ls-files (the INDEX, not the disk)
+      prove.a-passes
+
+   1 play(s)
+
+## no subject → refused, names the three
+rc=2
+   ✋ ConstraintError: name a play: rhx play.run --play <slug>   (or --list, or --all)
+
+## a checkout with no play dir → refused
+rc=2
+   ✋ ConstraintError: no tracked play dir at <fixture>/noplays/.play/permanent
+      ⇒ an empty set would report as a pass, so this halts instead
+
+## no checkout at all → refused
+rc=2
+   ✋ ConstraintError: no tracked play dir at <no checkout>
+      ⇒ an empty set would report as a pass, so this halts instead
 
