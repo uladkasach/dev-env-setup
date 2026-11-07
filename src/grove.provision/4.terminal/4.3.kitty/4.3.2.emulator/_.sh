@@ -23,17 +23,24 @@ _kitty_verify_fail() {
   failed=$(( failed + 1 ))
 }
 
+# .what = print what kitty's own loader resolves for one python expr over `o`, the loaded conf
+# .why kitty's loader is the one truthful reader (m2-m6); empty output = kitty absent or mute
+_kitty_loader_get() {
+  local conf="$1" expr="$2"
+  command -v kitty >/dev/null 2>&1 || return 0
+  timeout -k 5 20 kitty +runpy "
+from kitty.config import load_config
+o = load_config('$conf')
+print($expr)
+" 2>/dev/null | tail -1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
 # .what = claim 2f of configure.verify: a BEL requests no focus, per kitty's loader
 # .why the default does, and on wayland cosmic grants it, so two windows that beep
 #   steal focus from each other without end
 _kitty_verify_bell() {
-  local conf="$1" wab=""
-  if command -v kitty >/dev/null 2>&1; then
-    wab="$(timeout -k 5 20 kitty +runpy "
-from kitty.config import load_config
-print(load_config('$conf').window_alert_on_bell)
-" 2>/dev/null | tail -1 | tr -d '[:space:]')"
-  fi
+  local conf="$1" wab
+  wab="$(_kitty_loader_get "$conf" 'o.window_alert_on_bell')"
   if [[ -z "$wab" ]]; then
     echo "   🌙 kitty's loader did not answer, so whether a bell steals focus is UNREAD"
     return 0
@@ -55,13 +62,8 @@ print(load_config('$conf').window_alert_on_bell)
 # .what = claims 2c + 2d of configure.verify: the DECLARED window size wins over
 #   `remember_window_size`, per kitty's loader, and that override is STATED (m11)
 _kitty_verify_window_size() {
-  local conf="$1" rws=""
-  if command -v kitty >/dev/null 2>&1; then
-    rws="$(timeout -k 5 20 kitty +runpy "
-from kitty.config import load_config
-print(load_config('$conf').remember_window_size)
-" 2>/dev/null | tail -1 | tr -d '[:space:]')"
-  fi
+  local conf="$1" rws
+  rws="$(_kitty_loader_get "$conf" 'o.remember_window_size')"
   if [[ -z "$rws" ]]; then
     echo "   🌙 kitty's loader did not answer, so whether the DECLARED window"
     echo "      size wins is UNREAD on this box"
