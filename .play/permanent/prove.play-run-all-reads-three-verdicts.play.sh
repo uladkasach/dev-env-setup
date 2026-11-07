@@ -770,7 +770,9 @@ else
   cry "   💥 MalfunctionError: killed — the prior green log was changed or removed"
   failed=1
 fi
-transcript+="$(as_transcript_entry "--all · a run killed midway → its tree ends at the verdicts" "$killrc" \
+# the snap pins the class the assert above proves, never the number: `timeout` relays the TERM,
+# and its own exit then varies by coreutils version (143 on one, 124 on another)
+transcript+="$(as_transcript_entry "--all · a run killed midway → its tree ends at the verdicts" "non-zero" \
   "$(as_redacted_output "$(cat "$fixture/tmp/killed.out")" "$fixture" "" "$USERNAME")")"$'\n'
 snap_cut_log killed "$cut" "the killed run's receipt · what=all/<stamp>.stdout.log, no tally"
 
