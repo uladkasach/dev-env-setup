@@ -1,0 +1,8 @@
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --home .claude
+   ├─ home=.claude · <date> · STANDARD
+   │  ├─ + projects/…
+   │  ├─ = settings.json (kept: this box's copy)
+   │  └─ 🌙 the brain login never left grove-1; log in here: rhx brains.auth.set
+   └─ 1 unit · 1 restored · 0 await a thaw · 0 refused · 0 failed

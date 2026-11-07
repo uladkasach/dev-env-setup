@@ -1,0 +1,7 @@
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.feat-x
+   ├─ org=acme/repo=widget/tree=widget.feat-x · <date> · STANDARD
+   │  └─ + laid at <fixture>/fresh/<seat>/git/acme/_worktrees/widget.feat-x, linked by `git worktree repair`
+   │     └─ HEAD feat-x
+   └─ 1 unit · 1 restored · 0 await a thaw · 0 refused · 0 failed

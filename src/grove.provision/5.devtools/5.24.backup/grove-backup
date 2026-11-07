@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+######################################################################
+# .what = back up every unit on this grove to its bucket, then write the status
+#
+# .who runs it
+#   - `grove-backup.service`, as root, each hour (`grove-backup.timer`)
+#   - a human, by hand, as root: `sudo systemctl start grove-backup.service`
+#   - a play, which SOURCES it and calls `grove_backup_run` against fixtures
+#
+# .the run
+#   1. one lock per box: a second run while one is active exits, never a double put
+#   2. the reach, in its written order (grove name → bucket name → credential);
+#      the first that fails is the cause, and the whole run fails on it
+#   3. the walk: every clone, worktree, and home dir of every seat
+#   4. per unit: tar to a root-only temp file, hash, compare against that unit's
+#      LATEST object of any date, put only on change (F8)
+#   5. a unit that fails at run time is retried once, then named; the rest land
+#   6. the status, which every surface renders: ✓ only when every unit landed
+#
+# 🛑 .why a run is never ✓ over a gap
+#   a run that put 11 of 12 units is a run that lost one. the human reads one line,
+#   so that line must be ✗ whenever any unit did not land (inventory b20)
+#
+# guarantee:
+#   - writes only to the bucket, under this grove's own `grove=<slug>/` prefix,
+#     and to its state dir
+#   - reads every home; changes no file in any of them
+#   - exit 0 = every unit landed or was unchanged · 1 = the run failed (status says why)
+######################################################################
+set -uo pipefail
+
+# shellcheck source=./grove.backup.operations.sh
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/grove.backup.operations.sh"
+
+######################################################################
+# .what = one attempt at one unit
+# rc: 0 put · 1 skipped (unchanged) · 2 failed, retry-worthy · 3 denied
+######################################################################
+grove_backup_unit_once() {
+  local kind="$1" user="$2" path="$3" unit="$4" tmp="$5" index="$6"
+  local out="$tmp/unit.tar.gz" sha latest facts sha_latest rc key
+
+  sha="$(grove_backup_pack "$kind" "$(grove_backup_home_root)/$user" "$path" "$out")" || return 2
+
+  # the latest object of this unit, of ANY date — `date=` sorts as text
+  latest="$(awk -F'\t' -v p="grove=$GROVE_BACKUP_GROVE/$unit/date=" 'index($1, p) == 1 { print $1 }' "$index" \
+            | sort | tail -n 1)"
+  if [[ -n "$latest" ]]; then
+    facts="$tmp/head"
+    grove_backup_s3_head "$latest" "$facts"
+    rc=$?
+    [[ "$rc" -eq 3 ]] && return 3
+    if [[ "$rc" -ne 0 && "$rc" -ne 6 ]]; then
+      GROVE_BACKUP_PACK_WHY="its latest object could not be read: $GROVE_BACKUP_AWS_ERR"
+      return 2
+    fi
+    sha_latest="$(cut -f1 "$facts" 2>/dev/null)"
+    [[ "$rc" -eq 0 && "$sha_latest" == "$sha" ]] && return 1
+  fi
+
+  key="$(grove_backup_key "$GROVE_BACKUP_GROVE" "$unit" "$(grove_backup_today)")"
+  grove_backup_s3_put "$out" "$key" "$sha"
+  rc=$?
+  [[ "$rc" -eq 0 ]] && return 0
+  [[ "$rc" -eq 3 ]] && return 3
+  GROVE_BACKUP_PACK_WHY="the put failed: $GROVE_BACKUP_AWS_ERR"
+  return 2
+}
+
+######################################################################
+# .what = the whole run — see the header
+######################################################################
+grove_backup_run() {
+  local began state tmp index failures line kind user path unit attempt rc
+  local put=0 skipped=0 total=0 denied=0
+  local -a units
+
+  began="$(grove_backup_now)"
+  state="$(grove_backup_state_dir)"
+  mkdir -p "$state" || return 1
+
+  # 1. one lock per box
+  exec 9>"$state/run.lock"
+  if ! flock -n 9; then
+    echo "🌙 a backup is already active on this box; this run exits"
+    return 0
+  fi
+
+  tmp="$state/tmp"
+  rm -rf "$tmp"
+  mkdir -p "$tmp" && chmod 700 "$tmp" || return 1
+  failures="$tmp/failures.json"
+  : >"$failures"
+
+  # 2. the reach
+  if ! grove_backup_reach_check yes; then
+    echo "✗ grove backup · FAILED · $GROVE_BACKUP_CAUSE" >&2
+    echo "   └─ $GROVE_BACKUP_FIX" >&2
+    grove_backup_status_write "$began" failed "$GROVE_BACKUP_CAUSE" "$GROVE_BACKUP_FIX" 0 0 0 "$failures"
+    rm -rf "$tmp"
+    return 1
+  fi
+
+  # 3. the walk — zero units is never a ✓ (inventory b13)
+  mapfile -t units < <(grove_backup_units_walk)
+  total="${#units[@]}"
+  if [[ "$total" -eq 0 ]]; then
+    GROVE_BACKUP_CAUSE="no units found under $(grove_backup_home_root)/*"
+    GROVE_BACKUP_FIX="a run of zero units is never a ✓; read the walk: journalctl -u grove-backup -n 50"
+    echo "✗ grove backup · FAILED · $GROVE_BACKUP_CAUSE" >&2
+    grove_backup_status_write "$began" failed "$GROVE_BACKUP_CAUSE" "$GROVE_BACKUP_FIX" 0 0 0 "$failures"
+    rm -rf "$tmp"
+    return 1
+  fi
+
+  # the grove's whole prefix, read once — each unit's latest object comes from it
+  index="$tmp/index"
+  grove_backup_s3_list "grove=$GROVE_BACKUP_GROVE/" "$index"
+  rc=$?
+  if [[ "$rc" -ne 0 ]]; then
+    [[ "$rc" -eq 3 ]] && grove_backup_cause_denied
+    [[ "$rc" -ne 3 ]] && GROVE_BACKUP_CAUSE="the bucket could not be listed" \
+                     && GROVE_BACKUP_FIX="$GROVE_BACKUP_AWS_ERR"
+    echo "✗ grove backup · FAILED · $GROVE_BACKUP_CAUSE" >&2
+    echo "   └─ $GROVE_BACKUP_FIX" >&2
+    grove_backup_status_write "$began" failed "$GROVE_BACKUP_CAUSE" "$GROVE_BACKUP_FIX" "$total" 0 0 "$failures"
+    rm -rf "$tmp"
+    return 1
+  fi
+
+  echo "🌲 grove backup · grove=$GROVE_BACKUP_GROVE · $total units"
+
+  # 4 + 5. each unit, one retry each
+  for line in "${units[@]}"; do
+    IFS=$'\t' read -r kind user path unit <<<"$line"
+    for attempt in 1 2; do
+      GROVE_BACKUP_PACK_WHY=""
+      grove_backup_unit_once "$kind" "$user" "$path" "$unit" "$tmp" "$index"
+      rc=$?
+      [[ "$rc" -ne 2 ]] && break
+      [[ "$attempt" -eq 1 ]] && echo "   ↻ $unit · $GROVE_BACKUP_PACK_WHY · retry once"
+    done
+    rm -f "$tmp/unit.tar.gz" "$tmp"/unit.tar.gz.*
+
+    [[ "$rc" -eq 0 ]] && { put=$((put + 1)); echo "   + $unit"; continue; }
+    [[ "$rc" -eq 1 ]] && { skipped=$((skipped + 1)); continue; }
+    [[ "$rc" -eq 3 ]] && { denied=1; break; }
+    echo "   ✗ $unit · $GROVE_BACKUP_PACK_WHY" >&2
+    jq -nc --arg unit "$unit" --arg why "$GROVE_BACKUP_PACK_WHY" '{ unit: $unit, why: $why }' >>"$failures"
+  done
+
+  # 6. the status
+  local failed_count
+  failed_count="$(grep -c . "$failures")"
+
+  if [[ "$denied" -eq 1 ]]; then
+    grove_backup_cause_denied
+    echo "✗ grove backup · FAILED · $GROVE_BACKUP_CAUSE" >&2
+    echo "   └─ $GROVE_BACKUP_FIX" >&2
+    grove_backup_status_write "$began" failed "$GROVE_BACKUP_CAUSE" "$GROVE_BACKUP_FIX" "$total" "$put" "$skipped" "$failures"
+    rm -rf "$tmp"
+    return 1
+  fi
+
+  if [[ "$failed_count" -gt 0 ]]; then
+    GROVE_BACKUP_CAUSE="$failed_count of $total units did not land"
+    GROVE_BACKUP_FIX="each is named in failures; read the run: journalctl -u grove-backup -n 50"
+    echo "✗ grove backup · FAILED · $GROVE_BACKUP_CAUSE · $put put · $skipped skipped" >&2
+    grove_backup_status_write "$began" failed "$GROVE_BACKUP_CAUSE" "$GROVE_BACKUP_FIX" "$total" "$put" "$skipped" "$failures"
+    rm -rf "$tmp"
+    return 1
+  fi
+
+  echo "✓ grove backup · $put put · $skipped skipped"
+  grove_backup_status_write "$began" ok "" "" "$total" "$put" "$skipped" "$failures"
+  rm -rf "$tmp"
+  return 0
+}
+
+# run only when executed — a play sources this file and calls the run itself
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  grove_backup_run
+  exit $?
+fi
