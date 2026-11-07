@@ -29,3 +29,5 @@ case=4.
 
 ## .risk: risky
 it decides which seat holds the AWS badge, and so which uid can act in the prep account. a wrong call puts the badge on the root seat.
+## .verdict: ruled yes, at the lean
+the director, 2026-11-06 (seed S4): the badge sits on the camper seat only.

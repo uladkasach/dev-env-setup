@@ -30,3 +30,5 @@ case=4 `[t6]`; yield `.groundwork`.
 
 ## .risk: risky
 the play exercises the live badge: it signs a session from the cert and hops roles in the prep account. it writes nothing in AWS, but it reads and uses a credential on every run, so its output must never echo one.
+## .verdict: ruled yes, at the lean
+the director, 2026-11-06 (seed S4): `prove.grove-aws-identity-chain` is written new, and it never echoes a credential.

@@ -39,3 +39,5 @@ case=4, case=6, case=7.
 
 ## .risk: risky
 this is the AWS badge itself: a cert and private key on disk, signed into live sessions in the prep account. its file modes are the whole per-user wall (F15 holds the copy risk).
+## .verdict: ruled yes, at the lean
+the director, 2026-11-06 (seed S4): Roles Anywhere via `credential_process`; cert + key 0600 in the camper home.

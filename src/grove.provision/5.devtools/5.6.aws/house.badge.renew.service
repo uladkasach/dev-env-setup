@@ -1,0 +1,11 @@
+# .what = renew a house seat's Roles Anywhere cert, if fewer than a day is left
+# .why  = the cert lives 7 days, and no human sits at a house seat (vision case=7)
+# .note = a USER unit, owned by the camper seat. `@RENEW_EXEC@` is replaced by
+#         5.6.aws's configure.upsert with the checkout path it ran from, and its
+#         verify refuses a unit whose path no longer reaches a file
+[Unit]
+Description=renew the house badge cert before it ends
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env bash @RENEW_EXEC@

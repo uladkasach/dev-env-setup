@@ -13,7 +13,7 @@ what a **grove** should hold, and converges any grove toward that declaration.
 | kind | `$GROVE_ENV_SERVER` | `--for` | reached by | camp identity |
 |---|---|---|---|---|
 | **local** | `local@unix`, `local@cicd` | `local` | no transport — the shell is already on it | ✋ never |
-| **house** | `house@<platform>` | — (never derived) | undeclared here | ✋ never |
+| **house** | `house@unix` | `house` | loopback ssh to a seat user on a box we own, read off a root-owned election | ✋ never |
 | **cloud** | `cloud@aws.ec2`, `cloud@hetzner.hetzbot` | `cloud` | a duct (`term=duct`) | ✔ mandated |
 
 ⇒ inbound: a local grove takes none; a cloud grove takes its duct
@@ -128,7 +128,7 @@ from a shell, `grove.provision` is the same command
 
 ## .$server = $tier@$platform
 
-`local@unix`, `local@cicd`, `cloud@aws.ec2`, `cloud@hetzner.hetzbot`. a bundle that cannot run everywhere
+`local@unix`, `local@cicd`, `house@unix`, `cloud@aws.ec2`, `cloud@hetzner.hetzbot`. a bundle that cannot run everywhere
 DECLINES inline, with an early return, beside the reason it declines for:
 
 ```sh
