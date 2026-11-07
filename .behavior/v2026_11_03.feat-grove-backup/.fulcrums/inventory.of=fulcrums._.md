@@ -13,3 +13,4 @@ each entry's `.risk` section carries the why.
 | [F6](./inventory.of=fulcrums.case=F6-backup-is-its-own-term.md) | `backup` names this concept, apart from snapshot and park | clean | safe | best-guessed | 85% |
 | [F7](./inventory.of=fulcrums.case=F7-a-clone-restore-grafts-into-a-live-clone.md) | a clone restore grafts into the fresh grove's own clone | clean | safe | best-guessed | 75% |
 | [F8](./inventory.of=fulcrums.case=F8-skip-against-the-latest-object-not-today.md) | the skip compares against a unit's latest object, not today's | clean | safe | best-guessed | 85% |
+| [F9](./inventory.of=fulcrums.case=F9-restore-names-its-repo-with-of.md) | the restore names its repo with `--of`, since rhachet owns `--repo` | clean | safe | best-guessed | 90% |

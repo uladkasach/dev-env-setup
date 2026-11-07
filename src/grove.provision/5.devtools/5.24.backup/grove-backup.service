@@ -1,0 +1,32 @@
+# .what = one backup run of this grove's homes to its bucket
+#
+# .why ROOT: the agent reads every seat's home — `ground` and `camper` both hold work
+# .why no ProtectHome (the 1.8 template sets it): the homes are what this reads
+#
+# .why EnvironmentFile, optional (the `-`)
+#   on hetzner, root's aws reach is a roles-anywhere helper on loopback. infra
+#   declares its endpoint in /etc/grove/aws.env (owed item 3), so no port is
+#   typed in this public repo. absent on ec2, where the instance profile answers
+#
+# .why StateDirectory: systemd lays /var/lib/grove-backup at 0755, so the status
+#   file is world-readable — the camper seat and infra's stats read it without sudo
+#
+# .why Nice=10: a clone's own build or test outranks the hourly tar
+#
+# read a run with:
+#   journalctl -u grove-backup -n 50
+
+[Unit]
+Description=Back up this grove's clones, worktrees, and home dirs to its bucket
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/grove-backup/grove-backup
+EnvironmentFile=-/etc/grove/aws.env
+Environment=HOME=/root AWS_RETRY_MODE=standard AWS_MAX_ATTEMPTS=5
+StateDirectory=grove-backup
+StateDirectoryMode=0755
+Nice=10
+TimeoutStartSec=55min
