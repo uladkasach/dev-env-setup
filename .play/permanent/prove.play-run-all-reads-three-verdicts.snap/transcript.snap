@@ -293,7 +293,7 @@ rc=1
    └─ verdicts
 
 ## --all · a run killed midway → its tree ends at the verdicts
-rc=143
+rc=non-zero
 🎭 play.run --all --within 30
    ├─ verdict: .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log
    ├─ plays: .log/role=mechanic/skill=play.run/what=all/<stamp>/
