@@ -474,17 +474,32 @@ scan_one() {
 #      hold — so this narrows the refusal without narrowing the corpus.
 ######################################################################
 GONE=0
+LINK_DIR=""
 
 sweep() {
   HITS=0
   FILES=0
   GONE=0
+  GONE_PATHS=()
   local file
   while IFS= read -r file; do
     # ⚠️ `-e` first: it answers "is any entry here", which is the q13 question.
     #    a path that fails `-e` is the index/tree split this block exists for
+    # a broken symlink is NOT absent: git stores a symlink's blob as its target
+    # path, and that path is the whole of what it publishes. so read the path.
+    # 📜 measured 2026-11-07: a route dream symlink into a `.dream/` this disk
+    #    lacked refused every verdict, and the count named no file
+    if [[ -L "$ROOT/$file" && ! -e "$ROOT/$file" ]]; then
+      [[ -n "$LINK_DIR" ]] || LINK_DIR="$(mktemp -d)"
+      mkdir -p "$LINK_DIR/$(dirname "$file")"
+      readlink "$ROOT/$file" > "$LINK_DIR/$file"
+      FILES=$(( FILES + 1 ))
+      ROOT="$LINK_DIR" scan_one "$LINK_DIR/$file"
+      continue
+    fi
     if [[ ! -e "$ROOT/$file" ]]; then
       GONE=$(( GONE + 1 ))
+      GONE_PATHS+=("$file")   # a bare count gives the human no path to repair
       continue
     fi
     # present, but a dir (or a link at one) holds no text for a dox rule to
@@ -495,6 +510,8 @@ sweep() {
     FILES=$(( FILES + 1 ))
     scan_one "$ROOT/$file"
   done < <(git -C "$ROOT" ls-files)
+  [[ -z "$LINK_DIR" ]] || rm -rf "$LINK_DIR"
+  LINK_DIR=""
 }
 
 # .what = say so when the index and the disk disagree about the subject
@@ -507,7 +524,12 @@ say_gone() {
   [[ "$GONE" -gt 0 ]] || return 0
   echo "   ⚠️ $GONE tracked file(s) are ABSENT from disk and were NOT read" >&2
   echo "      the index and the tree disagree about the subject" >&2
-  echo "      read why: git status --short" >&2
+  local gone
+  for gone in "${GONE_PATHS[@]:0:10}"; do
+    echo "      ├─ $gone" >&2
+  done
+  [[ "$GONE" -gt 10 ]] && echo "      ├─ … and $(( GONE - 10 )) more" >&2
+  echo "      └─ read why: git status --short" >&2
 }
 
 ######################################################################

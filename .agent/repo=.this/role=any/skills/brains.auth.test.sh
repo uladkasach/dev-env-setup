@@ -338,6 +338,30 @@ for _p in "$_BRAINS_AUTH_LIVE_CREDS" "$_BRAINS_AUTH_LIVE_PROFILE" "$BRAINS_AUTH_
   esac
 done
 
+# ---------------------------------------------------------------- the last known week
+# a dead token hides today's usage, never the weekly reset — that is anchored, so the last
+# successful read in the log still fixes it. the two cases sit at the far ends of time so
+# the verdict never depends on today's date:
+#   - a reset in 2099 has not passed → its usage still holds, flagged stale
+#   - a reset in 2020 has passed → usage unknown, reset projected forward by whole weeks
+#     (2020-01-01 is a wednesday, so every projection lands on wed 00:00 utc)
+_LK_DIR="$BRAINS_AUTH_USAGE_LOG_DIR"
+mkdir -p "$_LK_DIR"
+# an older day holds kai's earlier read AND moana's only one; a newer day holds kai's latest
+# read plus a failed one for moana — the leaf must skip the failure and search further back
+printf '%s\n' \
+  '{"ts":"2020-01-01T08:00:00Z","accounts":{"kai@example.com":{"seven_day":{"utilization":12.0,"resets_at":"2099-06-12T17:00:00+00:00"}},"moana@example.com":{"seven_day":{"utilization":77.0,"resets_at":"2020-01-01T00:00:00+00:00"}}}}' \
+  > "$_LK_DIR/usage.2020-01-01.jsonl"
+printf '%s\n' \
+  '{"ts":"2020-01-02T09:30:00Z","accounts":{"kai@example.com":{"seven_day":{"utilization":64.0,"resets_at":"2099-06-19T17:00:00+00:00"}},"moana@example.com":{"error":"no_token"}}}' \
+  > "$_LK_DIR/usage.2020-01-02.jsonl"
+_LK="$(_brains_auth_week_lastknown_get $'kai@example.com\nmoana@example.com\nnever@example.com')"
+_snap 'lastknown.get' "$(jq -S . <<< "$_LK")"
+_snap 'lastknown.render' "$(_brains_auth_render "$FIXTURE_ALL_DEAD" '' "$_LK" | _normalize)"
+# an absent log is no history, never a failure
+_snap 'lastknown.absent-log' "$(BRAINS_AUTH_USAGE_LOG_DIR="$_SWAPDIR/nope" _brains_auth_week_lastknown_get 'kai@example.com')"
+rm -rf "$_LK_DIR"
+
 _ORT='sk-ant-ort01-parked-token-fixture'
 _OAT='sk-ant-oat01-access-token-fixture'
 

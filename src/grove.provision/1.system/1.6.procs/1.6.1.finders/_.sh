@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = the three runaway-process finders, on PATH
+# .what = the runaway-process finders, on PATH
 #
 #   machine_resource_procs_find_runaway — cpu + memory + swap hogs
 #   machine_resource_procs_find_spinner — a process that burns cpu with no work
 #   machine_resource_procs_find_orphan  — a process whose CWD the kernel says is
 #                                         deleted (⚠️ NOT "whose parent is gone")
+#   machine_resource_procs_find_loop    — a fleet of parents that share one spawn
+#                                         shape; the churn no hog list can see
 #
 # .why  three scripts in ONE bundle
 #         a bundle is a CONCERN. these three answer one question — *what consumes

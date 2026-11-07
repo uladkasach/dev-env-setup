@@ -37,6 +37,7 @@ grove_provision_1_6_1_finders_provision_upsert() {
     machine_resource_procs_find_runaway \
     machine_resource_procs_find_spinner \
     machine_resource_procs_find_orphan \
+    machine_resource_procs_find_loop \
     machine_usage_diagnose
   do
     local src="$GROVE_SRC/machine/$name"

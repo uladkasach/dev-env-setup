@@ -1,0 +1,247 @@
+#!/bin/bash
+######################################################################
+# .what = name a spawn LOOP: who keeps forks alive, by the SHAPE they share
+#
+# .why  = a fork storm from one fleet of identical loops reads, to every
+#         per-process tool, as a calm box: no pid holds the cpu, each child
+#         dies in under a second, and the parents idle in `sleep`. 📜 measured
+#         2026-11-06: 599 forks/sec, load ~40 on 12 cores, 48% idle — from ~145
+#         kitty tabs, each a `while true; ssh …; sleep 5; done` against a
+#         session name that did not exist. it took an hour by hand to name
+#
+#         the fingerprint groups each BIRTH by its parent's comm and the SET of
+#         child names that parent spawned. one line then names the fleet:
+#           145 zsh parents each spawn {sleep,ssh}   e.g. zsh -c while true; …
+#         a loop has a shape; a workload rarely repeats one 145 times
+#
+# usage:
+#   machine_resource_procs_find_loop                 # 5s live sample + fingerprint
+#   machine_resource_procs_find_loop --secs 10       # a longer sample
+#   machine_resource_procs_find_loop --gate          # sample ONLY if churn held
+#                                                    #   ≥100/sec for 3 log minutes
+#
+# options:
+#   --secs N         seconds to sample over (default 5)
+#   --sweeps N       ps sweeps across the window (default 20)
+#   --gate           read the machine.usage log first; quiet → one line, no sample
+#   --log FILE       the machine.usage day-file to gate on (default: today's)
+#   --sweeps-from F  read sweeps from a file (`sweep<TAB>pid<TAB>ppid<TAB>args`)
+#                    instead of /proc — a test fixture
+#   --rate N         the fork rate to report, in place of a /proc/stat delta
+#   --now N          the epoch the gate measures freshness against (test fixture)
+#
+# output:
+#   the first line is the verdict, for a caller to match on:
+#     🌀 loop    — sustained churn, fingerprint follows
+#     🌴 quiet   — no sustained churn (the gate held)
+#
+# guarantee:
+#   - READ-ONLY. it signals no process and kills none; a name is all it gives
+#   - BOUNDED. the sample is --secs long; the gate alone reads one file
+#   - exits 0 always (a report is not a verdict); 2 on bad input
+######################################################################
+set -u
+
+SECS=5
+SWEEPS=20
+GATE=0
+LOG=""
+SWEEPS_FROM=""
+RATE=""
+NOW=""
+GATE_LOW=""
+
+# .the alarm line — a healthy desktop idles at 5–20 forks/sec
+#   - 100/sec is a core spent on process setup, at ~5ms per fork+exec
+#   - THREE straight minutes, so a build or an npm install (a burst) passes,
+#     and a loop (which never stops) does not
+FORKS_ALARM=100
+MINUTES_ALARM=3
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --secs)        SECS="${2:-}"; shift 2 ;;
+    --sweeps)      SWEEPS="${2:-}"; shift 2 ;;
+    --gate)        GATE=1; shift ;;
+    --log)         LOG="${2:-}"; shift 2 ;;
+    --sweeps-from) SWEEPS_FROM="${2:-}"; shift 2 ;;
+    --rate)        RATE="${2:-}"; shift 2 ;;
+    --now)         NOW="${2:-}"; shift 2 ;;
+    -h|--help)     sed -n '2,42p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    # absorb harness-injected args; `rhx <skill>` prepends --repo/--role/--skill
+    --repo|--role|--skill) shift 2 ;;
+    *) echo "✋ ConstraintError: unknown arg '$1'" >&2; exit 2 ;;
+  esac
+done
+
+for n in "$SECS" "$SWEEPS"; do
+  [[ "$n" =~ ^[0-9]+$ && "$n" -gt 0 ]] || { echo "✋ ConstraintError: --secs and --sweeps must be positive integers" >&2; exit 2; }
+done
+[[ -z "$RATE" || "$RATE" =~ ^[0-9]+$ ]] || { echo "✋ ConstraintError: --rate must be an integer" >&2; exit 2; }
+[[ -z "$NOW" || "$NOW" =~ ^[0-9]+$ ]] || { echo "✋ ConstraintError: --now must be an epoch" >&2; exit 2; }
+[[ -z "$SWEEPS_FROM" || -r "$SWEEPS_FROM" ]] || { echo "✋ ConstraintError: --sweeps-from '$SWEEPS_FROM' is unreadable" >&2; exit 2; }
+
+######################################################################
+# the gate — did churn HOLD, per the minute rows machine_usage_record writes?
+#
+# a `B` row: B ts dt load1 mem swap forks ctxsw busy psi_cpu psi_mem
+#   - forks is the count over dt seconds, so forks/dt is the rate
+#   - the last MINUTES_ALARM rows must each clear the line, and the newest must
+#     be fresh (≤ 5 min old) — a stale log names a past storm, never this one
+#
+# ⚠️ an absent or short log is QUIET, never loud: the record timer may not run
+#    on this box, and an alarm on no evidence is the cry-wolf this repo silences
+######################################################################
+if [[ $GATE -eq 1 ]]; then
+  [[ -n "$LOG" ]] || LOG="${XDG_STATE_HOME:-$HOME/.local/state}/machine.usage/log/$(date +%F).tsv"
+  [[ -n "$NOW" ]] || NOW=$(date +%s)
+
+  verdict=$(awk -F'\t' -v need="$MINUTES_ALARM" -v line="$FORKS_ALARM" -v now="$NOW" '
+    $1 == "B" && $3 > 0 { n++; ts[n] = $2; r[n] = $7 / $3 }
+    END {
+      if (n < need) { printf "short %d", n; exit }
+      if (now - ts[n] > 300) { printf "stale %d", now - ts[n]; exit }
+      lo = -1
+      for (i = n - need + 1; i <= n; i++) if (lo < 0 || r[i] < lo) lo = r[i]
+      printf "%s %d", (lo >= line ? "held" : "calm"), lo
+    }' "$LOG" 2>/dev/null)
+  verdict="${verdict:-short 0}"
+
+  case "$verdict" in
+    held*) GATE_LOW="${verdict#held }" ;;  # sustained — fall through to the sample
+    calm*) echo "🌴 quiet — the slowest of the last ${MINUTES_ALARM} minutes ran ${verdict#calm } forks/sec (alarm at ${FORKS_ALARM})"; exit 0 ;;
+    stale*) echo "🌴 quiet — the newest usage row is ${verdict#stale }s old, so it names no current storm"; exit 0 ;;
+    *) echo "🌴 quiet — the usage log holds under ${MINUTES_ALARM} minute rows (${LOG})"; exit 0 ;;
+  esac
+fi
+
+######################################################################
+# the sample — repeated ps sweeps, plus the exact fork rate from /proc/stat
+######################################################################
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+
+if [[ -n "$SWEEPS_FROM" ]]; then
+  cp "$SWEEPS_FROM" "$WORK/sweeps"
+else
+  FORKS_A=$(awk '/^processes/{print $2}' /proc/stat)
+  GAP=$(awk -v s="$SECS" -v n="$SWEEPS" 'BEGIN{printf "%.3f", s/n}')
+  for i in $(seq 1 "$SWEEPS"); do
+    ps -eo pid=,ppid=,args= 2>/dev/null \
+      | awk -v i="$i" '{ pid = $1; ppid = $2; sub(/^ *[0-9]+ +[0-9]+ /, ""); printf "%d\t%s\t%s\t%s\n", i, pid, ppid, $0 }' \
+      >> "$WORK/sweeps"
+    sleep "$GAP"
+  done
+  FORKS_B=$(awk '/^processes/{print $2}' /proc/stat)
+  [[ -n "$RATE" ]] || RATE=$(( (FORKS_B - FORKS_A) / SECS ))
+fi
+RATE="${RATE:-0}"
+
+######################################################################
+# the fingerprint
+#
+#   - a BIRTH is a pid absent from the first sweep and present in a later one
+#   - each birth is charged to its parent; init (1) and kthreadd (2) are left
+#     out, since they adopt every orphan and so outrank any real culprit
+#   - a parent's SHAPE = its comm + the sorted set of child comms it spawned
+#   - parents that share a shape form one row: that is the fleet
+#
+# ⚠️ the comm is the first argv word's basename, never the 15-char kernel comm:
+#    a `zsh -c 'while true…'` loop reads `zsh`, and a node program reads `node`
+######################################################################
+awk -F'\t' '
+  function comm(a,   w) { w = a; sub(/ .*/, "", w); sub(/.*\//, "", w); sub(/^-/, "", w); return w }
+  {
+    s = $1; pid = $2; ppid = $3; args = $4
+    if (!(pid in seen_args)) { seen_args[pid] = args; seen_ppid[pid] = ppid }
+    if (s == 1) { base[pid] = 1; next }
+    if (pid in base || pid in born) next
+    if (ppid <= 2) next
+    born[pid] = 1
+    bp[++nb] = ppid
+    ba[nb] = args
+  }
+  # .what = the topmost ancestor that runs the SAME argv — a subshell is its parent
+  # .why  a `$(…)` in bash forks a child with its parent argv, so one recursive
+  #       run reads as hundreds of "parents". 📜 measured 2026-11-06: one tree
+  #       walk read as "281 bash parents" until subshells folded into their root
+  function root(p,   up, d) {
+    for (d = 0; d < 64; d++) {
+      up = (p in seen_ppid) ? seen_ppid[p] : ""
+      if (up == "" || up <= 2 || !(up in seen_args) || seen_args[up] != seen_args[p]) return p
+      p = up
+    }
+    return p
+  }
+  END {
+    for (i = 1; i <= nb; i++) {
+      r = root(bp[i])
+      # a subshell born of its own root argv is the run itself, not a spawn
+      if ((r in seen_args) && ba[i] == seen_args[r]) continue
+      # the ps/awk sweeps of this finder are the measurement, not the storm
+      if ((r in seen_args) && index(seen_args[r], "machine_resource_procs_find_loop")) continue
+      births[r]++
+      kids[r, comm(ba[i])] = 1
+    }
+    for (p in births) {
+      set = ""
+      n = 0
+      for (k in kids) { split(k, kk, SUBSEP); if (kk[1] == p) list[++n] = kk[2] }
+      # sort the child names, so two parents with one set share one key
+      for (i = 2; i <= n; i++) { v = list[i]; j = i - 1; while (j > 0 && list[j] > v) { list[j+1] = list[j]; j-- } list[j+1] = v }
+      for (i = 1; i <= n; i++) set = set (i > 1 ? "," : "") list[i]
+      pa = (p in seen_args) ? seen_args[p] : "[exited]"
+      gp = (p in seen_ppid) ? seen_ppid[p] : ""
+      ga = (gp != "" && gp in seen_args) ? seen_args[gp] : "[unseen]"
+      key = comm(pa) "\t" set
+      rows_births[key] += births[p]
+      rows_parents[key]++
+      if (!(key in rows_eg)) { rows_eg[key] = pa; rows_gp[key] = ga }
+    }
+    for (k in rows_births)
+      printf "%d\t%d\t%s\t%s\t%s\n", rows_births[k], rows_parents[k], k, rows_eg[k], rows_gp[k]
+  }' "$WORK/sweeps" | sort -t$'\t' -k1,1rn | awk 'NR<=5' > "$WORK/fingerprint"
+
+######################################################################
+# report
+######################################################################
+TOP_PARENTS=$(awk -F'\t' 'NR==1{print $2}' "$WORK/fingerprint")
+TOP_PARENTS="${TOP_PARENTS:-0}"
+
+if [[ -n "$GATE_LOW" || "$RATE" -ge "$FORKS_ALARM" ]]; then
+  echo "🌀 loop — ${RATE} forks/sec now${GATE_LOW:+, and ≥${GATE_LOW}/sec for ${MINUTES_ALARM} straight minutes}"
+else
+  echo "🌴 quiet — ${RATE} forks/sec (alarm at ${FORKS_ALARM})"
+fi
+echo "   │"
+if [[ ! -s "$WORK/fingerprint" ]]; then
+  echo "   └─ no birth this window had a live parent to charge it to"
+  echo "      └─ 🪄 widen the window: machine_resource_procs_find_loop --secs 15"
+  exit 0
+fi
+
+echo "   ├─ shapes, by births this window (a shape = parent comm + the children it spawned)"
+n=$(wc -l < "$WORK/fingerprint")
+i=0
+while IFS=$'\t' read -r b p pcomm kids eg gp; do
+  i=$((i + 1))
+  branch="├─"; trunk="│ "
+  [[ $i -eq $n ]] && { branch="└─"; trunk="  "; }
+  plural=""; [[ $p -gt 1 ]] && plural="s"
+  echo "   │  ${branch} ${b} births · ${p} ${pcomm} parent${plural} · each spawns {${kids}}"
+  echo "   │  ${trunk}  ├─ e.g.  ${eg:0:140}"
+  echo "   │  ${trunk}  └─ under ${gp:0:140}"
+done < "$WORK/fingerprint"
+echo "   │"
+
+# .the verdict line names the FLEET when one exists — many parents, one shape
+#   - a single parent that spawns fast is a loop too, and reads as one
+if [[ "$TOP_PARENTS" -ge 10 ]]; then
+  echo "   └─ 🔥 ${TOP_PARENTS} parents run ONE shape — a fleet of identical loops, not a workload"
+else
+  plural=""; [[ $TOP_PARENTS -gt 1 ]] && plural="s"
+  echo "   └─ 🔥 the top shape holds ${TOP_PARENTS} parent${plural} — read its argv for the loop"
+fi
+echo "      ├─ 🪄 its full lineage:  rhx machine.process.lineage --comm $(awk -F'\t' 'NR==1{split($4,k,","); print k[1]}' "$WORK/fingerprint") --top 3"
+echo "      └─ 🌊 named, never killed — the human decides the cut"
+exit 0

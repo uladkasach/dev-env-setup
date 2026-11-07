@@ -1,0 +1,7 @@
+
+🧠 claude budget
+   ├─ kai@example.com: ✋ refresh token dead (run: brains.auth.set)
+   │  └─ week     ██████░░░░  64% used  ·  stale, as of jan 02 09:30  ·  resets at fri 17:00, in <rel>
+   ├─ moana@example.com: ✋ no token (run: brains.auth.set)
+   │  └─ week     ··········   unknown  ·  resets at wed 00:00, in <rel>
+   └─

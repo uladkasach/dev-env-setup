@@ -178,6 +178,26 @@ EOF
   echo "   • firefox prefs declared in user.js (restart firefox to apply)"
 
   ####################################################################
+  # 2b. 1password's options — inline fill + save offer on, universal sign in off
+  #     they live in the extension's storage.local, which no pref or policy
+  #     reaches, so they are written into that store (firefox/addon.storage.local.py)
+  # 🛑 a write needs firefox QUIT: the extension holds its config in memory
+  #    and saves it back over any write made under it
+  ####################################################################
+  local op_out op_code
+  op_out="$(grove_provision_1_3_1_firefox_onepassword_options "$profile" apply 2>&1)"
+  op_code=$?
+  case "$op_code" in
+    0) echo "   • 1password options declared: inline fill + save offer on, universal sign in off ✔" ;;
+    4) echo "   🌙 1password options owed — firefox is live, and a write under it is lost"
+       echo "      fix: quit firefox (☰ → Quit), then rhx grove.provision --what 1.3.1.firefox --mode apply" ;;
+    5) echo "   🌙 1password has no storage here yet — its options land once it has run" ;;
+    *) echo "   ✋ could not declare the 1password options" >&2
+       echo "$op_out" | sed 's/^/      /' >&2
+       return 1 ;;
+  esac
+
+  ####################################################################
   # 3. the three extensions a human must accept
   #
   # each is opened ONLY when `extensions.json` does not already name it

@@ -82,8 +82,15 @@ eval "$(awk '
 # iowait + idle from one /proc/stat delta. `top -bn1` reports a since-boot
 # average, which hides a live stall; a 200ms delta shows what is true NOW.
 read -r _ u1 n1 s1 i1 w1 _ < /proc/stat
+FORKS1=$(awk '/^processes/ { print $2 }' /proc/stat)
 sleep 0.2
 read -r _ u2 n2 s2 i2 w2 _ < /proc/stat
+FORKS2=$(awk '/^processes/ { print $2 }' /proc/stat)
+
+# forks/sec over the same window. a spawn loop forks thousands a second while
+# psi, load, and memory all read fine — so it gets its own row, never a hint
+# hung off psi cpu. a calm desktop runs 5–20
+FORKS_NOW=$(( (FORKS2 - FORKS1) * 5 ))
 read -r IOWAIT IDLE <<<"$(awk -v a="$((u2-u1))" -v b="$((n2-n1))" -v c="$((s2-s1))" \
                               -v d="$((i2-i1))" -v e="$((w2-w1))" \
   'BEGIN{t=a+b+c+d+e; if(t<=0){print "0 0"; exit} printf "%d %d", (e/t)*100, (d/t)*100}')"
@@ -289,6 +296,14 @@ awk -v s="$SLAB_G" 'BEGIN{exit !(s>1.5)}'      && LIT_SLAB=1  || LIT_SLAB=0
 { [[ "$NVIM_TRIPS" -ge 1 ]] || [[ "$NVIM_RATE" -ge 5 ]] || [[ "$NVIM_BURST" -eq 1 ]]; } \
   && LIT_NVIM=1 || LIT_NVIM=0
 LIT_STALL=$(( LIT_SCPU || LIT_SIO || LIT_SMEM ))
+[[ "$FORKS_NOW" -ge 100 ]] && LIT_FORK=1 || LIT_FORK=0
+
+# a sustained loop: the finder's gate reads the usage log (≥100/sec for 3
+# straight minutes) and samples only then, so a calm box pays no sample
+LOOP_MSG=""
+LOOP_BIN="$HOME/.local/bin/machine_resource_procs_find_loop"
+[[ -x "$LOOP_BIN" ]] && LOOP_MSG=$(timeout 30 "$LOOP_BIN" --gate --secs 2 --sweeps 8 2>/dev/null || true)
+[[ "$LOOP_MSG" == "🌀"* ]] && LIT_FORK=1
 
 if [[ "$QUIET" -eq 0 ]]; then
   echo ""
@@ -300,6 +315,7 @@ if [[ "$QUIET" -eq 0 ]]; then
   echo "   ├─ $(moon $LIT_SWAP) swap:   ${SWAP_USED_G}G used (${SWAP_PCT}%)"
   echo "   ├─ $(moon $LIT_SLAB) kernel: ${SLAB_G}G slab (dir cache), ${ANON_G}G anon (heap)"
   echo "   ├─ $(moon $LIT_STALL) stall:  cpu ${PSI_CPU}%, io ${PSI_IO}%, mem ${PSI_MEM}%  · who waited, last 60s"
+  echo "   ├─ $(moon $LIT_FORK) churn:  ${FORKS_NOW} forks/sec now  · a calm desktop runs 5–20"
   echo "   ├─ $(moon $LIT_CNT) counts: ${PROCS} procs, ${TMP_ALL} dirs in /tmp (${TMP_FIX} fixtures)"
   # the nvim breaker's own verdict — read from its log, never re-derived here
   if [[ "$NVIM_LOG_M" -eq 0 && "$NVIM_TRIPS" -eq 0 && "$NVIM_RATE" -eq 0 && "$NVIM_BURST" -eq 0 ]]; then
@@ -377,10 +393,21 @@ concern() {
   concerns+=("${severity}|${says}|${fix}")
 }
 
+# a spawn loop leads when it is sustained: it taxes every core and hides
+# behind calm psi. the finder's first line already names the fleet
+if [[ "$LOOP_MSG" == "🌀"* ]]; then
+  LOOP_HEAD="${LOOP_MSG%%$'\n'*}"
+  concern 1 "$LOOP_HEAD" \
+            "name the fleet + its launcher:  rhx machine.diagnose.loop"
+elif [[ "$FORKS_NOW" -ge 100 ]]; then
+  concern 2 "🌀 ${FORKS_NOW} forks/sec right now — a loop, or a burst (npm, a build)" \
+            "name the fleet, if any:  rhx machine.diagnose.loop"
+fi
+
 # psi leads: a level says how full a resource is; psi says who waits on it.
 awk -v p="$PSI_CPU" 'BEGIN{exit !(p>=10)}' && \
-  concern 1 "🔥 psi cpu ${PSI_CPU}% — tasks wait on cpu; a spawn storm reads like this" \
-            "measure the fork rate + name its parent:  rhx machine.diagnose.churn"
+  concern 1 "🔥 psi cpu ${PSI_CPU}% — tasks wait on cpu" \
+            "measure the fork rate + name its parent:  rhx machine.diagnose.loop"
 
 awk -v p="$PSI_IO" 'BEGIN{exit !(p>=10)}' && \
   concern 1 "💿 psi io ${PSI_IO}% — tasks wait on disk; the swap-cliff signature" \

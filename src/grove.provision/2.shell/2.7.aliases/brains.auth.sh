@@ -22,7 +22,7 @@
 #   one, and you must add all three: the file, the source line, and the cp in the phase.
 #
 # vision: .behavior/v2026_07_28.brain-budget-utilization/1.vision.yield.md
-# tests:  rhx brains.auth.test   (334 cases, hermetic, no network, no real ~/.claude)
+# tests:  rhx brains.auth.test   (337 cases, hermetic, no network, no real ~/.claude)
 #         ⚠️ this number is ASSERTED, not maintained by hand — `header.count-matches-the-suite`
 #           reads it back out of this very line and compares it to the suite's own total. it
 #           drifted ~100 cases wrong once, when it was only a promise. now a case added
@@ -2745,13 +2745,93 @@ _brains_auth_reset_line() {
   ' <<< "$node" 2>/dev/null || printf '? could not read the reset fields'
 }
 
+# .what = the next weekly reset at or after now, projected from any past one ($1=iso reset)
+# .why  = the weekly window is anchored: it resets at the same instant every 7 days, signed in
+#   or not. so one observed reset fixes every later one, and an account we cannot read today
+#   still has a knowable next reset — the fact a human plans around.
+# .note = a reset still in the future is returned as-is; one in the past steps forward by whole
+#   weeks until it lands strictly after now. prints empty on an unparseable stamp.
+_brains_auth_week_reset_next() {
+  local iso="$1" r n week=604800 k
+  r="$(date -d "$iso" +%s 2>/dev/null)" || return 0
+  [[ -n "$r" ]] || return 0
+  n="$(date +%s)"
+  (( r > n )) && { date -u -d "@${r}" +%Y-%m-%dT%H:%M:%SZ; return 0; }
+  k=$(( (n - r) / week + 1 ))
+  date -u -d "@$(( r + k * week ))" +%Y-%m-%dT%H:%M:%SZ
+}
+
+# .what = the week row body for an account we could not read now ($1=last-known node)
+# .why  = a dead token hides the CURRENT usage, never the reset. the node is the latest
+#   successful read, shaped `{ts, seven_day:{utilization, resets_at}}`:
+#   - before that read's reset, its usage still describes this window → show it, flagged stale
+#   - at or past that reset, the window rolled and the usage is gone → say unknown
+#   either way the reset shows, projected forward by whole weeks.
+# .note = the "as of" stamp is absolute ("nov 02 14:00"), never an age, so the row reads the
+#   same on a re-read an hour later.
+_brains_auth_week_lastknown_body() {
+  local node="$1" ts used reset next r n pct asof
+  ts="$(jq -r '.ts // empty' <<< "$node")"
+  used="$(jq -r '.seven_day.utilization // 0' <<< "$node")"
+  reset="$(jq -r '.seven_day.resets_at // empty' <<< "$node")"
+  [[ -n "$reset" ]] || return 0
+  next="$(_brains_auth_week_reset_next "$reset")"
+  [[ -n "$next" ]] || return 0
+  r="$(date -d "$reset" +%s 2>/dev/null)"
+  n="$(date +%s)"
+  asof="$(date -d "$ts" '+%b %d %H:%M' 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+  if (( r > n )); then
+    pct="$(_brains_auth_round "$used")"
+    printf '%s %3d%% used  ·  stale, as of %s  ·  resets at %s, in %s' \
+      "$(_brains_auth_bar "$pct")" "$pct" "${asof:-?}" \
+      "$(_brains_auth_when "$next")" "$(_brains_auth_until "$next")"
+    return 0
+  fi
+  printf '%s   unknown  ·  resets at %s, in %s' \
+    '··········' "$(_brains_auth_when "$next")" "$(_brains_auth_until "$next")"
+}
+
+# .what = the latest successful weekly read per account, from the durable usage log
+#   ($1=newline list of reaches to find)
+# .why  = the log already records every sweep raw, so it IS the record of the last known
+#   reset — a second store would be a second writer of one fact. this only reads it.
+# .note = newest day first, and it stops once every reach is found, so the cost tracks how
+#   long an account has been dark, never the size of the whole history. prints `{}` when the
+#   log is absent; it never fails the read (the budget read is the product).
+_brains_auth_week_lastknown_get() {
+  local want="$1" dir found='{}' next f wantj
+  dir="${BRAINS_AUTH_USAGE_LOG_DIR:-$_BRAINS_AUTH_USAGE_LOG_DIR}"
+  wantj="$(jq -Rsc 'split("\n") | map(select(length > 0))' <<< "$want" 2>/dev/null)" || { printf '{}'; return 0; }
+  [[ -d "$dir" && "$wantj" != '[]' ]] || { printf '{}'; return 0; }
+  while IFS= read -r f; do
+    [[ -f "$f" ]] || continue
+    # an unreadable day keeps what the newer days already found, and moves on
+    next="$(jq -sc --argjson want "$wantj" --argjson found "$found" '
+      [ .[] | .ts as $t | (.accounts // {}) | to_entries[]
+        | select(.key as $k | ($want | index($k)) != null)
+        | select(.key as $k | ($found | has($k)) | not)
+        | select((.value.seven_day.resets_at? // null) != null)
+        | {k: .key, ts: $t, seven_day: .value.seven_day} ]
+      | group_by(.k) | map(max_by(.ts))
+      | reduce .[] as $e ($found; .[$e.k] = {ts: $e.ts, seven_day: $e.seven_day})
+    ' "$f" 2>/dev/null)" && [[ -n "$next" ]] && found="$next"
+    [[ "$(jq -r --argjson want "$wantj" '($want - keys) | length' <<< "$found" 2>/dev/null)" == 0 ]] && break
+  # `find`, never a bare glob: this file is sourced into zsh too, where a glob with no match
+  #   is a hard error (`rule.forbid.bare-globs-in-dual-shell-files`)
+  done < <(find "$dir" -maxdepth 1 -type f -name 'usage.*.jsonl' 2>/dev/null | sort -r)
+  printf '%s' "$found"
+}
+
 # ══ §12. render — the tree a human reads ═════════════════════════════════════
 # .what = render the combined usage json as a turtle-headed tree ($1=combined json)
 # .why  = keep the display logic out of the i/o + orchestration layers
 _brains_auth_render() {
-  local combined="$1" active="${2:-}"
+  local combined="$1" active="${2:-}" lastknown="${3:-}"
   local reach node err s_used w_used o_used s_reset w_reset s_pct w_pct
-  local mark reset_txt week_glyph
+  local mark reset_txt week_glyph lk_node lk_body
+  [[ -n "$lastknown" ]] || lastknown='{}'
+  # `lastknown` is `{reach: {ts, seven_day}}` — the latest successful read per account, handed
+  # in by the caller so this render stays a pure function of its arguments
   # `active` is detected once by the caller and passed in — every account line flags whether
   # it is the one claude is signed in as, the most useful fact when you juggle accounts
   #
@@ -2775,6 +2855,12 @@ _brains_auth_render() {
     # an account with an error: show a named fix (hint text lives in its own map)
     if [[ -n "$err" ]]; then
       echo "   ├─ ${reach}${mark}: $(_brains_auth_fix_for_error "$err")"
+      # a dead read hides today's usage, never the weekly reset: that is anchored, so the last
+      # successful read still fixes it. the row shows only when such a read exists.
+      lk_node="$(jq -c --arg s "$reach" '.[$s] // empty' <<< "$lastknown" 2>/dev/null)"
+      lk_body=''
+      [[ -n "$lk_node" ]] && lk_body="$(_brains_auth_week_lastknown_body "$lk_node")"
+      [[ -n "$lk_body" ]] && printf '   │  └─ week     %s\n' "$lk_body"
       continue
     fi
 
@@ -3198,8 +3284,14 @@ _brains_auth_usage() {
   #   reader can see; a wrong mark reads as truth.
   local active_marked=''
   _brains_auth_identity_is_actionable "$arc" && active_marked="$active"
-  _brains_auth_debug "stage=render mark=${active_marked:-<none>}"
-  _brains_auth_render "$combined" "$active_marked" || return 1
+  # the last known week for each account this sweep could NOT read, from the durable log.
+  # ⚠️ read AFTER the log append above, so a sweep never sees itself — and only for the
+  #   errored reaches, so a healthy sweep pays no history scan at all.
+  local dark lastknown='{}'
+  dark="$(jq -r 'to_entries[] | select(.value | type == "object" and has("error")) | .key' <<< "$combined" 2>/dev/null)"
+  [[ -n "$dark" ]] && lastknown="$(_brains_auth_week_lastknown_get "$dark")"
+  _brains_auth_debug "stage=render mark=${active_marked:-<none>} lastknown=${lastknown}"
+  _brains_auth_render "$combined" "$active_marked" "$lastknown" || return 1
   _brains_auth_debug "stage=render.done verdict=${verdict}"
   return "$verdict"
 }

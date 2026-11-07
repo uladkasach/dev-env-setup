@@ -1,0 +1,19 @@
+{
+  "key": "0b06d0984a6b67cf",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet"
+  },
+  "exid": null,
+  "title": "keyrack: an unrequested errored key should warn not block; del needs a host-only scope",
+  "description": "## .what\n\ntwo keyrack defects, met together on a laptop whose host manifest held a stale `@all.camp.GITHUB_TOKEN` entry (vault `aws.params`, mech `PERMANENT_VIA_REPLICA`). a laptop has no ec2 instance role, so that entry can never be read there.\n\n## defect 1 — an unrequested key blocks the unlock\n\n- **today**: one errored key (`aws.params found no AWS identity`) breaks unlocks throughout, though no repo manifest in scope declares that key\n- **want**:\n  - a key the repo manifest REQUESTS, and that fails → fail the unlock, as today\n  - a key the manifest did NOT request (a stray host entry), and that fails → WARN, name the key and why, then continue with the rest\n\n## defect 2 — `keyrack del` reaches into the vault, with no host-only option\n\n```\nrhx keyrack del --owner ehmpath --org @all --env camp --key GITHUB_TOKEN\n✋ ConstraintError: aws.params found no AWS identity\n   exid: /keyrack/infra/vault/aws.params/v1/ehmpath/_all_/camp/GITHUB_TOKEN\n```\n\n- **today**: del tries to delete the REMOTE value. for a replica vault, that value is shared by every box that reads it — here, the github token every cloud grove reads\n  - the only reason it did not wipe that shared value: the laptop held no aws identity\n  - a box whose shell held creds for that account would have deleted it for the whole fleet\n- **and**: there is no way to drop just this machine's entry, so a stale entry cannot be removed on any box that cannot reach its vault\n- **want**: a configurable del scope, e.g. `--scope host|vault|both`\n  - `host` = remove this machine's manifest entry only; touches no vault; works offline\n  - `vault` / `both` = also delete the remote value — explicit opt-in only, never the default for a replica vault\n  - safe default = `host`\n\n## .why it matters\n\n- a box cannot shed an entry it cannot reach, so one stale entry poisons every unlock on it\n- the del that would fix it is the one command that could destroy a fleet-wide secret\n\n## .downstream\n\n`uladkasach/dev-env-setup` 5.12.rack wrote this entry on every box until a fix on 2026-09-27 (#149) gated it to ec2. once a host-only del exists, its upsert will remove the stale entry off ec2, and its verify will fail while the entry remains.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": null,
+  "heldSeq": 8,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "697"
+}

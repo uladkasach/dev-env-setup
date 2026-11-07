@@ -231,6 +231,9 @@ if [[ "$FORK_RATE" -ge 50 ]]; then
     echo "   │     └─ 🪄 widen the window:  rhx machine.diagnose.churn --secs 15"
   fi
   echo "   │"
+  echo "   ├─ 🌀 a fleet of identical loops reads as many small spawners here"
+  echo "   │  └─ 🪄 group them by shape, with one argv and its launcher:  rhx machine.diagnose.loop"
+  echo "   │"
   echo "   └─ 🌊 a churn load is invisible to ps and top"
   echo "      └─ 🪄 each spawn dies before it can be read; only this rate sees it"
   echo ""
