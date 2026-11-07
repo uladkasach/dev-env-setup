@@ -21,6 +21,10 @@
 #   - an instance role's keys rotate on aws's clock and expire in hours
 #   - ⇒ this writes a POINTER, which never expires, and no secret at all
 #
+# 🏠 a house seat takes its own branch — `_upsert_house`, below
+#   - its badge is a Roles Anywhere cert on disk, so what it owes here is the
+#     0700 badge dir and the timer that renews the cert
+#
 # ⚠️ it declines on a laptop, which has no instance role
 #   - ⇒ a profile that named one would point at an identity that cannot answer
 #
@@ -35,6 +39,12 @@
 ######################################################################
 
 grove_provision_5_6_aws_configure_upsert() {
+  # a house seat has no instance role; its badge is a cert on disk
+  if [[ "${GROVE_ENV_SERVER:-}" == house@* ]]; then
+    grove_provision_5_6_aws_configure_upsert_house
+    return
+  fi
+
   ####################################################################
   # 1. is there an instance role to point at?
   #   - ask IMDS, never `--for cloud`: a cloud grove with no role attached must
@@ -143,7 +153,13 @@ grove_provision_5_6_aws_configure_upsert() {
   #
   # .findsert, never upsert — a human's own credentials file is theirs
   ####################################################################
-  local creds="$HOME/.aws/credentials"
+  grove_provision_5_6_aws_credentials_findsert 'the ec2 instance role'
+}
+
+# .what = findsert the EMPTY `~/.aws/credentials` that aws-sdk v2 opens unconditionally
+# .why one writer for both box kinds; only the line that names the badge differs
+grove_provision_5_6_aws_credentials_findsert() {
+  local badge="$1" creds="$HOME/.aws/credentials"
   if [[ -e "$creds" ]]; then
     echo "   • ~/.aws/credentials already present; left untouched ✔"
     return 0
@@ -153,9 +169,66 @@ grove_provision_5_6_aws_configure_upsert() {
     printf '%s\n' '# grove: intentionally EMPTY.'
     printf '%s\n' '# aws-sdk v2 opens this file unconditionally when AWS_SDK_LOAD_CONFIG=1,'
     printf '%s\n' '# which 2.shell/2.5.zsh/zshrc.sh sets. an absent file throws ENOENT from Config.region.'
-    printf '%s\n' '# this box has no key to store: its identity is ambient (the ec2 instance'
-    printf '%s\n' '# role), declared as [profile ambient] in ~/.aws/config.'
+    printf '# this box has no key to store: its identity is ambient (%s),\n' "$badge"
+    printf '%s\n' '# declared as [profile ambient] in ~/.aws/config.'
   } > "$creds" || return 1
   chmod 600 "$creds" || return 1
   echo "   • ~/.aws/credentials created, EMPTY ✔ (aws-sdk v2 opens it unconditionally)"
+}
+
+######################################################################
+# .what = a house seat's half: the badge dir at 0700, and the renewal timer armed
+#
+# .why a house seat's badge is a 7-day cert on disk (F6), so the one live part is
+#   its renewal. the timer is a USER unit: it renews this seat's own cert as this
+#   seat, and needs no sudo
+#
+# 🛑 it writes no cert and no key. the first cert is the mint's to place, from
+#   the host, since a seat cannot vouch for itself to a CA it holds no badge for
+#
+# guarantee:
+#   - idempotent: a converged seat reads ✔ and writes naught
+#   - the dir is tightened every run, never loosened
+######################################################################
+grove_provision_5_6_aws_configure_upsert_house() {
+  local dir unit_dir name timer_src
+  dir="$(grove_provision_5_6_aws_house_dir)"
+  unit_dir="$(grove_provision_5_6_aws_house_unit_dir)"
+  name="$(grove_provision_5_6_aws_house_renew_name)"
+  timer_src="$GROVE_SRC/grove.provision/5.devtools/5.6.aws/$name.timer"
+
+  # the badge dir, 0700 — the per-uid wall the cert and key sit behind
+  mkdir -p "$dir" && chmod 700 "$dir" || return 1
+  echo "   • $dir is 0700 ✔"
+
+  grove_provision_5_6_aws_credentials_findsert 'a house seat'"'"'s Roles Anywhere cert' || return 1
+
+  # what is already true — read before any write
+  local converged=1
+  cmp -s "$timer_src" "$unit_dir/$name.timer" || converged=0
+  grove_provision_5_6_aws_house_service_text | cmp -s - "$unit_dir/$name.service" || converged=0
+  systemctl --user is-enabled "$name.timer" >/dev/null 2>&1 || converged=0
+  systemctl --user is-active  "$name.timer" >/dev/null 2>&1 || converged=0
+  if [[ "$converged" -eq 1 ]]; then
+    echo "   • the renewal units match this checkout, and the timer is armed ✔"
+    return 0
+  fi
+
+  mkdir -p "$unit_dir" || return 1
+  grove_provision_5_6_aws_house_service_text > "$unit_dir/$name.service" || return 1
+  cp "$timer_src" "$unit_dir/$name.timer" || return 1
+  echo "   • $name.service and $name.timer declared"
+
+  # reload FIRST — a rewrite with no reload leaves the old definition live
+  systemctl --user daemon-reload || {
+    echo "   ✋ systemctl --user daemon-reload failed" >&2
+    echo "      ⇒ a house seat's user manager needs linger, since no desktop holds it up" >&2
+    echo "      fix: sudo -v && rhx grove.provision --what 1.6.5.usermanager --mode apply   (from the host)" >&2
+    return 1
+  }
+  systemctl --user enable --now "$name.timer" || {
+    echo "   ✋ could not enable $name.timer — the cert would lapse in 7 days, unrenewed" >&2
+    return 1
+  }
+  echo "   • $name.timer enabled (hourly; renews below $GROVE_PROVISION_5_6_AWS_HOUSE_RENEW_AT_HOURS hours left)"
 }

@@ -25,10 +25,13 @@
 #         provisioner needs both:
 #
 #           local@unix              a laptop         screen: yes   human: yes
+#           house@unix              a house grove    screen: no    human: no
 #           cloud@aws.ec2           an ec2 grove     screen: no    human: no
 #           cloud@hetzner.hetzbot   a hetzner grove  screen: no    human: no
 #
-#         those three are the WHOLE detected set — see `.the CLOSED SET` below.
+#         those four are the WHOLE detected set — see `.the CLOSED SET` below.
+#         `house@unix` is a seat user on a box we own, reached over loopback ssh:
+#         the platform is the laptop's, the tier is a grove's.
 #
 #         a bare `local` test would still be the wrong shape even so, because
 #         tier alone cannot express "local tier, no human" — the ci-runner case
@@ -103,7 +106,75 @@
 #        grove_env_probe_cicd() { [[ "${CI:-}" == "true" || -n "${GITHUB_ACTIONS:-}" ]]; }
 #
 #      until then it stays out.
+#
+# .why `house` adds a TIER and no platform
+#      a house seat runs on `unix`, the same hardware as the laptop beside it. what
+#      differs is who sits there: a grove seat, with no screen and no human. so the
+#      platform set stays two, and the tier set gains `house`, read off a DECLARED
+#      fact the host wrote (`grove_env_probe_house`), never off the hardware.
 ######################################################################
+
+######################################################################
+# .what = is this login a declared HOUSE seat? — read the host's election
+#
+# .why  a house seat cannot be told from its host by any hardware probe. dmi,
+#       systemd-detect-virt, and imds all answer as they do for the laptop,
+#       because it IS the laptop. and over loopback ssh the session envvars are
+#       either absent (→ "cannot tell which machine this is") or forwarded from
+#       the human (→ the desktop probe fires, and a grove seat calls itself
+#       `local@unix`, a laptop with a human at it). so the answer must be a fact
+#       the host DECLARED, read before the desktop probe.
+#
+# .the contract — one election file per house grove, written by the host bundle
+#
+#         /etc/grove/house.d/<grove>      root:root, mode 0644
+#           camper <unix user>
+#           ground <unix user>
+#
+#       a login whose `id -un` appears as a seat in any TRUSTED election is a
+#       house seat. the format is two words per line so the host bundle and this
+#       probe parse it with no grammar to typo.
+#
+# 🛑 .why TRUSTED means root-owned and not group/world-writable — dir AND file
+#       the marker is the one input that turns off every "a human is here" gate
+#       for its user. a seat that could write its own marker could also delete
+#       it, and either edit lets a seat choose its own tier. so the probe reads
+#       only what root wrote and only root can change. a marker in a dir any user
+#       can write (`/tmp`, mode 1777) is refused for the same reason, since a
+#       peer could plant or swap a file there.
+#
+# .why `GROVE_HOUSE_ELECTION_DIR` is honored, and why that grants no power
+#       a play points it at a fixture. it moves WHERE the probe reads, never WHO
+#       it trusts, so a non-root fixture is still refused. and a caller who can
+#       set an envvar can already set `GROVE_ENV_SERVER` whole, which is the
+#       documented override; this envvar opens no door that one does not.
+######################################################################
+grove_env_probe_house() {
+  local dir="${GROVE_HOUSE_ELECTION_DIR:-/etc/grove/house.d}" me="" f=""
+  me="$(id -un 2>/dev/null)" || return 1
+  [[ -n "$me" && -d "$dir" ]] || return 1
+  grove_env_probe_house_trusted "$dir" || return 1
+
+  for f in "$dir"/*; do
+    # a symlink could point at a file the dir's owner never vetted
+    [[ -f "$f" && ! -L "$f" ]] || continue
+    grove_env_probe_house_trusted "$f" || continue
+    awk -v me="$me" '($1 == "camper" || $1 == "ground") && $2 == me { hit = 1 } END { exit !hit }' \
+      "$f" 2>/dev/null && return 0
+  done
+  return 1
+}
+
+# .what = is this path owned by root and closed to group/other writes?
+# .why  = the trust half of the house probe, one place, so the dir and each file
+#         are held to the identical bar
+grove_env_probe_house_trusted() {
+  local owner="" mode=""
+  read -r owner mode < <(stat -c '%u %a' "$1" 2>/dev/null) || return 1
+  [[ "$owner" == "0" ]] || return 1
+  # the last two octal digits are group and other; a 2, 3, 6, or 7 in either is a write bit
+  [[ "${mode: -2:1}" == [0145] && "${mode: -1}" == [0145] ]] || return 1
+}
 
 ######################################################################
 # .what = is this an ec2 instance? — the FREE rungs only, no network call
@@ -407,7 +478,7 @@ grove_env_derive() {
   ####################################################################
   # server — where does this run? `$tier@$platform`
   #
-  # .why `--for` maps onto this rather than beside it: `--for local|cloud` is
+  # .why `--for` maps onto this rather than beside it: `--for local|house|cloud` is
   #      exactly `server`'s tier, so it is a cli form of one attribute, not a
   #      second axis. it names a tier only, so the platform is still inferred —
   #      a human who types `--for cloud` on an ec2 box gets `cloud@aws.ec2`
@@ -417,7 +488,7 @@ grove_env_derive() {
 
     # the tier: the flag when given, else inferred
     case "$for_flag" in
-      local|cloud) tier="$for_flag" ;;
+      local|house|cloud) tier="$for_flag" ;;
     esac
 
     ####################################################################
@@ -429,13 +500,16 @@ grove_env_derive() {
     #      reader needs here and the one fact no single probe can hold.
     #
     # .the order, and why
+    #      0. house    — a root-owned election, free. FIRST, because a house seat
+    #                    shares every hardware fact with its host and may hold a
+    #                    forwarded DISPLAY; only a declared fact tells them apart
     #      1. ec2      — four FREE rungs, no network call (see the probe)
     #      2. hetzner  — one declared file, free. ahead of desktop because a
     #                    hetzner grove is headless, and a declaration outranks
     #                    a session envvar
     #      3. desktop  — a session envvar, free
     #      4. ec2/imds — aws's own authoritative answer, and the ONLY probe that
-    #                    costs. it runs last because the three above are free, and
+    #                    costs. it runs last because the four above are free, and
     #                    it runs AT ALL because it covers the one hole the free
     #                    rungs cannot: an ec2 box whose dmi does not answer
     ####################################################################
@@ -451,9 +525,13 @@ grove_env_derive() {
     local hetzner_rc=0
     grove_env_probe_hetzner_hetzbot || hetzner_rc=$?
 
-    # the ec2 dmi rung answers first, as it does beside a READABLE declaration:
-    #   it reads the hardware, so no file on disk can contradict it
-    if grove_env_probe_aws_ec2; then
+    # the house election answers first: a house seat shares its host's hardware,
+    #   so only a fact root declared can tell the two apart. then the ec2 dmi
+    #   rung, as it does beside a READABLE declaration: it reads the hardware,
+    #   so no file on disk can contradict it
+    if grove_env_probe_house; then
+      platform="unix";     tier_natural="house"
+    elif grove_env_probe_aws_ec2; then
       platform="aws.ec2";  tier_natural="cloud"
     # 🛑 rc 2 — a declaration present but unreadable — HALTS the derivation, before
     #   any LATER rung. read as "absent", it would let one answer: the desktop rung
@@ -491,7 +569,7 @@ grove_env_derive() {
     #
     # .why a fallback is not needed at all
     #      we own every machine this runs on, and each kind has a probe above:
-    #      an ec2 grove, a hetzner grove, a laptop. a fallback exists to cover
+    #      an ec2 grove, a hetzner grove, a house seat, a laptop. a fallback exists to cover
     #      boxes you cannot enumerate — and there are none. so the honest
     #      response to "no probe fired" is not to guess a kind; it is to say so,
     #      and name the fix.
@@ -508,6 +586,7 @@ grove_env_derive() {
       echo "   asked, in order (each name is grove_env_probe_<name>):" >&2
       # every cell here is a literal, so the `→` column holds whatever path a
       #   play points the declaration at; the path itself prints below
+      echo "     house            (a root-owned election in /etc/grove/house.d names this login) → no" >&2
       echo "     aws_ec2          (dmi vendor · systemd-detect-virt · cloud-init · xen uuid)   → no" >&2
       echo "     hetzner_hetzbot  (the platform declaration == hetzner.hetzbot)                → no" >&2
       echo "     desktop          (WAYLAND_DISPLAY · DISPLAY · XDG_SESSION_TYPE, not over ssh) → no" >&2
@@ -520,6 +599,7 @@ grove_env_derive() {
       echo "" >&2
       echo "   fix — name the box yourself:" >&2
       echo "     GROVE_ENV_SERVER=local@unix            grove.provision   # a laptop" >&2
+      echo "     GROVE_ENV_SERVER=house@unix            grove.provision   # a house grove seat" >&2
       echo "     GROVE_ENV_SERVER=cloud@aws.ec2         grove.provision   # an ec2 grove" >&2
       echo "     GROVE_ENV_SERVER=cloud@hetzner.hetzbot grove.provision   # a hetzner grove" >&2
       echo "" >&2
@@ -547,9 +627,9 @@ grove_env_derive() {
   fi
 
   case "$GROVE_ENV_SERVER" in
-    local@*|cloud@*) ;;
-    *) echo "✋ ConstraintError: GROVE_ENV_SERVER must be \$tier@\$platform with tier local|cloud" >&2
-       echo "   └─ got '$GROVE_ENV_SERVER'; the probes detect three: local@unix, cloud@aws.ec2, cloud@hetzner.hetzbot" >&2
+    local@*|house@*|cloud@*) ;;
+    *) echo "✋ ConstraintError: GROVE_ENV_SERVER must be \$tier@\$platform with tier local|house|cloud" >&2
+       echo "   └─ got '$GROVE_ENV_SERVER'; the probes detect four: local@unix, house@unix, cloud@aws.ec2, cloud@hetzner.hetzbot" >&2
        return 2 ;;
   esac
 
@@ -626,7 +706,7 @@ grove_env_derive() {
 #      of the split is a second place to get it wrong
 ######################################################################
 
-# .what = the tier half of $server — `local` or `cloud`
+# .what = the tier half of $server — `local`, `house`, or `cloud`
 grove_env_server_tier() { echo "${GROVE_ENV_SERVER%%@*}"; }
 
 # .what = the platform half of $server — `unix`, `aws.ec2`, or `hetzner.hetzbot`

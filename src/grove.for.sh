@@ -2,12 +2,12 @@
 ######################################################################
 # the `--for` axis — DERIVED from the environment, never detected twice
 #
-# .what = the `--for local|cloud` vocabulary: what a RUN can be for.
+# .what = the `--for local|house|cloud` vocabulary: what a RUN can be for.
 #
 # .why it DERIVES rather than detects
 #         "which machine is this?" has exactly one answer here, and it lives in
 #         `grove.env.sh` as `$server`'s tier (rule.require.conform-to-sdk-environment).
-#         `--for local|cloud` IS that tier — the same fact under a cli spelling —
+#         `--for local|house|cloud` IS that tier — the same fact in a cli form —
 #         so this file reads it rather than probe the box again.
 #
 #         a second probe is a defect this repo repeats. three separate artifacts
@@ -17,10 +17,12 @@
 #
 # .values — what a RUN can be for
 #   local — a machine with a screen and a human at its keyboard
-#   cloud — a grove: a headless box reached over ssh/ssm, no screen, no human
+#   house — a house grove seat: a user on a box we own, reached over loopback
+#           ssh, no screen, no human
+#   cloud — a cloud grove: a headless box reached over ssh/ssm, no screen, no human
 #
-# ⚠️ .why there are only TWO values, and why a bundle does not read them
-#         a two-valued axis cannot express what a bundle actually depends on. a ci
+# ⚠️ .why a bundle does not read these values
+#         a tier alone cannot express what a bundle actually depends on. a ci
 #         runner is `local@cicd` — local tier, no screen, no human — so `local`
 #         alone would offer it a gpu terminal, a browser flatpak, and a keyboard
 #         remap. `--for` scopes a RUN; a bundle decides for ITSELF, on the fact it
@@ -61,6 +63,7 @@ grove_for_detect() {
   ####################################################################
   case "${GROVE_ENV_SERVER:-}" in
     cloud@*) echo "cloud" ;;
+    house@*) echo "house" ;;
     local@*) echo "local" ;;
     *)       return 1 ;;
   esac
@@ -70,5 +73,5 @@ grove_for_detect() {
 # .why  = one validator, so every caller rejects the same words. a run is always
 #         for exactly ONE kind of machine, so there is no third value to accept
 grove_for_valid() {
-  [ "${1:-}" = "cloud" ] || [ "${1:-}" = "local" ]
+  [ "${1:-}" = "cloud" ] || [ "${1:-}" = "house" ] || [ "${1:-}" = "local" ]
 }

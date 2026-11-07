@@ -1,6 +1,7 @@
 ✋ ConstraintError: cannot tell which machine this is — no platform probe answered
 
    asked, in order (each name is grove_env_probe_<name>):
+     house            (a root-owned election in /etc/grove/house.d names this login) → no
      aws_ec2          (dmi vendor · systemd-detect-virt · cloud-init · xen uuid)   → no
      hetzner_hetzbot  (the platform declaration == hetzner.hetzbot)                → no
      desktop          (WAYLAND_DISPLAY · DISPLAY · XDG_SESSION_TYPE, not over ssh) → no
@@ -13,6 +14,7 @@
 
    fix — name the box yourself:
      GROVE_ENV_SERVER=local@unix            grove.provision   # a laptop
+     GROVE_ENV_SERVER=house@unix            grove.provision   # a house grove seat
      GROVE_ENV_SERVER=cloud@aws.ec2         grove.provision   # an ec2 grove
      GROVE_ENV_SERVER=cloud@hetzner.hetzbot grove.provision   # a hetzner grove
 

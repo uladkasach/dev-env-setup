@@ -12,6 +12,7 @@ settled by the human 2026-08-30: *"local and cloud are two types of groves."*
 | kind | `$GROVE_ENV_SERVER` | `--for` | reached by |
 |---|---|---|---|
 | **local** | `local@unix`, `local@cicd` | `local` | no transport — the shell is already on it |
+| **house** | `house@unix` | `house` | loopback ssh to a seat user on a box we own, read off a root-owned election |
 | **cloud** | `cloud@aws.ec2` | `cloud` | a duct (`term=duct`) |
 
 ⚠️ they differ in **REACH**, never in nature. a laptop is a grove you stand on; a cloud
@@ -130,7 +131,7 @@ from a shell, `grove.provision` is the same command
 
 ## .$server = $tier@$platform
 
-`local@unix`, `local@cicd`, `cloud@aws.ec2`. a bundle that cannot run everywhere
+`local@unix`, `local@cicd`, `house@unix`, `cloud@aws.ec2`. a bundle that cannot run everywhere
 DECLINES inline, with an early return, beside the reason it declines for:
 
 ```sh
