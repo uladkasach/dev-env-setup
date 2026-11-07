@@ -2,6 +2,7 @@
    • server=cloud@aws.ec2          derive=-                      → 'cloud', rc=0 ✔
    • server=cloud@hetzner.hetzbot  derive=-                      → 'cloud', rc=0 ✔
    • server=local@unix             derive=-                      → 'local', rc=0 ✔
+   • server=house@unix             derive=-                      → 'house', rc=0 ✔
    • server=notatier               derive=-                      → '', rc=1 ✔
    • server=(unset)                derive=halt                   → '', rc=1 ✔
    • server=(unset)                derive=cloud@hetzner.hetzbot  → 'cloud', rc=0 ✔

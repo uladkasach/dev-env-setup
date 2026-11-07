@@ -586,7 +586,7 @@ grove_env_derive() {
       echo "   asked, in order (each name is grove_env_probe_<name>):" >&2
       # every cell here is a literal, so the `→` column holds whatever path a
       #   play points the declaration at; the path itself prints below
-      echo "     house            (a root-owned election in /etc/grove/house.d names $(id -un 2>/dev/null))  → no" >&2
+      echo "     house            (a root-owned election in /etc/grove/house.d names this login) → no" >&2
       echo "     aws_ec2          (dmi vendor · systemd-detect-virt · cloud-init · xen uuid)   → no" >&2
       echo "     hetzner_hetzbot  (the platform declaration == hetzner.hetzbot)                → no" >&2
       echo "     desktop          (WAYLAND_DISPLAY · DISPLAY · XDG_SESSION_TYPE, not over ssh) → no" >&2
