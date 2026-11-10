@@ -11,6 +11,10 @@ repo="$(git rev-parse --show-toplevel)"
 fn="$(awk '/^claude\(\) \{/,/^\}/' "$repo/src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh")"
 [[ -n "$fn" ]] || { echo "✋ could not find claude() in bash_aliases.sh"; exit 1; }
 
+# claude() awaits the user manager first; this play judges which binary launches, not the
+#   manager, so the await is stubbed beside the binaries
+fn="_user_systemd_await() { return 0; }"$'\n'"$fn"
+
 stubs="$(mktemp -d)"
 trap 'rm -rf "$stubs"' EXIT
 for name in rhx claude; do
