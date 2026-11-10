@@ -64,4 +64,8 @@ grove_provision_5_devtools() {
   #   reach the two skills says so — instead of a timer that ticks forever
   #   over a gate that never closes
   bundle.upgrade 5.18.openhours
+
+  # .why AFTER 5.6.aws: the agent calls the aws cli that bundle installs.
+  #   it reads no key from the rack: its credential is the box's own identity
+  bundle.upgrade 5.24.backup
 }

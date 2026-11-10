@@ -1,0 +1,19 @@
+{
+  "key": "4b7a70dd05d321d2",
+  "kind": "create",
+  "repo": {
+    "owner": "ahbode",
+    "name": "infrastructure"
+  },
+  "exid": null,
+  "title": "grove backup: declare bucket name, grove name, and root aws reach on the box",
+  "description": "## .what\n\ndev-env-setup#169 (the grove backup agent) is built against these declarations. each is owed from #63 / #64; the agent fails loud, by name, until each lands.\n\n## .asks\n\n1. **the bucket name on the box**: write `/etc/grove/backup.bucket` (one line, mode 644) from `CAMP_GROVE_BUCKET_NAME` itself, beside `/etc/grove/platform`. dev-env-setup is public, so the literal can never be typed there; this file is its one channel (dev-env-setup fulcrum F1, ruled A).\n2. **the grove name on the box**: write `/etc/grove/name` (one line, the grove slug, mode 644). the backup key prefix is `grove=<slug>/`; a guessed name would let two groves overwrite each other.\n3. **root's aws reach on hetzner**: #64 points camper's `[default]` at the roles-anywhere loopback helper; the agent runs as root via systemd. write `/etc/grove/aws.env` (systemd EnvironmentFile syntax, e.g. `AWS_EC2_METADATA_SERVICE_ENDPOINT=http://127.0.0.1:<port>/`) so the unit reads the endpoint rather than a port typed in dev-env-setup. absent on ec2 = the instance profile answers.\n4. **`GROVE_BACKUP_SCOPE` on main**: it sits on #64's branch; dev-env-setup clamps its dirs + excludes to it by test.\n5. **the backup line in grove stats**: `git.grove.stats` and `hetzner.grove.probe` render one line from world-readable `/var/lib/grove-backup/status.json` (shape in the dev-env-setup#169 pr).\n6. **a fresh grove of each kind** to prove the restore end to end.\n\n## .if ask 1 is refused\n\nsay so on this issue. the fallback (a json the box reads from this repo) needs a grove credential that reads ahbode/infrastructure. that is a director call on the dev-env-setup side, so the drive halts there until it is made.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": "as-human",
+  "idem": "findsert",
+  "heldSeq": 8,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "99"
+}
