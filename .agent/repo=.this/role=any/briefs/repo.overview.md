@@ -14,6 +14,9 @@ settled by the human 2026-08-30: *"local and cloud are two types of groves."*
 | **local** | `local@unix`, `local@cicd` | `local` | no transport — the shell is already on it |
 | **cloud** | `cloud@aws.ec2` | `cloud` | a duct (`term=duct`) |
 
+⇒ inbound: a local grove takes none; a cloud grove takes its duct
+(`define.invariant.local-grove-is-outbound-only`).
+
 ⚠️ they differ in **REACH**, never in nature. a laptop is a grove you stand on; a cloud
 grove is one you speak to through a duct. every bundle is written for both, and one that
 cannot serve a kind DECLINES inline beside its reason.
@@ -25,10 +28,6 @@ over ssh; this is its front door"* — **true of a cloud grove, and false of a l
 phase beneath it asked for the `ssh` metapackage on every kind, debian's `openssh-server`
 postinst enabled the unit, and one apply put a password-authenticated port on the box that
 holds the rack.
-
-⇒ this line used to read *"a laptop **or** a cloud grove"*, which states the laptop is not
-a grove — the opposite of what `term=grove` declares. one fact, two holders, and the
-always-booted holder was the wrong one.
 
 ⇒ **when you write `grove` in a claim, name the KIND, or confirm the claim holds for both.**
 
@@ -51,9 +50,6 @@ cannot go stale — it reads `src/grove.provision/` and reports:
 #    ├─ dispatches:    …
 #    └─ reached slugs: …
 ```
-
-that is the same repair `rule.require.one-command-provision` already made to its own
-table of plays: *"the counts are now GONE, and every play reads its SET from the tree."*
 
 ⚠️ there is **one kind** of bundle, not two. a bundle either dispatches its children or does
 the work, and the runtime does not care which — so a PHASE is a bundle too, turtles all the

@@ -50,6 +50,9 @@ grove_provision_5_devtools() {
   #   (`rule.require.the-provisioner-joins-the-tailnet`)
   bundle.upgrade 5.23.tailscale
 
+  # AFTER 5.23.tailscale and 5.2.rust: it reads that client's route, and cargo builds it
+  bundle.upgrade 5.24.vpntray
+
   # 🛑 AFTER `5.12.rack` and `5.13.reach`: it reads keys through the profiles
   #   those two name and fill. any earlier, it blames a human for a key that
   #   is merely not placed yet. `5.18.openhours` reads no key, so it may follow

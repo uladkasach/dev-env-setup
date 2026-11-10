@@ -23,6 +23,9 @@
 #     1.10.hosts     the ssm-proxy db tunnel aliases (/etc/hosts)
 #     1.11.wifi      wifi power-save off (NetworkManager conf.d + live radio)
 #                    + a stall watchdog that records, then reconnects (system unit)
+#     1.12.firewall  no inbound connection, on a local grove (nftables + its unit)
+#     1.13.exitnode  the vpn switch: mullvad on/off with no password, paused
+#                    for a captive portal (a root switch + sudoers + NM hook)
 #
 # .why nearly all apply to EVERY box
 #   - a screen-gate reads "no EFFECT here" as "cannot be HELD here"; a
@@ -49,4 +52,6 @@ grove_provision_1_system() {
   bundle.upgrade 1.9.audio
   bundle.upgrade 1.10.hosts
   bundle.upgrade 1.11.wifi
+  bundle.upgrade 1.12.firewall
+  bundle.upgrade 1.13.exitnode
 }

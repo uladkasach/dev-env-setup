@@ -1,0 +1,26 @@
+# .what = load the grove firewall before any network comes up
+# .why  = a laptop that joins a network before its firewall loads is open for
+#         that gap; network-pre.target is the point before any link is configured
+#
+# ⚠️ written by src/grove.provision/1.system/1.12.firewall — change the repo copy
+
+[Unit]
+Description=grove firewall — a local grove takes no inbound connection
+Documentation=file:///etc/grove/firewall.nft
+DefaultDependencies=no
+Wants=network-pre.target
+Before=network-pre.target shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ProtectSystem=full
+ProtectHome=true
+ExecStart=/usr/sbin/nft -f /etc/grove/firewall.nft
+ExecReload=/usr/sbin/nft -f /etc/grove/firewall.nft
+# stop removes THIS table alone; tailscale's and docker's stay
+ExecStop=-/usr/sbin/nft delete table inet grove_firewall
+
+[Install]
+WantedBy=sysinit.target

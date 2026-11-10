@@ -107,7 +107,12 @@ FAIL=0
 # .why  = `in 2h14m` is measured from the real clock, so it differs on every run.
 #   the reset INSTANT it counts toward is snapped (via `resets at mon 03:19`),
 #   so the information stays pinned; only the volatile view of it is masked.
-_normalize() { sed -E 's/in [0-9]+h[0-9]+m/in <rel>/g'; }
+_normalize() {
+  # the next charge is computed from today's month, so its date is masked like the countdown;
+  #   the month math itself is pinned by `bill.next`, against a fixed "now"
+  sed -E -e 's/in [0-9]+h[0-9]+m/in <rel>/g' \
+    -e 's/charges at [a-z]{3} [a-z]{3} [0-9]{2}, in [0-9]+[dh]/charges at <date>, in <rel>/g'
+}
 
 # .what = compare an actual output against a stored snapshot ($1=name, $2=actual)
 # .why  = one shared assert so every case reports the same way, and a failure
@@ -350,7 +355,7 @@ mkdir -p "$_LK_DIR"
 # an older day holds kai's earlier read AND moana's only one; a newer day holds kai's latest
 # read plus a failed one for moana — the leaf must skip the failure and search further back
 printf '%s\n' \
-  '{"ts":"2020-01-01T08:00:00Z","accounts":{"kai@example.com":{"seven_day":{"utilization":12.0,"resets_at":"2099-06-12T17:00:00+00:00"}},"moana@example.com":{"seven_day":{"utilization":77.0,"resets_at":"2020-01-01T00:00:00+00:00"}}}}' \
+  '{"ts":"2020-01-01T08:00:00Z","accounts":{"kai@example.com":{"seven_day":{"utilization":12.0,"resets_at":"2099-06-12T17:00:00+00:00"},"brains_auth_subscription":{"created_at":"2019-09-15T08:00:00Z","billing_type":"stripe_subscription"}},"moana@example.com":{"seven_day":{"utilization":77.0,"resets_at":"2020-01-01T00:00:00+00:00"}}}}' \
   > "$_LK_DIR/usage.2020-01-01.jsonl"
 printf '%s\n' \
   '{"ts":"2020-01-02T09:30:00Z","accounts":{"kai@example.com":{"seven_day":{"utilization":64.0,"resets_at":"2099-06-19T17:00:00+00:00"}},"moana@example.com":{"error":"no_token"}}}' \
@@ -361,6 +366,24 @@ _snap 'lastknown.render' "$(_brains_auth_render "$FIXTURE_ALL_DEAD" '' "$_LK" | 
 # an absent log is no history, never a failure
 _snap 'lastknown.absent-log' "$(BRAINS_AUTH_USAGE_LOG_DIR="$_SWAPDIR/nope" _brains_auth_week_lastknown_get 'kai@example.com')"
 rm -rf "$_LK_DIR"
+
+# ---------------------------------------------------------------- the next charge
+# a monthly plan charges on the day-of-month it started, clamped to a short month's last day.
+# "now" is pinned per row, so the month math is checked on every edge regardless of today.
+_bills=''
+while IFS='|' read -r _start _now _why; do
+  [[ -z "$_start" ]] && continue
+  _bills+="$(printf '%-24s now %-20s -> %-21s (%s)' "$_start" "$_now" \
+    "$(_brains_auth_bill_next "$_start" "$(date -u -d "$_now" +%s)")" "$_why")"$'\n'
+done <<< '2026-01-31T10:00:00Z|2026-02-10T00:00:00Z|short month clamps to its last day
+2026-01-31T10:00:00Z|2028-02-10T00:00:00Z|leap february clamps to the 29th
+2026-01-31T10:00:00Z|2026-03-31T09:00:00Z|the day itself, before the clock
+2026-01-31T10:00:00Z|2026-03-31T11:00:00Z|the day itself, after the clock
+2026-09-15T08:00:00Z|2026-12-20T00:00:00Z|december wraps into the next year
+2026-09-15T08:00:00Z|2026-09-01T00:00:00Z|before the start, the first charge is the start
+not a date|2026-09-01T00:00:00Z|unparseable start prints naught'
+_snap 'bill.next' "${_bills%$'\n'}"
+_snap 'bill.render' "$(_brains_auth_render '{"kai@example.com":{"five_hour":null,"seven_day":{"utilization":9.0,"resets_at":"2026-06-19T17:00:00+00:00"},"brains_auth_subscription":{"created_at":"2026-01-31T10:00:00Z","billing_type":"stripe_subscription"}}}' | _normalize)"
 
 _ORT='sk-ant-ort01-parked-token-fixture'
 _OAT='sk-ant-oat01-access-token-fixture'

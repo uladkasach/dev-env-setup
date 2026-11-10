@@ -57,48 +57,57 @@ grove_provision_2_3_ssh_provision_upsert() {
     return 0
   fi
 
-  # read BEFORE any write, and read TWO facts: `enabled` returns at the next
-  # boot, `active` is live right now. a converged box answers masked +
-  # inactive, so this step then writes no state — the idempotent case
-  local unit_state unit_active
-  unit_state="$(systemctl is-enabled ssh 2>/dev/null || true)"
-  unit_active="$(systemctl is-active ssh 2>/dev/null || true)"
+  # TWO units hold sshd, and BOTH are converged:
+  #   - ssh.service — the daemon
+  #   - ssh.socket  — ubuntu 22.10+ socket activation: systemd itself holds :22
+  #     and starts sshd on the first connection. a masked service with a live
+  #     socket still LISTENS — 📜 measured 2026-11-09, :22 open on 0.0.0.0 and
+  #     [::] with ssh.service masked
+  # ⚠️ the socket goes FIRST: a socket left up re-spawns the service it fronts
+  local unit fails=0
+  for unit in ssh.socket ssh.service; do
+    grove_provision_2_3_ssh_unit_converge "$unit" || fails=$(( fails + 1 ))
+  done
+  [[ "$fails" -eq 0 ]]
+}
 
-  # a unit never installed answers `is-enabled` with an error and an empty
-  # string — the healthy laptop case after the package split, needs no stop,
-  # but a later apt install could still restore the server, so it is masked
-  # too (debian allows a mask on a unit not yet present)
-  local need_mask=0
-  [[ "$unit_state" != "masked" ]] && need_mask=1
-  [[ "$unit_active" == "active" ]] && need_mask=1
+# .what = stop, disable, and mask one sshd unit — no write where it is already masked + inactive
+# .why read BEFORE any write, two facts: `enabled` returns at the next boot,
+#   `active` is live right now. a unit never installed answers `is-enabled` with
+#   an empty string, and is masked too — debian allows a mask on a unit not yet
+#   present, and a later apt install could otherwise restore it
+grove_provision_2_3_ssh_unit_converge() {
+  local unit="$1" unit_state unit_active
+  unit_state="$(systemctl is-enabled "$unit" 2>/dev/null || true)"
+  unit_active="$(systemctl is-active "$unit" 2>/dev/null || true)"
 
-  if [[ "$need_mask" -eq 0 ]]; then
-    echo "   • sshd masked — this grove serves no ssh ✔"
+  if [[ "$unit_state" == "masked" && "$unit_active" != "active" ]]; then
+    echo "   • $unit masked — this grove serves no ssh ✔"
     return 0
   fi
 
   if ! pkg_can_sudo; then
-    echo "   🌙 sshd unit not converged — this seat holds no usable sudo"
+    echo "   🌙 $unit not converged — this seat holds no usable sudo"
     echo "      ⇒ is-enabled=${unit_state:-<absent>} is-active=${unit_active:-<absent>}"
-    echo "      ⇒ warm the credential, then re-apply:  sudo -v"
+    echo "      ⇒ run, from your own terminal:  sudo -v && rhx grove.provision --what 2.3.ssh --mode apply"
     return 0
   fi
 
-  echo "   • sshd: is-enabled=${unit_state:-<absent>} is-active=${unit_active:-<absent>} → mask"
+  echo "   • $unit: is-enabled=${unit_state:-<absent>} is-active=${unit_active:-<absent>} → mask"
 
   # ORDER is load-bear: stop before disable before mask. a mask on a unit
   # still active leaves the live process up until the next boot
-  [[ "$unit_active" == "active" ]] && sudo systemctl stop ssh 2>/dev/null
-  sudo systemctl disable ssh >/dev/null 2>&1
-  if ! sudo systemctl mask ssh >/dev/null 2>&1; then
-    echo "   ✋ could not mask ssh.service" >&2
+  [[ "$unit_active" == "active" ]] && sudo systemctl stop "$unit" 2>/dev/null
+  sudo systemctl disable "$unit" >/dev/null 2>&1
+  if ! sudo systemctl mask "$unit" >/dev/null 2>&1; then
+    echo "   ✋ could not mask $unit" >&2
     echo "      ⇒ a local grove declares no inbound ssh, and this box still" >&2
-    echo "        carries the unit — so the socket may return at the next boot" >&2
-    echo "      read the live socket:  ss -tlnp | grep ':22 '" >&2
+    echo "        carries the unit — so :22 may return at the next boot" >&2
+    echo "      read the live listener:  rhx network.firewall.get" >&2
     return 1
   fi
 
-  echo "   • sshd stopped, disabled, and masked ✔"
+  echo "   • $unit stopped, disabled, and masked ✔"
   echo "      ⇒ mask, not merely disable — an apt install that restores"
   echo "        openssh-server would otherwise re-enable it"
 }

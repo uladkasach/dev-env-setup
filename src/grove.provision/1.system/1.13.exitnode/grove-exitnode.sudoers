@@ -1,0 +1,4 @@
+# an admin may switch the exit node to mullvad, or off, with no password.
+# the switch checks its own args and reaches one tailscale pref, so this grants
+# naught else; `portal` and `resume` stay root's (NetworkManager's) alone
+%sudo ALL=(root) NOPASSWD: /usr/local/sbin/grove-exitnode on, /usr/local/sbin/grove-exitnode on *, /usr/local/sbin/grove-exitnode off

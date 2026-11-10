@@ -1,0 +1,47 @@
+#!/usr/sbin/nft -f
+######################################################################
+# .what = the host firewall of a local grove: no connection comes IN;
+#         every connection this box begins goes out, and its replies return
+#
+# .why  = a local grove is a laptop with a human at its keyboard. it joins
+#         networks it does not own — an airport, a cafe, a hotel — and it
+#         serves no one. (define.invariant.local-grove-is-outbound-only)
+#
+# ⚠️ written by src/grove.provision/1.system/1.12.firewall — an edit here is
+#    overwritten at the next apply. change the repo copy instead
+######################################################################
+
+# declare, delete, re-add — one atomic transaction that replaces THIS table
+# alone. a `flush ruleset` would also wipe tailscale's and docker's tables
+table inet grove_firewall
+delete table inet grove_firewall
+
+table inet grove_firewall {
+  chain input {
+    type filter hook input priority filter; policy drop;
+
+    # the box speaks to itself
+    iif "lo" accept
+
+    # replies to connections this box began — the one way in
+    ct state established,related accept
+    ct state invalid drop
+
+    # ipv6 cannot find its router or its neighbors without these.
+    # hoplimit 255 proves the sender is on this link, never routed from afar
+    icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert, nd-router-advert } ip6 hoplimit 255 accept
+
+    # a dhcpv6 reply comes unicast from the server's link-local address, so
+    # conntrack never ties it to the multicast ask that this box sent
+    ip6 saddr fe80::/10 udp sport 547 udp dport 546 accept
+  }
+
+  chain forward {
+    type filter hook forward priority filter; policy accept;
+
+    # docker publishes a port by DNAT, which skips the input chain entirely.
+    # refuse a NEW connection that docker forwarded in from outside the box;
+    # containers' own traffic, and replies to it, pass
+    ct state new ct status dnat iifname != "docker0" iifname != "br-*" drop
+  }
+}
