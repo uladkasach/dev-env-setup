@@ -1,0 +1,5 @@
+   🌙 openhours is opted out — no gate installed
+      this box has not elected the gate; the default is off
+      opt in: rhx machine.openhours.optin.set --mode apply
+              rhx grove.provision --what 5.18.openhours --mode apply
+      read it: rhx machine.openhours.optin.get

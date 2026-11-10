@@ -1,0 +1,6 @@
+   • the open-hours reconciler and its two units declared
+   • the reconciler's cwd built and linked
+     <fixture>/home/.local/state/machine_openhours/cwd
+   • schedule declared — days 1-5, 08:00–20:00 America/Chicago
+   • machine_openhours_reconcile.timer enabled and started (2/hr)
+   • the gate converged to the policy for right now

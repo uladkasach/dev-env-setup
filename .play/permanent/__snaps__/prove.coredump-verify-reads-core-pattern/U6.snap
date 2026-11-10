@@ -1,0 +1,6 @@
+   🌙 the crash collector is a BOX-WIDE fact, and this seat has no root
+      ⇒ core_pattern: |/usr/share/apport/apport -p%p -s%s -c%c -d%d -P%P -u%u -g%g -- %E
+      ⇒ a seat converges its own $HOME; this lives outside it, and the
+        seat with sudo runs this same bundle and sets it there
+      ⇒ this seat owes no step. if that seat has not run it yet, this
+        bundle's verify names the run

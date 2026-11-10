@@ -1,0 +1,2 @@
+   💥 MalfunctionError: the fetch failed (curl 7) — https://example.com/x.tgz
+      read why: curl -fsSL --max-time 600 'https://example.com/x.tgz' -o /dev/null

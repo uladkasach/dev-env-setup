@@ -1,0 +1,6 @@
+   • keyrack_daemon_prune.service matches this checkout ✔
+   ✋ ConstraintError: <fixture>/home/.config/systemd/user/keyrack_daemon_prune.timer does NOT match <fixture>/repo/src/machine/keyrack_daemon_prune.timer
+      ⇒ the prune runs on a cadence this repo did not declare
+      fix: rhx grove.provision --what 1.6.4.keyrackd --mode apply
+   • keyrack_daemon_prune.timer is enabled ✔
+   • keyrack_daemon_prune.timer is armed on this boot ✔

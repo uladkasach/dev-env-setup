@@ -1,0 +1,4 @@
+   • keyrack_daemon_prune.service and keyrack_daemon_prune.timer declared
+   ✋ ConstraintError: could not enable keyrack_daemon_prune.timer
+      ⇒ the leaked-daemon pool grows unbounded, and its memory is ANON,
+        so it lands in swap rather than in reclaimable cache

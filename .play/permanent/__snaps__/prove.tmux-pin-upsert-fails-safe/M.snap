@@ -1,0 +1,16 @@
+   ✋ ConstraintError: INTEGRITY CHECK FAILED — <fixture>/build.tmux/tmux-3.5a.tar.gz
+      expected: 0000000000000000000000000000000000000000000000000000000000000000
+      received: 0f184b53c2d29ec6cf9e22f6b187062e16ffb02a1a924f43dd54bd06f6455ef1
+      ⇒ do NOT extract, run, or install these bytes. two causes, and
+        they want opposite repairs:
+        · the pin is STALE — upstream published a new build under the
+          same url. bump the version AND the hash in one edit
+        · the bytes are WRONG — a mirror, cdn, or release account served
+          something upstream did not publish. that is the case this
+          check exists for, and it is not a bump
+      ⇒ the tmux tarball is discarded unbuilt
+      ⇒ the prior tmux is untouched; no crew lost its server
+      ⇒ either the transfer corrupted, or the release was re-uploaded
+      read why: rhx play.run --play prove.tmux-tarball-matches-the-pin
+           a green there means the transfer corrupted — re-run the apply;
+           a red means the release moved — re-pin from a second party (see _.sh)

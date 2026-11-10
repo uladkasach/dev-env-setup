@@ -1,0 +1,6 @@
+   ✋ ConstraintError: the kernel pipes each core to systemd-coredump now, and apport takes it back at the next boot
+      ⇒ apport's init rewrites core_pattern on every boot while enabled=1, after
+        systemd-sysctl — so the first crash after a reboot leaves no core
+      read why: cat <fixture>/apport.default
+      fix: sudo -v && rhx grove.provision --what 1.6.8.coredump --mode apply
+           (on a grove: run it on the ground seat, which holds sudo)

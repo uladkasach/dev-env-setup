@@ -45,6 +45,15 @@ node_modules
 # a RUNTIME lock — it names one machine's live process, so a commit of it
 # either lies to the next machine or blocks it
 .claude/scheduled_tasks.lock
+
+# route daemon CRASH logs — each names the seat's absolute home path and the driver
+# session id, and a route writes one per crash, often byte for byte the same. a record
+# of one machine's sessions, never of the repo, and this repo is public
+# (rule.forbid.dox-in-public-repo)
+.behavior/*/.malfunctions/*.crash.*.log
+
+# python bytecode — a play that imports a kitten writes it beside the source
+__pycache__/
 !.agent/.actors/actor.via.repo=ambient/
 
 # a route driver daemon writes crash logs here. each holds absolute paths of

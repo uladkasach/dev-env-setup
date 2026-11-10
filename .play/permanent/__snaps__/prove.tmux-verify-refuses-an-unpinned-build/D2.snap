@@ -1,0 +1,6 @@
+   ✋ ConstraintError: tmux 3.5a sits at <fixture>/pin/tmux, but PATH holds no tmux
+      ⇒ <fixture>/pin is off this PATH, so no caller finds the pin
+      ⇒ no rebuild is attempted: the pin is already built, and a rebuild cannot move PATH
+      read why: echo "$PATH"
+      fix: put <fixture>/pin on PATH for this seat's shells
+   • tpm present at the declared commit ✔ (<fixture>/tpm/tpm)

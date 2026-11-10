@@ -1,0 +1,5 @@
+   • ~/.tmux.conf matches the checkout ✔
+   🌙 no tmux server answered, so which confs tmux loads cannot be observed
+      ⇒ either none runs, or none that runs replied within 5s
+   🌙 no tmux server runs, so where tpm places plugins cannot be asked
+      ⇒ the plugin claim is unproven on this run, not disproven

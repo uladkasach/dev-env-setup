@@ -1,0 +1,5 @@
+   • tmux 3.5a built → <fixture>/prior/tmux
+     prior: 3.2a (<fixture>/bin/tmux); live servers keep the build they started on
+     ⇒ that holds for EVERY seat's servers, and this seat's plan sees its own only:
+       a crew seat's servers stay on the prior build until they end, and the crew
+       seat's own plan names them (rhx grove.provision --what 2.8.tmux)

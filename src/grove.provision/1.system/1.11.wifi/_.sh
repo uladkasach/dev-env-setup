@@ -20,7 +20,7 @@
 # .what = the drivers whose cards stall under wifi power-save — declared ONCE
 # .why the conf file, the live write, and the verify all derive from this list
 GROVE_PROVISION_1_11_WIFI_DRIVERS=(
-  ath11k_pci   # qualcomm QCA6390 — measured 2026-10-03..05, see header
+  ath11k_pci   # qualcomm QCA6390 — measured 2026-10-03..05 (howto.allowlist-a-wifi-driver-for-powersave-off)
 )
 
 # .what = where the declaration lands, declared ONCE for both halves

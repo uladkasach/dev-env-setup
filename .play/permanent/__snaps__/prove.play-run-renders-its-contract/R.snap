@@ -1,0 +1,4 @@
+   ✋ ConstraintError: 'repair.stub-mends' is a repair play, and this repo has no such verb
+      ⇒ a play that moves a box FORWARD toward the declared state is
+        a BUNDLE (rule.forbid.repair-plays)
+      fix: rhx grove.provision --what <slug> --mode apply

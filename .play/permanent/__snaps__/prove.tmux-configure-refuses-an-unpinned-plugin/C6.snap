@@ -1,0 +1,13 @@
+   • tmux.conf declared (~/.tmux.conf)
+   ✋ ConstraintError: tpm did not land every plugin the conf names: tmux-resurrect
+      ⇒ this is SILENT at runtime: tmux starts, the conf loads, and the
+        plugin's keybinds and status segments are simply omitted with no
+        error anywhere. the human finds it by a dead keypress
+      ⇒ tmux-resurrect is what saves a session on prefix+ctrl-s and
+        restores it on prefix+ctrl-r, so its absence makes both keys dead
+      ⇒ waited 90s for the clones under <fixture>/home/.tmux/plugins; a slow
+        network or a github reach that needs auth are the usual causes
+      read why, on an isolated server so the duct is untouched:
+        tmux -L grove_tpm -f ~/.tmux.conf new-session -d -s tpm_init
+        tmux -L grove_tpm run-shell -t tpm_init <fixture>/home/.tmux/plugins/tpm/bin/install_plugins
+        tmux -L grove_tpm capture-pane -p -t tpm_init

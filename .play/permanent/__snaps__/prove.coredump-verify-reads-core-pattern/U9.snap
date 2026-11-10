@@ -1,0 +1,4 @@
+   ✋ ConstraintError: apport still claims core_pattern at the next boot
+      ⇒ the kernel pipes to systemd-coredump now, and apport takes it back at boot,
+        so the first crash after a reboot leaves no core
+      read why: cat <fixture>/apport.default

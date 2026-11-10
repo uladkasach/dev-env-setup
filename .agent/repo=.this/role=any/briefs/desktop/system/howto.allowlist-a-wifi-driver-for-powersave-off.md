@@ -67,6 +67,18 @@ sudo -v && rhx grove.provision --what 1.11.wifi --mode apply
 
 the verify must show three ✔: declared, effective, and `listed radio(s): power-save off`.
 
+## .measured — `ath11k_pci` (qualcomm QCA6390)
+
+- **2026-10-03..05, power-save ON** (`rhx network.wifi.probe`): no deauth from the AP, no beacon
+  loss, no suspend — traffic simply stopped, and at the reconnect ath11k reported it could not
+  flush its transmit queue. the drops continued with battery saver off, so the power profile was
+  not the cause. ⇒ the driver joined the allowlist
+- **2026-10-12, power-save OFF**: the same card stalled twice — the DHCPv6 renewal stopped, no
+  deauth, no beacon loss, no kernel line, and a reconnect restored traffic in 2s. the cause is
+  unproven: the old ath11k firmware and a DFS channel are both candidates. the state that would
+  name it is readable only DURING the stall, and each human reconnect erased it ⇒ `1.11.wifi`'s
+  stall watchdog records the link, driver, and firmware state first, then reconnects
+
 ## .why an allowlist and not a box-wide off
 
 power-save is free battery on a card whose driver wakes correctly. a box-wide off spends that
