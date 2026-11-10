@@ -104,9 +104,11 @@ always:
     # line each every session; the glossary index above finds them on demand
     # each `.demo=` file is the evidence under one parent brief, and its parent
     # names it in a `.refs` line — so the parent is the way in
+    # the exit-node plan is cited by `network.vpn.set` and the outbound invariant
     not:
       - briefs/domain.terms/term=*
       - briefs/**/*.demo=*
+      - briefs/grove/reach/plan.exit-node.md
   skills:
     # test snapshots are fixtures of brains.auth.test, never a skill to invoke
     not:

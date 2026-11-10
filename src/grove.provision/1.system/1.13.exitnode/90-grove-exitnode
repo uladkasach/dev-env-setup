@@ -1,0 +1,22 @@
+#!/bin/sh
+# .what = NetworkManager's hook into the exit-node switch: on a captive portal,
+#         pause the exit node; on full reach again, restore it
+#
+# .why the pause
+#   - a captive portal answers only on the local network, and the exit node
+#     sends every packet through the tunnel — so the sign-in page cannot load,
+#     and no traffic flows at all until a human turns the vpn off by hand
+#
+# .why it is safe to pause
+#   - the pause lasts only while NetworkManager reads PORTAL; at FULL the node
+#     comes back. the panel shield turns amber for the whole gap
+#   - inbound stays dropped throughout (`1.12.firewall`)
+#
+# NetworkManager runs this as root, with $2 = the action and
+# $CONNECTIVITY_STATE set on a `connectivity-change`
+[ "$2" = connectivity-change ] || exit 0
+case "${CONNECTIVITY_STATE:-}" in
+  PORTAL) exec /usr/local/sbin/grove-exitnode portal ;;
+  FULL)   exec /usr/local/sbin/grove-exitnode resume ;;
+esac
+exit 0

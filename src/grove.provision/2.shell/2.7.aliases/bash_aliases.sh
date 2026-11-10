@@ -120,7 +120,38 @@ alias use.github.admin='export GITHUB_TOKEN=$(op item get github.admin.pat --fie
 # terraform caching, for when on slow internet
 alias use.terraform.caching='mkdir -p $HOME/.terraform.d/plugin-cache && export TF_PLUGIN_CACHE_DIR="$HOME/.terraform.d/plugin-cache"' # https://www.terraform.io/docs/cli/config/config-file.html#provider-plugin-cache
 
-# networking utilities
+# vpn — route through a mullvad exit node, or back to direct (`plan.exit-node`)
+#
+# .why no password
+#   - `1.13.exitnode` installs a root switch that sudoers lets an admin run
+#     with no password, and that reaches one pref — mullvad on, or off
+#   - where the switch is absent, `sudo -v` asks here, in a terminal a human can
+#     answer; rhx runs the skill with no tty (`gotcha.rhx-runs-a-skill-with-no-tty`)
+#   - the skill holds the logic and reads the route back; this is only the door
+#
+# 🛑 .why the skill runs from THIS repo, whatever the cwd
+#   - `rhx <skill>` finds a skill through the roles linked in the cwd's repo, and
+#     `network.vpn.*` lives in this repo's own `.agent/repo=.this` role. so from
+#     any other dir it answers "no skill" — 📜 measured 2026-11-10
+#   - a subshell `cd` reaches the skill and leaves the caller's cwd as it was
+#
+# usage:
+#   use.vpn.switch on [<cc>]    # the best online mullvad node in one country (default: us)
+#   use.vpn.switch off          # direct again
+#   use.vpn.switch              # the route now
+use.vpn.switch() {
+  local ask=(sudo -v) repo
+  [[ -x /usr/local/sbin/grove-exitnode ]] && ask=(true)
+  repo="$(_grove_src)/.."
+  case "${1:-}" in
+    on)  "${ask[@]}" && ( cd "$repo" && rhx network.vpn.set --exit mullvad ${2:+--country "$2"} ) ;;
+    off) "${ask[@]}" && ( cd "$repo" && rhx network.vpn.set --off ) ;;
+    '')  ( cd "$repo" && rhx network.vpn.get ) ;;
+    *)   echo "✋ ConstraintError: use.vpn.switch on [<cc>] | off" >&2; return 2 ;;
+  esac
+}
+
+# network utilities
 alias use.mtu.1400='sudo ifconfig wlp113s0 mtu 1400' # for when you're on older infra networks; https://serverfault.com/a/670081/276221; https://www.cloudflare.com/learning/network-layer/what-is-mtu/
 
 # 🛑 .there is no `use.keymap.altswap` / `altboot`, and they must not come back

@@ -106,26 +106,31 @@ grove_provision_2_3_ssh_provision_verify() {
     if ! command -v systemctl >/dev/null 2>&1; then
       echo "   • sshd unit state unread — no systemctl on this box 🌙"
     else
-      local unit_state unit_active
-      unit_state="$(systemctl is-enabled ssh 2>/dev/null || true)"
-      unit_active="$(systemctl is-active ssh 2>/dev/null || true)"
-
       # ⚠️ the bar is MASKED, not merely "not enabled". a unit that is disabled
       #    and not present still returns the moment an apt install restores
       #    openssh-server, and its postinst re-enables it. masked is the only
       #    state apt cannot walk over, so masked is what the upsert converges
       #    to and masked is what this rung demands
+      #
+      # ⚠️ BOTH units are asked: ssh.socket holds :22 by itself and spawns sshd
+      #    on the first connection — 📜 measured 2026-11-09, :22 open on a box
+      #    whose ssh.service was masked
+      local unit unit_state unit_active
+      for unit in ssh.socket ssh.service; do
+      unit_state="$(systemctl is-enabled "$unit" 2>/dev/null || true)"
+      unit_active="$(systemctl is-active "$unit" 2>/dev/null || true)"
       if [[ "$unit_state" == "masked" && "$unit_active" != "active" ]]; then
-        echo "   • sshd masked — this grove serves no ssh ✔"
+        echo "   • $unit masked — this grove serves no ssh ✔"
       else
         echo "   ✋ this local grove does not have ssh masked, and it declares no" >&2
         echo "      inbound ssh at all" >&2
         echo "      ⇒ tier: $GROVE_ENV_SERVER" >&2
-        echo "      ⇒ ssh.service is-enabled=${unit_state:-<absent>} is-active=${unit_active:-<absent>}" >&2
+        echo "      ⇒ $unit is-enabled=${unit_state:-<absent>} is-active=${unit_active:-<absent>}" >&2
         echo "      ⇒ this repo writes no sshd_config, so a live daemon runs under" >&2
         echo "        the stock one — PasswordAuthentication at its compiled" >&2
-        echo "        default of yes — and this tree declares no host firewall." >&2
-        echo "        so it is an inbound auth surface on every network this box joins" >&2
+        echo "        default of yes. \`1.12.firewall\` drops it inbound, and that is one" >&2
+        echo "        layer: with the firewall stopped or absent, it is an inbound auth" >&2
+        echo "        surface on every network this box joins" >&2
         echo "      ⇒ and an unmasked-but-absent unit is not safe either: the next" >&2
         echo "        apt install that restores openssh-server re-enables it" >&2
         echo "      read the live socket:" >&2
@@ -137,6 +142,7 @@ grove_provision_2_3_ssh_provision_verify() {
         echo "        this rung (rule.forbid.exemption-as-habit)" >&2
         failed=$(( failed + 1 ))
       fi
+      done
     fi
   fi
 

@@ -22,7 +22,7 @@
 #   one, and you must add all three: the file, the source line, and the cp in the phase.
 #
 # vision: .behavior/v2026_07_28.brain-budget-utilization/1.vision.yield.md
-# tests:  rhx brains.auth.test   (337 cases, hermetic, no network, no real ~/.claude)
+# tests:  rhx brains.auth.test   (339 cases, hermetic, no network, no real ~/.claude)
 #         ⚠️ this number is ASSERTED, not maintained by hand — `header.count-matches-the-suite`
 #           reads it back out of this very line and compares it to the suite's own total. it
 #           drifted ~100 cases wrong once, when it was only a promise. now a case added
@@ -376,16 +376,30 @@ _brains_auth_should_union_active() {
 #   identity, or is empty because there genuinely is none), 1 = the read FAILED and the identity
 #   is UNKNOWN. callers must not treat those alike — "no account signed in" invites an overwrite,
 #   "could not tell" must refuse one (rule.forbid.failhide).
+# .what = ask the profile endpoint; emit `<body>\n<http code>` ($1=ua, $2=access token)
+# .why  = two readers ask it — who a token belongs to, and when its subscription started — and
+#   one call leaf keeps HOW it is asked (the bearer on stdin, the beta opt-in, the ua) in one
+#   place, the same split `_brains_auth_usage_reply` makes for the usage endpoint.
+# .note = the subshell turns pipefail off so the exit code is curl's own, never printf's
+#   SIGPIPE — see `_brains_auth_usage_reply` for the measured flake behind that.
+_brains_auth_profile_reply() {
+  local ua="$1" access="$2"
+  (
+    set +o pipefail
+    # the access token rides curl's stdin config (-K -), never argv, so it stays out of /proc
+    printf 'header = "Authorization: Bearer %s"\n' "$access" \
+      | curl -sS -m "$_BRAINS_AUTH_HTTP_TIMEOUT" -w $'\n%{http_code}' "$_BRAINS_AUTH_PROFILE_URL" \
+          -H "anthropic-beta: ${_BRAINS_AUTH_ANTHROPIC_BETA}" \
+          -H "User-Agent: ${ua}" \
+          -H "Content-Type: application/json" \
+          -K -
+  )
+}
+
 _brains_auth_who_for_access() {
   local ua="$1" access="$2" resp code body uuid email
   [[ -z "$access" ]] && return 0
-  # the access token rides curl's stdin config (-K -), never argv, so it stays out of /proc
-  resp="$(printf 'header = "Authorization: Bearer %s"\n' "$access" \
-    | curl -sS -m "$_BRAINS_AUTH_HTTP_TIMEOUT" -w $'\n%{http_code}' "$_BRAINS_AUTH_PROFILE_URL" \
-        -H "anthropic-beta: ${_BRAINS_AUTH_ANTHROPIC_BETA}" \
-        -H "User-Agent: ${ua}" \
-        -H "Content-Type: application/json" \
-        -K -)"
+  resp="$(_brains_auth_profile_reply "$ua" "$access")"
   code="${resp##*$'\n'}"
   body="${resp%$'\n'*}"
   # a non-200 is an UNREAD identity, never an absent one — say so via the exit code
@@ -402,6 +416,82 @@ _brains_auth_who_for_access() {
   }
   printf '%s\t%s' "$uuid" "$email"
   return 0
+}
+
+# .what = the subscription facts a token's profile carries; emit compact json, or naught
+#   ($1=ua, $2=access)
+# .why  = the usage endpoint names no billing date at all (`billing_period` reads "unknown"),
+#   but the profile names when the subscription STARTED — the anchor a monthly charge recurs
+#   on. the claude cli itself reads it from here (`organization.subscription_created_at`,
+#   seen via `rhx brains.claude.strings --pattern subscription_created_at`).
+# .note = best-effort by design: any failure prints naught and returns 0. the budget read is
+#   the product, and an unread bill date must never cost a human their usage numbers.
+_brains_auth_subscription_for_access() {
+  local ua="$1" access="$2" resp code body
+  [[ -n "$access" ]] || return 0
+  resp="$(_brains_auth_profile_reply "$ua" "$access" 2>/dev/null)" || return 0
+  code="${resp##*$'\n'}"
+  body="${resp%$'\n'*}"
+  [[ "$code" == 200 ]] || return 0
+  jq -c '.organization // {}
+    | select(.subscription_created_at != null)
+    | {created_at: .subscription_created_at, billing_type: (.billing_type // null)}' \
+    <<< "$body" 2>/dev/null
+  return 0
+}
+
+# .what = the next monthly charge at or after now, from the subscription start ($1=iso start)
+# .why  = a monthly stripe plan charges on the day-of-month it started, at the same clock time;
+#   a month shorter than that day charges on its last day. so the start fixes every later
+#   charge, and an account whose token is dead still has a knowable next bill.
+# 🛑 it ASSUMES a monthly plan. no endpoint names the interval (`billing_period` reads
+#   "unknown"), so an annual plan would print a monthly date that is wrong. the row says
+#   "monthly" so the assumption is on the page, never hidden.
+# .note = prints empty on an unparseable stamp. `$2` = "now" as epoch seconds, for tests only;
+#   it defaults to the real clock, so the month math is checkable on any day of the year.
+_brains_auth_bill_next() {
+  local iso="$1" n="${2:-}" s day clock y m i last cand ce
+  s="$(date -u -d "$iso" +%s 2>/dev/null)" || return 0
+  [[ -n "$s" ]] || return 0
+  [[ -n "$n" ]] || n="$(date +%s)"
+  day="$(date -u -d "@$s" +%-d)"
+  clock="$(date -u -d "@$s" +%H:%M:%S)"
+  y="$(date -u -d "@$n" +%Y)"; m="$(date -u -d "@$n" +%-m)"
+  # this month or a later one — at most two steps are ever needed, three bounds a clock skew
+  for i in 0 1 2; do
+    last="$(date -u -d "$(printf '%04d-%02d-01' "$y" "$m") +1 month -1 day" +%-d)"
+    (( day < last )) && last="$day"
+    cand="$(printf '%04d-%02d-%02dT%sZ' "$y" "$m" "$last" "$clock")"
+    ce="$(date -u -d "$cand" +%s 2>/dev/null)"
+    (( ce > n && ce >= s )) && { printf '%s' "$cand"; return 0; }
+    (( m == 12 )) && { m=1; y=$(( y + 1 )); continue; }
+    m=$(( m + 1 ))
+  done
+}
+
+# .what = the bills row body ($1=subscription node `{created_at, billing_type}`)
+# .why  = one line a human reads as "when does this charge next", beside the usage it buys
+_brains_auth_bill_body() {
+  local start next
+  start="$(jq -r '.created_at // empty' <<< "$1" 2>/dev/null)"
+  [[ -n "$start" ]] || return 0
+  next="$(_brains_auth_bill_next "$start")"
+  [[ -n "$next" ]] || return 0
+  printf 'charges at %s, in %s  ·  monthly, since %s' \
+    "$(date -d "$next" '+%a %b %d' 2>/dev/null | tr '[:upper:]' '[:lower:]')" \
+    "$(_brains_auth_until_days "$next")" \
+    "$(date -d "$start" '+%b %d %Y' 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+}
+
+# .what = a coarse countdown "12d" or "5h" to an iso instant ($1=iso)
+# .why  = a bill is weeks away, and "604h12m" reads worse than "25d"
+_brains_auth_until_days() {
+  local t n d
+  t="$(date -d "$1" +%s 2>/dev/null)" || { printf '?'; return; }
+  n="$(date +%s)"
+  d=$(( t - n )); (( d < 0 )) && d=0
+  (( d >= 86400 )) && { printf '%dd' $(( d / 86400 )); return; }
+  printf '%dh' $(( d / 3600 ))
 }
 
 # .what = is $1 shaped like the email a key is cut at? (0 = yes)
@@ -2446,6 +2536,15 @@ _brains_auth_node_via_access() {
                 end)}' 2>/dev/null || _brains_auth_error_node 'unexpected_shape'
     return
   fi
+
+  # attach the subscription start from the profile, under a key the usage endpoint never
+  # uses, so the sweep log keeps it beside the numbers — and an account whose token dies
+  # later still has the anchor its next charge recurs on. a failed profile read attaches
+  # naught and costs the usage node naught.
+  local sub merged
+  sub="$(_brains_auth_subscription_for_access "$ua" "$access")"
+  [[ -n "$sub" ]] && merged="$(jq -c --argjson s "$sub" '. + {brains_auth_subscription: $s}' <<< "$body" 2>/dev/null)"
+  [[ -n "${merged:-}" ]] && body="$merged"
   printf '%s' "$body"
 }
 
@@ -2782,9 +2881,9 @@ _brains_auth_week_lastknown_body() {
   asof="$(date -d "$ts" '+%b %d %H:%M' 2>/dev/null | tr '[:upper:]' '[:lower:]')"
   if (( r > n )); then
     pct="$(_brains_auth_round "$used")"
-    printf '%s %3d%% used  ·  stale, as of %s  ·  resets at %s, in %s' \
-      "$(_brains_auth_bar "$pct")" "$pct" "${asof:-?}" \
-      "$(_brains_auth_when "$next")" "$(_brains_auth_until "$next")"
+    printf '%s %3d%% used  ·  resets at %s, in %s  ·  stale, as of %s' \
+      "$(_brains_auth_bar "$pct")" "$pct" \
+      "$(_brains_auth_when "$next")" "$(_brains_auth_until "$next")" "${asof:-?}"
     return 0
   fi
   printf '%s   unknown  ·  resets at %s, in %s' \
@@ -2806,16 +2905,22 @@ _brains_auth_week_lastknown_get() {
   while IFS= read -r f; do
     [[ -f "$f" ]] || continue
     # an unreadable day keeps what the newer days already found, and moves on
+    # two facts per account, each taken from the newest read that holds it: the week (its
+    # usage + reset) and the subscription start (the anchor of its monthly charge)
     next="$(jq -sc --argjson want "$wantj" --argjson found "$found" '
       [ .[] | .ts as $t | (.accounts // {}) | to_entries[]
         | select(.key as $k | ($want | index($k)) != null)
-        | select(.key as $k | ($found | has($k)) | not)
-        | select((.value.seven_day.resets_at? // null) != null)
-        | {k: .key, ts: $t, seven_day: .value.seven_day} ]
-      | group_by(.k) | map(max_by(.ts))
-      | reduce .[] as $e ($found; .[$e.k] = {ts: $e.ts, seven_day: $e.seven_day})
+        | {k: .key, ts: $t, v: .value} ]
+      | sort_by(.ts) | reverse
+      | reduce .[] as $e ($found;
+          if ((.[$e.k].seven_day? // null) == null) and (($e.v.seven_day.resets_at? // null) != null)
+          then .[$e.k] = ((.[$e.k] // {}) + {ts: $e.ts, seven_day: $e.v.seven_day}) else . end
+          | if ((.[$e.k].subscription? // null) == null) and (($e.v.brains_auth_subscription? // null) != null)
+            then .[$e.k] = ((.[$e.k] // {}) + {subscription: $e.v.brains_auth_subscription}) else . end)
     ' "$f" 2>/dev/null)" && [[ -n "$next" ]] && found="$next"
-    [[ "$(jq -r --argjson want "$wantj" '($want - keys) | length' <<< "$found" 2>/dev/null)" == 0 ]] && break
+    # done once every account has its week. the subscription rides along from whatever days
+    #   were read — every read since it was added carries it, so the newest one has both
+    [[ "$(jq -r --argjson want "$wantj" '[$want[] as $k | select((.[$k].seven_day? // null) == null)] | length' <<< "$found" 2>/dev/null)" == 0 ]] && break
   # `find`, never a bare glob: this file is sourced into zsh too, where a glob with no match
   #   is a hard error (`rule.forbid.bare-globs-in-dual-shell-files`)
   done < <(find "$dir" -maxdepth 1 -type f -name 'usage.*.jsonl' 2>/dev/null | sort -r)
@@ -2828,9 +2933,9 @@ _brains_auth_week_lastknown_get() {
 _brains_auth_render() {
   local combined="$1" active="${2:-}" lastknown="${3:-}"
   local reach node err s_used w_used o_used s_reset w_reset s_pct w_pct
-  local mark reset_txt week_glyph lk_node lk_body
+  local mark reset_txt week_glyph reset_glyph bill_txt lk_node lk_body
   [[ -n "$lastknown" ]] || lastknown='{}'
-  # `lastknown` is `{reach: {ts, seven_day}}` — the latest successful read per account, handed
+  # `lastknown` is `{reach: {ts, seven_day, subscription}}` — the latest successful read per account, handed
   # in by the caller so this render stays a pure function of its arguments
   # `active` is detected once by the caller and passed in — every account line flags whether
   # it is the one claude is signed in as, the most useful fact when you juggle accounts
@@ -2858,9 +2963,14 @@ _brains_auth_render() {
       # a dead read hides today's usage, never the weekly reset: that is anchored, so the last
       # successful read still fixes it. the row shows only when such a read exists.
       lk_node="$(jq -c --arg s "$reach" '.[$s] // empty' <<< "$lastknown" 2>/dev/null)"
-      lk_body=''
+      lk_body=''; bill_txt=''
       [[ -n "$lk_node" ]] && lk_body="$(_brains_auth_week_lastknown_body "$lk_node")"
-      [[ -n "$lk_body" ]] && printf '   │  └─ week     %s\n' "$lk_body"
+      # the charge date is anchored on the subscription start, so a dead token hides it not
+      [[ -n "$lk_node" ]] && bill_txt="$(_brains_auth_bill_body "$(jq -c '.subscription // {}' <<< "$lk_node")")"
+      week_glyph='└─'
+      [[ -n "$bill_txt" ]] && week_glyph='├─'
+      [[ -n "$lk_body" ]] && printf '   │  %s week     %s\n' "$week_glyph" "$lk_body"
+      [[ -n "$bill_txt" ]] && printf '   │  └─ bills    %s\n' "$bill_txt"
       continue
     fi
 
@@ -2903,8 +3013,12 @@ _brains_auth_render() {
       "$(_brains_auth_bar "$(_brains_auth_round "$o_used")")" "$(_brains_auth_round "$o_used")"
     # the reset row shows only when a reset exists, so the week row closes the block otherwise
     reset_txt="$(_brains_auth_reset_line "$node")"
+    # the bills row closes the block when the profile named a subscription start
+    bill_txt="$(_brains_auth_bill_body "$(jq -c '.brains_auth_subscription // {}' <<< "$node")")"
     week_glyph='└─'
-    [[ -n "$reset_txt" ]] && week_glyph='├─'
+    [[ -n "$reset_txt" || -n "$bill_txt" ]] && week_glyph='├─'
+    reset_glyph='└─'
+    [[ -n "$bill_txt" ]] && reset_glyph='├─'
     # the week row stays even when null: it closes the block, and with no session row either
     #   an absent line would leave the account header bare and unexplained
     if [[ "$(jq -r '.seven_day == null' <<< "$node")" == true ]]; then
@@ -2913,7 +3027,8 @@ _brains_auth_render() {
       printf '   │  %s week     %s %3d%% used  ·  %s\n' "$week_glyph" \
         "$(_brains_auth_bar "$w_pct")" "$w_pct" "$w_tail"
     fi
-    [[ -n "$reset_txt" ]] && printf '   │  └─ reset    %s\n' "$reset_txt"
+    [[ -n "$reset_txt" ]] && printf '   │  %s reset    %s\n' "$reset_glyph" "$reset_txt"
+    [[ -n "$bill_txt" ]] && printf '   │  └─ bills    %s\n' "$bill_txt"
   done < <(jq -r 'keys[]' <<< "$combined")
   echo "   └─"
   echo ""

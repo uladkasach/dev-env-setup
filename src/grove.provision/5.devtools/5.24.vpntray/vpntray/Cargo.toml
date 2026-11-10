@@ -1,0 +1,16 @@
+[package]
+name = "grove-vpntray"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "a panel shield: shown when traffic leaves through a tailscale exit node, hidden when it goes direct"
+
+[dependencies]
+# a StatusNotifierItem over zbus — pure rust, so no libdbus headers to install.
+# `blocking` is the crate's own feature name: its sync api, not a gerund of ours
+ksni = { version = "=0.3.1", default-features = false, features = ["blocking", "async-io"] }
+serde_json = "=1.0.140"
+
+[profile.release]
+opt-level = "s"
+strip = true

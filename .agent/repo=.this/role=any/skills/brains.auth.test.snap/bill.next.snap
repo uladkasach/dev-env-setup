@@ -1,0 +1,7 @@
+2026-01-31T10:00:00Z     now 2026-02-10T00:00:00Z -> 2026-02-28T10:00:00Z  (short month clamps to its last day)
+2026-01-31T10:00:00Z     now 2028-02-10T00:00:00Z -> 2028-02-29T10:00:00Z  (leap february clamps to the 29th)
+2026-01-31T10:00:00Z     now 2026-03-31T09:00:00Z -> 2026-03-31T10:00:00Z  (the day itself, before the clock)
+2026-01-31T10:00:00Z     now 2026-03-31T11:00:00Z -> 2026-04-30T10:00:00Z  (the day itself, after the clock)
+2026-09-15T08:00:00Z     now 2026-12-20T00:00:00Z -> 2027-01-15T08:00:00Z  (december wraps into the next year)
+2026-09-15T08:00:00Z     now 2026-09-01T00:00:00Z -> 2026-09-15T08:00:00Z  (before the start, the first charge is the start)
+not a date               now 2026-09-01T00:00:00Z ->                       (unparseable start prints naught)

@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+######################################################################
+# .what = the one root-owned switch for this laptop's exit node — on to
+#         mullvad, off, and the captive-portal pause + resume
+#
+# .why a switch of its own, and not `tailscale set` under sudo
+#   - tailscaled takes a pref change from root or its operator, and either
+#     grant reaches EVERY pref — shields-up included
+#   - this file reaches one pref, to one class of target, and checks its own
+#     args; so sudoers may run it with no password and grant naught beyond it
+#     (`rule.require.narrowest-terminal-grant` — the same shape, for a pref)
+#
+# usage (as root):
+#   grove-exitnode on [<cc>]   # the best online mullvad node in one country (default: us)
+#   grove-exitnode off         # direct again
+#   grove-exitnode portal      # NetworkManager saw a captive portal: pause, remember the node
+#   grove-exitnode resume      # NetworkManager saw full reach: restore the paused node
+#
+# guarantee:
+#   - lan access through the exit node stays OFF
+#   - `portal` pauses only an exit node in use; `resume` restores only what
+#     `portal` paused, so a human's `off` is never undone
+#   - every call leaves one line in the journal (`journalctl -t grove-exitnode`)
+######################################################################
+
+set -uo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+readonly HELD_AT=/run/grove/exitnode.held
+readonly TS=/usr/bin/tailscale
+
+# .why a home country by default
+#   - a node abroad makes every site serve the wrong locale and raises more
+#     captchas; the human is US-based, so `on` with no country stays in the US
+readonly CC_DEFAULT=us
+
+say() { echo "$*"; logger -t grove-exitnode -- "$*" 2>/dev/null || true; }
+die() { echo "$*" >&2; logger -t grove-exitnode -- "$*" 2>/dev/null || true; exit "${2:-1}"; }
+
+[[ $EUID -eq 0 ]] || die "✋ ConstraintError: grove-exitnode runs as root — sudo grove-exitnode $*" 2
+
+# .what = the exit node in use, by DNS name, or naught
+exit_in_use() {
+  timeout 10 "$TS" status --json 2>/dev/null | jq -r '
+    .Peer // {} | to_entries | map(.value) | map(select(.ExitNode == true))
+    | first | .DNSName // empty' | sed 's/\.$//'
+}
+
+# .what = the best online mullvad node, optionally in one country
+mullvad_best() {
+  local cc="${1:-}"
+  timeout 10 "$TS" status --json 2>/dev/null | jq -r --arg cc "${cc^^}" '
+    .Peer // {} | to_entries | map(.value)
+    | map(select(.ExitNodeOption == true and .Online == true
+                 and ((.DNSName // "") | test("mullvad\\.ts\\.net\\.?$"))
+                 and ($cc == "" or (.Location.CountryCode // "") == $cc)))
+    | sort_by(-(.Location.Priority // 0)) | first | .DNSName // empty' | sed 's/\.$//'
+}
+
+set_exit() {
+  timeout 15 "$TS" set "--exit-node=$1" --exit-node-allow-lan-access=false
+}
+
+case "${1:-}" in
+  on)
+    [[ $# -le 2 ]] || die "✋ ConstraintError: grove-exitnode on [<cc>]" 2
+    cc="${2:-$CC_DEFAULT}"
+    [[ "$cc" =~ ^[a-zA-Z]{2}$ ]] || die "✋ ConstraintError: '$cc' is not a two-letter country code" 2
+    node="$(mullvad_best "$cc")"
+    [[ -n "$node" ]] || die "✋ ConstraintError: no online mullvad exit node${cc:+ in '$cc'} is shared with this laptop" 2
+    set_exit "$node" || die "💥 MalfunctionError: tailscale refused --exit-node=$node"
+    rm -f "$HELD_AT"
+    say "on: via $node" ;;
+
+  off)
+    [[ $# -eq 1 ]] || die "✋ ConstraintError: grove-exitnode off" 2
+    set_exit "" || die "💥 MalfunctionError: tailscale refused --exit-node="
+    rm -f "$HELD_AT"
+    say "off: direct" ;;
+
+  portal)
+    [[ $# -eq 1 ]] || die "✋ ConstraintError: grove-exitnode portal" 2
+    node="$(exit_in_use)"
+    [[ -n "$node" ]] || { say "portal: no exit node in use — no pause owed"; exit 0; }
+    mkdir -p "$(dirname "$HELD_AT")"
+    printf '%s\n' "$node" > "$HELD_AT"
+    set_exit "" || die "💥 MalfunctionError: tailscale refused the pause of $node"
+    say "portal: paused $node — direct until the portal is passed" ;;
+
+  resume)
+    [[ $# -eq 1 ]] || die "✋ ConstraintError: grove-exitnode resume" 2
+    [[ -s "$HELD_AT" ]] || exit 0
+    node="$(head -n 1 "$HELD_AT")"
+    if set_exit "$node"; then
+      rm -f "$HELD_AT"
+      say "resume: via $node"
+      exit 0
+    fi
+    # the paused node may have gone; the next best home-country node holds the intent
+    alt="$(mullvad_best "$CC_DEFAULT")"
+    [[ -n "$alt" ]] && set_exit "$alt" && { rm -f "$HELD_AT"; say "resume: $node refused, via $alt"; exit 0; }
+    die "💥 MalfunctionError: resume failed — $node refused, and no other mullvad node is online; still direct" ;;
+
+  *)
+    die "✋ ConstraintError: grove-exitnode on [<cc>] | off | portal | resume" 2 ;;
+esac
