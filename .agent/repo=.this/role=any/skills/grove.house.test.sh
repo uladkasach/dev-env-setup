@@ -83,6 +83,11 @@ mkcert() {   # mkcert <dir> <days>
 }
 mkcert "$T/week/.aws/house" 7 || { echo "✋ openssl could not mint a fixture cert" >&2; exit 2; }
 mkcert "$T/day/.aws/house"  1 || exit 2
+# a 1-day cert read in its mint second has exactly 24h left, which is NOT under a day
+#   (hours left floor to whole hours). wait for the clock to leave that second, so
+#   every read below sees 23 — on a fast runner the same-second read is the common case
+day_minted="$(date -u +%s)"
+while [[ "$(date -u +%s)" == "$day_minted" ]]; do sleep 0.1; done
 
 cfg_good="$T/config.good"
 printf '%s\n' \
