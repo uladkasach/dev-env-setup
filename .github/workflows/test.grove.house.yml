@@ -1,0 +1,73 @@
+# .what = clamp a house grove's box-free half on every push that touches it
+#
+# .why  = a house grove is the first grove a ci runner CAN be: a fresh ubuntu box with
+#   `sudo -n` and no human (vision case=5). these jobs need no grove, no aws account, and
+#   no secret, so every row they clamp is proven on every push — never on the one day a
+#   human remembers to run it
+#
+# .the jobs
+#   - `readers`   — `grove.house.test`: the badge shape (rows 27, 28), the file modes
+#                   (row 24), the hours left and the renewal (row 37), the aws.params gate
+#                   (row 29), and the probe's refusal of a self-owned election (row 11).
+#                   hermetic: fixtures in one temp dir, no network
+#   - `env-probe` — the two env plays. `prove.house-probe-reads-only-a-root-election`
+#                   needs root-owned fixtures, which only root can write — so it runs
+#                   here, where `sudo -n` holds, and it FAILS where `sudo -n` does not.
+#                   `prove.for-detect-refuses-an-underived-env` is read-only
+#
+# ⚠️ .what this does NOT prove, by declaration
+#   - the AWS half — `prove.grove-aws-identity-chain` — needs the trust
+#     `ahbode/infrastructure#36` places. a green run here never means "the badge works"
+#   - the seat half — cross-uid reads, the loopback sshd, the mint and del — needs a
+#     minted house grove, so `prove.house-grove-box-half` joins this file with the door
+#     that mints one
+#
+# .note = no `npm ci`: every step is bash plus openssl, awk, stat, and sudo, all present
+#   on ubuntu-latest. so a fork PR runs it green with no token
+name: test.grove.house
+
+on:
+  push:
+    paths:
+      - 'src/grove.env.sh'
+      - 'src/grove.for.sh'
+      - 'src/grove.provision/5.devtools/5.6.aws/**'
+      - 'src/grove.provision/5.devtools/5.12.rack/**'
+      - '.agent/repo=.this/role=any/skills/grove.house.test.sh'
+      - '.play/permanent/prove.house-probe-reads-only-a-root-election.play.sh'
+      - '.play/permanent/prove.for-detect-refuses-an-underived-env.play.sh'
+      - '.github/workflows/test.grove.house.yml'
+  pull_request:
+    paths:
+      - 'src/grove.env.sh'
+      - 'src/grove.for.sh'
+      - 'src/grove.provision/5.devtools/5.6.aws/**'
+      - 'src/grove.provision/5.devtools/5.12.rack/**'
+      - '.agent/repo=.this/role=any/skills/grove.house.test.sh'
+      - '.play/permanent/prove.house-probe-reads-only-a-root-election.play.sh'
+      - '.play/permanent/prove.for-detect-refuses-an-underived-env.play.sh'
+      - '.github/workflows/test.grove.house.yml'
+  workflow_dispatch:
+
+jobs:
+  readers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: assert openssl
+        run: openssl version
+      - name: grove.house.test
+        run: bash '.agent/repo=.this/role=any/skills/grove.house.test.sh'
+
+  env-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # the probe play writes root-owned fixtures; an absent `sudo -n` must fail here,
+      # by name, rather than surface as a claim the play could not reach
+      - name: assert sudo -n
+        run: sudo -n true
+      - name: prove.house-probe-reads-only-a-root-election
+        run: bash .play/permanent/prove.house-probe-reads-only-a-root-election.play.sh
+      - name: prove.for-detect-refuses-an-underived-env
+        run: bash .play/permanent/prove.for-detect-refuses-an-underived-env.play.sh

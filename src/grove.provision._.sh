@@ -345,7 +345,7 @@ grove_env_derive --for "$FOR" || exit 2
 FOR="${FOR:-$(grove_for_detect)}"
 
 if ! grove_for_valid "$FOR"; then
-  echo "✋ --for must be 'cloud' or 'local' (got '$FOR')" >&2
+  echo "✋ --for must be 'cloud', 'house', or 'local' (got '$FOR')" >&2
   exit 2
 fi
 

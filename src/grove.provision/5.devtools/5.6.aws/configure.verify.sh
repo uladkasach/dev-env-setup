@@ -22,6 +22,12 @@
 grove_provision_5_6_aws_configure_verify() {
   local cfg="$HOME/.aws/config"
 
+  # a house seat has no IMDS; its badge has its own claims
+  if [[ "${GROVE_ENV_SERVER:-}" == house@* ]]; then
+    grove_provision_5_6_aws_configure_verify_house
+    return
+  fi
+
   ####################################################################
   # applicability — the same IMDS question the upsert asks
   ####################################################################
@@ -213,4 +219,128 @@ grove_provision_5_6_aws_configure_verify() {
   fi
 
   return 0
+}
+
+######################################################################
+# .what = prove a house seat's badge: its shape, its files, its hours, its renewal
+#
+# .why a house seat signs as a cert on disk, so four facts hold its badge, and each
+#   breaks alone (vision case=4, case=6, case=7):
+#     a. the profile SHAPE — `credential_process` alone. a `serve` port, a static
+#        key, or an sso token beside it is a second identity (rows 27, 28)
+#     b. the FILE MODES — 0600 in a 0700 dir. a widened key is a key every uid
+#        can sign as (row 24)
+#     c. the HOURS left — at least a day, so a dead renewal is loud a day early
+#     d. the RENEWAL — the timer armed, the unit rendered from this checkout
+#
+# guarantee:
+#   - READ-ONLY. no aws call: (a)–(c) read files, (d) asks the user manager
+######################################################################
+grove_provision_5_6_aws_configure_verify_house() {
+  local failed=0 name unit_dir state_active state_enabled
+  grove_provision_5_6_aws_house_badge_verdicts \
+    "$HOME/.aws/config" \
+    "$(grove_provision_5_6_aws_house_cert)" \
+    "$(grove_provision_5_6_aws_house_key)" \
+    "" || failed=1
+
+  # d — the renewal timer, armed, and rendered from THIS checkout
+  name="$(grove_provision_5_6_aws_house_renew_name)"
+  unit_dir="$(grove_provision_5_6_aws_house_unit_dir)"
+  state_active="$(systemctl --user is-active "$name.timer" 2>/dev/null)"
+  state_enabled="$(systemctl --user is-enabled "$name.timer" 2>/dev/null)"
+  if [[ "$state_active" == active && "$state_enabled" == enabled ]] \
+    && grove_provision_5_6_aws_house_service_text | cmp -s - "$unit_dir/$name.service"; then
+    echo "   • $name.timer is enabled and active, its unit from this checkout ✔"
+  else
+    echo "   ✋ the renewal timer is not armed as this checkout declares" >&2
+    echo "      ⇒ active: ${state_active:-?} · enabled: ${state_enabled:-?} · unit matches: $(grove_provision_5_6_aws_house_service_text | cmp -s - "$unit_dir/$name.service" && echo yes || echo no)" >&2
+    echo "      ⇒ unrenewed, the cert lapses within 7 days and the badge dies with it" >&2
+    echo "      fix: rhx grove.provision --what 5.6.aws --mode apply" >&2
+    failed=1
+  fi
+
+  return "$failed"
+}
+
+######################################################################
+# .what = the three FILE-shaped claims of a house badge, over paths a caller names
+#
+# .why apart from the verify so the hermetic clamp (`grove.house.test`) asks the
+#   SAME judge over fixtures — one judge, never a copy of it in a test
+#
+# usage: _house_badge_verdicts <aws config> <cert> <key> [<now epoch>]
+######################################################################
+grove_provision_5_6_aws_house_badge_verdicts() {
+  local cfg="$1" cert="$2" key="$3" now="${4:-}" failed=0 at shape sect f state left
+  at="$GROVE_PROVISION_5_6_AWS_HOUSE_RENEW_AT_HOURS"
+
+  # a — the shape, of the named badge and of the bare call alike
+  for sect in 'profile ambient' default; do
+    shape="$(grove_provision_5_6_aws_badge_shape "$cfg" "$sect")"
+    case "$shape" in
+      process)
+        echo "   • [$sect] is credential_process via aws_signing_helper, and no other source ✔" ;;
+      # ⚠️ no fix-text here names a 5.6.aws apply: the badge line carries the
+      #    trust anchor, profile, and role that #36 places, so the MINT writes it
+      #    beside the cert, and an apply here would loop on the same refusal
+      absent)
+        echo "   ✋ [$sect] holds no badge source" >&2
+        echo "      ⇒ a consumer that names no profile, or names ambient, finds no identity" >&2
+        echo "      ⇒ the mint writes this line with the cert, once ahbode/infrastructure#36" >&2
+        echo "        names the trust anchor it chains to" >&2
+        failed=1 ;;
+      serve|instance_role)
+        echo "   ✋ [$sect] reads an imds endpoint ($shape) — on a house seat that is a 127.0.0.1 serve port" >&2
+        echo "      ⇒ every uid on this box can reach 127.0.0.1, so every uid would wear this badge" >&2
+        echo "      fix: delete that line from [$sect] in ~/.aws/config, then stop the serve process" >&2
+        failed=1 ;;
+      *)
+        echo "   ✋ [$sect] draws from $shape, never credential_process alone" >&2
+        echo "      ⇒ a static key never expires; an sso token puts a human on a schedule;" >&2
+        echo "        two sources side by side is a second identity behind the first" >&2
+        echo "      fix: delete every source line in [$sect] of ~/.aws/config but the" >&2
+        echo "           aws_signing_helper credential-process one" >&2
+        failed=1 ;;
+    esac
+  done
+
+  # b — the file modes, cert and key alike
+  for f in "$cert" "$key"; do
+    state="$(grove_provision_5_6_aws_badge_file_state "$f")"
+    case "$state" in
+      tight) echo "   • $(basename "$f") is this seat's own, 0600 in a 0700 dir ✔" ;;
+      absent)
+        echo "   ✋ no badge file at $f" >&2
+        echo "      ⇒ the first cert and key are placed by the mint, from the host, once" >&2
+        echo "        ahbode/infrastructure#36 places the trust they chain to" >&2
+        failed=1 ;;
+      *)
+        echo "   ✋ $(basename "$f") is $state — the per-uid wall is open" >&2
+        echo "      ⇒ $(stat -c '%U %a' "$f" 2>/dev/null), in a dir of $(stat -c '%a' "$(dirname "$f")" 2>/dev/null)" >&2
+        echo "      fix: chmod 600 $f && chmod 700 $(dirname "$f")" >&2
+        failed=1 ;;
+    esac
+  done
+
+  # c — the hours left
+  left="$(grove_provision_5_6_aws_cert_hours_left "$cert" "$now")"
+  if [[ "$left" == '?' ]]; then
+    echo "   ✋ the cert at $cert cannot be read" >&2
+    failed=1
+  elif (( left < 0 )); then
+    echo "   ✋ the cert ended $(( -left )) hours ago — the badge is dead" >&2
+    echo "      ⇒ a dead cert cannot sign its own renewal; a human re-issues from the host" >&2
+    echo "      read why: journalctl --user -u $(grove_provision_5_6_aws_house_renew_name).service" >&2
+    failed=1
+  elif (( left < at )); then
+    echo "   ✋ the cert has $left hours left — the renewal owed below $at has not landed" >&2
+    echo "      ⇒ the badge dies in $left hours unless a renewal lands first" >&2
+    echo "      read why: journalctl --user -u $(grove_provision_5_6_aws_house_renew_name).service" >&2
+    failed=1
+  else
+    echo "   • the cert has $left hours left ✔ (renewal owed below $at)"
+  fi
+
+  return "$failed"
 }
