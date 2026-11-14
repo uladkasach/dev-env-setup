@@ -71,7 +71,8 @@ grove_for_detect() {
 
 # .what = is this a legitimate `--for` value?
 # .why  = one validator, so every caller rejects the same words. a run is always
-#         for exactly ONE kind of machine, so there is no third value to accept
+#         for exactly ONE kind of machine, so it accepts one tier word, never `any`
+#         and never a list
 grove_for_valid() {
   [ "${1:-}" = "cloud" ] || [ "${1:-}" = "house" ] || [ "${1:-}" = "local" ]
 }
