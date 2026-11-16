@@ -26,7 +26,7 @@ set -u
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=/dev/null
-source "$HERE/src/grove.provision/5.devtools/5.24.backup/grove.backup.operations.sh"
+source "$HERE/src/grove.provision/5.devtools/5.25.backup/grove.backup.operations.sh"
 
 SOURCE_PATH='provision/aws.infra/account=camp/grove/groveBackupScope.ts'
 BRANCH='origin/beav/feat-hetzner-cloud-grove'

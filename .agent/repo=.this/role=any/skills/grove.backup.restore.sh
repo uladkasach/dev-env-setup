@@ -66,8 +66,8 @@ help() {
 if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; then help; exit 0; fi
 
 REPO_ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
-# shellcheck source=../../../src/grove.provision/5.devtools/5.24.backup/grove.backup.operations.sh
-source "$REPO_ROOT/src/grove.provision/5.devtools/5.24.backup/grove.backup.operations.sh"
+# shellcheck source=../../../src/grove.provision/5.devtools/5.25.backup/grove.backup.operations.sh
+source "$REPO_ROOT/src/grove.provision/5.devtools/5.25.backup/grove.backup.operations.sh"
 
 ######################################################################
 # the tree this run prints — rows gather per unit, then print with glyphs

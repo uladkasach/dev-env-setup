@@ -15,8 +15,8 @@
 #   - idempotent: a second apply on a converged box writes naught
 ######################################################################
 
-grove_provision_5_24_backup_provision_upsert() {
-  if ! grove_provision_5_24_backup_applies; then
+grove_provision_5_25_backup_provision_upsert() {
+  if ! grove_provision_5_25_backup_applies; then
     echo "   🌙 a ${GROVE_ENV_SERVER:-（underived）} box holds no grove role; grove backup is for groves"
     return 0
   fi
@@ -27,7 +27,7 @@ grove_provision_5_24_backup_provision_upsert() {
   local src dst mode converged=1
   while IFS=$'\t' read -r src dst mode; do
     cmp -s "$src" "$dst" || converged=0
-  done < <(grove_provision_5_24_backup_files)
+  done < <(grove_provision_5_25_backup_files)
   systemctl is-enabled grove-backup.timer >/dev/null 2>&1 || converged=0
   systemctl is-active grove-backup.timer >/dev/null 2>&1 || converged=0
 
@@ -55,7 +55,7 @@ grove_provision_5_24_backup_provision_upsert() {
       return 1
     fi
     sudo install -D -m "$mode" -o root -g root "$src" "$dst" || return 1
-  done < <(grove_provision_5_24_backup_files)
+  done < <(grove_provision_5_25_backup_files)
   echo "   • the agent, its library, grove-backup.service, and grove-backup.timer declared"
 
   ####################################################################
