@@ -15,7 +15,7 @@ a redundant copy of a grove's `~/git`, `~/.claude`, and `~/.rhachet`, kept in th
 that a machine restores onto a fresh grove.
 
 ## .refs
-- src/grove.provision/5.devtools/5.24.backup/                       # the bundle, the agent, its timer
+- src/grove.provision/5.devtools/5.25.backup/                       # the bundle, the agent, its timer
 - .agent/repo=.this/role=any/skills/grove.backup.get.sh             # the status line, every grove, one grove's units
 - .agent/repo=.this/role=any/skills/grove.backup.restore.sh         # its mirror: `term=grove.restore`
 - .play/permanent/prove.grove-backup-round-trip.play.sh

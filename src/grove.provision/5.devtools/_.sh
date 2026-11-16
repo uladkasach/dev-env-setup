@@ -67,7 +67,7 @@ grove_provision_5_devtools() {
 
   # .why AFTER 5.6.aws: the agent calls the aws cli that bundle installs.
   #   it reads no key from the rack: its credential is the box's own identity
-  bundle.upgrade 5.24.backup
+  bundle.upgrade 5.25.backup
 
   # LAST: the crew boot gate reads this marker, so a box declares itself a work
   #   grove only once every bundle above has converged it
