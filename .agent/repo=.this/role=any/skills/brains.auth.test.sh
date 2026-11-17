@@ -366,6 +366,16 @@ _LK="$(_brains_auth_week_lastknown_get $'kai@example.com\nmoana@example.com\nnev
 _snap 'lastknown.get' "$(jq -S . <<< "$_LK")"
 _snap 'lastknown.render' "$(_brains_auth_render "$FIXTURE_ALL_DEAD" '' "$_LK" | _normalize)"
 # an absent log is no history, never a failure
+# ---- accounts render in weekly reset order: sun → sat, then clock, then name. a dark account
+#   keeps its place via its last-known reset; one with no reset at all sorts last.
+#   2026-11-15 is a sunday; resets sit at midday utc so the weekday holds in any local zone.
+_snap 'order.weekly-reset' "$(_brains_auth_reaches_in_reset_order \
+  '{"zed@example.com":{"seven_day":{"utilization":1,"resets_at":"2026-11-21T12:00:00Z"}},
+    "amy@example.com":{"seven_day":{"utilization":1,"resets_at":"2026-11-15T13:00:00Z"}},
+    "bob@example.com":{"seven_day":{"utilization":1,"resets_at":"2026-11-15T12:00:00Z"}},
+    "dee@example.com":{"error":"refresh_rejected"},
+    "nan@example.com":{"error":"refresh_rejected"}}' \
+  '{"dee@example.com":{"seven_day":{"utilization":5,"resets_at":"2026-11-16T12:00:00Z"}}}')"
 _snap 'lastknown.absent-log' "$(BRAINS_AUTH_USAGE_LOG_DIR="$_SWAPDIR/nope" _brains_auth_week_lastknown_get 'kai@example.com')"
 rm -rf "$_LK_DIR"
 
