@@ -22,7 +22,7 @@
 #   one, and you must add all three: the file, the source line, and the cp in the phase.
 #
 # vision: .behavior/v2026_07_28.brain-budget-utilization/1.vision.yield.md
-# tests:  rhx brains.auth.test   (339 cases, hermetic, no network, no real ~/.claude)
+# tests:  rhx brains.auth.test   (340 cases, hermetic, no network, no real ~/.claude)
 #         ⚠️ this number is ASSERTED, not maintained by hand — `header.count-matches-the-suite`
 #           reads it back out of this very line and compares it to the suite's own total. it
 #           drifted ~100 cases wrong once, when it was only a promise. now a case added
@@ -815,7 +815,7 @@ _brains_auth_until() {
   printf '%dh%02dm' "$h" "$m"
 }
 
-# .what = a compact countdown "1d18h" or "2h14m" from now ($1=iso)
+# .what = a compact countdown "1d18h" or "0d2h14m" from now ($1=iso)
 # .why  = the budget tree reads a reset as a clock plus a countdown in parens; a week away
 #   reads "6d15h", which a human parses at a glance where "159h19m" needs arithmetic
 _brains_auth_until_short() {
@@ -824,8 +824,10 @@ _brains_auth_until_short() {
   [[ -n "$t" ]] || { printf '?'; return; }
   n="$(date +%s)"
   d=$(( t - n )); (( d < 0 )) && d=0
+  # the day field is always present, so rows compare at a glance: a same-day reset says
+  #   "0d", never drops it. minutes show only on that same day, where they still matter
   (( d >= 86400 )) && { printf '%dd%dh' $(( d / 86400 )) $(( (d % 86400) / 3600 )); return; }
-  printf '%dh%02dm' $(( d / 3600 )) $(( (d % 3600) / 60 ))
+  printf '0d%dh%02dm' $(( d / 3600 )) $(( (d % 3600) / 60 ))
 }
 
 # .what = format an iso timestamp as a weekday + clock "fri 09:00" ($1=iso)
@@ -3005,8 +3007,9 @@ _brains_auth_render() {
   #   column settles every row; "used" is what the endpoint reports (`utilization`).
   echo ""
   echo "🧠 claude budget · % used"
-  # readable accounts first, dark ones after, each half alphabetical — the ones you can use
-  #   right now lead
+  # accounts in WEEKLY RESET order: weekday (sun=0 … sat=6), then clock, then name. the key is
+  #   a fixed point in the week, never a countdown or a health state, so the order holds still
+  #   whatever the hour, and an account that goes dark keeps its place
   while IFS= read -r reach; do
     [[ -z "$reach" ]] && continue
     node="$(jq -c --arg s "$reach" '.[$s]' <<< "$combined")"
@@ -3101,7 +3104,7 @@ _brains_auth_render() {
     # the money side goes to its own tree below; here we only note when it charges
     next="$(_brains_auth_bill_next_for "$(jq -c '.brains_auth_subscription // {}' <<< "$node")")"
     [[ -n "$next" ]] && bills+=("${next}"$'\t'"${reach}")
-  done < <(jq -r 'to_entries | sort_by((.value | type == "object" and has("error")), .key) | .[].key' <<< "$combined")
+  done < <(_brains_auth_reaches_in_reset_order "$combined" "$lastknown")
   if (( nkinds == 1 )); then
     printf '   └─ %s\n' "$(_brains_auth_fix_for_error "$kinds")"
   else
@@ -3109,6 +3112,25 @@ _brains_auth_render() {
   fi
   _brains_auth_render_bills "${bills[@]}"
   echo ""
+}
+
+# .what = every reach, in weekly reset order ($1=combined json, $2=lastknown json)
+# .why  = a stable order a human learns once: sun → sat by the local weekday + clock of each
+#   account's weekly reset. a dark account sorts by its last-known reset, which recurs at the
+#   same weekday + clock, so it never moves. an account with no known reset sorts last.
+# .note = ties (and the unknowns) break on the name, so the order is total
+_brains_auth_reaches_in_reset_order() {
+  local combined="$1" lastknown="${2:-}" reach iso key
+  [[ -n "$lastknown" ]] || lastknown='{}'
+  while IFS=$'\t' read -r reach iso; do
+    [[ -n "$reach" ]] || continue
+    key='9-9999'
+    [[ -n "$iso" ]] && key="$(date -d "$iso" '+%w-%H%M' 2>/dev/null)" || true
+    [[ -n "$key" ]] || key='9-9999'
+    printf '%s\t%s\n' "$key" "$reach"
+  done < <(jq -r --argjson lk "$lastknown" '
+    to_entries[] | [.key, (.value.seven_day.resets_at? // $lk[.key].seven_day.resets_at? // "")] | @tsv
+  ' <<< "$combined" 2>/dev/null) | sort -t $'\t' -k1,1 -k2,2 | cut -f2
 }
 
 # .what = the money budget, as its own tree: each account's next charge, soonest first

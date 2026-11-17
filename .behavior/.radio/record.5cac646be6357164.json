@@ -1,0 +1,19 @@
+{
+  "key": "5cac646be6357164",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet"
+  },
+  "exid": null,
+  "title": "feat(hooks): onTool regex filter per rule, checked before the dispatcher boots (stacked on #764)",
+  "description": "## .what\n\nlet a role register a hook rule with a declared **`onTool` filter** — a regex over the tool name and over the tool input — that rhachet evaluates **before it boots**. a call no rule wants then exits in a few ms, with zero bun / rhachet boot.\n\n🔗 **stacked on #764** (one dispatcher process per event). build after it lands: the filter lives in front of that one dispatcher.\n\n## .why — measured, one Bash tool call (`pwd`), 10 hooks\n\n| shape | cpu per Bash call | peak rss |\n|---|---|---|\n| today: 10 separate hook processes | ~2010–2110 ms | 207 MB |\n| after #764: one in-process dispatcher | ~1200 ms est. | 52 MB |\n| **after #764 + this: a call no rule wants** | **a few ms (one `sh` + one `grep`)** | ~0 |\n\n- the 3 rhx hooks alone are ~1350 ms (67%) of today's cost, and on a plain `pwd` none of them applies\n  - `route.mutate.guard`, `route.foreground.guard`, `route.bounce`: matter only when a route is bound to the branch; on an unbound branch every call is a miss\n  - `memory.guard`: matters only when the call names a claude memory path\n  - `route.mutate.guard` also fires on **Read**, which cannot mutate\n- a typical busy session's calls are mostly misses for every rule, so most calls would drop from ~1200 ms to a few ms\n\n## .shape\n\n- a rule declares, for example:\n  ```ts\n  onTool: {\n    name: /^(Write|Edit|Bash)$/,\n    input: /\\/memory\\/|MEMORY\\.md/,\n    when: { fileExists: '<the path route.bind.set writes>' },  // optional precondition\n  }\n  ```\n- `rhx init --hooks` compiles every rule's filter for an event into the ONE registered command as a posix pre-check, e.g. `sh -c 'grep -qE \"<union of input regexes>\" || [ -e <bind file> ] || exit 0; exec rhx hooks.dispatch --event PreToolUse'`\n- the claude `matcher` field becomes the union of the rules' `name` regexes, so claude itself skips the event for a tool no rule names\n- inside the dispatcher, each rule runs only if its own filter matches\n- a rule with no `onTool` keeps today's behavior (always runs)\n\n## .done bar\n\n- on an unbound branch, a Bash `pwd` call costs ≤ ~10 ms cpu in hooks and zero rhx boots, per `rhx claude.hooks.cost --tool Bash` (uladkasach/dev-env-setup)\n- bhrain's `route.*` guards and `memory.guard` declare their filters; `route.mutate.guard` drops `Read`, or states what a read is guarded against",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": null,
+  "heldSeq": 11,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "765"
+}

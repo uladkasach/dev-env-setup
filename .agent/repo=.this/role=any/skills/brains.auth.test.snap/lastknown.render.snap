@@ -1,10 +1,10 @@
 
 🧠 claude budget · % used
+   ├─ moana@example.com  ✋ no token (run: brains.auth.set)
+   │  └─ week        ?            · resets wed 00:00 (<rel>)
    ├─ kai@example.com  ✋ refresh token dead (run: brains.auth.set)
    │  ├─ week    ██████░░░░   64% · resets fri 17:00 (<rel>) · stale jan 02
    │  └─ reset   🎁 2 saved · usable now · expires dec 10 · stale jan 01
-   ├─ moana@example.com  ✋ no token (run: brains.auth.set)
-   │  └─ week        ?            · resets wed 00:00 (<rel>)
    └─
 
 💳 claude bills · next charge, monthly assumed
