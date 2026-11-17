@@ -1,17 +1,20 @@
 //! .what = a panel shield that answers one question: is traffic on the vpn?
 //!
-//!   - green shield, filled   — an exit node is in use (`via <host>` in the tooltip)
-//!   - grey shield, outline   — direct; traffic leaves by the network the laptop is on
-//!   - amber shield, filled   — paused for a captive portal, or tailscaled did not answer
+//!   - `network-vpn`              — an exit node is in use (`via <host>` in the tooltip)
+//!   - `network-vpn-disconnected` — direct; traffic leaves by the network the laptop is on
+//!   - `network-vpn-acquiring`    — paused for a captive portal; sign-in resumes it
+//!   - `network-vpn-error`        — tailscaled did not answer
 //!
-//! .why its own icon, drawn here
+//! .why the theme's own vpn icons, by name
 //!   - tailscale's tray shows connected/disconnected, and names the exit node
 //!     only inside its menu — so the one fact the human glances for is hidden
-//!   - the shield is drawn as a pixmap, so it reads the same under any theme
+//!   - a named symbolic icon draws in the panel's own style: crisp at any scale,
+//!     and it follows light and dark. a hand-drawn 22px pixmap did neither.
+//!     the cost is colour — the state reads by shape, not green versus grey
 //!
 //! .why "off" still draws a mark
-//!   - an absent icon reads the same as a dead tray. a grey outline says "direct"
-//!     and proves the shield itself is alive
+//!   - an absent icon reads the same as a dead tray. the disconnected icon says
+//!     "direct" and proves the shield itself is alive
 //!
 //! .why a poll every 3s, and not a stream
 //!   - `tailscale status --json` is the stable interface; the change stream lives
@@ -65,51 +68,15 @@ fn read_route() -> Route {
         })
 }
 
-/// .what = is pixel (x, y) inside a 22px shield? — a flat top, straight sides,
-///         and a taper to a point at the bottom
-fn is_in_shield(x: i32, y: i32) -> bool {
-    let (top, shoulder, tip) = (2, 10, 20);
-    if y < top || y > tip {
-        return false;
+/// .what = the theme icon for a route, by name — the panel draws it in its own
+///         style, at its own scale, in light or dark
+fn icon_name_for(route: &Route) -> &'static str {
+    match route {
+        Route::Exit(_) => "network-vpn-symbolic",
+        Route::Direct => "network-vpn-disconnected-symbolic",
+        Route::Paused => "network-vpn-acquiring-symbolic",
+        Route::Unknown => "network-vpn-error-symbolic",
     }
-    let half = if y <= shoulder {
-        8.0
-    } else {
-        8.0 * (tip - y) as f32 / (tip - shoulder) as f32
-    };
-    ((x as f32) - 10.5).abs() <= half
-}
-
-/// .what = is pixel (x, y) on the shield's 2px border? — the outline form
-fn is_on_shield_edge(x: i32, y: i32) -> bool {
-    if !is_in_shield(x, y) {
-        return false;
-    }
-    let near = [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, -1), (-1, 1), (1, 1)];
-    near.iter().any(|(dx, dy)| !is_in_shield(x + dx, y + dy))
-}
-
-/// .what = the icon for a route, ARGB32 in network byte order — the pixmap
-///         format the StatusNotifierItem spec asks for
-fn draw_icon(route: &Route) -> ksni::Icon {
-    let size: i32 = 22;
-    let (rgb, filled): ([u8; 3], bool) = match route {
-        Route::Exit(_) => ([0x2e, 0xc2, 0x7e], true),
-        Route::Unknown | Route::Paused => ([0xe5, 0xa5, 0x0a], true),
-        Route::Direct => ([0x9a, 0x99, 0x96], false),
-    };
-    let mut data = Vec::with_capacity((size * size * 4) as usize);
-    for y in 0..size {
-        for x in 0..size {
-            let mark = if filled { is_in_shield(x, y) } else { is_on_shield_edge(x, y) };
-            if mark {
-                data.extend_from_slice(&[0xff, rgb[0], rgb[1], rgb[2]]);
-            } else {
-                data.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
-            }
-        }
-    }
-    ksni::Icon { width: size, height: size, data }
 }
 
 struct VpnTray {
@@ -128,6 +95,10 @@ impl VpnTray {
 }
 
 impl ksni::Tray for VpnTray {
+    // a left click opens the menu. ksni's default sends it to `activate`, which
+    // this shield leaves empty — so a click did naught. 📜 measured 2026-11-14
+    const MENU_ON_ACTIVATE: bool = true;
+
     fn id(&self) -> String {
         "grove-vpntray".to_string()
     }
@@ -136,8 +107,8 @@ impl ksni::Tray for VpnTray {
         self.label()
     }
 
-    fn icon_pixmap(&self) -> Vec<ksni::Icon> {
-        vec![draw_icon(&self.route)]
+    fn icon_name(&self) -> String {
+        icon_name_for(&self.route).to_string()
     }
 
     fn tool_tip(&self) -> ksni::ToolTip {
@@ -147,13 +118,54 @@ impl ksni::Tray for VpnTray {
         }
     }
 
+    /// .what = the status, then both choices — on and off — every time; the
+    ///         one already in effect is greyed out
+    ///
+    /// .why a menu, and not a click on the icon itself
+    ///   - a click that flips the route is one stray tap from a change of
+    ///     network path. a menu row is a choice the human reads first
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
-        vec![ksni::menu::StandardItem {
+        let is_on = matches!(self.route, Route::Exit(_));
+        let is_off = matches!(self.route, Route::Direct);
+        let status = ksni::menu::StandardItem {
             label: self.label(),
             enabled: false,
             ..Default::default()
+        };
+        let on = ksni::menu::StandardItem {
+            label: "vpn on — usa".to_string(),
+            enabled: !is_on,
+            activate: Box::new(|tray: &mut Self| tray.switch("on")),
+            ..Default::default()
+        };
+        let off = ksni::menu::StandardItem {
+            label: "vpn off — direct".to_string(),
+            enabled: !is_off,
+            activate: Box::new(|tray: &mut Self| tray.switch("off")),
+            ..Default::default()
+        };
+        vec![status.into(), ksni::MenuItem::Separator, on.into(), off.into()]
+    }
+}
+
+/// the root switch `1.13.exitnode` installs; sudoers lets an admin run its
+/// `on` and `off` with no password, so `sudo -n` never prompts
+const SWITCH_AT: &str = "/usr/local/sbin/grove-exitnode";
+
+impl VpnTray {
+    /// .what = run the switch, then show the route it left — never the route
+    ///         it was asked for, so a refused switch reads as refused
+    fn switch(&mut self, to: &str) {
+        let ran = Command::new("sudo").args(["-n", SWITCH_AT, to]).output();
+        if !matches!(&ran, Ok(out) if out.status.success()) {
+            let why = match ran {
+                Ok(out) => String::from_utf8_lossy(&out.stderr).trim().to_string(),
+                Err(err) => err.to_string(),
+            };
+            eprintln!("💥 MalfunctionError: `sudo -n {SWITCH_AT} {to}` failed — {why}");
+            eprintln!("   fix: sudo -v && rhx grove.provision --what 1.13.exitnode --mode apply");
         }
-        .into()]
+        self.route = read_route();
     }
 }
 

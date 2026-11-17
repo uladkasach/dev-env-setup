@@ -1,5 +1,20 @@
 {
   "kai@example.com": {
+    "cedar_ember": {
+      "grants": [
+        {
+          "ends_at": "2099-12-10T16:00:00+00:00",
+          "resets_left": 2,
+          "usable_now": true
+        },
+        {
+          "ends_at": "2020-01-01T00:00:00+00:00",
+          "resets_left": 1,
+          "usable_now": true
+        }
+      ]
+    },
+    "cedar_ts": "2020-01-01T08:00:00Z",
     "seven_day": {
       "resets_at": "2099-06-19T17:00:00+00:00",
       "utilization": 64.0

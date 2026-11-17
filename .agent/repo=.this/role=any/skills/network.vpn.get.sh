@@ -52,7 +52,7 @@ main() {
   printf '%s' "$js" | jq -r '
     (.Peer // {} | to_entries | map(.value) | map(select(.ExitNode == true)) | first) as $x
     | if $x == null then "      direct — no exit node; traffic leaves by this network"
-      else "      via \($x.HostName) · \($x.Location.Country // "tailnet") · online=\($x.Online)"
+      else "      via \($x.HostName) · \($x.Location.Country // "tailnet") \(if $x.Online then "✔" else "✋ offline — traffic is held, not sent direct" end)"
       end'
 
   # 2. what this laptop may choose
@@ -66,7 +66,7 @@ main() {
        | .[] | "      \(.HostName)  (tailnet)  online=\(.Online)"),
       (map(select((.DNSName // "") | test("mullvad\\.ts\\.net\\.?$")))
        | if length == 0 then empty else
-           "      mullvad: \(length) nodes, \(map(select(.Online)) | length) online — by country (--country <cc>):",
+           "      mullvad: \(length) nodes, \(map(select(.Online)) | length) online — by country (use.vpn.switch on <cc>):",
            (group_by(.Location.CountryCode // "?")
             | map("\(.[0].Location.CountryCode // "?" | ascii_downcase) \(length)")
             | _nwise(10) | "        " + join(" · "))
@@ -87,10 +87,14 @@ main() {
   echo "      binary: $([[ -x "$bin" ]] && echo "built" || echo "absent — $fix")"
   echo "      autostart: $([[ -e "$entry" ]] && echo "declared" || echo "absent — $fix")"
   pid="$(pgrep -u "$(id -u)" -x grove-vpntray 2>/dev/null | head -n 1)"
-  if [[ -n "$pid" ]]; then echo "      up now: yes (pid $pid)"; else echo "      up now: no"; fi
+  if [[ -n "$pid" ]]; then
+    echo "      up now: yes (pid $pid)"
+  else
+    echo "      up now: no — read why: rhx machine.journal.read --scope user --grep vpntray --since -1d"
+  fi
 
   echo ""
-  echo "🌲 done — switch with: rhx network.vpn.set --exit <host|mullvad> · --off"
+  echo "🌲 done — switch with: use.vpn.switch on [<cc>] · use.vpn.switch off"
 }
 
 main "$@"

@@ -36,7 +36,7 @@ grove_provision_5_24_vpntray_configure_verify() {
   fi
   echo "   • binary built from the repo's source ✔"
 
-  if ! cmp -s "$dir/grove-vpntray.desktop" "$entry"; then
+  if ! cmp -s <(grove_provision_5_24_vpntray_entry_render) "$entry"; then
     echo "   ✋ ConstraintError: $entry is $([[ -e "$entry" ]] && echo 'not the repo copy' || echo 'absent') — the shield does not start at login" >&2
     echo "      fix: $fix" >&2
     return 1

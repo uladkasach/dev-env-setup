@@ -75,10 +75,10 @@ grove_provision_5_24_vpntray_configure_upsert() {
   fi
 
   # 2. the declaration — started at every login
-  if cmp -s "$dir/grove-vpntray.desktop" "$entry"; then
+  if cmp -s <(grove_provision_5_24_vpntray_entry_render) "$entry"; then
     echo "   • autostart entry current ✔"
   else
-    mkdir -p "$(dirname "$entry")" && install -m 0644 "$dir/grove-vpntray.desktop" "$entry" || {
+    mkdir -p "$(dirname "$entry")" && grove_provision_5_24_vpntray_entry_render > "$entry" && chmod 0644 "$entry" || {
       echo "   💥 MalfunctionError: could not write $entry" >&2
       return 1
     }
@@ -109,14 +109,18 @@ grove_provision_5_24_vpntray_configure_upsert() {
   fi
   # a rebuilt binary replaces the one up now
   [[ -n "$pid" ]] && kill "$pid" 2>/dev/null && sleep 0.5
-  setsid -f "$bin" >/dev/null 2>&1 </dev/null
+  # its stderr lands in a log, so a shield that exits names why
+  local log_at="$HOME/.local/state/grove/vpntray.log"
+  mkdir -p "$(dirname "$log_at")"
+  setsid -f "$bin" >>"$log_at" 2>&1 </dev/null
   # past one 3s poll, so a shield cut from the session bus has exited by now
   sleep 5
   if [[ -z "$(grove_provision_5_24_vpntray_pid)" ]]; then
     echo "   💥 MalfunctionError: the shield exited — it could not reach the panel on the session bus" >&2
-    echo "      ⇒ a sandboxed shell (an agent's) holds no session bus; run this apply from your own terminal" >&2
-    echo "      read why: $bin    # run it in a terminal; it prints its error" >&2
+    tail -n 3 "$log_at" 2>/dev/null | sed 's/^/      /' >&2
+    echo "      ⇒ a sandboxed shell (an agent's) may hold a different bus; run this apply from your own terminal" >&2
+    echo "      read why: $log_at" >&2
     return 1
   fi
-  echo "   • shield started — green while on an exit node, a grey outline while direct, amber while paused for a portal"
+  echo "   • shield started — the theme's vpn icon while on an exit node, its disconnected icon while direct; click it to switch"
 }

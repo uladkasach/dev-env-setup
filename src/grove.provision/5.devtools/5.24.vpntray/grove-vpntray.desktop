@@ -2,6 +2,6 @@
 Type=Application
 Name=grove vpn shield
 Comment=a panel shield while traffic leaves through a tailscale exit node
-Exec=sh -c 'exec "$HOME/.local/bin/grove-vpntray"'
+Exec=@BIN@
 NoDisplay=true
 X-GNOME-Autostart-enabled=true

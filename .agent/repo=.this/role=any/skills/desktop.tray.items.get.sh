@@ -81,8 +81,15 @@ main() {
   local raw items
   raw="$(timeout 5 gdbus call --session --dest "$WATCHER" --object-path /StatusNotifierWatcher \
     --method org.freedesktop.DBus.Properties.Get "$WATCHER" RegisteredStatusNotifierItems 2>/dev/null)"
-  items="$(printf '%s' "$raw" | grep -o "'[^']*'" | tr -d "'")"
-  [[ -n "$items" ]] || echo "      none listed by the watcher"
+  # a watcher may hold one item many times (cosmic appends each re-register), so
+  # the count is shown and the reads below run once per distinct item
+  items="$(printf '%s' "$raw" | grep -o "'[^']*'" | tr -d "'" | sort | uniq -c | sort -rn)"
+  if [[ -n "$items" ]]; then
+    printf '%s\n' "$items" | awk '{ printf "      %s%s\n", $2, ($1 > 1 ? "  (×" $1 ")" : "") }'
+    items="$(printf '%s\n' "$items" | awk '{print $2}')"
+  else
+    echo "      none listed by the watcher"
+  fi
 
   # 3. every item on the bus, listed or not — a watcher may not report its list,
   #    and an item may hold a name and never have registered
@@ -101,7 +108,7 @@ main() {
 
   echo ""
   echo "── 4. what each item asks the panel to draw"
-  local item svc path pid cmd id title icon_name pixmaps status
+  local item svc path pid cmd id title icon_name theme_path pixmaps status
   while read -r item; do
     [[ -n "$item" ]] || continue
     svc="${item%%/*}"
@@ -109,17 +116,28 @@ main() {
     [[ "$item" == */* ]] || path=/StatusNotifierItem
     pid="$(timeout 5 gdbus call --session --dest org.freedesktop.DBus --object-path /org/freedesktop/DBus \
       --method org.freedesktop.DBus.GetConnectionUnixProcessID "$svc" 2>/dev/null | grep -o '[0-9]*,' | tr -d ,)"
+    # no owner = the app left the bus and the watcher kept its entry. an empty pid
+    # must never reach /proc — "/proc//cmdline" reads the KERNEL's command line
+    if [[ -z "$pid" ]]; then
+      echo "      • $item"
+      echo "          stale — its owner left the bus; the watcher kept the entry"
+      continue
+    fi
     cmd="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | cut -c1-60)"
     id="$(__sni_prop "$svc" "$path" Id)"
     title="$(__sni_prop "$svc" "$path" Title)"
     status="$(__sni_prop "$svc" "$path" Status)"
     icon_name="$(__sni_prop "$svc" "$path" IconName)"
+    # an app that ships its own icons names their dir here; a host that ignores
+    # it cannot find the icon by name, and draws a broken one
+    theme_path="$(__sni_prop "$svc" "$path" IconThemePath)"
     pixmaps="$(timeout 5 gdbus call --session --dest "$svc" --object-path "$path" \
       --method org.freedesktop.DBus.Properties.Get org.kde.StatusNotifierItem IconPixmap 2>/dev/null \
       | grep -o '([0-9]*, [0-9]*,' | head -n 3 | tr -d '(,' | sed 's/ /x/' | paste -sd' ')"
     echo "      • ${id:-?}  (pid ${pid:-?} · ${cmd:-?})"
     echo "          title: ${title:-∅} · status: ${status:-∅}"
     echo "          icon-name: ${icon_name:-∅} · pixmaps: ${pixmaps:-∅}"
+    echo "          icon-theme-path: ${theme_path:-∅}"
   done <<<"$items"
 
   echo ""

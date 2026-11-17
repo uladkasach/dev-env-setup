@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = a panel shield — green while traffic leaves through an exit node, a
-#         grey outline while it goes direct, amber while paused for a captive
-#         portal — started at every login on a laptop
+# .what = a panel shield — the theme's vpn icon while traffic leaves through an
+#         exit node, its disconnected icon while direct, and a menu to switch —
+#         started at every login on a laptop
 #
 # .why
 #   - the exit node is off by default and switched on for a network the human
@@ -34,6 +34,24 @@ grove_provision_5_24_vpntray_dir() { printf '%s' "$GROVE_SRC/grove.provision/5.d
 grove_provision_5_24_vpntray_bin_at() { printf '%s/.local/bin/grove-vpntray' "$HOME"; }
 grove_provision_5_24_vpntray_entry_at() { printf '%s/.config/autostart/grove-vpntray.desktop' "$HOME"; }
 grove_provision_5_24_vpntray_stamp_at() { printf '%s/.local/share/grove/vpntray.src.sha256' "$HOME"; }
+
+# .what = the autostart entry as it must land on this box: the repo's template,
+#         with `@BIN@` swapped for this user's absolute binary path
+#
+# 🛑 .why an absolute path, and never `$HOME` in Exec
+#   - systemd's xdg-autostart generator turns each entry into a user unit, and it
+#     escapes `$` on the way: `sh -c 'exec "$HOME/…"'` runs with a literal
+#     `$HOME`, finds no file, exits 127, and the shield never starts.
+#     📜 measured 2026-11-13: "exec: $HOME/.local/bin/grove-vpntray: not found"
+#   - the desktop entry spec expands no variables either, so the path is written
+#     out in full at apply time
+grove_provision_5_24_vpntray_entry_render() {
+  local bin
+  bin="$(grove_provision_5_24_vpntray_bin_at)"
+  while IFS= read -r line; do
+    printf '%s\n' "${line//@BIN@/$bin}"
+  done < "$(grove_provision_5_24_vpntray_dir)/grove-vpntray.desktop"
+}
 
 # the tray tailscale ships, retired by this bundle
 grove_provision_5_24_vpntray_legacy_entry_at() { printf '%s/.config/autostart/tailscale-systray.desktop' "$HOME"; }

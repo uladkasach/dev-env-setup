@@ -468,7 +468,7 @@ pkg_install() {
   # a real install remains, so NOW the machinery to change the box must be there
   pkg_assert_sudo || return 1
 
-  local absent=() broken=() cand
+  local absent=() broken=() unmet=() cand deps
   for name in "${wanted[@]}"; do
     if pkg_apt apt-get install -y "$name"; then
       echo "   • $name ✔"
@@ -480,10 +480,29 @@ pkg_install() {
     cand="$(apt-cache policy "$name" 2>/dev/null | awk -F': ' '/Candidate:/{print $2}')"
     if [[ -z "$cand" || "$cand" == "(none)" ]]; then
       absent+=("$name")
+      continue
+    fi
+
+    # a candidate whose own Depends no repo satisfies is a THIRD cause, and no
+    # re-run or index refresh fixes it. apt's simulated install names it, no root
+    # 📜 measured 2026-11-16: dropbox's repo package depends on `libpango1.0-0`,
+    #    which 24.04 dropped — and the old text blamed a lock or a stale index
+    deps="$(apt-get --simulate install "$name" 2>&1 | grep -o 'Depends: .* but it is not installable' | sed 's/^Depends: //; s/ but it is not installable$//' | sort -u | paste -sd',' || true)"
+    if [[ -n "$deps" ]]; then
+      unmet+=("$name ← needs ${deps//,/, }")
     else
       broken+=("$name")
     fi
   done
+
+  if [[ ${#unmet[@]} -gt 0 ]]; then
+    echo "   ✋ apt HAS these, and a dependency of each is in NO repo this box reads:" >&2
+    printf '      • %s\n' "${unmet[@]}" >&2
+    echo "      ⇒ no retry or index refresh installs them: the package was built for" >&2
+    echo "        a release that shipped a name this one does not" >&2
+    echo "      fix: the bundle must supply that dependency, or install from a source" >&2
+    echo "        built for this release. read it: rhx apt.package.get --name <pkg>" >&2
+  fi
 
   if [[ ${#absent[@]} -gt 0 ]]; then
     echo "   ✋ absent from this box's repos: ${absent[*]}" >&2
@@ -502,5 +521,5 @@ pkg_install() {
     echo "        sudo apt-get update" >&2
   fi
 
-  [[ ${#absent[@]} -eq 0 && ${#broken[@]} -eq 0 ]]
+  [[ ${#absent[@]} -eq 0 && ${#broken[@]} -eq 0 && ${#unmet[@]} -eq 0 ]]
 }

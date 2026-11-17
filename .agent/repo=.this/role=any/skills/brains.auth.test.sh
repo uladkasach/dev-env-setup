@@ -111,7 +111,8 @@ _normalize() {
   # the next charge is computed from today's month, so its date is masked like the countdown;
   #   the month math itself is pinned by `bill.next`, against a fixed "now"
   sed -E -e 's/in [0-9]+h[0-9]+m/in <rel>/g' \
-    -e 's/charges at [a-z]{3} [a-z]{3} [0-9]{2}, in [0-9]+[dh]/charges at <date>, in <rel>/g'
+    -e 's/\(([0-9]+d)?[0-9]+h([0-9]{2}m)?\)/(<rel>)/g' \
+    -e 's/  [a-z]{3} [a-z]{3} [0-9]{2} \(([0-9]+[dh]|<rel>)\)$/  <date> (<rel>)/'
 }
 
 # .what = compare an actual output against a stored snapshot ($1=name, $2=actual)
@@ -225,6 +226,7 @@ _snap 'render.partial-failure' \
 _RESET_CASES='[
   {"case":"saved-usable","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":1,"usable_now":true,"ends_at":"2026-10-22T16:00:00+00:00"}]},"juniper_tide":{"eligible":false,"ineligible_reason":"not_at_wall","available":false,"resets_per_week":1}}},
   {"case":"saved-at-limit","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":1,"usable_now":false,"ends_at":"2026-10-22T16:00:00+00:00"}]},"juniper_tide":null}},
+  {"case":"saved-mixed","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":1,"usable_now":true,"ends_at":"2026-12-10T16:00:00+00:00"},{"resets_left":1,"usable_now":false,"ends_at":"2027-03-09T16:00:00+00:00"}]},"juniper_tide":null}},
   {"case":"used","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":0,"usable_now":false,"ends_at":"2026-10-22T16:00:00+00:00"}]},"juniper_tide":{"eligible":false,"ineligible_reason":"not_at_wall","available":false,"resets_per_week":1}}},
   {"case":"never-granted","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[]},"juniper_tide":{"eligible":true,"ineligible_reason":null,"in_experiment":true,"arm":"reset","available":true,"resets_per_week":1}}},
   {"case":"outside-experiment","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[]},"juniper_tide":{"eligible":true,"ineligible_reason":null,"in_experiment":false,"arm":null,"available":true,"resets_per_week":1}}},
@@ -355,7 +357,7 @@ mkdir -p "$_LK_DIR"
 # an older day holds kai's earlier read AND moana's only one; a newer day holds kai's latest
 # read plus a failed one for moana — the leaf must skip the failure and search further back
 printf '%s\n' \
-  '{"ts":"2020-01-01T08:00:00Z","accounts":{"kai@example.com":{"seven_day":{"utilization":12.0,"resets_at":"2099-06-12T17:00:00+00:00"},"brains_auth_subscription":{"created_at":"2019-09-15T08:00:00Z","billing_type":"stripe_subscription"}},"moana@example.com":{"seven_day":{"utilization":77.0,"resets_at":"2020-01-01T00:00:00+00:00"}}}}' \
+  '{"ts":"2020-01-01T08:00:00Z","accounts":{"kai@example.com":{"seven_day":{"utilization":12.0,"resets_at":"2099-06-12T17:00:00+00:00"},"brains_auth_subscription":{"created_at":"2019-09-15T08:00:00Z","billing_type":"stripe_subscription"},"cedar_ember":{"grants":[{"resets_left":2,"usable_now":true,"ends_at":"2099-12-10T16:00:00+00:00"},{"resets_left":1,"usable_now":true,"ends_at":"2020-01-01T00:00:00+00:00"}]}},"moana@example.com":{"seven_day":{"utilization":77.0,"resets_at":"2020-01-01T00:00:00+00:00"}}}}' \
   > "$_LK_DIR/usage.2020-01-01.jsonl"
 printf '%s\n' \
   '{"ts":"2020-01-02T09:30:00Z","accounts":{"kai@example.com":{"seven_day":{"utilization":64.0,"resets_at":"2099-06-19T17:00:00+00:00"}},"moana@example.com":{"error":"no_token"}}}' \
