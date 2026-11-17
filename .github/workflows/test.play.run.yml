@@ -1,0 +1,40 @@
+# .what = run the play.run clamp on every push and pr
+#
+# .note = no `paths:` filter. the clamp reads more than its own files — the runner, the snap
+#   helper, and this repo's `.gitignore`, which keeps `.log` out of git — and a hand-kept list of
+#   them would drift. it is hermetic and takes about a minute, so it runs on every change.
+#
+# .why  = a ship report reads a tree's suite verdict from the log `play.run --all` leaves at
+#   .log/role=mechanic/skill=play.run/what=all/<stamp>.stdout.log. the clamp
+#   `prove.play-run-all-reads-three-verdicts` proves that receipt: one log per run, its last line
+#   the tally, no log on a refusal, no overwrite on a taken stamp. until this workflow, a pr that
+#   touched play.run ran zero checks, so "green on ci" could not be true of it at all.
+#
+# .note = this deliberately does NOT run `npm ci`. the clamp is hermetic: it builds temp git repos
+#   of stub plays inside its own mktemp dir and needs bash, git, and coreutils (`timeout`, `date`,
+#   `comm`, `find`) — all present on ubuntu-latest. no node, no registry auth, no secrets, so a
+#   fork pr runs it green without a token. the same shape as test.brains.auth.yml.
+#
+# .note = it calls the runner by its own file, never by `rhx` (which needs node). the runner still
+#   applies its index and verb checks to the clamp, so the clamp runs the way a human runs it.
+#   under ci the snap helper refuses to write an absent snap, so a deleted baseline fails loud.
+name: test.play.run
+
+on:
+  # push on main alone: a pr's own pushes run under pull_request, so a branch runs it once
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: play.run clamp
+        run: bash '.agent/repo=.this/role=any/skills/play.run.sh' --play prove.play-run-all-reads-three-verdicts --within 300
