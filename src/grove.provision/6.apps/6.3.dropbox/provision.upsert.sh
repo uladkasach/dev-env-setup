@@ -16,6 +16,22 @@
 #   - apt refuses any package this repo serves that the key does not sign
 #   - idempotent: the repo file is DECLARED, never appended
 #   - it DECLINES on a box with no screen
+#
+# .security (checked 2026-11-16) — rule.forbid.unchecked-dependency-vulns
+#   runs:   /usr/bin/dropbox, a python launcher, as the user; a nautilus
+#           extension, loaded only by nautilus (cosmic files does not load it);
+#           postinst + postrm as ROOT — read in full. postinst adds dropbox's
+#           key to the BLANKET keyring and rewrites the repo line to http,
+#           unless /etc/default/dropbox-repo exists → this phase declares it
+#   app:    the launcher downloads the sync app from dropbox.com and checks its
+#           gpg signature against an embedded key — ONLY with python3-gpg
+#           present → this phase installs it. the app then updates itself
+#   age:    2020.03.04, the repo's only release
+#   holes:  no advisory found for nautilus-dropbox (the launcher + extension).
+#           searched: web search for its CVEs, cvedetails' dropbox vendor list.
+#           the only linux-client CVE (CVE-2010-3354) is the 2010 daemon, which
+#           self-updates; the 2024 desktop CVEs are windows-only (mark-of-the-web,
+#           .exe). nautilus itself carries CVEs, and the distro patches it
 
 grove_provision_6_3_dropbox_provision_upsert() {
   if [[ "$GROVE_ENV_SERVER" != local@* ]]; then
@@ -95,6 +111,19 @@ grove_provision_6_3_dropbox_provision_upsert() {
   echo "deb [arch=amd64 signed-by=$keyfile] https://linux.dropbox.com/ubuntu disco main" \
     | sudo tee /etc/apt/sources.list.d/dropbox.list >/dev/null || return 1
 
+  # 2a. the opt-out dropbox's own postinst honors. without it, that hook (run as
+  # ROOT) adds dropbox's key with `apt-key add` — the BLANKET key file, trusted
+  # for every repo — and overwrites the line above with a plain-http, unscoped
+  # one. 📜 read 2026-11-16 (`rhx apt.package.get --name dropbox --files`)
+  printf '%s\n' "# declared by 6.3.dropbox: its repo and key are scoped by the bundle;" \
+    "# while this file exists, dropbox's postinst adds no key or repo of its own" \
+    | sudo tee /etc/default/dropbox-repo >/dev/null || return 1
+
+  # 2b. the launcher checks the app it downloads against dropbox's signature
+  # ONLY when python3-gpg is present; without it, it warns and installs the
+  # download unchecked. a distro package, so the distro patches it
+  pkg_install python3-gpg || return 1
+
   # 3. the install — the ONLY step an already-present dropbox may skip. a
   # box installed by the OLD route carries a launcher NEWER than the repo's;
   # apt does not downgrade, and the skip below does not ask it to
@@ -105,6 +134,9 @@ grove_provision_6_3_dropbox_provision_upsert() {
 
   # the repo just landed, so the index must be re-read before its package is visible
   pkg_refresh || true
+
+  # the repo's launcher depends on a name 24.04 no longer ships (see _.sh)
+  grove_provision_6_3_dropbox_pango_stub_upsert || return 1
 
   pkg_install dropbox || return 1
 

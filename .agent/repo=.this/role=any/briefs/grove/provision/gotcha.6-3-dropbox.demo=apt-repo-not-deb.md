@@ -39,6 +39,20 @@ and `diagnose.apt-key-wire-read`, 2026-08-13, justified the switch to a gpg-sign
   `Release.gpg` too
 - ⇒ to raise the tier, re-run that diagnose from a different network
 
+## m5 — the repo's package is NOT installable on 24.04, and m1–m4 never asked
+
+- m1–m4 proved the repo is signed and by whom; none of them ran an install on the
+  release the laptop runs. the first real install, 2026-11-16, failed:
+  `dropbox : Depends: libpango1.0-0 (>= 1.36.3) but it is not installable`
+- `rhx apt.package.get --name libpango1.0-0` → no candidate. ubuntu shipped that name
+  as an empty transitional package over `libpango-1.0-0`, and 24.04 dropped it. the
+  repo has served only `2020.03.04` since, so it will not catch up on its own
+- ⇒ the bundle builds that same empty package locally (`…_pango_stub_upsert` in
+  `6.3.dropbox/_.sh`): no fetch, no maintainer scripts, a Depends on the three
+  renamed pango libraries. the signed route stands
+- ⇒ the lesson: a route is proven by an install on the target release, never by
+  the signature that guards it
+
 ## .see also
 
 - `6.3.dropbox/provision.upsert.sh` — the header these measurements back

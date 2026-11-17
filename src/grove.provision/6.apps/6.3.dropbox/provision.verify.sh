@@ -55,7 +55,7 @@ grove_provision_6_3_dropbox_provision_verify() {
     echo "   ✋ dropbox is absent from PATH" >&2
     echo "      ⇒ every path under ~/Dropbox is a plain local directory that no" >&2
     echo "        other machine sees — which looks identical to a synced one" >&2
-    echo "      fix: rhx grove.provision --what 6.3.dropbox --mode apply \\" >&2
+    echo "      fix: sudo -v && rhx grove.provision --what 6.3.dropbox --mode apply \\" >&2
     echo "             --include dropbox" >&2
     return 1
   fi
@@ -125,7 +125,41 @@ grove_provision_6_3_dropbox_provision_verify() {
     echo "   ✋ the dropbox repo is declared, and its keyfile is absent" >&2
     echo "      ⇒ apt cannot verify this source, so it refuses every package it" >&2
     echo "        serves and reports the repo as unsigned on each update" >&2
-    echo "      fix: rhx grove.provision --what 6.3.dropbox --mode apply \\" >&2
+    echo "      fix: sudo -v && rhx grove.provision --what 6.3.dropbox --mode apply \\" >&2
+    echo "             --include dropbox" >&2
+    failed=1
+  fi
+
+  ####################################################################
+  # 4. the launcher can check what it downloads
+  #
+  # ⚠️ without python3-gpg the launcher still downloads and runs the sync app —
+  #    it only warns that the signature went unchecked. so a box that "works"
+  #    can run an app no one verified (rule.forbid.unchecked-dependency-vulns)
+  ####################################################################
+  if pkg_present python3-gpg; then
+    echo "   • python3-gpg present — the launcher checks the app's signature ✔"
+  else
+    echo "   ✋ python3-gpg is absent" >&2
+    echo "      ⇒ the launcher downloads the dropbox app and runs it UNCHECKED;" >&2
+    echo "        it warns once, and that note reads like a nag" >&2
+    echo "      fix: sudo -v && rhx grove.provision --what 6.3.dropbox --mode apply \\" >&2
+    echo "             --include dropbox" >&2
+    failed=1
+  fi
+
+  ####################################################################
+  # 5. the postinst opt-out — so a reinstall or upgrade of the package
+  #    cannot put dropbox's key in the blanket key file
+  ####################################################################
+  if [[ -e /etc/default/dropbox-repo ]]; then
+    echo "   • /etc/default/dropbox-repo present — the package's own repo setup stays off ✔"
+  else
+    echo "   ✋ /etc/default/dropbox-repo is absent" >&2
+    echo "      ⇒ the next dropbox install or upgrade runs its postinst as root, which" >&2
+    echo "        adds dropbox's key to the key file trusted for EVERY repo, and" >&2
+    echo "        rewrites the repo line to plain http" >&2
+    echo "      fix: sudo -v && rhx grove.provision --what 6.3.dropbox --mode apply \\" >&2
     echo "             --include dropbox" >&2
     failed=1
   fi

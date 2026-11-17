@@ -1,6 +1,6 @@
 
-🧠 claude budget
+🧠 claude budget · % used
    ├─ surfer@example.com  ← signed in
-   │  ├─ session  █████░░░░░  58% used  ·  resets at mon 09:00, in <rel>
-   │  └─ week     ███░░░░░░░  31% used  ·  resets at fri 17:00, in <rel>
+   │  ├─ session █████░░░░░   58% · resets mon 09:00 (<rel>)
+   │  └─ week    ███░░░░░░░   31% · resets fri 17:00 (<rel>)
    └─

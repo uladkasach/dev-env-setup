@@ -1,5 +1,5 @@
 
-🧠 claude budget
-   ├─ kai@example.com: ✋ refresh token dead (run: brains.auth.set)
-   ├─ moana@example.com: ✋ no token (run: brains.auth.set)
+🧠 claude budget · % used
+   ├─ kai@example.com  ✋ refresh token dead (run: brains.auth.set)
+   ├─ moana@example.com  ✋ no token (run: brains.auth.set)
    └─

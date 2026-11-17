@@ -1,0 +1,19 @@
+{
+  "key": "866d7171b4a5e914",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-ghlitch"
+  },
+  "exid": null,
+  "title": "guardian: forbid dependencies installed with no check for known holes",
+  "description": "## .what\n\nteach the guardian an attack vector it has no brief for: **a dependency installed with no check for known holes.**\n\na signature or a hash check proves a package came from who it claims (ORIGIN). it says naught about whether that code is SAFE. a correctly signed package with a published exploit passes every signature check there is, so a repo that verifies downloads with care can still install a vulnerable one and believe it is covered.\n\n## .measured — dev-env-setup, 2026-11-16\n\n- a bundle installed dropbox from its gpg-signed apt repo. the key was pinned and verified with care.\n- that repo has served one package since 2020. no step asked whether code that old was safe.\n- once asked, a read of the package found two real hazards the signature checks could not see:\n  - its **postinst, run as root**, adds the vendor key with `apt-key add` into the blanket key file (trusted for EVERY repo) and rewrites the repo line to plain http, unless an opt-out file exists\n  - its launcher verifies the app it downloads **only if python3-gpg is installed**; otherwise it warns and runs the download unchecked (fail-open)\n- the human caught it in one question; no rule or reviewer did.\n\n## .the ask — general, not apt-specific\n\na guardian brief (rule + attack-vector inventory entry) that any repo with dependencies can apply — apt repos, pinned binaries, npm/pnpm, cargo, flatpak, ci actions:\n\n1. **what runs, and as whom?** read the package contents and its install hooks (postinst, npm `postinstall`, build hooks) — they run at install, often as root, before anyone opens the app\n2. **how old is it?** a source whose newest release is over a year old is a smell: holes found since stay unpatched\n3. **is there a known hole?** search advisories (OSV, the vendor, a CVE database) for the package + version; record WHERE was searched and WHAT was found, dated — \"no advisory found\" included\n4. **fail-open checks:** a tool whose verification silently turns off when an optional dependency is absent is a hole in its own right\n\nexempt: packages from the distro's own repos, which its security team patches.\n\nenforcement sketch: third-party install with no dated check record = blocker; known unpatched advisory = blocker unless the record names why it cannot reach the box.\n\n## .reference\n\ndev-env-setup carries a local version: `rule.forbid.unchecked-dependency-vulns`, plus read-only skills `apt.package.get --files` (contents + root hooks, never installed) and `apt.keys.get` (blanket vs scoped apt keys).",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": null,
+  "heldSeq": 9,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "209"
+}

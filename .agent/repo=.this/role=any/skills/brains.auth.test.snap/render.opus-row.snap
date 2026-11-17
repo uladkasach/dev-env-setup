@@ -1,7 +1,7 @@
 
-🧠 claude budget
+🧠 claude budget · % used
    ├─ surfer@example.com
-   │  ├─ session  █████████░  91% used  ·  resets at mon 09:00, in <rel>
-   │  ├─ opus     ████░░░░░░  40% used
-   │  └─ week     ██████░░░░  64% used  ·  resets at fri 17:00, in <rel>
+   │  ├─ session █████████░   91% · resets mon 09:00 (<rel>)
+   │  ├─ opus    ████░░░░░░   40%
+   │  └─ week    ██████░░░░   64% · resets fri 17:00 (<rel>)
    └─

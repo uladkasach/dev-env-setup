@@ -226,15 +226,20 @@ main() {
   __bt_await 'Agent registered|Default agent|already registered' 5
 
   # 1. a bond that already exists here — a connect may be all it needs
-  local need_pair=yes
+  local need_pair=yes stale=no
   if [[ "$bonded" == yes ]]; then
     echo "   ├─ • connects (already bonded here)…"
     __bt_send "connect $MAC"
     if __bt_await 'Connection successful|Failed to connect' 20 && [[ "$__BT_MATCH" == *successful* ]]; then
       need_pair=no
     else
-      echo "   │  the device refused — its bond lives on another host now. re-pairs."
-      __bt_send "remove $MAC"; __bt_await 'Device has been removed|not available' 10
+      # 🛑 the bond is NOT removed here. a failed connect has three causes — the
+      # device is off, asleep, or bound to another host — and only the third
+      # makes this bond stale. a remove now, before the device is even seen,
+      # destroys a bond that works the moment the device wakes.
+      # 📜 measured 2026-11-16: a trackpad that was merely off lost its bond here
+      echo "   │  no answer — off, asleep, or bound to another host. it re-pairs only once the device is seen."
+      stale=yes
     fi
   fi
 
@@ -254,6 +259,13 @@ main() {
     fi
     [[ "$__BT_MATCH" =~ Device\ ([0-9A-F:]{17}) ]] && MAC="${BASH_REMATCH[1]}"
     __bt_send "scan off"
+
+    # the device is visible in pair mode, so the old bond is now proven stale — drop it
+    if [[ "$stale" == yes ]]; then
+      echo "   ├─ • found in pair mode — drops the stale bond…"
+      __bt_send "remove $MAC"; __bt_await 'Device has been removed|not available' 10
+      __bt_send "scan on"; __bt_await "Device ${MAC}( |\$)" "$SCAN_SECS" "devices"; __bt_send "scan off"
+    fi
     echo "   ├─ • found $MAC — pairs (up to ${PAIR_SECS}s)…"
 
     # bluetoothctl reports the outcome as "Pair<-ing> successful" / "Failed to pair"

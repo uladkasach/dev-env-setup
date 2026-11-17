@@ -70,14 +70,13 @@ rhx grove.provision --mode plan   # every slug, at every depth
 ## .exception
 
 a one-off command is allowed only to unblock immediately, while the bundle is being written.
-it must be followed by the bundle — otherwise the box now holds a change the repo cannot
-reproduce, which is `rule.require.repo-as-source-of-truth`'s whole concern.
+the bundle must follow — else the box holds a change the repo cannot reproduce
+(`rule.require.repo-as-source-of-truth`).
 
-## .note on this brief's own name
+## .note
 
-`install` is a **superseded** verb here (`term=grove.provision._.choice._.md`). the filename
-stands because this rule is broader than `grove.provision` — it forbids one-off commands
-generally.
+the filename keeps `install`, a superseded verb (`term=grove.provision._.choice._.md`): the
+rule forbids every one-off command, not only `grove.provision`'s.
 
 ## .enforcement
 

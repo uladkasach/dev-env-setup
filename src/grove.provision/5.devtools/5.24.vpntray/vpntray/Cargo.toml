@@ -3,12 +3,16 @@ name = "grove-vpntray"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "a panel shield: shown when traffic leaves through a tailscale exit node, hidden when it goes direct"
+description = "a panel shield: green on a tailscale exit node, a grey outline when direct"
 
 [dependencies]
 # a StatusNotifierItem over zbus — pure rust, so no libdbus headers to install.
 # `blocking` is the crate's own feature name: its sync api, not a gerund of ours
-ksni = { version = "=0.3.1", default-features = false, features = ["blocking", "async-io"] }
+#
+# ⚠️ the runtime is ksni's DEFAULT, tokio. under `async-io` the shield registered
+#    with the panel, then dropped off the bus while the process lived on — no
+#    error, no exit, no icon. 📜 measured 2026-11-14
+ksni = { version = "=0.3.1", features = ["blocking"] }
 serde_json = "=1.0.140"
 
 [profile.release]

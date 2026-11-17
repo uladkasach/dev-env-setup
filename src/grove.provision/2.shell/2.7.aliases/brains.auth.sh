@@ -469,18 +469,23 @@ _brains_auth_bill_next() {
   done
 }
 
-# .what = the bills row body ($1=subscription node `{created_at, billing_type}`)
-# .why  = one line a human reads as "when does this charge next", beside the usage it buys
-_brains_auth_bill_body() {
-  local start next
+# .what = the next charge instant for one subscription ($1=subscription node `{created_at, …}`)
+# .why  = the bills tree sorts on it, and the row text is drawn from it, so one read serves both
+_brains_auth_bill_next_for() {
+  local start
   start="$(jq -r '.created_at // empty' <<< "$1" 2>/dev/null)"
   [[ -n "$start" ]] || return 0
-  next="$(_brains_auth_bill_next "$start")"
-  [[ -n "$next" ]] || return 0
-  printf 'charges at %s, in %s  ·  monthly, since %s' \
-    "$(date -d "$next" '+%a %b %d' 2>/dev/null | tr '[:upper:]' '[:lower:]')" \
-    "$(_brains_auth_until_days "$next")" \
-    "$(date -d "$start" '+%b %d %Y' 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+  _brains_auth_bill_next "$start"
+}
+
+# .what = the bills row body ($1=next charge iso) → "sat nov 28 (15d)"
+# .why  = one glance answers "when does this charge next". the "monthly" assumption is stated
+#   once, in the bills tree header, rather than on every row
+_brains_auth_bill_body() {
+  [[ -n "${1:-}" ]] || return 0
+  printf '%s (%s)' \
+    "$(date -d "$1" '+%a %b %d' 2>/dev/null | tr '[:upper:]' '[:lower:]')" \
+    "$(_brains_auth_until_days "$1")"
 }
 
 # .what = a coarse countdown "12d" or "5h" to an iso instant ($1=iso)
@@ -808,6 +813,19 @@ _brains_auth_until() {
   (( diff < 0 )) && diff=0
   h=$(( diff / 3600 )); m=$(( (diff % 3600) / 60 ))
   printf '%dh%02dm' "$h" "$m"
+}
+
+# .what = a compact countdown "1d18h" or "2h14m" from now ($1=iso)
+# .why  = the budget tree reads a reset as a clock plus a countdown in parens; a week away
+#   reads "6d15h", which a human parses at a glance where "159h19m" needs arithmetic
+_brains_auth_until_short() {
+  local t n d
+  t="$(date -d "${1:-}" +%s 2>/dev/null)" || { printf '?'; return; }
+  [[ -n "$t" ]] || { printf '?'; return; }
+  n="$(date +%s)"
+  d=$(( t - n )); (( d < 0 )) && d=0
+  (( d >= 86400 )) && { printf '%dd%dh' $(( d / 86400 )) $(( (d % 86400) / 3600 )); return; }
+  printf '%dh%02dm' $(( d / 3600 )) $(( (d % 3600) / 60 ))
 }
 
 # .what = format an iso timestamp as a weekday + clock "fri 09:00" ($1=iso)
@@ -2831,13 +2849,19 @@ _brains_auth_exit_for() {
 _brains_auth_reset_line() {
   local node="$1"
   jq -r '
-    def day: if . == null then "?" else (.[0:10]) end;
     (.cedar_ember) as $ce | (.juniper_tide) as $jt |
     if (($ce.ineligible_reason // "") == "surface" or ($jt.ineligible_reason // "") == "surface") then
       "? unknown — the endpoint did not see the claude cli (user-agent)"
     else
-      [ ( ($ce.grants // [])[] | select((.resets_left // 0) > 0) |
-          "🎁 \(.resets_left) saved · \(if .usable_now then "usable now" else "usable at your limit" end) · until \(.ends_at | day)" ),
+      # every saved grant folds into ONE clause: the total, how many are usable now, and the
+      #   earliest expiry. a clause per grant repeats "🎁 N saved" and buries the one count
+      #   a human acts on
+      def mon: if . == null then "?" else (.[0:10] | strptime("%Y-%m-%d") | strftime("%b %d") | ascii_downcase) end;
+      [ ( ($ce.grants // []) | map(select((.resets_left // 0) > 0)) | select(length > 0)
+          | (map(.resets_left) | add) as $n
+          | (map(select(.usable_now == true) | .resets_left) | add // 0) as $now
+          | (map(.ends_at) | sort | .[0]) as $end
+          | "🎁 \($n) saved · \(if $now == $n then "usable now" elif $now == 0 then "usable at your limit" else "\($now) usable now" end) · \(if length > 1 then "first expires" else "expires" end) \($end | mon)" ),
         ( select($jt.arm == "reset" and $jt.available == true) | "🎁 session reset available now" )
       ] | join(" · ")
     end
@@ -2878,16 +2902,33 @@ _brains_auth_week_lastknown_body() {
   [[ -n "$next" ]] || return 0
   r="$(date -d "$reset" +%s 2>/dev/null)"
   n="$(date +%s)"
-  asof="$(date -d "$ts" '+%b %d %H:%M' 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+  asof="$(date -d "$ts" '+%b %d' 2>/dev/null | tr '[:upper:]' '[:lower:]')"
   if (( r > n )); then
     pct="$(_brains_auth_round "$used")"
-    printf '%s %3d%% used  ·  resets at %s, in %s  ·  stale, as of %s' \
+    printf '%s%5d%% · resets %s (%s) · stale %s' \
       "$(_brains_auth_bar "$pct")" "$pct" \
-      "$(_brains_auth_when "$next")" "$(_brains_auth_until "$next")" "${asof:-?}"
+      "$(_brains_auth_when "$next")" "$(_brains_auth_until_short "$next")" "${asof:-?}"
     return 0
   fi
-  printf '%s   unknown  ·  resets at %s, in %s' \
-    '··········' "$(_brains_auth_when "$next")" "$(_brains_auth_until "$next")"
+  # the `?` sits where the bar would, so every row's `· resets` lands in one column
+  printf '    ?            · resets %s (%s)' \
+    "$(_brains_auth_when "$next")" "$(_brains_auth_until_short "$next")"
+}
+
+# .what = the reset row body for an account we could not read now ($1=last-known node)
+# .why  = saved resets are banked, so the last read that saw them still counts them. a grant
+#   whose `ends_at` has passed is dropped — it can no longer be spent, stale or not.
+# .note = only `cedar_ember` (saved grants) carries over. `juniper_tide` is a live offer at
+#   the wall, so a past read of it says naught about now. prints empty when no live grant is left.
+_brains_auth_reset_lastknown_body() {
+  local node="$1" ts body asof
+  ts="$(jq -r '.cedar_ts // empty' <<< "$node" 2>/dev/null)"
+  body="$(_brains_auth_reset_line "$(jq -c --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+    {cedar_ember: ((.cedar_ember // {}) | .grants = ((.grants // []) | map(select((.ends_at // "") > $now))))}
+  ' <<< "$node" 2>/dev/null)")"
+  [[ -n "$body" ]] || return 0
+  asof="$(date -d "$ts" '+%b %d' 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+  printf '%s · stale %s' "$body" "${asof:-?}"
 }
 
 # .what = the latest successful weekly read per account, from the durable usage log
@@ -2916,7 +2957,11 @@ _brains_auth_week_lastknown_get() {
           if ((.[$e.k].seven_day? // null) == null) and (($e.v.seven_day.resets_at? // null) != null)
           then .[$e.k] = ((.[$e.k] // {}) + {ts: $e.ts, seven_day: $e.v.seven_day}) else . end
           | if ((.[$e.k].subscription? // null) == null) and (($e.v.brains_auth_subscription? // null) != null)
-            then .[$e.k] = ((.[$e.k] // {}) + {subscription: $e.v.brains_auth_subscription}) else . end)
+            then .[$e.k] = ((.[$e.k] // {}) + {subscription: $e.v.brains_auth_subscription}) else . end
+          # the saved resets: a dead token hides how much is used, never how many resets are
+          #   banked. the newest read that saw them holds the count
+          | if ((.[$e.k].cedar_ember? // null) == null) and (($e.v.cedar_ember.grants? // null) != null)
+            then .[$e.k] = ((.[$e.k] // {}) + {cedar_ember: $e.v.cedar_ember, cedar_ts: $e.ts}) else . end)
     ' "$f" 2>/dev/null)" && [[ -n "$next" ]] && found="$next"
     # done once every account has its week. the subscription rides along from whatever days
     #   were read — every read since it was added carries it, so the newest one has both
@@ -2933,7 +2978,8 @@ _brains_auth_week_lastknown_get() {
 _brains_auth_render() {
   local combined="$1" active="${2:-}" lastknown="${3:-}"
   local reach node err s_used w_used o_used s_reset w_reset s_pct w_pct
-  local mark reset_txt week_glyph reset_glyph bill_txt lk_node lk_body
+  local mark reset_txt lk_node lk_body kinds nkinds next i last row s_tail w_tail
+  local -a rows=() bills=()
   [[ -n "$lastknown" ]] || lastknown='{}'
   # `lastknown` is `{reach: {ts, seven_day, subscription}}` — the latest successful read per account, handed
   # in by the caller so this render stays a pure function of its arguments
@@ -2948,29 +2994,55 @@ _brains_auth_render() {
   # .why no "— across all subscriptions" suffix: the same render serves `--reach <one>`, and
   #   there the suffix would be a plain lie. one header that is always true beats one that
   #   is true only in the default case.
+  # one distinct error across the dark accounts → each wears only its glyph, and the fix is
+  #   said ONCE, as the last line of the tree. several kinds → each account names its own fix
+  #   inline, since a shared legend could not say which fix belongs to which account
+  kinds="$(jq -r '[.[] | select(type == "object" and has("error")) | .error] | unique | .[]' <<< "$combined" 2>/dev/null)"
+  nkinds=0; [[ -n "$kinds" ]] && nkinds="$(wc -l <<< "$kinds")"
+  #
+  # .why "% used" sits in the header and on no row: the number alone is ambiguous ("58%" spent,
+  #   or left?), and the two readings are opposites a go/no-go rests on. one label over the
+  #   column settles every row; "used" is what the endpoint reports (`utilization`).
   echo ""
-  echo "🧠 claude budget"
+  echo "🧠 claude budget · % used"
+  # readable accounts first, dark ones after, each half alphabetical — the ones you can use
+  #   right now lead
   while IFS= read -r reach; do
     [[ -z "$reach" ]] && continue
     node="$(jq -c --arg s "$reach" '.[$s]' <<< "$combined")"
     err="$(_brains_auth_get_error "$node")"
     mark=''
     [[ -n "$active" && "$reach" == "$active" ]] && mark='  ← signed in'
+    rows=()
 
-    # an account with an error: show a named fix (hint text lives in its own map)
+    # an account with an error: a glyph (or the named fix, see `nkinds`), then the last-known week
     if [[ -n "$err" ]]; then
-      echo "   ├─ ${reach}${mark}: $(_brains_auth_fix_for_error "$err")"
+      lk_node="$(jq -c --arg s "$reach" '.[$s] // empty' <<< "$lastknown" 2>/dev/null)"
+      if (( nkinds == 1 )); then
+        printf '   ├─ %s%s %s\n' "$reach" "$mark" \
+          "$(_brains_auth_glyph_for_severity "$(_brains_auth_severity_for_error "$err")")"
+      else
+        printf '   ├─ %s%s  %s\n' "$reach" "$mark" "$(_brains_auth_fix_for_error "$err")"
+      fi
       # a dead read hides today's usage, never the weekly reset: that is anchored, so the last
       # successful read still fixes it. the row shows only when such a read exists.
-      lk_node="$(jq -c --arg s "$reach" '.[$s] // empty' <<< "$lastknown" 2>/dev/null)"
-      lk_body=''; bill_txt=''
-      [[ -n "$lk_node" ]] && lk_body="$(_brains_auth_week_lastknown_body "$lk_node")"
+      if [[ -n "$lk_node" ]]; then
+        lk_body="$(_brains_auth_week_lastknown_body "$lk_node")"
+        [[ -n "$lk_body" ]] && rows+=("$(printf '%-8s%s' week "$lk_body")")
+        reset_txt="$(_brains_auth_reset_lastknown_body "$lk_node")"
+        [[ -n "$reset_txt" ]] && rows+=("$(printf '%-8s%s' reset "$reset_txt")")
+      fi
+      # no array index: this file is sourced into zsh too, whose arrays start at 1
+      i=0
+      for row in "${rows[@]}"; do
+        i=$(( i + 1 )); last='├─'; (( i == ${#rows[@]} )) && last='└─'
+        printf '   │  %s %s\n' "$last" "$row"
+      done
       # the charge date is anchored on the subscription start, so a dead token hides it not
-      [[ -n "$lk_node" ]] && bill_txt="$(_brains_auth_bill_body "$(jq -c '.subscription // {}' <<< "$lk_node")")"
-      week_glyph='└─'
-      [[ -n "$bill_txt" ]] && week_glyph='├─'
-      [[ -n "$lk_body" ]] && printf '   │  %s week     %s\n' "$week_glyph" "$lk_body"
-      [[ -n "$bill_txt" ]] && printf '   │  └─ bills    %s\n' "$bill_txt"
+      if [[ -n "$lk_node" ]]; then
+        next="$(_brains_auth_bill_next_for "$(jq -c '.subscription // {}' <<< "$lk_node")")"
+        [[ -n "$next" ]] && bills+=("${next}"$'\t'"${reach}")
+      fi
       continue
     fi
 
@@ -3000,38 +3072,71 @@ _brains_auth_render() {
     #   - a window that is null: this PLAN has no such limit (ultra plans dropped the 5h one),
     #     so its row is simply not drawn — a limit that does not exist earns no line
     #   - a window present with no reset: the limit exists, and no window has opened yet
-    s_tail="no window open yet"
-    [[ -n "$s_reset" ]] && s_tail="resets at $(_brains_auth_when "$s_reset"), in $(_brains_auth_until "$s_reset")"
-    w_tail="no window open yet"
-    [[ -n "$w_reset" ]] && w_tail="resets at $(_brains_auth_when "$w_reset"), in $(_brains_auth_until "$w_reset")"
+    s_tail="· no window open yet"
+    [[ -n "$s_reset" ]] && s_tail="· resets $(_brains_auth_when "$s_reset") ($(_brains_auth_until_short "$s_reset"))"
+    w_tail="· no window open yet"
+    [[ -n "$w_reset" ]] && w_tail="· resets $(_brains_auth_when "$w_reset") ($(_brains_auth_until_short "$w_reset"))"
     printf '   ├─ %s%s\n' "$reach" "$mark"
     [[ "$(jq -r '.five_hour != null' <<< "$node")" == true ]] && \
-      printf '   │  ├─ session  %s %3d%% used  ·  %s\n' \
-        "$(_brains_auth_bar "$s_pct")" "$s_pct" "$s_tail"
+      rows+=("$(printf '%-8s%s%5d%% %s' session "$(_brains_auth_bar "$s_pct")" "$s_pct" "$s_tail")")
     # opus rides just after session (same 5h window) only when the account has one
-    [[ -n "$o_used" ]] && printf '   │  ├─ opus     %s %3d%% used\n' \
-      "$(_brains_auth_bar "$(_brains_auth_round "$o_used")")" "$(_brains_auth_round "$o_used")"
-    # the reset row shows only when a reset exists, so the week row closes the block otherwise
-    reset_txt="$(_brains_auth_reset_line "$node")"
-    # the bills row closes the block when the profile named a subscription start
-    bill_txt="$(_brains_auth_bill_body "$(jq -c '.brains_auth_subscription // {}' <<< "$node")")"
-    week_glyph='└─'
-    [[ -n "$reset_txt" || -n "$bill_txt" ]] && week_glyph='├─'
-    reset_glyph='└─'
-    [[ -n "$bill_txt" ]] && reset_glyph='├─'
-    # the week row stays even when null: it closes the block, and with no session row either
-    #   an absent line would leave the account header bare and unexplained
+    [[ -n "$o_used" ]] && \
+      rows+=("$(printf '%-8s%s%5d%%' opus "$(_brains_auth_bar "$(_brains_auth_round "$o_used")")" "$(_brains_auth_round "$o_used")")")
+    # the week row stays even when null: with no session row either, an absent line would
+    #   leave the account header bare and unexplained
     if [[ "$(jq -r '.seven_day == null' <<< "$node")" == true ]]; then
-      printf '   │  %s week     no weekly limit on this plan\n' "$week_glyph"
+      rows+=("$(printf '%-8s%s' week 'no weekly limit on this plan')")
     else
-      printf '   │  %s week     %s %3d%% used  ·  %s\n' "$week_glyph" \
-        "$(_brains_auth_bar "$w_pct")" "$w_pct" "$w_tail"
+      rows+=("$(printf '%-8s%s%5d%% %s' week "$(_brains_auth_bar "$w_pct")" "$w_pct" "$w_tail")")
     fi
-    [[ -n "$reset_txt" ]] && printf '   │  %s reset    %s\n' "$reset_glyph" "$reset_txt"
-    [[ -n "$bill_txt" ]] && printf '   │  └─ bills    %s\n' "$bill_txt"
-  done < <(jq -r 'keys[]' <<< "$combined")
-  echo "   └─"
+    # the reset row shows only when a reset exists
+    reset_txt="$(_brains_auth_reset_line "$node")"
+    [[ -n "$reset_txt" ]] && rows+=("$(printf '%-8s%s' reset "$reset_txt")")
+    # no array index: this file is sourced into zsh too, whose arrays start at 1
+    i=0
+    for row in "${rows[@]}"; do
+      i=$(( i + 1 )); last='├─'; (( i == ${#rows[@]} )) && last='└─'
+      printf '   │  %s %s\n' "$last" "$row"
+    done
+    # the money side goes to its own tree below; here we only note when it charges
+    next="$(_brains_auth_bill_next_for "$(jq -c '.brains_auth_subscription // {}' <<< "$node")")"
+    [[ -n "$next" ]] && bills+=("${next}"$'\t'"${reach}")
+  done < <(jq -r 'to_entries | sort_by((.value | type == "object" and has("error")), .key) | .[].key' <<< "$combined")
+  if (( nkinds == 1 )); then
+    printf '   └─ %s\n' "$(_brains_auth_fix_for_error "$kinds")"
+  else
+    echo "   └─"
+  fi
+  _brains_auth_render_bills "${bills[@]}"
   echo ""
+}
+
+# .what = the money budget, as its own tree: each account's next charge, soonest first
+#   ($@ = "<next iso>\t<reach>" per account that named a subscription start)
+# .why  = tokens and money are two budgets a human weighs apart — "can I work now" versus
+#   "what is about to cost me" — so each reads as its own tree rather than a row buried in
+#   every account block. soonest first, since the next charge is the one a human can act on.
+# .note = no subscription start anywhere → no tree, rather than an empty one
+_brains_auth_render_bills() {
+  (( $# > 0 )) || return 0
+  local line next reach width=0 i n
+  local -a sorted=()
+  while IFS= read -r line; do sorted+=("$line"); done < <(printf '%s\n' "$@" | sort)
+  for line in "${sorted[@]}"; do
+    reach="${line#*$'\t'}"
+    (( ${#reach} > width )) && width=${#reach}
+  done
+  echo ""
+  # 🛑 "monthly" is an assumption (no endpoint names the interval), so the header says so
+  echo "💳 claude bills · next charge, monthly assumed"
+  # no array index: this file is sourced into zsh too, whose arrays start at 1
+  n=${#sorted[@]}; i=0
+  for line in "${sorted[@]}"; do
+    i=$(( i + 1 ))
+    next="${line%%$'\t'*}"; reach="${line#*$'\t'}"
+    printf '   %s %-*s  %s\n' "$( (( i == n )) && printf '└─' || printf '├─')" \
+      "$width" "$reach" "$(_brains_auth_bill_body "$next")"
+  done
 }
 
 # .what = why an unverified name cannot be trusted — the shared diagnosis line

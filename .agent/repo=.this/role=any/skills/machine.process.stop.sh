@@ -10,20 +10,24 @@
 #   rhx machine.process.stop --match 'director.shiptree.sh'              # plan
 #   rhx machine.process.stop --match 'director.shiptree.sh' --mode apply # SIGTERM
 #   rhx machine.process.stop --match 'duct.poll.sh' --mode apply --signal KILL
+#   rhx machine.process.stop --match 'feat-x' --long    # full argv, parent, age, cwd
 #
 # guarantee:
 #   - --match is a FIXED string, never a regex; matched against the full argv
 #   - plan is the default: it lists each match and sends no signal
+#   - --long reads parent pid, age, cwd, and the whole argv, so a leak is read
+#     before it is cut (a cwd marked "(deleted)" = its test dir is gone)
 #   - never signals its own process tree, nor a protected comm
 #     (kitty, tmux, claude, systemd, init, sshd, Xwayland, cosmic-*)
 #   - exit 0 = done · 1 = a signal failed · 2 = bad input
 ######################################################################
 set -uo pipefail
 
-match="" mode="plan" signal="TERM"
+match="" mode="plan" signal="TERM" long=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --match)  match="${2:-}"; shift 2 ;;
+    --long)   long=1; shift ;;
     --mode)   mode="${2:-}"; shift 2 ;;
     --signal) signal="${2:-}"; shift 2 ;;
     # absorb harness-injected args; `rhx <skill>` prepends --repo/--role/--skill
@@ -70,6 +74,17 @@ fi
 count="$(printf '%s\n' "$hits" | wc -l)"
 printf '%s\n' "$hits" | head -n 12 | while IFS=$'\t' read -r pid comm argv; do
   printf '   ├─ %-8s %-10s %s\n' "$pid" "$comm" "$argv"
+  [[ $long -eq 1 ]] || continue
+  # read the rest of the record straight from /proc; a gone pid prints naught
+  ppid="$(awk '/^PPid:/ { print $2 }' "/proc/$pid/status" 2>/dev/null)"
+  age="$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ')"
+  cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null)"
+  full="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | cut -c1-600)"
+  pargv="$(tr '\0' ' ' < "/proc/$ppid/cmdline" 2>/dev/null | cut -c1-200)"
+  echo "   │  ├─ age:    ${age:-?}s"
+  echo "   │  ├─ cwd:    ${cwd:-?}"
+  echo "   │  ├─ parent: ${ppid:-?} ${pargv}"
+  echo "   │  └─ argv:   ${full}"
 done
 [[ $count -gt 12 ]] && echo "   ├─ … and $((count - 12)) more"
 
