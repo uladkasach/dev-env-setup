@@ -1,0 +1,19 @@
+{
+  "key": "ce3158c6e3c332c2",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet"
+  },
+  "exid": null,
+  "title": "feat(hooks): one dispatcher process per claude event, rules run in-process",
+  "description": "## .what\n\nregister ONE hook command per claude event (PreToolUse, PostToolUse, Stop, SessionStart, UserPromptSubmit), which loads every enrolled role's hook rules once and runs them **in-process**. today `rhx init --hooks` writes one command per rule, so every tool call starts one process per rule.\n\n## .why — measured on a laptop with ~10 busy claude sessions\n\none Bash tool call fires 10 PreToolUse hooks: 3 `rhx … --mode hook` (bhrain driver + learner) and 7 `bash …/pretooluse.*.sh` (ehmpathy mechanic). cpu = user+sys of each hook's process tree via `/usr/bin/time`, median of 3–5 runs, a benign `pwd` call:\n\n| shape | cpu per Bash call | peak rss |\n|---|---|---|\n| today: 10 separate hook processes | **2010–2110 ms** (startup ~1190, the rules' own work ~900) | 207 MB at once |\n| one dispatcher that spawns 10 rhx children (serial or parallel, same cpu) | ~3130 ms, startup alone | 53 MB each |\n| **one dispatcher, rules in-process** | **~1200 ms** est. (one boot 280 + work) | **52 MB** |\n\n- floor: one rhx boot with no work = 280 ms cpu, 52 MB; one bash hook with no work = 40–50 ms, 7 MB\n- at ~2 Bash calls/sec across sessions, the hooks burn ~4 cpu-seconds per second: ~4 of 12 cores, around the clock\n- the in-process estimate is a floor on the gain: most of each rhx hook's \"work\" (110–270 ms) is that process's own load of its role code, which one process does once; the checks themselves are regexes\n- a dispatcher that spawns children is WORSE than today; only the in-process fan-out wins\n\n## .shape\n\n- `rhx init --hooks` writes one entry per event, e.g. `rhx hooks.dispatch --event PreToolUse`, whose matcher is the union of all rules' matchers\n- the dispatcher reads stdin once, parses once, runs each rule whose matcher fits the tool, and exits 2 at the first block with that rule's message (or aggregates all blocks — a choice to make)\n- shell-authored rules (the mechanic `pretooluse.*.sh`) need an in-process path too: a TS port, or a declared pure-pattern form, so most never need a shell\n- one timeout per rule inside the dispatcher, so one slow rule cannot eat the event budget\n\n## .done bar\n\n- a Bash tool call starts 1 hook process, not 10\n- `rhx claude.hooks.cost --tool Bash` (uladkasach/dev-env-setup) shows ≤ ~1200 ms cpu and ≤ ~55 MB per call, down from ~2010 ms / 207 MB\n\n## .stacked\n\na follow-up task adds an `onTool` regex filter per rule, which lets this dispatcher skip its own boot on a call no rule wants. it builds on this task.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": null,
+  "heldSeq": 10,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "764"
+}

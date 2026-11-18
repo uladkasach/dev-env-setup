@@ -232,11 +232,16 @@ _RESET_CASES='[
   {"case":"outside-experiment","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[]},"juniper_tide":{"eligible":true,"ineligible_reason":null,"in_experiment":false,"arm":null,"available":true,"resets_per_week":1}}},
   {"case":"session-later","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[]},"juniper_tide":{"eligible":false,"ineligible_reason":"weekly_limit","available":false,"next_available_at":"2026-10-09T00:00:00+00:00"}}},
   {"case":"wrong-client","node":{"cedar_ember":{"eligible":false,"ineligible_reason":"surface","grants":[]},"juniper_tide":{"eligible":false,"ineligible_reason":"surface","available":false}}},
-  {"case":"not-asked","node":{"cedar_ember":null,"juniper_tide":null}}
+  {"case":"not-asked","node":{"cedar_ember":null,"juniper_tide":null}},
+  {"case":"full-and-fable","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":1,"usable_now":true,"ends_at":"2026-12-10T22:00:00+00:00","clears":["five_hour","seven_day","seven_day_overage_included"],"gives_back_weekly":false},{"resets_left":1,"usable_now":true,"ends_at":"2027-03-09T07:59:00+00:00","clears":["five_hour","seven_day_overage_included"],"gives_back_weekly":true}]},"juniper_tide":null}},
+  {"case":"fable-only","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":0,"usable_now":false,"ends_at":"2026-12-10T22:00:00+00:00","clears":["five_hour","seven_day"]},{"resets_left":2,"usable_now":false,"ends_at":"2027-03-09T07:59:00+00:00","clears":["five_hour"]}]},"juniper_tide":null}}
 ]'
+# each case renders both kinds: the full row (🎁 clears the week) and the fable row (🎀 does not)
 _snap 'reset.cases' "$(
   jq -c '.[]' <<< "$_RESET_CASES" | while IFS= read -r _row; do
-    printf '%s -> %s\n' "$(jq -r '.case' <<< "$_row")" "$(_brains_auth_reset_line "$(jq -c '.node' <<< "$_row")")"
+    printf '%s -> %s | %s\n' "$(jq -r '.case' <<< "$_row")" \
+      "$(_brains_auth_reset_line "$(jq -c '.node' <<< "$_row")" full)" \
+      "$(_brains_auth_reset_line "$(jq -c '.node' <<< "$_row")" fable)"
   done
 )"
 
@@ -366,6 +371,16 @@ _LK="$(_brains_auth_week_lastknown_get $'kai@example.com\nmoana@example.com\nnev
 _snap 'lastknown.get' "$(jq -S . <<< "$_LK")"
 _snap 'lastknown.render' "$(_brains_auth_render "$FIXTURE_ALL_DEAD" '' "$_LK" | _normalize)"
 # an absent log is no history, never a failure
+# ---- accounts render in weekly reset order: sun → sat, then clock, then name. a dark account
+#   keeps its place via its last-known reset; one with no reset at all sorts last.
+#   2026-11-15 is a sunday; resets sit at midday utc so the weekday holds in any local zone.
+_snap 'order.weekly-reset' "$(_brains_auth_reaches_in_reset_order \
+  '{"zed@example.com":{"seven_day":{"utilization":1,"resets_at":"2026-11-21T12:00:00Z"}},
+    "amy@example.com":{"seven_day":{"utilization":1,"resets_at":"2026-11-15T13:00:00Z"}},
+    "bob@example.com":{"seven_day":{"utilization":1,"resets_at":"2026-11-15T12:00:00Z"}},
+    "dee@example.com":{"error":"refresh_rejected"},
+    "nan@example.com":{"error":"refresh_rejected"}}' \
+  '{"dee@example.com":{"seven_day":{"utilization":5,"resets_at":"2026-11-16T12:00:00Z"}}}')"
 _snap 'lastknown.absent-log' "$(BRAINS_AUTH_USAGE_LOG_DIR="$_SWAPDIR/nope" _brains_auth_week_lastknown_get 'kai@example.com')"
 rm -rf "$_LK_DIR"
 

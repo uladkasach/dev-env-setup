@@ -36,6 +36,7 @@ grove_provision_4_3_2_emulator_configure_verify() {
   local pair dest mismatched=() named_absent=() kittens=()
   for pair in kitty.conf:kitty.conf copy_notify.py:copy_notify.py \
     reboot_window.py:reboot_window.py scroll_window.py:scroll_window.py \
+    visual_select.py:visual_select.py \
     desert.conf:themes/desert.conf; do
     dest="$conf_dir/${pair#*:}"
     [[ "${pair%%:*}" == *.py ]] && kittens+=("${pair#*:}")
@@ -177,6 +178,35 @@ print(load_config('$conf').window_alert_on_bell)
         ;;
     esac
   fi
+
+  # 2g. a program may WRITE the clipboard, per the loader — the last hop of every tmux copy
+  #     - tmux copy-mode (and nvim in a duct) copies by an OSC 52 write to kitty
+  #     - without `write-clipboard`, kitty drops it: the copy lands in tmux, never on
+  #       the desktop, and no signal says so. a paste then yields the OLD clipboard
+  #     - the tmux half of the same hop is the `clipboard` feature, which 2.8.tmux's
+  #       verify checks on every attached client
+  local ccw=""
+  if command -v kitty >/dev/null 2>&1; then
+    ccw="$(timeout -k 5 20 kitty +runpy "
+from kitty.config import load_config
+print('write-clipboard' in load_config('$conf').clipboard_control)
+" 2>/dev/null | tail -1 | tr -d '[:space:]')"
+  fi
+  case "$ccw" in
+    True)
+      echo "   • a program may write the clipboard ✔ (write-clipboard, per kitty's own loader)"
+      ;;
+    False)
+      _kitty_verify_fail "kitty's clipboard_control lacks write-clipboard" \
+        "⇒ an OSC 52 write is dropped, so a tmux copy-mode copy (super+v, ctrl+c) and an" \
+        "  nvim yank in a duct never reach the desktop clipboard — silently" \
+        "fix: rhx grove.provision --what 4.3.2.emulator --mode apply" \
+        "⚠️ an open kitty keeps the value it started with; a new one reads this"
+      ;;
+    *)
+      echo "   🌙 kitty's loader did not answer, so whether a program may write the clipboard is UNREAD"
+      ;;
+  esac
 
   # 3. every file kitty.conf NAMES exists, and the theme is included (m10)
   if [[ ${#named_absent[@]} -eq 0 ]]; then

@@ -174,7 +174,7 @@ def _local_tmux_in_copy_mode(pane: tuple) -> bool:
     #     is no app in the loop at all. tmux swaps to the `copy-mode-vi` table
     #     and swallows every key, so none reaches the pane's process
     #   - ⇒ the key cannot land as an interrupt, which is the whole invariant
-    #   - `tmux.conf` binds it there to copy-selection-and-cancel
+    #   - `tmux.conf` binds it there to copy the selection and keep it
     #
     # ⚠️ without this the local duct is the one that stays dead: over ssh the
     #   branch below already delivers unconditionally, so a REMOTE copy-mode

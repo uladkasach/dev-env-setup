@@ -1,9 +1,11 @@
-saved-usable -> 🎁 1 saved · usable now · expires oct 22
-saved-at-limit -> 🎁 1 saved · usable at your limit · expires oct 22
-saved-mixed -> 🎁 2 saved · 1 usable now · first expires dec 10
-used -> 
-never-granted -> 🎁 session reset available now
-outside-experiment -> 
-session-later -> 
-wrong-client -> ? unknown — the endpoint did not see the claude cli (user-agent)
-not-asked -> 
+saved-usable -> 🎁 1 saved · usable now · expires oct 22 | 
+saved-at-limit -> 🎁 1 saved · usable at your limit · expires oct 22 | 
+saved-mixed -> 🎁 2 saved · 1 usable now · first expires dec 10 | 
+used ->  | 
+never-granted -> 🎁 session reset available now | 
+outside-experiment ->  | 
+session-later ->  | 
+wrong-client -> ? unknown — the endpoint did not see the claude cli (user-agent) | 
+not-asked ->  | 
+full-and-fable -> 🎁 1 saved · usable now · expires dec 10 | 🎀 1 saved · usable now · expires mar 09
+fable-only ->  | 🎀 2 saved · usable at your limit · expires mar 09

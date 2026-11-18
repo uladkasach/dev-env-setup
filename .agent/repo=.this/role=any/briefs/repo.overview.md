@@ -211,9 +211,8 @@ that diffs the two reports drift on every healthy box. the `.ron` is the single 
 css is the written record of the palette, a human's to retire. `3.2.theme/_.sh` says so at
 the bundle.
 
-> ⚠️ an OWNER column is the easiest cell in a table like this to assert without a check, and
-> a table is where an unverified claim hides best. grep for the `cmp` before you write one
-> (`rule.require.trust-but-verify`).
+> ⚠️ an OWNER column is the cell most often asserted unchecked. grep for the `cmp` before you
+> write one (`rule.require.trust-but-verify`).
 
 ⚠️ the two `util`/`backup` files are human-run utilities, NOT bundles. a bundle
 converges the machine; `backup_env.sh` reads the machine and writes OUT to
