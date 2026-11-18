@@ -20,5 +20,5 @@ grove_provision_5_21_playwright_provision_upsert() {
   fi
 
   pkg_install "${packages[@]}" || return 1
-  echo "   • playwright chromium libs ✔ (${#packages[@]} packages, $release)"
+  echo "   • playwright browser libs ✔ (${#packages[@]} packages, $release)"
 }

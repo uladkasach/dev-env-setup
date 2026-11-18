@@ -21,12 +21,12 @@ grove_provision_5_21_playwright_provision_verify() {
   done
 
   if [[ ${#absent[@]} -eq 0 ]]; then
-    echo "   • all ${#packages[@]} playwright chromium libs installed ✔ ($release)"
+    echo "   • all ${#packages[@]} playwright browser libs installed ✔ ($release)"
     return 0
   fi
 
-  echo "   ✋ ${#absent[@]} playwright chromium lib(s) absent: ${absent[*]}" >&2
-  echo "      ⇒ a playwright chromium on this box fails to launch, so every e2e suite reds" >&2
+  echo "   ✋ ${#absent[@]} playwright browser lib(s) absent: ${absent[*]}" >&2
+  echo "      ⇒ a playwright browser on this box fails to launch, so every e2e suite reds" >&2
   echo "      fix: sudo -v && rhx grove.provision --what 5.21.playwright --mode apply" >&2
   return 1
 }
