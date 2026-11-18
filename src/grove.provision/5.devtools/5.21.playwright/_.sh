@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = the system libraries a playwright chromium needs to launch —
-#         what `npx playwright install-deps chromium` installs, declared here
+# .what = the system libraries a playwright browser needs to launch —
+#         chromium's set from `npx playwright install-deps chromium`, plus the
+#         webkit libs a launch has named, declared here
 #
 # .why it is a bundle
 #   - a repo's e2e suite downloads its own browser build per playwright
@@ -69,6 +70,15 @@ grove_provision_5_21_playwright_packages() {
         libglib2.0-0t64 libnspr4 libnss3 libpango-1.0-0 libx11-6 libxcb1 \
         libxcomposite1 libxdamage1 libxext6 libxfixes3 libxkbcommon0 libxrandr2
       ;;
+  esac
+
+  # webkit — the libs the webkit build dlopens beyond chromium's set. measured
+  #   2026-11-18: a grove's webkit e2e failed to launch for libevent alone (the
+  #   bhrowser suite), so the row holds that lib; grow it from nativeDeps.ts
+  #   `webkit` when a launch names another
+  case "$release" in
+    ubuntu22.04) printf '%s\n' libevent-2.1-7 ;;
+    ubuntu24.04) printf '%s\n' libevent-2.1-7t64 ;;
   esac
 }
 
