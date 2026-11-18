@@ -3840,10 +3840,17 @@ vim.keymap.set('v', '<C-S-c>', '"+y')
 -- show a copied status on clipboard yanks (mirrors the +stage 🤙 status), so
 -- every copy path (<C-c>, <C-S-c>, "+y) confirms the copy in one place. gated on
 -- the + register so an ordinary yy into the unnamed register stays quiet.
+--
+-- 🛑 and gated on a clipboard PROVIDER, or the confirmation lies
+--   - with no provider, `"+y` still fills the register and fires TextYankPost,
+--     but the text never reaches the desktop
+--   - nvim already says so, loud, with the fix ("clipboard: No provider. Try
+--     :checkhealth") — a "copied" toast beside it would contradict the truth
+--   - ⇒ the toast confirms only a copy that can have left nvim
 vim.api.nvim_create_autocmd('TextYankPost', {
   callback = function()
     local ev = vim.v.event
-    if ev.operator == 'y' and ev.regname == '+' then
+    if ev.operator == 'y' and ev.regname == '+' and vim.fn.has('clipboard') == 1 then
       print('+copied 🤙')
       -- desktop toast. through tmux the copy happens in nvim, not kitty, so
       -- kitty's copy_notify.py toast never fires (it only toasts when kitty

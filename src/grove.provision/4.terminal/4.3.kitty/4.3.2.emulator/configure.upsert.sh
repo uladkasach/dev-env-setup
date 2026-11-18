@@ -28,10 +28,13 @@ grove_provision_4_3_2_emulator_configure_upsert() {
   echo "   • kitty.conf declared (~/.config/kitty/kitty.conf)"
 
   local kitten
-  for kitten in copy_notify.py reboot_window.py scroll_window.py; do
+  for kitten in copy_notify.py reboot_window.py scroll_window.py visual_select.py; do
     cp "$bundle_dir/$kitten" "$HOME/.config/kitty/$kitten"
   done
-  echo "   • kittens declared (copy_notify.py, reboot_window.py, scroll_window.py)"
+  echo "   • kittens declared (copy_notify.py, reboot_window.py, scroll_window.py, visual_select.py)"
+  # the overlay's nvim setup moved to 4.5.nvim (tmux sources it too, on every
+  # grove); a copy left here from before would be a stale twin no one reads
+  rm -f "$HOME/.config/kitty/visual_select.lua"
 
   cp "$bundle_dir/desert.conf" "$HOME/.config/kitty/themes/desert.conf"
   echo "   • desert theme declared (~/.config/kitty/themes/desert.conf)"

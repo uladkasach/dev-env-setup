@@ -111,8 +111,11 @@ always:
       - briefs/grove/reach/plan.exit-node.md
   skills:
     # test snapshots are fixtures of brains.auth.test, never a skill to invoke
+    # a `<family>.operations.sh` is the shared setup its family's verbs source,
+    # never a skill to invoke — each verb is the way in
     not:
       - skills/**/*.snap
+      - skills/**/*.operations.sh
     say:
       - skills/machine.diagnose.lag.sh
       - skills/use.apikeys.sh

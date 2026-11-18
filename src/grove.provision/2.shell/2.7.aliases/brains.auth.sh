@@ -2849,22 +2849,33 @@ _brains_auth_exit_for() {
 #   absence buries the one account that holds a reset. the `surface` misread is the exception
 #   and still prints, since it is a read we could not trust rather than a reset that is absent.
 _brains_auth_reset_line() {
-  local node="$1"
-  jq -r '
+  local node="$1" kind="${2:-full}"
+  jq -r --arg kind "$kind" '
     (.cedar_ember) as $ce | (.juniper_tide) as $jt |
     if (($ce.ineligible_reason // "") == "surface" or ($jt.ineligible_reason // "") == "surface") then
-      "? unknown — the endpoint did not see the claude cli (user-agent)"
+      # the misread is one fact about the whole read, so it is said once, on the full row
+      if $kind == "full" then "? unknown — the endpoint did not see the claude cli (user-agent)" else "" end
     else
-      # every saved grant folds into ONE clause: the total, how many are usable now, and the
-      #   earliest expiry. a clause per grant repeats "🎁 N saved" and buries the one count
-      #   a human acts on
+      # two kinds of saved grant, told apart by what they CLEAR (measured 2026-11-18):
+      #   · full  — clears `seven_day`: the whole week resets                     → 🎁
+      #   · fable — leaves `seven_day`; refills the 5h limit + the fable allowance,
+      #             and gives back only what fable spent of the week
+      #             (`gives_back_weekly: true`)                                   → 🎀
+      #   the grant `id` and `label` also name "fable", but they are prose; `clears` is the
+      #   contract, so the split reads it
+      # each kind folds into ONE clause: the total, how many are usable now, and the earliest
+      #   expiry. a clause per grant repeats "N saved" and buries the one count a human acts on
       def mon: if . == null then "?" else (.[0:10] | strptime("%Y-%m-%d") | strftime("%b %d") | ascii_downcase) end;
-      [ ( ($ce.grants // []) | map(select((.resets_left // 0) > 0)) | select(length > 0)
+      # a grant that names no `clears` (an older read) reads as it always did: a full reset
+      def isfull: (.clears == null) or (((.clears // []) | index("seven_day")) != null);
+      (if $kind == "full" then "🎁" else "🎀" end) as $glyph |
+      [ ( ($ce.grants // []) | map(select((.resets_left // 0) > 0))
+          | map(select(if $kind == "full" then isfull else (isfull | not) end)) | select(length > 0)
           | (map(.resets_left) | add) as $n
           | (map(select(.usable_now == true) | .resets_left) | add // 0) as $now
           | (map(.ends_at) | sort | .[0]) as $end
-          | "🎁 \($n) saved · \(if $now == $n then "usable now" elif $now == 0 then "usable at your limit" else "\($now) usable now" end) · \(if length > 1 then "first expires" else "expires" end) \($end | mon)" ),
-        ( select($jt.arm == "reset" and $jt.available == true) | "🎁 session reset available now" )
+          | "\($glyph) \($n) saved · \(if $now == $n then "usable now" elif $now == 0 then "usable at your limit" else "\($now) usable now" end) · \(if length > 1 then "first expires" else "expires" end) \($end | mon)" ),
+        ( select($kind == "full" and $jt.arm == "reset" and $jt.available == true) | "🎁 session reset available now" )
       ] | join(" · ")
     end
   ' <<< "$node" 2>/dev/null || printf '? could not read the reset fields'
@@ -2923,11 +2934,11 @@ _brains_auth_week_lastknown_body() {
 # .note = only `cedar_ember` (saved grants) carries over. `juniper_tide` is a live offer at
 #   the wall, so a past read of it says naught about now. prints empty when no live grant is left.
 _brains_auth_reset_lastknown_body() {
-  local node="$1" ts body asof
+  local node="$1" kind="${2:-full}" ts body asof
   ts="$(jq -r '.cedar_ts // empty' <<< "$node" 2>/dev/null)"
   body="$(_brains_auth_reset_line "$(jq -c --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
     {cedar_ember: ((.cedar_ember // {}) | .grants = ((.grants // []) | map(select((.ends_at // "") > $now))))}
-  ' <<< "$node" 2>/dev/null)")"
+  ' <<< "$node" 2>/dev/null)" "$kind")"
   [[ -n "$body" ]] || return 0
   asof="$(date -d "$ts" '+%b %d' 2>/dev/null | tr '[:upper:]' '[:lower:]')"
   printf '%s · stale %s' "$body" "${asof:-?}"
@@ -3032,8 +3043,10 @@ _brains_auth_render() {
       if [[ -n "$lk_node" ]]; then
         lk_body="$(_brains_auth_week_lastknown_body "$lk_node")"
         [[ -n "$lk_body" ]] && rows+=("$(printf '%-8s%s' week "$lk_body")")
-        reset_txt="$(_brains_auth_reset_lastknown_body "$lk_node")"
+        reset_txt="$(_brains_auth_reset_lastknown_body "$lk_node" full)"
         [[ -n "$reset_txt" ]] && rows+=("$(printf '%-8s%s' reset "$reset_txt")")
+        reset_txt="$(_brains_auth_reset_lastknown_body "$lk_node" fable)"
+        [[ -n "$reset_txt" ]] && rows+=("$(printf '%-8s%s' fable "$reset_txt")")
       fi
       # no array index: this file is sourced into zsh too, whose arrays start at 1
       i=0
@@ -3092,9 +3105,12 @@ _brains_auth_render() {
     else
       rows+=("$(printf '%-8s%s%5d%% %s' week "$(_brains_auth_bar "$w_pct")" "$w_pct" "$w_tail")")
     fi
-    # the reset row shows only when a reset exists
-    reset_txt="$(_brains_auth_reset_line "$node")"
+    # each reset row shows only when such a reset exists: a full one (🎁 the whole week), then
+    #   a fable one (🎀 the 5h limit + fable's share of the week) on its own row
+    reset_txt="$(_brains_auth_reset_line "$node" full)"
     [[ -n "$reset_txt" ]] && rows+=("$(printf '%-8s%s' reset "$reset_txt")")
+    reset_txt="$(_brains_auth_reset_line "$node" fable)"
+    [[ -n "$reset_txt" ]] && rows+=("$(printf '%-8s%s' fable "$reset_txt")")
     # no array index: this file is sourced into zsh too, whose arrays start at 1
     i=0
     for row in "${rows[@]}"; do

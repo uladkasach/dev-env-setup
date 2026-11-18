@@ -232,11 +232,16 @@ _RESET_CASES='[
   {"case":"outside-experiment","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[]},"juniper_tide":{"eligible":true,"ineligible_reason":null,"in_experiment":false,"arm":null,"available":true,"resets_per_week":1}}},
   {"case":"session-later","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[]},"juniper_tide":{"eligible":false,"ineligible_reason":"weekly_limit","available":false,"next_available_at":"2026-10-09T00:00:00+00:00"}}},
   {"case":"wrong-client","node":{"cedar_ember":{"eligible":false,"ineligible_reason":"surface","grants":[]},"juniper_tide":{"eligible":false,"ineligible_reason":"surface","available":false}}},
-  {"case":"not-asked","node":{"cedar_ember":null,"juniper_tide":null}}
+  {"case":"not-asked","node":{"cedar_ember":null,"juniper_tide":null}},
+  {"case":"full-and-fable","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":1,"usable_now":true,"ends_at":"2026-12-10T22:00:00+00:00","clears":["five_hour","seven_day","seven_day_overage_included"],"gives_back_weekly":false},{"resets_left":1,"usable_now":true,"ends_at":"2027-03-09T07:59:00+00:00","clears":["five_hour","seven_day_overage_included"],"gives_back_weekly":true}]},"juniper_tide":null}},
+  {"case":"fable-only","node":{"cedar_ember":{"eligible":true,"ineligible_reason":null,"grants":[{"resets_left":0,"usable_now":false,"ends_at":"2026-12-10T22:00:00+00:00","clears":["five_hour","seven_day"]},{"resets_left":2,"usable_now":false,"ends_at":"2027-03-09T07:59:00+00:00","clears":["five_hour"]}]},"juniper_tide":null}}
 ]'
+# each case renders both kinds: the full row (🎁 clears the week) and the fable row (🎀 does not)
 _snap 'reset.cases' "$(
   jq -c '.[]' <<< "$_RESET_CASES" | while IFS= read -r _row; do
-    printf '%s -> %s\n' "$(jq -r '.case' <<< "$_row")" "$(_brains_auth_reset_line "$(jq -c '.node' <<< "$_row")")"
+    printf '%s -> %s | %s\n' "$(jq -r '.case' <<< "$_row")" \
+      "$(_brains_auth_reset_line "$(jq -c '.node' <<< "$_row")" full)" \
+      "$(_brains_auth_reset_line "$(jq -c '.node' <<< "$_row")" fable)"
   done
 )"
 

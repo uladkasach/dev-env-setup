@@ -125,6 +125,21 @@ grove_provision_4_5_nvim_configure_upsert() {
 
   echo "   • nvim plugin lockfile declared → $lock_dst"
 
+  # the super+v selector's setup — sourced by kitty's no-tmux overlay
+  # (4.3.2.emulator/visual_select.py) AND tmux's popup (2.8.tmux/tmux.conf).
+  # this bundle owns it, since it is nvim config and the one bundle on every box
+  #   - at the config root, never under lua/ or plugin/: nvim auto-loads neither
+  #     path here, so only a `-S` sources it and every other nvim stays untouched
+  local sel_src="$bundle_dir/visual_select.lua"
+  local sel_dst="$HOME/.config/nvim/visual_select.lua"
+  if ! cp "$sel_src" "$sel_dst"; then
+    echo "   ✋ could not write $sel_dst" >&2
+    echo "      ⇒ super+v opens a plain nvim with no selector keys, in kitty and tmux alike" >&2
+    echo "      read why: the cp error above — usually a permission or a full disk" >&2
+    return 1
+  fi
+  echo "   • super+v selector setup declared → $sel_dst"
+
   # 🛑 the imagemagick POLICY — owned since this bundle installs the tool. the
   #    debian default permits every coder. a SEAT path that bites with no root;
   #    not fatal, and `configure.verify` asks that it bites (m4)

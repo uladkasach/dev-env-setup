@@ -64,6 +64,24 @@ grove_provision_4_5_nvim_configure_verify() {
       "fix: rhx grove.provision --what 4.5.nvim --mode apply"
     failed=1
   fi
+  # .what = 1c. the super+v selector setup is on the box AND matches this checkout
+  # .why kitty's overlay and tmux's popup both `-S` this exact path; absent or
+  #   stale, super+v opens a plain nvim whose keys do not match the gesture
+  local sel_src="$bundle_dir/visual_select.lua"
+  local sel_dst="$HOME/.config/nvim/visual_select.lua"
+  if [[ ! -r "$sel_dst" ]]; then
+    _nvim_verify_say "no super+v selector setup at $sel_dst" \
+      "⇒ super+v opens a plain nvim, with no enter / ctrl+c / leave keys, in kitty and tmux alike" \
+      "fix: rhx grove.provision --what 4.5.nvim --mode apply"
+    failed=1
+  elif cmp -s "$sel_src" "$sel_dst"; then
+    echo "   • the super+v selector setup matches this checkout ✔"
+  else
+    _nvim_verify_say "the installed super+v selector setup DIFFERS from this checkout" \
+      "read what differs: diff $sel_src $sel_dst" \
+      "fix: rhx grove.provision --what 4.5.nvim --mode apply"
+    failed=1
+  fi
   # .what = 2. nvim can actually LOAD it (skipped if absent; provision.verify claims that)
   # .why the BINARY, never the name — `2.7.aliases` exports a `nvim` function
   #   (the memory cap), so the bare name would load-test the WRAPPER
