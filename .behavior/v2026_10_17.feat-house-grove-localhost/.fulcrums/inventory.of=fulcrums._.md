@@ -11,7 +11,7 @@ marker file is not. each entry's `.risk` holds its reason.
 
 | case | title | rework | risk | status | confidence |
 |---|---|---|---|---|---|
-| F1 | the authority form: `house://<name>`, never `house://localhost` (Q4) | clean now; dirty once nheuron#18 parses it | low | **open — commander's**, S4; joint with nheuron#18, infra#36 | 75% |
+| F1 | the authority form: `house://<name>`, never `house://localhost` (Q4) | clean now; dirty once nheuron#18 parses it | low | **ruled C** by the director, S5 (`house://house-1`); joint with nheuron#18, infra#36 | 75% |
 | F2 | seat unix names: `<name>-camper` / `<name>-ground` | clean now; dirty once a seat is minted | low | open | 60% |
 | F3 | the house ground holds NOPASSWD sudo on the host | clean | **risky** | **open — commander's**, S4 | 55% |
 | F4 | reach: a dedicated loopback sshd unit; `ssh.service` + `ssh.socket` masked before `openssh-server` lands | clean | **risky** | **ruled: yes** — director, S4 | 75% |

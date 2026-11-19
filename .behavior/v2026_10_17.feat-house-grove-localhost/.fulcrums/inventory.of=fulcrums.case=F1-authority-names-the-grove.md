@@ -28,5 +28,9 @@ fork inside C, left to #18; a uri that carries the kind may duplicate the row's 
 ## .where
 `1.vision.yield.md` `.the contract`; case=3 `[t1]`.
 
+## .verdict: ruled C, at the lean
+the director, 2026-11-19 (seed S5): the uri is `house://house-1`. `localhost` keeps its one
+sense, this machine with no ssh, so no house grove is addressed by it.
+
 ## .risk: low
 the uri is a name in a registry row and a duct address. it carries no key, cert, or grant, and writes to no prod account. a rename after nheuron#18 parses it is dirty rework, not a credential exposure.

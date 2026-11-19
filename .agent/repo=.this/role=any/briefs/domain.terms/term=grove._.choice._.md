@@ -23,8 +23,9 @@ joined in the house-grove route (2026-10-17): a seat on a box we own is a grove 
 
 ⚠️ a house grove shares its HARDWARE with a local grove and is still a second grove: it has its
 own unix users, its own home, its own reach. the kind is read off the election, never the box.
-the uri form a house grove is addressed by is an open fork (F1 in the house-grove route), so this
-row names no uri.
+a house grove is addressed by its registry NAME, `house://<name>` (`house://house-1`), never
+`house://localhost`: `localhost` keeps its one sense, this machine with no ssh, and one box may
+host many house groves. the registry row holds the seat address (`<seat>@<host>:<port>`).
 
 ⚠️ **the word is not a synonym for "a remote box".** the tree already treats the kinds as
 one subject with a tag — `--for local|house|cloud` is one flag over one bundle list — so a
