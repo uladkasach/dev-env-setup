@@ -1,0 +1,19 @@
+{
+  "key": "82e169097e1f1e12",
+  "kind": "update",
+  "repo": {
+    "owner": "ahbode",
+    "name": "infrastructure"
+  },
+  "exid": "99",
+  "title": "grove backup: declare the bucket name and grove name on the box",
+  "description": "## .what\n\ndev-env-setup#169 (the grove backup agent) is built against these declarations. each is owed from #63 / #64; the agent fails loud, by name, until each lands.\n\nthe agent is a system unit that ground installs and that runs as camper (`User=camper`). it backs up camper's `~/git`, `~/.claude`, `~/.rhachet` only, and reaches aws through camper's own config: the instance role on ec2, roles anywhere on hetzner.\n\n## .asks\n\n1. **the bucket name on the box**: write `/etc/grove/backup.bucket` (one line, mode 644) from `CAMP_GROVE_BUCKET_NAME` itself, beside `/etc/grove/platform`. dev-env-setup is public, so the literal can never be typed there; this file is its one channel (dev-env-setup fulcrum F1, ruled A).\n2. **the grove name on the box**: write `/etc/grove/name` (one line, the grove slug, mode 644). the backup key prefix is `grove=<slug>/`; a guessed name would let two groves overwrite each other.\n3. ~~**root's aws reach on hetzner** (`/etc/grove/aws.env`)~~ — **withdrawn**: the agent runs as camper, so camper's config, which #64 already points at the roles anywhere helper, is its reach. no root endpoint is needed.\n4. **`GROVE_BACKUP_SCOPE` on main**: it sits on #64's branch; dev-env-setup clamps its dirs + excludes to it by test.\n5. **the backup line in grove stats**: `git.grove.stats` and `hetzner.grove.probe` render one line from world-readable `/var/lib/grove-backup/status.json` (shape in the dev-env-setup#169 pr).\n6. ~~**a fresh grove of each kind**~~ — **withdrawn**: the full restore onto a fresh grove is already proven. dev-env-setup proves a partial restore laid aside (`--into`) on a live grove.\n\na first ✓ run waits on asks 1 and 2 only.\n\n## .if ask 1 is refused\n\nsay so on this issue. the fallback (a json the box reads from this repo) needs a grove credential that reads ahbode/infrastructure. that is a director call on the dev-env-setup side, so the drive halts there until it is made.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": "as-human",
+  "idem": "upsert",
+  "heldSeq": 9,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "99"
+}

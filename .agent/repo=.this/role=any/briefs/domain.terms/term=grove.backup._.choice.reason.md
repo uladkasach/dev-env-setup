@@ -38,5 +38,6 @@ chosen over:
 
 - a backup never holds a plaintext credential: `~/.claude/.credentials.json` and the keyrack's
   `os.direct` vault are cut at the pack
-- a backup runs as root, on a timer, with no hand step; a run that lands no unit is a ✗
+- a backup runs as camper, the one seat that holds work, on a timer, with no hand step; a run
+  that lands no unit is a ✗
 - a backup's bucket name and grove name come from the box (`/etc/grove/`), never a literal here

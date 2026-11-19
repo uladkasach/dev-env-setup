@@ -121,12 +121,11 @@ print_groves() {
               *) GROVE_BACKUP_CAUSE="the list failed"; GROVE_BACKUP_FIX="$GROVE_BACKUP_AWS_ERR"; fail_reach ;; esac
 
   while IFS= read -r g; do
-    g="${g#grove=}"; g="${g%/}"
     grove_backup_s3_list "grove=$g/" "$tmp/keys" || { grove_backup_cause_denied; fail_reach; }
     lm="$(cut -f2 "$tmp/keys" | sort | tail -n 1)"
     lm="$(date -u -d "$lm" +%Y-%m-%dT%H:%MZ 2>/dev/null || echo "$lm")"
     lines+=("$(printf '%-24s %s' "$g" "$lm")")
-  done <"$tmp/prefixes"
+  done < <(grove_backup_groves_of_prefixes <"$tmp/prefixes")
 
   own="$(grove_backup_decl_read "$(grove_backup_name_file)" "$GROVE_BACKUP_SLUG_PATTERN")" \
     && ! grep -qxF "grove=$own/" "$tmp/prefixes" \
@@ -134,7 +133,7 @@ print_groves() {
 
   local i
   for i in "${!lines[@]}"; do echo "   ├─ ${lines[$i]}"; done
-  echo "   └─ ${#lines[@]} groves"
+  echo "   └─ $(plural "${#lines[@]}" grove)"
 }
 
 ######################################################################
