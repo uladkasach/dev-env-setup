@@ -20,7 +20,9 @@ the repo's extant `--for local|cloud` axis is **not a new idea**. it is `server`
 server.split('@')[0]  →  'local' | 'cloud'
 ```
 
-so `--for` conforms by derivation into `server`, and a grove is literally `cloud@aws.ec2`.
+so `--for` conforms by derivation into `server`, and a CLOUD grove is literally
+`cloud@<platform>` — `cloud@aws.ec2` or `cloud@hetzner.hetzbot`. a local grove is
+`local@unix` or `local@cicd` (`repo.overview`).
 
 ## .why conform rather than keep a private tag
 
@@ -157,9 +159,15 @@ grove_env_probe_aws_ec2_imds    # aws's authoritative answer; the only one that 
 
 the derivation is then a bare ladder of those calls, and states only the **order**.
 
-### .the platform set is CLOSED, and has two members
+### .the platform set is CLOSED, and has three members
 
-`aws.ec2` (a grove) and `unix` (a laptop). that is the whole set.
+| platform | kind | how the box answers |
+|---|---|---|
+| `aws.ec2` | a cloud grove | probed — the rungs above |
+| `hetzner.hetzbot` | a cloud grove | DECLARED — `/etc/grove/platform`, laid by the boot over ground; a box with no metadata cannot be probed |
+| `unix` | a laptop | probed — a graphical session |
+
+that is the whole set. a declared platform no member names fails closed.
 
 it can be closed because **we own every machine this runs on** — the set is a list of boxes we
 can name, not a guess about the world.

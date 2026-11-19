@@ -172,7 +172,7 @@ echo "   arm 1 — the pnpm shim answers a declared pin with stdin CLOSED"
 # NEVER $HOME — a human may hold a `~/package.json`
 ######################################################################
 _pin="${_wanted[${#_wanted[@]}-1]}"
-_fixture="$(mktemp -d)"
+_fixture="$(mktemp -d)" || { echo "💥 MalfunctionError: could not make a temp dir" >&2; exit 1; }
 trap 'rm -rf "$_fixture"' EXIT
 
 printf '{\n  "name": "prove-pnpm-pins",\n  "packageManager": "pnpm@%s"\n}\n' \

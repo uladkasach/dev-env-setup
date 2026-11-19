@@ -49,5 +49,5 @@ provisioner as the owner of the fix (`define.invariant.grove-tailscale-has-one-o
 ## .see also
 
 - `handoff.infra.grove-tailnet-join.md` (this repo, route `v2026_10_25.feat-tailscale-on-every-machine`) — the ask that set the boundary
-- `rule.forbid.aws-params-off-ec2` — the same shape: a vault's identity decides who may touch it
+- `rule.require.aws-params-on-camp-groves-only` — the same shape: a vault's identity decides who may touch it
 - `rule.require.seam-claims-have-an-owner` — a power one seat lacks goes to the seat that holds it

@@ -20,6 +20,7 @@
 ######################################################################
 
 grove_provision_5_12_rack_configure_verify() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "the rack's camp entries"; return 0; }
   local key org env
   key="$(grove_provision_5_12_rack_slug_key)"
   org="$(grove_provision_5_12_rack_slug_org)"
@@ -30,21 +31,21 @@ grove_provision_5_12_rack_configure_verify() {
     return 0
   fi
 
-  # .off the ec2 platform the upsert DECLINED the github entry, so there is no
+  # .off a camp grove the upsert DECLINED the github entry, so there is no
   #   aws.params value this seat may read — a ✋ here would condemn a seat that
-  #   did right (`rule.forbid.aws-params-off-ec2`, `gotcha.a-check-that-cries-wolf-gets-silenced`)
-  if ! grove_provision_5_12_rack_platform_is_ec2; then
-    echo "   • declined — ${org}.${env}.${key} is an aws.params slug, and '${GROVE_ENV_SERVER:-unset}' has no ec2 identity"
+  #   did right (`rule.require.aws-params-on-camp-groves-only`, `gotcha.a-check-that-cries-wolf-gets-silenced`)
+  if ! grove_provision_5_12_rack_is_camp_grove; then
+    echo "   • declined — ${org}.${env}.${key} is an aws.params slug, and '${GROVE_ENV_SERVER:-unset}' is not a camp grove"
 
-    # 🛑 but a STALE entry off ec2 is a defect: no unlock here can read it, and
+    # 🛑 but a STALE entry off a camp grove is a defect: no unlock here can read it, and
     #   rhachet fails the whole unlock on it (pre-#149 boxes; the upsert's heal)
     local held
     if ! held="$(grove_provision_5_12_rack_slug_vault_held "$(grove_provision_5_12_rack_gitroot)")"; then
       echo "   🌙 unverified — this seat's rack could not be read, so a stale entry is UNREAD"
       echo "      read why: rhx keyrack list --owner $(grove_provision_5_12_rack_slug_owner) --org $org --env $env"
     elif [[ "$held" == "aws.params" ]]; then
-      echo "   ✋ this seat's rack still names ${org}.${env}.${key} in aws.params" >&2
-      echo "      ⇒ no unlock off ec2 can read it, so every unlock on this box fails on it" >&2
+      echo "   ✋ ConstraintError: this seat's rack still names ${org}.${env}.${key} in aws.params" >&2
+      echo "      ⇒ no unlock off a camp grove can read it, so every unlock on this box fails on it" >&2
       echo "      fix: rhx grove.provision --what 5.12.rack --mode apply" >&2
       return 1
     else
@@ -127,12 +128,11 @@ grove_provision_5_12_rack_verify_awsprofile() {
   owner="$(grove_provision_5_12_rack_slug_owner)"
   want="$(grove_provision_5_12_rack_awsprofile_value)"
 
-  # .a box with no ambient identity was correctly DECLINED by the upsert
-  #   - ⇒ a failure here would be a false ✋ against a seat that did right
-  #   - (`gotcha.a-check-that-cries-wolf-gets-silenced`)
+  # no ambient identity: a laptop declines (the upsert did right), a camp seat
+  #   ✋s — the same one verdict the upsert gave (`grove_env_ambient_absent_says`)
   if ! aws configure export-credentials --profile "$want" >/dev/null 2>&1; then
-    echo "   • declined — no ambient identity here, so no name to prove"
-    return 0
+    grove_env_ambient_absent_says "the rack's '${want}' AWS_PROFILE row"
+    return
   fi
 
   ####################################################################

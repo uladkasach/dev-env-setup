@@ -4,37 +4,20 @@
 #         pause + resume around a captive portal
 #
 # .why
-#   - the exit node is off by default and switched on for a network the human
-#     does not trust (`plan.exit-node`). a switch that asks for a password is
-#     one the human skips
-#   - an untrusted network is often a captive one: its sign-in page cannot load
-#     through the tunnel, so with the vpn on the human is stuck until they turn
-#     it off by hand — and then forgets to turn it back on
+#   - a switch that asks for a password is one the human skips (`plan.exit-node`)
+#   - a captive portal's sign-in cannot load through the tunnel, so the switch
+#     pauses on PORTAL and resumes on FULL, lest the human forget to turn it on
+#   - one pref, never `tailscale set --operator=$USER`: an operator may change
+#     EVERY pref from any process of this user
+#   - ⚠️ the pause sends outbound direct while it holds; inbound stays dropped
+#     (`1.12.firewall`) and the panel shield turns amber (`5.24.vpntray`)
+#   - `local@unix` alone: a grove's tailscale is its provisioner's
+#     (`define.invariant.grove-tailscale-has-one-owner`)
 #
 # .the three files, each root's
-#   - /usr/local/sbin/grove-exitnode — the switch. it reaches one tailscale pref
-#     and checks its own args
-#   - /etc/sudoers.d/grove-exitnode — an admin runs `on` and `off` with no
-#     password. the whole grant is that one file
-#   - /etc/NetworkManager/dispatcher.d/90-grove-exitnode — NetworkManager calls
-#     the switch on PORTAL (pause) and on FULL (resume)
-#
-# .why not `tailscale set --operator=$USER`
-#   - the operator may change EVERY pref, shields-up included, from any process
-#     of this user — an npm postinstall, an agent. the switch grants one pref
-#
-# .why the pause is safe enough
-#   - it lasts only while NetworkManager reads PORTAL, and the panel shield
-#     turns amber (`5.24.vpntray`) for the whole gap
-#   - inbound stays dropped throughout (`1.12.firewall`)
-#   - ⚠️ what the pause DOES open: outbound traffic leaves direct while it
-#     holds. a human who wants zero direct packets signs in with the vpn off
-#     and every other app closed
-#
-# .why `local@unix` alone
-#   - a grove's tailscale is its provisioner's
-#     (`define.invariant.grove-tailscale-has-one-owner`), and a grove does not
-#     roam between networks
+#   - /usr/local/sbin/grove-exitnode — the switch, one tailscale pref
+#   - /etc/sudoers.d/grove-exitnode — an admin runs `on` and `off`, no password
+#   - /etc/NetworkManager/dispatcher.d/90-grove-exitnode — calls the switch
 #
 # usage:
 #   sudo -v && rhx grove.provision --what 1.13.exitnode --mode apply

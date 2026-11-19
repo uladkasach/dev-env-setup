@@ -18,7 +18,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SUBJECT="$HERE/.play/permanent/prove.earlyoom-spares-the-session.play.sh"
 [[ -r "$SUBJECT" ]] || { echo "✋ ConstraintError: the subject play is absent from $HERE" >&2; exit 2; }
 
-fixture="$(mktemp -d)"
+fixture="$(mktemp -d)" || { echo "💥 MalfunctionError: could not make a temp dir" >&2; exit 1; }
 trap 'rm -rf "$fixture"' EXIT
 mkdir -p "$fixture/bin" "$fixture/tmp"
 

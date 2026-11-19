@@ -38,7 +38,15 @@
 ######################################################################
 set -uo pipefail
 
-REPO="${GROVE_SRC:-$PWD/src}"
+# find src by a FILE IT HOLDS: a `git.grove.send --reply --play` lands this file
+#   alone, so $PWD is the duct's cwd, and the boot's checkout is the fallback
+REPO="${GROVE_SRC:-}"
+if [[ -z "$REPO" ]]; then
+  for cand in "$PWD/src" "$HOME/git/more/dev-env-setup/src"; do
+    [[ -d "$cand/grove.provision" ]] && { REPO="$cand"; break; }
+  done
+fi
+REPO="${REPO:-$PWD/src}"
 POLICY="$REPO/grove.provision/1.system/1.6.procs/1.6.3.earlyoom/earlyoom.default"
 TMPDIR_BAIT=""
 BAIT_PIDS=()
@@ -46,7 +54,10 @@ FAILED=0
 
 cleanup() {
   local pid
-  for pid in "${BAIT_PIDS[@]}"; do kill "$pid" 2>/dev/null; done
+  # each bait is this shell's child: `wait` reaps it once the SIGTERM lands, so the
+  #   residue probe below reads the settled world, never a process mid-exit (under a
+  #   loaded full run the bare kill-then-probe saw both baits alive)
+  for pid in "${BAIT_PIDS[@]}"; do kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; done
   [[ -n "$TMPDIR_BAIT" ]] && rm -rf "$TMPDIR_BAIT"
   echo ""
   local alive=0
@@ -99,14 +110,17 @@ echo "   ├─ bait systemd pid ${BAIT_PIDS[0]}, oom_score $(cat "/proc/${BAIT_
 echo "   ├─ bait node    pid ${BAIT_PIDS[1]}, oom_score $(cat "/proc/${BAIT_PIDS[1]}/oom_score")"
 
 # .what = run earlyoom --dryrun with the given args; print the comm it would kill
-# .why  = -m/-s at 99 (earlyoom's cap: "value 100 exceeds limit 99") put it
-#         below threshold on its first poll, so it decides
-#         at once; a timeout bounds the call (hazard.a-clamp-for-a-hang-needs-a-timeout)
+# .why  = the thresholds put it at or below its limit on its first poll, so it
+#         decides at once; a timeout bounds the call (hazard.a-clamp-for-a-hang-needs-a-timeout)
+#   - -m 99: earlyoom's cap for mem ("value 100 exceeds limit 99")
+#   - -s 100: earlyoom acts only when mem AND swap are both at or below their
+#     limits, so `-s 99` never fires on a box whose swap is all free. 📜 measured
+#     2026-11-17 on a hetzner grove: 100% swap free, both arms read no victim
 LAST_RAW=""
 victim_of() {
   # ⚠️ stdbuf: off a tty earlyoom buffers its output, and the timeout's kill
   #    discards the buffer — so an unbuffered run is what makes any line arrive
-  LAST_RAW="$(timeout 8 stdbuf -oL -eL "$EARLYOOM_BIN" --dryrun -m 99,99 -s 99,99 "$@" 2>&1)"
+  LAST_RAW="$(timeout 8 stdbuf -oL -eL "$EARLYOOM_BIN" --dryrun -m 99,99 -s 100,100 "$@" 2>&1)"
   LAST_RC=$?
   VICTIM="$(printf '%s\n' "$LAST_RAW" | grep -oP 'process [0-9]+ uid [0-9]+ "\K[^"]+' | head -1)"
 }

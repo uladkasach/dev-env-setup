@@ -200,6 +200,28 @@ grove_provision_5_13_reach_declsrc() {
   esac
 }
 
+# .what = the two causes an AssumeRole AccessDenied wears, and which to ask first
+# .why  = the apply and the verify meet the same refusal; ONE holder keeps them at
+#         one diagnosis, since "an infra ask" alone steers a human to file a grant
+#         on a row the org may never have meant to hold
+# .note = prints to stderr
+grove_provision_5_13_reach_denied_causes_say() {
+  local org="$1" role="$2"
+  {
+    echo "      ⇒ TWO causes wear this one message, and they want OPPOSITE repairs:"
+    echo "      1. does a '${org}' row belong on a grove of THIS org at all?"
+    echo "         no  ⇒ 🔴 OURS. delete the row; no grant is owed, and none may"
+    echo "               be sought (rule.require.a-grove-reaches-its-own-org-only)"
+    echo "      2. only if yes — the role EXISTS and this box sits outside its"
+    echo "         trust policy ⇒ an ask of ${org}/infrastructure: trust this box's"
+    echo "         principal on '${role}', with all three actions at once:"
+    echo "         $(grove_aws_trust_actions_owed)"
+    echo "      ⇒ ask 1 FIRST. its answer is the ORG's, and the refusal says no"
+    echo "        word about it — an ask filed on a no buys a durable hop into"
+    echo "        another org's accounts, to silence a check that was right"
+  } >&2
+}
+
 # .what = read the grove role name out of infrastructure's own declaration
 # 🛑 anchor on GROVE_ROLE_NAME — the OIDC block above it holds the SAME keys, and
 #      its `prodReader` differs by one segment, so a bare grep looks right
@@ -336,7 +358,7 @@ grove_provision_5_13_reach_srcrepo() {
 }
 
 # .what = bring that clone CURRENT, where safe. stdout names which:
-#         current | ahead | dirty | detached | unreachable | absent
+#         current | ahead | dirty | detached | unreachable | carried | absent
 #
 # 🛑 .why THIS bundle owns the currency, and `5.10.repos` does not
 #   that bundle converges PRESENCE across ~140 clones and stops, on purpose — a
@@ -360,6 +382,18 @@ grove_provision_5_13_reach_sync() {
   #   one either. `absent` is the honest word for it
   repo="$(grove_provision_5_13_reach_srcrepo)" || { echo absent; return 0; }
 
+  # an EMPTY dir holds no clone and no carried tree: `absent`, the same word
+  #   `grove_provision_5_10_repos_state` gives it, so the two bundles agree
+  [[ -d "$repo" && -n "$(ls -A "$repo" 2>/dev/null)" ]] || { echo absent; return 0; }
+
+  # 🛑 a tree laid with NO `.git` is `carried`, never `absent`
+  #   - the rows read two files off disk (`_rolesrc`, `_arnsrc`) and the account
+  #     out of `declapract.use.yml`; none of them reads git. so a tree carried by
+  #     `git.grove.push` (which never sends `.git`) serves every row
+  #   - ⇒ this is how a box with no github read credential gets its hops
+  #   - it has no upstream, so it is never brought current — the upsert says so
+  [[ -e "$repo/.git" ]] || { echo carried; return 0; }
+
   git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || { echo absent; return 0; }
 
   # a tree with edits in flight is a human's, and is never advanced under them
@@ -382,6 +416,22 @@ grove_provision_5_13_reach_sync() {
   echo ahead
 }
 
+# .what = one `_envs` row `<org>:<env>:<reader>:<accountKey>:<roleKey>`, as its
+#   five fields on one `|`-split line: `org|env|reader|akey|rkey`
+# .why the upsert and the verify both read every field; two parses drift, and a
+#   `${pair##*:}` in the wrong slot reads the ROLE key as the account key
+# ⚠️ `|`, never a space: IFS whitespace collapses an empty field and shifts the rest
+# ⚠️ a short row still yields five fields; callers halt on `*:*:*:*:*` first
+grove_provision_5_13_reach_row_fields() {
+  local pair="$1" org env reader akey rkey rest
+  org="${pair%%:*}";    rest="${pair#*:}"
+  env="${rest%%:*}";    rest="${rest#*:}"
+  reader="${rest%%:*}"; rest="${rest#*:}"
+  akey="${rest%%:*}"
+  rkey="${rest##*:}"
+  printf '%s|%s|%s|%s|%s' "$org" "$env" "$reader" "$akey" "$rkey"
+}
+
 ######################################################################
 # .what = the profile name every row DECLARES, one per line
 #
@@ -400,12 +450,10 @@ grove_provision_5_13_reach_sync() {
 # .refs = gotcha.5-13-reach.demo=per-org-rows-and-the-reap, m7
 ######################################################################
 grove_provision_5_13_reach_declared_profiles() {
-  local owner pair rest org env
+  local owner pair org env _
   owner="$(grove_provision_5_13_reach_owner)"
   for pair in $(grove_provision_5_13_reach_envs); do
-    org="${pair%%:*}"
-    rest="${pair#*:}"
-    env="${rest%%:*}"
+    IFS='|' read -r org env _ <<< "$(grove_provision_5_13_reach_row_fields "$pair")"
     printf '%s.%s.%s\n' "$org" "$env" "$owner"
   done
 }

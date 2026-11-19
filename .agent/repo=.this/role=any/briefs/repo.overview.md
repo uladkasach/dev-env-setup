@@ -5,14 +5,16 @@
 personal dev-environment repo for debian-based linux (pop-os, ubuntu). it declares
 what a **grove** should hold, and converges any grove toward that declaration.
 
-## 🛑 .a GROVE spans BOTH kinds — the laptop is one, and this is load-bear
+## 🛑 .a GROVE spans every kind — the laptop is one, and this is load-bear
 
-settled by the human 2026-08-30: *"local and cloud are two types of groves."*
+**`local`, `house`, and `cloud` are PEER tiers** — the prefix of `$GROVE_ENV_SERVER`.
+`house` is never a platform: there is no `local@house`, only `house@<platform>`.
 
-| kind | `$GROVE_ENV_SERVER` | `--for` | reached by |
-|---|---|---|---|
-| **local** | `local@unix`, `local@cicd` | `local` | no transport — the shell is already on it |
-| **cloud** | `cloud@aws.ec2` | `cloud` | a duct (`term=duct`) |
+| kind | `$GROVE_ENV_SERVER` | `--for` | reached by | camp identity |
+|---|---|---|---|---|
+| **local** | `local@unix`, `local@cicd` | `local` | no transport — the shell is already on it | ✋ never |
+| **house** | `house@<platform>` | — (never derived) | undeclared here | ✋ never |
+| **cloud** | `cloud@aws.ec2`, `cloud@hetzner.hetzbot` | `cloud` | a duct (`term=duct`) | ✔ mandated |
 
 ⇒ inbound: a local grove takes none; a cloud grove takes its duct
 (`define.invariant.local-grove-is-outbound-only`).
@@ -105,7 +107,7 @@ number is a stable **identifier**, and the dispatch is the **order** — never
 reason about what runs before what from the digits.
 
 ⚠️ `sort -V` at the root is load-bear for the same reason: plain lexical order
-puts `10.x` before `2.x`. `prove.fix-texts-are-actionable` holds a fixture arm
+puts `10.x` before `2.x`. `prove.every-bundle-is-dispatched` holds a fixture arm
 for each of these two traps.
 
 ## .the one entrypoint
@@ -126,7 +128,7 @@ from a shell, `grove.provision` is the same command
 
 ## .$server = $tier@$platform
 
-`local@unix`, `local@cicd`, `cloud@aws.ec2`. a bundle that cannot run everywhere
+`local@unix`, `local@cicd`, `cloud@aws.ec2`, `cloud@hetzner.hetzbot`. a bundle that cannot run everywhere
 DECLINES inline, with an early return, beside the reason it declines for:
 
 ```sh
@@ -161,6 +163,7 @@ collocate into:
 | `grove.provision._.sh` | the entrypoint; root of the bundle tree |
 | `bundle.upgrade.sh` | the runtime — the one operation, at every depth |
 | `grove.for.sh` / `grove.env.sh` / `grove.pkg.sh` | shared runtime: target, server detection, package installs |
+| `grove.aws.sh` | shared runtime: the box's aws identity endpoint; the `~/.aws/config` swap that keeps `[default]` |
 | `grove.web.sh` | shared runtime: the ONE wire boundary. `web_fetch`, `web_verify_sha256`, `web_verify_gpg_signature`, `web_verify_gpg_fingerprints`, `git_clone`, and the bounded `web_npm` / `web_pnpm` / `web_corepack` / `web_flatpak`. sourced by the entrypoint at `grove.provision._.sh:263` |
 | `machine/` | systemd units + scripts. copied by FIVE bundles: `1.6.1.finders`, `1.6.2.monitor`, `1.7.usage`, `1.8.tmpfiles`, `4.3.4.snapshot` — no ONE owner, so no ONE dir to collocate into |
 | `cosmic.gtk.desert.css` | **nobody** — an orphan; see below |
@@ -214,10 +217,8 @@ the bundle.
 > ⚠️ an OWNER column is the cell most often asserted unchecked. grep for the `cmp` before you
 > write one (`rule.require.trust-but-verify`).
 
-⚠️ the two `util`/`backup` files are human-run utilities, NOT bundles. a bundle
-converges the machine; `backup_env.sh` reads the machine and writes OUT to
-1password. same nouns, opposite direction. neither is bundle-owned config, so neither
-moves.
+⚠️ the two `util`/`backup` files are human-run utilities, NOT bundles: `backup_env.sh`
+reads the machine and writes OUT to 1password, the opposite direction. neither moves.
 
 ## .other dirs
 
@@ -267,10 +268,8 @@ aaron-bond.better-comments@3.0.2
 …
 ```
 
-— so it is not valid yaml, and its name says "extensions to avoid" while its content dumps
-ALL installed ones. `profiles/main/data/extensions.yml` holds the real list as structured
-`enabled:` / `disabled:` entries with uuids, maintained by the extension. superseded; left in
-place as a record of a past extension set, the human's to discard.
+— not valid yaml, and it dumps ALL installed extensions, not redundant ones. the extension
+keeps the real list in `profiles/main/data/extensions.yml`. superseded; the human's to discard.
 
 `grove.bootstrap.sh` sits at the repo ROOT and is the single documented exemption
 from the bundle rule: it runs *before* the repo exists, so it cannot be a step of

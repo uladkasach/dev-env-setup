@@ -271,7 +271,7 @@ fi
 echo ""
 
 if [[ "$failed" -ne 0 ]]; then
-  echo "✋ prove.boot-claims-are-bounded-to-one-run" >&2
+  echo "💥 MalfunctionError: prove.boot-claims-are-bounded-to-one-run" >&2
   echo "   a boot that reports a PRIOR run's claims is a false ✋ machine, and a" >&2
   echo "   false ✋ is the half that gets a check silenced" >&2
   exit 1

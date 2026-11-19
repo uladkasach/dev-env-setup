@@ -9,10 +9,8 @@
 #   - ⇒ the second probe runs `aws configure export-credentials`, a consumer's call
 #   - (`rule.require.upgrade-entries-verify-themselves`)
 #
-# ⚠️ the probe is BOUNDED
-#   - IMDS with no route to 169.254.169.254 HANGS rather than refuses
-#   - ⇒ an unbounded verify stalls a whole run behind one metadata call
-#   - (`rule.require.bounded-probes-in-verifies`)
+# ⚠️ the probe is BOUNDED: an IMDS with no route HANGS rather than refuses
+#   (`rule.require.bounded-probes-in-verifies`)
 #
 # guarantee:
 #   - READ-ONLY: it observes and mutates no state
@@ -20,22 +18,23 @@
 ######################################################################
 
 grove_provision_5_6_aws_configure_verify() {
-  local cfg="$HOME/.aws/config"
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "the camp aws identity"; return 0; }
+  local cfg endpoint road
+  cfg="$(grove_aws_config)"
 
-  ####################################################################
-  # applicability — the same IMDS question the upsert asks
-  ####################################################################
-  if ! curl -sS -m 3 -X PUT 'http://169.254.169.254/latest/api/token' \
-    -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' >/dev/null 2>&1; then
-    echo "   🌙 not applicable — no ec2 instance metadata here"
-    return 0
-  fi
+  # applicability — the upsert's platform question. an ec2 grove whose metadata
+  #   does not answer is a FAULT, never a 🌙: claim 2 below names the gap
+  endpoint="$(grove_aws_identity_endpoint)"; road="$(grove_aws_identity_road "$?")"
+  local rc=0
+  grove_provision_5_6_aws_road_verify "$road" "$cfg" "$endpoint" || rc=$?
+  (( rc == 3 )) && return 0
+  (( rc == 0 )) || return "$rc"
 
   ####################################################################
   # claim 1 — the profile is DECLARED
   ####################################################################
   if [[ ! -r "$cfg" ]] || ! grep -q '^\[profile ambient\]' "$cfg" 2>/dev/null; then
-    echo "   ✋ the 'ambient' profile is NOT declared in ~/.aws/config" >&2
+    echo "   ✋ ConstraintError: the 'ambient' profile is NOT declared in ~/.aws/config" >&2
     echo "      ⇒ every consumer that reads AWS_PROFILE has no name to read," >&2
     echo "        so it fails with 'AWS_PROFILE not set' while the box's own" >&2
     echo "        instance role sits one metadata call away" >&2
@@ -43,6 +42,29 @@ grove_provision_5_6_aws_configure_verify() {
     return 1
   fi
   echo "   • the 'ambient' profile is declared ✔"
+
+  # claim 1b — on hetzner, `ambient` mirrors [default]'s endpoint (infra owns the
+  #   port and may move it; a stale mirror times out in claim 2 with no cause named),
+  #   and our fence holds no [default] of its own
+  if [[ -n "$endpoint" ]]; then
+    local mirror
+    mirror="$(grove_aws_config_value cfg="$cfg" name='profile ambient' key=ec2_metadata_service_endpoint)"
+    if [[ "$mirror" != "$endpoint" ]]; then
+      echo "   ✋ ConstraintError: [profile ambient] names endpoint '${mirror:-<none>}', and [default] names '$endpoint'" >&2
+      echo "      ⇒ infra's identity skill moved the signer; the mirror is stale" >&2
+      echo "      fix: rhx grove.provision --what 5.6.aws --mode apply" >&2
+      return 1
+    fi
+    echo "   • [profile ambient] mirrors [default]'s endpoint ✔ ($endpoint)"
+
+    if grove_provision_5_6_aws_fence_holds_default "$cfg"; then
+      echo "   ✋ ConstraintError: this bundle's fence in $cfg holds a [default] block" >&2
+      echo "      ⇒ on a hetzner grove [default] is infra's; a second one here shadows it" >&2
+      echo "      fix: rhx grove.provision --what 5.6.aws --mode apply" >&2
+      return 1
+    fi
+    echo "   • [default] is infra's alone ✔ (this bundle's fence holds none)"
+  fi
 
   ####################################################################
   # claim 2 — and it LIVES. the claim above says only that text exists
@@ -57,18 +79,23 @@ grove_provision_5_6_aws_configure_verify() {
     if printf '%s' "$out" | grep 'AWS_ACCESS_KEY_ID' >/dev/null; then
       echo "   • the ambient profile yields live credentials ✔ (value not printed)"
     else
-      echo "   ✋ the profile exported NO access key" >&2
+      echo "   ✋ ConstraintError: the profile exported NO access key" >&2
       echo "      ⇒ it is declared and inert, which reads as healthy to a" >&2
       echo "        presence check and fails at the first real aws call" >&2
       return 1
     fi
   else
-    echo "   ✋ the ambient profile could not export credentials" >&2
+    echo "   ✋ ConstraintError: the ambient profile could not export credentials" >&2
     echo "      ⇒ the block is present, so a file check would report ✔ — this" >&2
     echo "        is exactly the gap between DECLARED and LIVE" >&2
     echo "      it said:" >&2
     printf '%s\n' "$out" | head -3 | sed 's/^/        /' >&2
-    echo "      fix: confirm an iam role is attached to this instance" >&2
+    if [[ -n "$endpoint" ]]; then
+      echo "      fix: confirm infra's signer serves on $endpoint (systemctl status of its" >&2
+      echo "        serve unit) and its roles-anywhere session is live — an ask of infra" >&2
+    else
+      echo "      fix: confirm an iam role is attached to this instance" >&2
+    fi
     return 1
   fi
 
@@ -89,14 +116,20 @@ grove_provision_5_6_aws_configure_verify() {
     timeout -k 5 20 aws configure get region 2>&1)" && [[ -n "$bare" ]]; then
     echo "   • with NO profile named, a region still resolves ✔ ($bare)"
   else
-    echo "   ✋ with NO profile named, NO region resolves" >&2
+    echo "   ✋ ConstraintError: with NO profile named, NO region resolves" >&2
     echo "      ⇒ a consumer that drops AWS_PROFILE (keys in env outrank it)" >&2
     echo "        then fails on a region it cannot find — while a check that" >&2
     echo "        NAMES the profile reads perfectly green" >&2
     echo "      ⇒ a laptop hides this: a human's ~/.aws/config carries a" >&2
     echo "        [default] block, so a profile-less sdk still finds a region" >&2
-    echo "      fix: rhx grove.provision --what 5.6.aws --mode apply" >&2
-    echo "        (it writes a [default] block that mirrors [profile ambient])" >&2
+    if [[ -n "$endpoint" ]]; then
+      # 🛑 on hetzner [default] is INFRA's, and no apply here writes it
+      echo "      fix: an ask of infra — its [default] in $cfg must carry a region" >&2
+      echo "        (this repo never writes infra's [default], so no apply clears this)" >&2
+    else
+      echo "      fix: rhx grove.provision --what 5.6.aws --mode apply" >&2
+      echo "        (it writes a [default] block that mirrors [profile ambient])" >&2
+    fi
     return 1
   fi
 
@@ -112,7 +145,7 @@ grove_provision_5_6_aws_configure_verify() {
   if [[ -e "$HOME/.aws/credentials" ]]; then
     echo "   • ~/.aws/credentials is present ✔ (aws-sdk v2 opens it unconditionally)"
   else
-    echo "   ✋ ~/.aws/credentials is ABSENT" >&2
+    echo "   ✋ ConstraintError: ~/.aws/credentials is ABSENT" >&2
     echo "      ⇒ this box sets AWS_SDK_LOAD_CONFIG=1 (2.5.zsh/zshrc.sh), so aws-sdk" >&2
     echo "        v2 opens that file to derive a region and throws ENOENT when" >&2
     echo "        it is absent — even with valid credentials already in env" >&2
@@ -198,7 +231,7 @@ grove_provision_5_6_aws_configure_verify() {
       echo "       a fresh login is clean; to clear this one: rhx duct.reboot"
     fi
   else
-    echo "   ✋ a fresh non-interactive zsh exports AWS_PROFILE='$seen'" >&2
+    echo "   ✋ ConstraintError: a fresh non-interactive zsh exports AWS_PROFILE='$seen'" >&2
     echo "      ⇒ keyrack checks 'os.envvar' FIRST, so this one value outranks" >&2
     echo "        EVERY rack entry on this box — every org, every env. a suite" >&2
     echo "        that asks the rack for its account gets '$seen' instead, and" >&2

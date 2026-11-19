@@ -1,0 +1,61 @@
+## 5.6.aws configure.upsert (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of the camp aws identity: the camp seat
+
+## 5.6.aws configure.verify (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of the camp aws identity: the camp seat
+
+## 5.12.rack configure.upsert (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of the rack's camp entries: the camp seat
+
+## 5.12.rack configure.verify (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of the rack's camp entries: the camp seat
+
+## 5.4.gh configure.upsert (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of github auth: the camp seat
+
+## 5.4.gh configure.verify (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of github auth: the camp seat
+
+## 5.10.repos provision.upsert (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of the org repos: the camp seat
+
+## 5.10.repos provision.verify (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of the org repos: the camp seat
+
+## 5.10.repos configure.upsert (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of the org repos: the camp seat
+
+## 5.10.repos configure.verify (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of the org repos: the camp seat
+
+## 5.13.reach configure.upsert (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of account reach: the camp seat
+
+## 5.13.reach configure.verify (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of account reach: the camp seat
+
+## 5.15.identity configure.upsert (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of the git identity: the camp seat
+
+## 5.15.identity configure.verify (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of the git identity: the camp seat
+
+## 5.16.keys configure.verify (rc 0)
+   🌙 declined — 'ground' is this grove's ADMIN seat: it holds no aws identity
+      and does no credentialed work. owner of the work keys: the camp seat
+
+

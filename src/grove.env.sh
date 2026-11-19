@@ -523,11 +523,12 @@ grove_env_derive() {
       echo "     GROVE_ENV_SERVER=cloud@aws.ec2         grove.provision   # an ec2 grove" >&2
       echo "     GROVE_ENV_SERVER=cloud@hetzner.hetzbot grove.provision   # a hetzner grove" >&2
       echo "" >&2
-      echo "   on a hetzner grove, the durable fix is its bootstrap: it writes one" >&2
-      echo "   line, 'hetzner.hetzbot', into the platform declaration:" >&2
+      echo "   on a hetzner grove, the durable fix is one line, 'hetzner.hetzbot'," >&2
+      echo "   in the platform declaration:" >&2
       echo "     $(grove_env_platform_file)" >&2
-      echo "   infra's hetzner bootstrap owns that write — ask 3 of this repo's" >&2
-      echo "     .behavior/v2026_10_25.feat-tailscale-on-every-machine/handoff.infra.grove-tailnet-join.md" >&2
+      echo "   the grove's boot lays it, from the registry, over the ground seat:" >&2
+      echo "     rhx git.grove.set <grove> --platform hetzner.hetzbot" >&2
+      echo "     rhx git.grove.provision boot <grove> --mode apply" >&2
       echo "   the override above serves one run until that file lands." >&2
       echo "   on your laptop over ssh: the desktop rung declines an ssh seat, so" >&2
       echo "   name it local@unix, or run at the laptop's own keyboard." >&2
@@ -631,6 +632,50 @@ grove_env_server_tier() { echo "${GROVE_ENV_SERVER%%@*}"; }
 
 # .what = the platform half of $server — `unix`, `aws.ec2`, or `hetzner.hetzbot`
 grove_env_server_platform() { echo "${GROVE_ENV_SERVER#*@}"; }
+
+# .what = the seat name this shell runs as: `GROVE_ENV_SEAT` when set, else the login
+# .why  = a cloud grove splits two seats (`term=seat`): `ground` holds sudo and
+#   converges box-wide facts; `camper` does the work. the name IS the declaration —
+#   infra's bootstrap creates both. the override serves a play, never a box
+grove_env_seat() { printf '%s' "${GROVE_ENV_SEAT:-$(id -un)}"; }
+
+# .what = is this shell the ADMIN seat of a cloud grove — the cloud tier, as `ground`?
+# .why  = the admin seat holds NO aws identity and does no credentialed work: no rack
+#   token, no gh auth, no git identity, no org repos, no reach, no keys. each such
+#   bundle declines here, and the boot gate expects none
+#   (`rule.require.aws-params-on-camp-groves-only`)
+grove_env_seat_is_admin() {
+  [[ "${GROVE_ENV_SERVER:-}" == cloud@* && "$(grove_env_seat)" == ground ]]
+}
+
+# .what = the one decline line every credentialed bundle prints on the admin seat
+grove_env_seat_admin_declines() {
+  echo "   🌙 declined — '$(grove_env_seat)' is this grove's ADMIN seat: it holds no aws identity"
+  echo "      and does no credentialed work. owner of $1: the camp seat"
+}
+
+# .what = the one verdict for "no ambient identity answers here", by tier
+#   (a transformer + its words: returns 0 where a decline is correct, 1 where it is a fault)
+# .why  = a laptop has no badge by design, so a 🌙 is true there. a camp seat MUST
+#   have one, so the same silence there is a dead signer or a lapsed session, and
+#   a 🌙 would let the very apply every fix-text names read as success
+grove_env_ambient_absent_says() {
+  local what="$1"
+  if [[ "${GROVE_ENV_SERVER:-}" != cloud@* ]]; then
+    echo "   🌙 declined — no ambient identity here, so no badge for $what"
+    echo "      ⇒ off camp this is correct: '${GROVE_ENV_SERVER:-unset}' carries no mandated identity;"
+    echo "        a laptop's route to the same profile is an sso login, a human's to perform"
+    return 0
+  fi
+  echo "   ✋ no ambient identity answers on this camp seat, so $what cannot hold" >&2
+  echo "      ⇒ a grove's [default] must answer: the identity bundle names why it does not" >&2
+  if [[ "$(grove_env_server_platform)" == hetzner.hetzbot ]]; then
+    echo "      ⇒ on hetzner the [default] reads infra's signer — a stopped signer unit or" >&2
+    echo "        a lapsed roles-anywhere session reads exactly like this" >&2
+  fi
+  echo "      fix: rhx grove.provision --what 5.6.aws --mode plan" >&2
+  return 1
+}
 
 ######################################################################
 # .note = there are NO `grove_env_has_*` predicates, and that is deliberate.

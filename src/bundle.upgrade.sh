@@ -446,6 +446,43 @@ bundle.root.owns() {
 }
 
 ######################################################################
+# .what = render a tool's own words under a 💥, one `⇒ it said:` row per line
+# .why  = a tool's raw stderr lands at column 0, above the header that cites it,
+#         and breaks the tree; captured and replayed here, it nests under its 💥
+#
+# usage:
+#   said="$(sudo install … 2>&1)" || { echo "   💥 …" >&2; bundle.said "      " "$said" >&2; }
+######################################################################
+bundle.said() {
+  local indent="$1" text="$2" line
+  [[ -n "$text" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -n "${line//[[:space:]]/}" ]] || continue
+    printf '%s⇒ it said: %s\n' "$indent" "$line"
+  done <<< "$text"
+}
+
+######################################################################
+# .what = run a command with its stdout streamed and its stderr kept in BUNDLE_SAID
+# .why  = stdout is the status a human watches (apt's progress, fnm's download), so
+#         it is never captured; stderr is the reason a 💥 cites, so it is kept for
+#         `bundle.said` — and on a pass it is replayed as it came, so no word is lost
+#
+# usage:
+#   bundle.run pkg_install libatomic1 || { echo "   💥 …" >&2; bundle.said "      " "$BUNDLE_SAID" >&2; }
+######################################################################
+bundle.run() {
+  local errf rc=0
+  BUNDLE_SAID=""
+  errf="$(mktemp)" || { BUNDLE_SAID="mktemp failed, so the tool's own words were not kept"; return 1; }
+  "$@" 2>"$errf" || rc=$?
+  BUNDLE_SAID="$(cat "$errf")"
+  rm -f "$errf"
+  (( rc == 0 )) && [[ -n "$BUNDLE_SAID" ]] && printf '%s\n' "$BUNDLE_SAID" >&2
+  return "$rc"
+}
+
+######################################################################
 # .what = drive one bundle
 ######################################################################
 bundle.upgrade() {

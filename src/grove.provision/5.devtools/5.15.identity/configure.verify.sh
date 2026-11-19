@@ -21,6 +21,7 @@
 ######################################################################
 
 grove_provision_5_15_identity_configure_verify() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "the git identity"; return 0; }
   local email name
   email="$(git config --global user.email 2>/dev/null || true)"
   name="$(git config --global user.name 2>/dev/null || true)"

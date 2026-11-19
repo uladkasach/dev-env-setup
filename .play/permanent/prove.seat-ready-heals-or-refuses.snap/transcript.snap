@@ -1,0 +1,33 @@
+
+## a tailnet seat with no owned block, another block names ground → laid to camper
+rc=0 seat=camper@grove-fix:22
+   🔧 alias 'grove-fix' laid to the registry's seat (camper@grove-fix:22)
+
+## the same seat, run again → kept, silent
+rc=0 seat=camper@grove-fix:22
+
+
+## a tailnet seat whose owned block names a stale host → relaid to the registry's host
+rc=0 seat=camper@grove-fix:22
+   🔧 alias 'grove-fix' laid to the registry's seat (camper@grove-fix:22)
+
+## an --alias seat whose block names another user → refused
+rc=2 seat=ground@infra-host:22
+✋ ConstraintError: ssh alias 'grove-fix-infra' dials ground@infra-host:22, and the registry names user 'camper'
+   ⇒ its Host block is not this repo's to write (an --alias seat, or a tunnel the wake lays)
+   fix: rhx git.grove.wake grove-fix-infra
+
+## the refusal names the fix
+rc=2 seat=ground@infra-host:22
+✋ ConstraintError: ssh alias 'grove-fix-infra' dials ground@infra-host:22, and the registry names user 'camper'
+   ⇒ its Host block is not this repo's to write (an --alias seat, or a tunnel the wake lays)
+   fix: rhx git.grove.wake grove-fix-infra
+
+## an --alias seat whose block names its user → passes
+rc=0 seat=camper@infra-host:22
+
+
+## a grove the registry does not hold → passes, the caller names the absence
+rc=0 seat=ground@nowhere:22
+
+

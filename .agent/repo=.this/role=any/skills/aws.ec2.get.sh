@@ -62,20 +62,20 @@ set -uo pipefail
 #         holds whatever that policy says, today or after the next edit.
 #
 # ⚠️ the CHECKOUT's copy, never `~/.bash_aliases.ductwork.sh` — a skill in this
-#    tree is judged against this tree, and an installed copy may be older
+#    tree is judged against this tree, and an installed copy may be older.
+#    sourced UNCONDITIONALLY: `rhx` loads the installed copy via `BASH_ENV`,
+#    so a `command -v` guard would keep it (measured in `git.grove.operations.sh`)
 ######################################################################
-if ! command -v __duct_strip_escapes >/dev/null 2>&1; then
-  _aws_ec2_ductwork="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
-  if [[ -r "$_aws_ec2_ductwork" ]]; then
-    # shellcheck disable=SC1090
-    source "$_aws_ec2_ductwork"
-  else
-    echo "✋ ductwork is absent from this checkout, so aws-chosen bytes cannot be stripped" >&2
-    echo "   looked at: $_aws_ec2_ductwork" >&2
-    echo "   ⇒ it owns __duct_strip_escapes, the one sink between a tag value" >&2
-    echo "     and a terminal that OBEYS what it is sent" >&2
-    exit 1
-  fi
+_aws_ec2_ductwork="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
+if [[ -r "$_aws_ec2_ductwork" ]]; then
+  # shellcheck disable=SC1090
+  source "$_aws_ec2_ductwork"
+else
+  echo "✋ ductwork is absent from this checkout, so aws-chosen bytes cannot be stripped" >&2
+  echo "   looked at: $_aws_ec2_ductwork" >&2
+  echo "   ⇒ it owns __duct_strip_escapes, the one sink between a tag value" >&2
+  echo "     and a terminal that OBEYS what it is sent" >&2
+  exit 1
 fi
 
 # ⚠️ read the whole ARG VECTOR, never `$1` — rhachet injects `--skill <slug>` ahead

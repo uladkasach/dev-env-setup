@@ -100,12 +100,13 @@
 #      ⇒ so a pipe is legal wherever there is a source to read from. this skill
 #        has none, which is the whole reason it asks for a tty.
 #
-# .why `--vault aws.params` — a CENTRAL store, and only on an EC2 grove
-#         an ec2 grove answers IMDS, and IMDS is the one identity `aws.params`
-#         accepts for an `@all` slug (`asKeyrackAwsParamIdentity.js:17`). a grove
-#         is NOT always ec2: a local, house, or hetzner grove has no IMDS, so rung 0b
-#         probes the far box and refuses it before any prompt
-#         (`rule.forbid.aws-params-off-ec2`). such a grove keeps its token in
+# .why `--vault aws.params` — a CENTRAL store, and only on a CAMP grove
+#         keyrack reads an `@all` slug as `source: imds` (`asKeyrackAwsParamIdentity.js:17`),
+#         which clears AWS_PROFILE and rides the sdk default chain — so `[default]`
+#         answers: IMDS on ec2, infra's IAM Roles Anywhere signer on hetzner. every
+#         camp grove carries that identity by mandate. a local or house grove has
+#         none, so rung 0b probes the far box and refuses it before any prompt
+#         (`rule.require.aws-params-on-camp-groves-only`). such a grove keeps its token in
 #         `os.secure`, set on the box itself — `5.4.gh`'s fix-text names the
 #         command. a laptop authed itself with `gh auth login`, so it never
 #         reaches this skill at all.
@@ -161,7 +162,7 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "  --owner    keyrack owner; default ehmpath"
   echo "  --org      org sigil for the slug; default @all (every org reads it)"
   echo ""
-  echo "an ec2 grove only: off ec2 the token lives in os.secure, set on the box."
+  echo "a camp grove only: on a local or house grove the token lives in os.secure, set on the box."
   echo ""
   echo "the value is TYPED on the box over an interactive ssh tty — never passed"
   echo "as an argument, never sent down a duct. see the header for why."
@@ -175,10 +176,10 @@ KR_ENV="camp"
 KR_OWNER="ehmpath"
 KR_ORG="@all"
 KR_KEY="GITHUB_TOKEN"
-# central, not a replica — safe only on an ec2 box, which holds the IMDS identity
-# aws.params wants. rung 0b PROBES that before any write; a local, house, or hetzner grove is
-# refused there (`rule.forbid.aws-params-off-ec2`). see the `.why --vault aws.params`
-# block in the header
+# central, not a replica — safe only on a camp grove, which holds the camp identity
+# aws.params wants. rung 0b PROBES that before any write; a local or house grove is
+# refused there (`rule.require.aws-params-on-camp-groves-only`). see the
+# `.why --vault aws.params` block in the header
 KR_VAULT="aws.params"
 # the checkout every remote `rhx` must run from — see the ⚠️ in the header
 KR_REPO="git/more/dev-env-setup"
@@ -228,20 +229,20 @@ source ~/.bash_aliases 2>/dev/null || true
 # ⚠️ the CHECKOUT's copy, never `~/.bash_aliases.ductwork.sh` — a skill in
 #    this tree is judged against this tree, and an installed copy may be
 #    older. the `source ~/.bash_aliases` above is for `git_alias_grove`, and
-#    it is exactly the stale-copy hazard this block refuses to inherit.
+#    it is exactly the stale-copy hazard this block refuses to inherit — so
+#    the source below is UNCONDITIONAL (a `command -v` guard kept that copy;
+#    the measurement sits in `git.grove.operations.sh`).
 ######################################################################
-if ! command -v __duct_strip_escapes >/dev/null 2>&1; then
-  _auth_gh_ductwork="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
-  if [[ -r "$_auth_gh_ductwork" ]]; then
-    # shellcheck disable=SC1090
-    source "$_auth_gh_ductwork"
-  else
-    echo "✋ ConstraintError: ductwork is absent from this checkout, so grove bytes cannot be stripped" >&2
-    echo "   looked at: $_auth_gh_ductwork" >&2
-    echo "   ⇒ it owns __duct_strip_escapes, the one sink between a grove's" >&2
-    echo "     output and a terminal that OBEYS what it is sent" >&2
-    exit 1
-  fi
+_auth_gh_ductwork="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
+if [[ -r "$_auth_gh_ductwork" ]]; then
+  # shellcheck disable=SC1090
+  source "$_auth_gh_ductwork"
+else
+  echo "✋ ConstraintError: ductwork is absent from this checkout, so grove bytes cannot be stripped" >&2
+  echo "   looked at: $_auth_gh_ductwork" >&2
+  echo "   ⇒ it owns __duct_strip_escapes, the one sink between a grove's" >&2
+  echo "     output and a terminal that OBEYS what it is sent" >&2
+  exit 1
 fi
 
 REGISTRY="${GIT_FOREST_DIR:-$HOME/.git.forest}/groves/$GROVE.json"
@@ -251,6 +252,11 @@ if [[ ! -f "$REGISTRY" ]]; then
   exit 2
 fi
 SSH_ALIAS=$(jq -r '.sshAlias // .name' "$REGISTRY")
+# 🛑 a token placed on the wrong seat lands in another rack: the alias must dial
+#   the registry's seat first (`grove_ssh_seat_ready`, git.grove.ssh.operations.sh)
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.ssh.operations.sh"
+grove_ssh_seat_ready "$GROVE" || exit $?
 
 ######################################################################
 # 🛑 the alias is CLAMPED before ssh reads it as a positional
@@ -288,7 +294,7 @@ echo "🐢 heres the wave..."
 echo ""
 echo "🔑 git.grove.auth.github.set $GROVE --mode $MODE"
 echo "   ├─ slug:  owner=$KR_OWNER  ${KR_ORG}.${KR_ENV}.${KR_KEY}"
-echo "   ├─ vault: $KR_VAULT  (central; an ec2 grove's IMDS answers it)"
+echo "   ├─ vault: $KR_VAULT  (central; a camp grove's identity answers it)"
 echo "   └─ drive"
 
 # .what = run one command on the grove, non-interactive, and hand back its output
@@ -308,8 +314,22 @@ echo "   └─ drive"
 #         a login shell on this box prints `keynav started` from the `.profile`
 #         line `1.1.keybinds` appends, so login-shell STDOUT carries a banner that
 #         belongs to no probe. an exit code carries no banner
+#
+# 🛑 .why a wall-clock bound beside ConnectTimeout
+#         ConnectTimeout bounds only a dead NETWORK. a login shell that hangs (a
+#         stuck rc line, an aws read with no answer) holds the session past it,
+#         so every probe rides `timeout -k` (`rule.require.bounded-probes-in-verifies`).
+#         60s covers the slowest probe here: a keyrack read that unlocks first
+#         (a play narrows it to prove the bound bites; no caller should)
+GROVE_AUTH_ASK_BOUND="${GROVE_AUTH_ASK_BOUND:-60}"
+
+# .what = did the `timeout` bound end the probe, rather than the probe answer?
+#         124 = timeout's TERM fired · 137 = its `-k` KILL fired after
+_probe_was_bounded() { (( $1 == 124 || $1 == 137 )); }
+
 _ask() {
-  ssh -o BatchMode=yes -o ConnectTimeout=15 "$SSH_ALIAS" "bash -lc $(printf '%q' "$*")" >/dev/null 2>&1
+  timeout -k 5 "$GROVE_AUTH_ASK_BOUND" \
+    ssh -o BatchMode=yes -o ConnectTimeout=15 "$SSH_ALIAS" "bash -lc $(printf '%q' "$*")" </dev/null >/dev/null 2>&1
 }
 
 # .what = the same question, but keeps stderr so a MALFUNCTION can be quoted
@@ -321,7 +341,8 @@ _ask() {
 #    drifts. `2>&1` first, so BOTH streams meet the sink (ssh relays the remote
 #    command's stderr byte for byte, and the pipe alone would carry neither)
 _ask_loud() {
-  ssh -o BatchMode=yes -o ConnectTimeout=15 "$SSH_ALIAS" "bash -lc $(printf '%q' "$*")" 2>&1 \
+  timeout -k 5 "$GROVE_AUTH_ASK_BOUND" \
+    ssh -o BatchMode=yes -o ConnectTimeout=15 "$SSH_ALIAS" "bash -lc $(printf '%q' "$*")" </dev/null 2>&1 \
     | __duct_strip_escapes
 }
 
@@ -336,27 +357,73 @@ if ! _ask true; then
 fi
 echo "      ├─ box  reachable at '$SSH_ALIAS'"
 
-# 0b. does the box hold an ec2 identity? only then is aws.params readable
+# 0b. is the box a CAMP grove, and does its camp identity answer? only then is
+#     aws.params readable
 #
-# 🛑 `rule.forbid.aws-params-off-ec2`. this rung used to be a comment — "a grove is
-#    always ec2" — and that is true of an EC2 grove only. a local, house, or hetzner grove
-#    has no instance role, so a set there writes into whatever account its shell
-#    holds, and no read on that box ever gets the value back
-# ⇒ PROBED, never claimed: the same IMDS token ask `5.6.aws` makes. `-f` so an http
-#    refusal fails too, `-m 3` so a box with no route to IMDS answers in seconds
-if ! _ask 'curl -fsS -m 3 -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60"'; then
-  echo "      └─ ✋ ConstraintError: grove '$GROVE' has no ec2 identity — IMDS does not answer there" >&2
+# 🛑 `rule.require.aws-params-on-camp-groves-only`. the gate is the TIER, never the
+#    platform: a camp grove (`cloud@*`) carries the camp identity by mandate — an
+#    ec2 box through its instance role, a hetzner box through infra's IAM Roles
+#    Anywhere signer. a local or house grove has none, so a set there writes into
+#    whatever account its shell holds, and no read on that box gets the value back
+# ⇒ PROBED, never claimed, in two halves, both on the FAR box:
+#    a. the tier — the box's own `grove_env_derive`, the same one its provision reads
+#    b. the identity — the road keyrack's `@all` read takes: the sdk default chain
+#       with AWS_PROFILE cleared, so `[default]` answers (IMDS on ec2, the signer on
+#       hetzner). bounded, so a dead endpoint answers in seconds
+#
+# ⚠️ the box NAMES its server, and the gate reads the name — never the probe's exit.
+#    an exit collapses three states: not camp, no checkout to derive with, and a
+#    derive that fails closed (a hetzner box with no /etc/grove/platform). only
+#    the first is a refusal; the other two are a box not yet provisioned
+_tier_of() { printf '%s\n' "$1" | awk -F= '$1 == "GROVE_ENV_SERVER" { print $2; exit }'; }
+TIER_SAID="$(_ask_loud "source ~/$KR_REPO/src/grove.env.sh && grove_env_derive && printf 'GROVE_ENV_SERVER=%s\n' \"\$GROVE_ENV_SERVER\"")"; TIER_RC=$?
+TIER="$(_tier_of "$TIER_SAID")"
+# a probe the bound ended said naught about the tier — never read it as "not camp"
+if _probe_was_bounded "$TIER_RC"; then
+  echo "      └─ 💥 MalfunctionError: grove '$GROVE' did not answer the tier probe within ${GROVE_AUTH_ASK_BOUND}s" >&2
   echo "" >&2
-  echo "  why: this skill stores the token in aws.params, and only an ec2 box can" >&2
-  echo "       read that vault. a local, house, or hetzner grove would get a value" >&2
-  echo "       it can never read back, written into whatever account its shell holds" >&2
+  echo "  why: a login shell on the box held the session past the bound — an rc line" >&2
+  echo "       that waits, or a derive with no answer. the tier is unknown, not denied" >&2
+  echo "  fix: read the box's own derive, then re-run —" >&2
+  echo "    rhx git.grove.send $GROVE --what 'rhx grove.provision --mode plan'" >&2
+  exit 1
+fi
+if [[ -z "$TIER" ]]; then
+  echo "      └─ 💥 MalfunctionError: grove '$GROVE' could not name its own tier" >&2
+  echo "" >&2
+  echo "  why: its derive did not answer — no checkout at ~/$KR_REPO/src, or a derive" >&2
+  echo "       that fails closed (a hetzner box with no /etc/grove/platform yet)" >&2
+  echo "  it said:" >&2
+  printf '%s\n' "${TIER_SAID:-(no words)}" | head -6 | sed 's/^/    /' >&2
+  echo "  fix: provision it first — the boot lays the checkout and the platform:" >&2
+  echo "    rhx git.grove.provision boot $GROVE --mode apply" >&2
+  exit 1
+fi
+if [[ "$TIER" != cloud@* ]]; then
+  echo "      └─ ✋ ConstraintError: grove '$GROVE' is not a camp grove (its GROVE_ENV_SERVER is $TIER)" >&2
+  echo "" >&2
+  echo "  why: this skill stores the token in aws.params, and only a camp grove holds" >&2
+  echo "       the camp identity that reads it back. a local or house grove would get" >&2
+  echo "       a value written into whatever account its shell holds" >&2
   echo "  fix: keep the token in os.secure instead — run this ON that grove, at a tty:" >&2
   echo "    cd ~/$KR_REPO && rhx keyrack set \\" >&2
   echo "      --owner $KR_OWNER --key $KR_KEY --org $KR_ORG --env $KR_ENV --vault os.secure" >&2
   echo "    (or, on a box with a human: gh auth login)" >&2
   exit 2
 fi
-echo "      ├─ ec2  the box holds an instance identity, so aws.params is readable"
+if ! _ask 'env -u AWS_PROFILE timeout 15 aws sts get-caller-identity'; then
+  echo "      └─ ✋ ConstraintError: grove '$GROVE' is a camp grove, and its camp identity does not answer" >&2
+  echo "" >&2
+  echo "  why: a camp grove carries the camp aws identity by MANDATE, on every seat;" >&2
+  echo "       this seat's [default] chain answered no identity, so aws.params is" >&2
+  echo "       unreadable here and a set would be read back by naught" >&2
+  echo "  fix: on hetzner, infra wires [default] to its IAM Roles Anywhere signer —" >&2
+  echo "       run ahbode/infrastructure's grove identity skill for this seat; on ec2," >&2
+  echo "       the instance role is detached. then prove it on the box:" >&2
+  echo "    rhx git.grove.send $GROVE --what 'rhx grove.provision --what 5.6.aws --mode apply'" >&2
+  exit 2
+fi
+echo "      ├─ camp the box is a camp grove and its identity answers, so aws.params is readable"
 
 # 1. is keyrack even ON the box? it ships inside rhachet, which 5.3.brains installs
 if ! _ask 'command -v rhx'; then

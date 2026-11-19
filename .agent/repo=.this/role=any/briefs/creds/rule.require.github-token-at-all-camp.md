@@ -73,17 +73,19 @@ the pat.
 
 ### ✔ `--vault aws.params` — shipped on purpose, and it is the ONLY vault this slug wants
 
-a **cloud grove is exclusively ec2**, so IMDS is always there — and IMDS is the one identity
-`aws.params` accepts for an `@all` slug (`asKeyrackAwsParamIdentity.js:17`). the laptop's
-absence of IMDS costs this slug no capability, because a **local box is human-backed**: it
-authed itself with `gh auth login` on the way past and never reads this slug at all.
+a **camp grove always carries the camp identity**, served as an IMDS answer: ec2 through its
+instance role, hetzner through infra's IAM Roles Anywhere signer at the loopback endpoint
+`[default]` names. that IMDS answer is the one identity `aws.params` accepts for an `@all` slug
+(`asKeyrackAwsParamIdentity.js:17`). the laptop's lack of one costs this slug no capability,
+because a **local box is human-backed**: it authed itself with `gh auth login` on the way past
+and never reads this slug at all.
 
 so the two boxes need different things and each has what it needs. that is the design, not a
 compromise:
 
 | box | how it reaches github | why |
 |---|---|---|
-| cloud grove | `@all.camp.GITHUB_TOKEN` @ `aws.params` | headless — no human to answer a login; ec2 — so IMDS is always there |
+| cloud grove | `@all.camp.GITHUB_TOKEN` @ `aws.params` | headless — no human to answer a login; camp — so the camp identity is always there (`rule.require.aws-params-on-camp-groves-only`) |
 | local laptop | `gh auth login`, by hand | a human is at the keyboard, so the cheapest path is the direct one |
 
 ⚠️ **do not "fix" this to `os.secure` for laptop compatibility.** `os.secure` is a REPLICA —

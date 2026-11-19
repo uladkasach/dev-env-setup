@@ -1,0 +1,511 @@
+## 5.6.aws · hetzner first apply (rc 0)
+   • ~/.aws/credentials created, EMPTY ✔ (aws-sdk v2 opens it unconditionally)
+   • the 'ambient' profile is declared ✔ (role: grove-role, region: us-east-1)
+     .endpoint = http://127.0.0.1:9911, mirrored from [default]
+   • [default] read, never written ✔ (infra's identity skill owns it)
+     .note = it names the platform's role; it stores no credential
+
+## 5.6.aws · hetzner second apply (rc 0)
+   • ~/.aws/credentials already present; left untouched ✔
+   • the 'ambient' profile is current ✔ (role: grove-role, region: us-east-1; no write)
+   • [default] read, never written ✔ (infra's identity skill owns it)
+
+## 5.6.aws · hetzner apply after infra's rewrite (rc 0)
+   • ~/.aws/credentials already present; left untouched ✔
+   • the 'ambient' profile is declared ✔ (role: grove-role, region: us-east-1)
+     .endpoint = http://127.0.0.1:9911, mirrored from [default]
+   • [default] read, never written ✔ (infra's identity skill owns it)
+     .note = it names the platform's role; it stores no credential
+
+## 5.6.aws · hetzner apply after infra moved the signer (rc 0)
+   • ~/.aws/credentials already present; left untouched ✔
+   • the 'ambient' profile is declared ✔ (role: grove-role, region: us-east-1)
+     .endpoint = http://127.0.0.1:9912, mirrored from [default]
+   • [default] read, never written ✔ (infra's identity skill owns it)
+     .note = it names the platform's role; it stores no credential
+
+## 5.6.aws · hetzner, a non-loopback endpoint (rc 1)
+   • ~/.aws/credentials created, EMPTY ✔ (aws-sdk v2 opens it unconditionally)
+   ✋ ConstraintError: [default] in <fix>/h4/.aws/config names ec2_metadata_service_endpoint = 'http://203.0.113.9:9911'
+      ⇒ that is not a loopback http url, and every profile this repo lays would
+        send its identity requests there — to another host, or to naught
+      fix: re-run infra's grove identity skill, which writes
+        http://127.0.0.1:<port>, then rhx grove.provision --what 5.6.aws --mode apply
+
+## 5.6.aws · ec2 apply over a legacy fence (rc 0)
+   • ~/.aws/credentials created, EMPTY ✔ (aws-sdk v2 opens it unconditionally)
+   • the 'ambient' profile is declared ✔ (role: grove-role, region: us-east-1)
+     .note = it names the platform's role; it stores no credential
+
+## 5.6.aws · laptop (rc 0)
+   🌙 declined — local@unix serves no platform identity, so there
+      is no ambient identity to name. a laptop's aws profiles are its human's to place
+
+## 5.6.aws · camp grove on an unmapped platform (rc 1)
+   ✋ ConstraintError: cloud@other.platform is a camp grove, and this repo knows no road to its aws identity
+      ⇒ a camp grove carries the camp identity by mandate; only aws.ec2 (IMDS) and
+        hetzner.hetzbot (infra's IAM Roles Anywhere signer) are mapped
+      fix: teach grove_aws_identity_endpoint (src/grove.aws.sh) this platform's road
+
+## aws.reach.set · hetzner plan (rc 0)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode plan
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     grove (cloud@hetzner.hetzbot)
+   ├─ identity: http://127.0.0.1:9911 (mirrored from [default])
+   ├─ reach:   the grove's badge ⇒ arn:aws:iam::123456789012:role/grove-hop
+   └─ plan — apply would write these two halves:
+
+      1. into ~/.aws/config
+         # grove: reach acme.test.ehmpath — begin
+         [profile acme.test.ehmpath]
+         role_arn = arn:aws:iam::123456789012:role/grove-hop
+         credential_source = Ec2InstanceMetadata
+         region = us-east-1
+         ec2_metadata_service_endpoint = http://127.0.0.1:9911
+         # grove: reach acme.test.ehmpath — end
+
+      2. onto the rack
+         rhx keyrack set --owner ehmpath --key AWS_PROFILE \
+                         --org acme --env test --vault os.direct
+
+      then it PROVES the pair with a live call:
+         aws sts get-caller-identity --profile acme.test.ehmpath
+
+      re-run with --mode apply.
+
+## aws.reach.set · hetzner apply, up to the rack half (rc 1)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     grove (cloud@hetzner.hetzbot)
+   ├─ identity: http://127.0.0.1:9911 (mirrored from [default])
+   ├─ reach:   the grove's badge ⇒ arn:aws:iam::123456789012:role/grove-hop
+   └─ apply
+      ├─ ~/.aws/config now declares [profile acme.test.ehmpath] ✔
+      └─ 💥 MalfunctionError: the cwd is not a git repo, and the box has no rack root
+
+  why: rhachet's cli refuses every keyrack subcommand outside a git root
+  fix: rhx grove.provision --what 5.12.rack --mode apply
+       (it owns <fix>/h8/.local/state/keyrack.gitroot, and declares AWS_PROFILE there)
+
+## aws.reach.set · hetzner, a hand-laid twin (rc 2)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     grove (cloud@hetzner.hetzbot)
+   ├─ identity: http://127.0.0.1:9911 (mirrored from [default])
+   ├─ reach:   the grove's badge ⇒ arn:aws:iam::123456789012:role/grove-hop
+   └─ ✋ ConstraintError: <fix>/h8b/.aws/config already declares [profile acme.test.ehmpath] OUTSIDE this skill's fence
+
+  where: <fix>/h8b/.aws/config, lines 9-10
+  why: a second block of one name is silent — the sdk reads the last one,
+       so this skill would either shadow that block or be shadowed by it
+  ⇒ the block was laid by hand (or by another writer), so it is not this
+    skill's to delete
+  fix: remove that unfenced [profile acme.test.ehmpath] block from <fix>/h8b/.aws/config, then re-run this
+
+## aws.reach.set · hetzner apply, the role refuses the session's tags (rc 1)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     grove (cloud@hetzner.hetzbot)
+   ├─ identity: http://127.0.0.1:9911 (mirrored from [default])
+   ├─ reach:   the grove's badge ⇒ arn:aws:iam::111122223333:role/grove-hop
+   └─ apply
+      ├─ ~/.aws/config now declares [profile acme.test.ehmpath] ✔
+      ├─ gitroot: <fix>/h8d/.local/state/keyrack.gitroot (the cwd is not a repo)
+      ├─ rack already answers acme.test.AWS_PROFILE = acme.test.ehmpath
+      ├─ prove: aws sts get-caller-identity --profile acme.test.ehmpath
+      └─ 💥 MalfunctionError: the profile is declared and does NOT answer
+
+  aws said:
+    An error occurred (AccessDenied) when calling the AssumeRole operation: User: arn:aws:sts::123456789012:assumed-role/grove-role/session is not authorized to perform: sts:TagSession on resource: arn:aws:iam::111122223333:role/grove-hop
+
+  ⇒ the role TRUSTS this box, and refuses what its session carries (sts:TagSession)
+    the principal that asked: arn:aws:sts::123456789012:assumed-role/grove-role/session
+    ⇒ an IAM Roles Anywhere session carries a source identity and session tags,
+      and a chained AssumeRole passes both on. the role's trust statement for
+      that principal must allow all three actions — an ask of acme/infrastructure:
+        "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession"
+
+## aws.reach.set · hetzner apply, the hop's source does not answer (rc 1)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     grove (cloud@hetzner.hetzbot)
+   ├─ identity: http://127.0.0.1:9911 (mirrored from [default])
+   ├─ reach:   the grove's badge ⇒ arn:aws:iam::111122223333:role/grove-hop
+   └─ apply
+      ├─ ~/.aws/config now declares [profile acme.test.ehmpath] ✔
+      ├─ gitroot: <fix>/h8e/.local/state/keyrack.gitroot (the cwd is not a repo)
+      ├─ rack already answers acme.test.AWS_PROFILE = acme.test.ehmpath
+      ├─ prove: aws sts get-caller-identity --profile acme.test.ehmpath
+      └─ 💥 MalfunctionError: the profile is declared and does NOT answer
+
+  aws said:
+    Error when retrieving credentials from custom-process: connect: connection refused
+
+  ⇒ the hop's SOURCE did not answer: this is no refusal by the role
+    the ambient identity it chains from: <it did not answer either>
+    ⇒ a stopped signer, a lapsed session, or absent credentials reads exactly so
+    fix: rhx grove.provision --what 5.6.aws --mode plan
+
+## aws.reach.set · hetzner apply, the hop answers (rc 0)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     grove (cloud@hetzner.hetzbot)
+   ├─ identity: http://127.0.0.1:9911 (mirrored from [default])
+   ├─ reach:   the grove's badge ⇒ arn:aws:iam::111122223333:role/grove-hop
+   └─ apply
+      ├─ ~/.aws/config now declares [profile acme.test.ehmpath] ✔
+      ├─ gitroot: <fix>/h8f/.local/state/keyrack.gitroot (the cwd is not a repo)
+      ├─ rack already answers acme.test.AWS_PROFILE = acme.test.ehmpath
+      ├─ prove: aws sts get-caller-identity --profile acme.test.ehmpath
+      └─ ✔ answers, in account 111122223333
+
+🌊 cowabunga! 'acme' env=test is reachable from this box
+   ├─ name:   acme.test.AWS_PROFILE  =  acme.test.ehmpath
+   ├─ body:   [profile acme.test.ehmpath] in ~/.aws/config
+   ├─ whoami: arn:aws:sts::111122223333:assumed-role/grove-hop/session
+   └─ next:   run the suite the same way a laptop does —
+      rhx git.repo.test --what integration
+
+## aws.reach.set · hetzner apply again, the hop answers (rc 0)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     grove (cloud@hetzner.hetzbot)
+   ├─ identity: http://127.0.0.1:9911 (mirrored from [default])
+   ├─ reach:   the grove's badge ⇒ arn:aws:iam::111122223333:role/grove-hop
+   └─ apply
+      ├─ ~/.aws/config already current for [profile acme.test.ehmpath]
+      ├─ gitroot: <fix>/h8f/.local/state/keyrack.gitroot (the cwd is not a repo)
+      ├─ rack already answers acme.test.AWS_PROFILE = acme.test.ehmpath
+      ├─ prove: aws sts get-caller-identity --profile acme.test.ehmpath
+      └─ ✔ answers, in account 111122223333
+
+🌊 cowabunga! 'acme' env=test is reachable from this box
+   ├─ name:   acme.test.AWS_PROFILE  =  acme.test.ehmpath
+   ├─ body:   [profile acme.test.ehmpath] in ~/.aws/config
+   ├─ whoami: arn:aws:sts::111122223333:assumed-role/grove-hop/session
+   └─ next:   run the suite the same way a laptop does —
+      rhx git.repo.test --what integration
+
+## aws.reach.set · hetzner apply, the hop answers as another account (rc 2)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     grove (cloud@hetzner.hetzbot)
+   ├─ identity: http://127.0.0.1:9911 (mirrored from [default])
+   ├─ reach:   the grove's badge ⇒ arn:aws:iam::111122223333:role/grove-hop
+   └─ apply
+      ├─ ~/.aws/config already current for [profile acme.test.ehmpath]
+      ├─ gitroot: <fix>/h8f/.local/state/keyrack.gitroot (the cwd is not a repo)
+      ├─ rack already answers acme.test.AWS_PROFILE = acme.test.ehmpath
+      ├─ prove: aws sts get-caller-identity --profile acme.test.ehmpath
+      └─ ✋ ConstraintError: the profile answers as the WRONG account
+
+  expected: 111122223333
+  detected: 999999999999  (arn:aws:sts::999999999999:assumed-role/grove-hop/session)
+  ⇒ this is the silent failure --account exists to prevent: a valid
+    identity in somewhere else. re-check the account for env=test
+
+## aws.reach.set · hetzner apply, an empty rack refuses the set (rc 1)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     grove (cloud@hetzner.hetzbot)
+   ├─ identity: http://127.0.0.1:9911 (mirrored from [default])
+   ├─ reach:   the grove's badge ⇒ arn:aws:iam::111122223333:role/grove-hop
+   └─ apply
+      ├─ ~/.aws/config now declares [profile acme.test.ehmpath] ✔
+      ├─ gitroot: <fix>/h8g/.local/state/keyrack.gitroot (the cwd is not a repo)
+      ├─ rack does not answer acme.test.AWS_PROFILE yet
+      │  vault: os.direct  (a grove)
+      └─ 💥 MalfunctionError: keyrack refused the set
+         ⇒ it said: keyrack: AWS_PROFILE is not declared for env=test
+
+  why: AWS_PROFILE may not be DECLARED for env=test in this repo's
+       .agent/keyrack.yml — an undeclared key stores and then reads
+       'absent 🫧' forever (domain.terms/term=entry)
+  fix: declare it, then re-run —
+    env.test:
+      - AWS_PROFILE
+
+## aws.reach.set · hetzner apply, the set claims success and stores no value (rc 2)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     grove (cloud@hetzner.hetzbot)
+   ├─ identity: http://127.0.0.1:9911 (mirrored from [default])
+   ├─ reach:   the grove's badge ⇒ arn:aws:iam::111122223333:role/grove-hop
+   └─ apply
+      ├─ ~/.aws/config already current for [profile acme.test.ehmpath]
+      ├─ gitroot: <fix>/h8g/.local/state/keyrack.gitroot (the cwd is not a repo)
+      ├─ rack does not answer acme.test.AWS_PROFILE yet
+      │  vault: os.direct  (a grove)
+      └─ ✋ ConstraintError: the set reported success and the rack still answers ''
+
+  expected: acme.test.ehmpath
+  ⇒ every consumer reads the rack, so each will act as ''
+    no matter how correct the profile body is
+  ⇒ if it still answers an EXPORTED value, the rack is shadowed:
+    'os.envvar' is checked FIRST in keyrack's grant flow, so an
+    AWS_PROFILE in the shell outranks every rack entry there is.
+    ~/.zshenv exports one (owned by 2.5.zsh) — that is the cause.
+  fix: set it by hand, and answer 'acme.test.ehmpath' at the value prompt —
+    rhx keyrack set --owner ehmpath --key AWS_PROFILE \
+                    --org acme --env test --vault os.direct
+
+## aws.reach.set · hetzner apply, an empty rack is set (rc 0)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     grove (cloud@hetzner.hetzbot)
+   ├─ identity: http://127.0.0.1:9911 (mirrored from [default])
+   ├─ reach:   the grove's badge ⇒ arn:aws:iam::111122223333:role/grove-hop
+   └─ apply
+      ├─ ~/.aws/config already current for [profile acme.test.ehmpath]
+      ├─ gitroot: <fix>/h8g/.local/state/keyrack.gitroot (the cwd is not a repo)
+      ├─ rack does not answer acme.test.AWS_PROFILE yet
+      │  vault: os.direct  (a grove)
+      ├─ rack now answers acme.test.AWS_PROFILE = acme.test.ehmpath ✔
+      ├─ prove: aws sts get-caller-identity --profile acme.test.ehmpath
+      └─ ✔ answers, in account 111122223333
+
+🌊 cowabunga! 'acme' env=test is reachable from this box
+   ├─ name:   acme.test.AWS_PROFILE  =  acme.test.ehmpath
+   ├─ body:   [profile acme.test.ehmpath] in ~/.aws/config
+   ├─ whoami: arn:aws:sts::111122223333:assumed-role/grove-hop/session
+   └─ next:   run the suite the same way a laptop does —
+      rhx git.repo.test --what integration
+
+## aws.reach.del · hetzner apply, up to the rack half (rc 1)
+🐢 heres the wave...
+
+🔭 aws.reach.del --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ ~/.aws/config holds its fenced [profile] body
+   └─ apply
+      ├─ ~/.aws/config no longer declares [profile acme.test.ehmpath] ✔
+      └─ 💥 MalfunctionError: the cwd is not a git repo, and the box has no rack root
+         fix: rhx grove.provision --what 5.12.rack --mode apply
+
+## 5.6.aws · hetzner, the swap's write fails (rc 1)
+   • ~/.aws/credentials created, EMPTY ✔ (aws-sdk v2 opens it unconditionally)
+   💥 MalfunctionError: ~/.aws/config was NOT written: the write failed (io) — check that <fix>/h9b/.aws/config is writable
+      ⇒ it said: mv: cannot move to <fix>/h9b/.aws/config: Permission denied
+      fix: rhx grove.provision --what 5.6.aws --mode apply
+
+## 5.6.aws · hetzner, the endpoint gives no token (rc 1)
+   • ~/.aws/credentials already present; left untouched ✔
+   ✋ ConstraintError: cloud@hetzner.hetzbot declares a platform identity at http://127.0.0.1:9911, and it gave no token
+      ⇒ a profile that named it would point at an identity that cannot answer
+      fix: confirm infra's signer serves on http://127.0.0.1:9911 (systemctl status of its serve unit),
+        then rhx grove.provision --what 5.6.aws --mode apply
+
+## 5.6.aws · hetzner, the endpoint names no role (rc 1)
+   • ~/.aws/credentials already present; left untouched ✔
+   ✋ ConstraintError: the identity endpoint answers, but names NO role
+      ⇒ a profile that named it would point at an absent identity, and
+        every consumer aimed there would fail later and less clearly
+      fix: attach an iam role to the box (ec2: an instance profile; hetzner:
+        infra's roles-anywhere profile), then re-apply
+
+## aws.reach.set · hetzner, the swap's write fails (rc 1)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     grove (cloud@hetzner.hetzbot)
+   ├─ identity: http://127.0.0.1:9911 (mirrored from [default])
+   ├─ reach:   the grove's badge ⇒ arn:aws:iam::123456789012:role/grove-hop
+   └─ apply
+      └─ 💥 MalfunctionError: ~/.aws/config was NOT written: the write failed (io) — check that <fix>/h9c/.aws/config is writable
+         ⇒ it said: mv: cannot move to <fix>/h9c/.aws/config: Permission denied
+
+## aws.reach.del · hetzner, the swap's write fails (rc 1)
+🐢 heres the wave...
+
+🔭 aws.reach.del --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   ├─ ~/.aws/config holds its fenced [profile] body
+   └─ apply
+      └─ 💥 MalfunctionError: ~/.aws/config was NOT written: the write failed (io) — check that <fix>/h9d/.aws/config is writable
+         ⇒ it said: mv: cannot move to <fix>/h9d/.aws/config: Permission denied
+
+## 5.6.aws verify · hetzner, converged (rc 0)
+   • the 'ambient' profile is declared ✔
+   • [profile ambient] mirrors [default]'s endpoint ✔ (http://127.0.0.1:9911)
+   • [default] is infra's alone ✔ (this bundle's fence holds none)
+   • the ambient profile yields live credentials ✔ (value not printed)
+   • with NO profile named, a region still resolves ✔ (us-east-1)
+   • ~/.aws/credentials is present ✔ (aws-sdk v2 opens it unconditionally)
+   • a fresh NON-INTERACTIVE zsh exports NO AWS_PROFILE ✔ (the rack is not shadowed)
+   • tmux's global environment exports no AWS_PROFILE ✔
+
+## 5.6.aws verify · hetzner, infra moved the signer (rc 1)
+   • the 'ambient' profile is declared ✔
+   ✋ ConstraintError: [profile ambient] names endpoint 'http://127.0.0.1:9911', and [default] names 'http://127.0.0.1:9912'
+      ⇒ infra's identity skill moved the signer; the mirror is stale
+      fix: rhx grove.provision --what 5.6.aws --mode apply
+
+## 5.6.aws verify · hetzner, a [default] inside this bundle's fence (rc 1)
+   • the 'ambient' profile is declared ✔
+   • [profile ambient] mirrors [default]'s endpoint ✔ (http://127.0.0.1:9911)
+   ✋ ConstraintError: this bundle's fence in <fix>/h11b/.aws/config holds a [default] block
+      ⇒ on a hetzner grove [default] is infra's; a second one here shadows it
+      fix: rhx grove.provision --what 5.6.aws --mode apply
+
+## 5.6.aws verify · hetzner, the ambient profile is not declared (rc 1)
+   ✋ ConstraintError: the 'ambient' profile is NOT declared in ~/.aws/config
+      ⇒ every consumer that reads AWS_PROFILE has no name to read,
+        so it fails with 'AWS_PROFILE not set' while the box's own
+        instance role sits one metadata call away
+      fix: rhx grove.provision --what 5.6.aws --mode apply
+
+## 5.6.aws verify · hetzner, the profile exports no access key (rc 1)
+   • the 'ambient' profile is declared ✔
+   • [profile ambient] mirrors [default]'s endpoint ✔ (http://127.0.0.1:9911)
+   • [default] is infra's alone ✔ (this bundle's fence holds none)
+   ✋ ConstraintError: the profile exported NO access key
+      ⇒ it is declared and inert, which reads as healthy to a
+        presence check and fails at the first real aws call
+
+## 5.6.aws verify · hetzner, the profile cannot export (rc 1)
+   • the 'ambient' profile is declared ✔
+   • [profile ambient] mirrors [default]'s endpoint ✔ (http://127.0.0.1:9911)
+   • [default] is infra's alone ✔ (this bundle's fence holds none)
+   ✋ ConstraintError: the ambient profile could not export credentials
+      ⇒ the block is present, so a file check would report ✔ — this
+        is exactly the gap between DECLARED and LIVE
+      it said:
+        Error: the custom-process credential provider failed: connect: connection refused
+      fix: confirm infra's signer serves on http://127.0.0.1:9911 (systemctl status of its
+        serve unit) and its roles-anywhere session is live — an ask of infra
+
+## 5.6.aws verify · hetzner, no region resolves bare (rc 1)
+   • the 'ambient' profile is declared ✔
+   • [profile ambient] mirrors [default]'s endpoint ✔ (http://127.0.0.1:9911)
+   • [default] is infra's alone ✔ (this bundle's fence holds none)
+   • the ambient profile yields live credentials ✔ (value not printed)
+   ✋ ConstraintError: with NO profile named, NO region resolves
+      ⇒ a consumer that drops AWS_PROFILE (keys in env outrank it)
+        then fails on a region it cannot find — while a check that
+        NAMES the profile reads perfectly green
+      ⇒ a laptop hides this: a human's ~/.aws/config carries a
+        [default] block, so a profile-less sdk still finds a region
+      fix: an ask of infra — its [default] in <home>/.aws/config must carry a region
+        (this repo never writes infra's [default], so no apply clears this)
+
+## 5.6.aws verify · hetzner, a fresh zsh exports AWS_PROFILE (rc 1)
+   • the 'ambient' profile is declared ✔
+   • [profile ambient] mirrors [default]'s endpoint ✔ (http://127.0.0.1:9911)
+   • [default] is infra's alone ✔ (this bundle's fence holds none)
+   • the ambient profile yields live credentials ✔ (value not printed)
+   • with NO profile named, a region still resolves ✔ (us-east-1)
+   • ~/.aws/credentials is present ✔ (aws-sdk v2 opens it unconditionally)
+   ✋ ConstraintError: a fresh non-interactive zsh exports AWS_PROFILE='ambient'
+      ⇒ keyrack checks 'os.envvar' FIRST, so this one value outranks
+        EVERY rack entry on this box — every org, every env. a suite
+        that asks the rack for its account gets 'ambient' instead, and
+        runs as the wrong identity with no error at all
+      ⇒ measured on grove-1 2026-08-08: 44 aws refusals as the camp
+        role, on a box whose prep hop was declared and proven
+      ⇒ this probe already unset the variable, so the value came from a
+        FILE a zsh reads — ~/.zshenv, or a ~/.zprofile a human wrote
+      fix: rhx grove.provision --what 2.5.zsh --mode apply
+        (~/.zshenv is 2.5.zsh's, and it exports no AWS_PROFILE)
+
+## 5.6.aws verify · hetzner, the credentials file is absent (rc 1)
+   • the 'ambient' profile is declared ✔
+   • [profile ambient] mirrors [default]'s endpoint ✔ (http://127.0.0.1:9911)
+   • [default] is infra's alone ✔ (this bundle's fence holds none)
+   • the ambient profile yields live credentials ✔ (value not printed)
+   • with NO profile named, a region still resolves ✔ (us-east-1)
+   ✋ ConstraintError: ~/.aws/credentials is ABSENT
+      ⇒ this box sets AWS_SDK_LOAD_CONFIG=1 (2.5.zsh/zshrc.sh), so aws-sdk
+        v2 opens that file to derive a region and throws ENOENT when
+        it is absent — even with valid credentials already in env
+      fix: rhx grove.provision --what 5.6.aws --mode apply
+
+## 5.6.aws verify · hetzner, serve not wired (rc 1)
+   ✋ ConstraintError: [default] in <home>/.aws/config names no ec2_metadata_service_endpoint, so this seat has no aws identity
+      ⇒ a camp grove carries the camp identity on EVERY seat; on hetzner that line
+        is this seat's one road to infra's IAM Roles Anywhere signer
+      fix (infra): run ahbode/infrastructure's grove identity skill for THIS seat,
+        with serve wired; then rhx grove.provision --what 5.6.aws --mode apply
+
+## 5.6.aws verify · hetzner, a non-loopback endpoint (rc 1)
+   ✋ ConstraintError: [default] in <home>/.aws/config names a non-loopback ec2_metadata_service_endpoint ('http://203.0.113.9:9911')
+      fix: re-run infra's grove identity skill, then rhx grove.provision --what 5.6.aws --mode apply
+
+## 5.6.aws verify · camp grove on an unmapped platform (rc 1)
+   ✋ ConstraintError: cloud@other.platform is a camp grove, and this repo knows no road to its aws identity
+      fix: teach grove_aws_identity_endpoint (src/grove.aws.sh) this platform's road
+
+## 5.6.aws verify · laptop (rc 0)
+   🌙 not applicable — local@unix serves no platform identity
+
+## aws.reach.set · hetzner, serve not wired (rc 2)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   └─ ✋ ConstraintError: a hetzner grove, and [default] in <home>/.aws/config names no ec2_metadata_service_endpoint
+
+  why: every grove body here names the endpoint that serves the box's identity,
+       and on hetzner that line is infra's to write. this skill mirrors it, and
+       will not invent a port
+  fix: run infra's grove identity skill with serve wired, then re-run this
+
+## aws.reach.set · hetzner, a non-loopback endpoint (rc 2)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   └─ ✋ ConstraintError: [default] in <home>/.aws/config names a non-loopback ec2_metadata_service_endpoint ('http://203.0.113.9:9911')
+
+  why: that line would be copied into this profile, and the sdk would send
+       its identity requests to another host
+  fix: re-run infra's grove identity skill, then re-run this
+
+## aws.reach.set · camp grove on an unmapped platform (rc 2)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode apply
+   ├─ profile: acme.test.ehmpath
+   └─ ✋ ConstraintError: cloud@other.platform is a camp grove, and this repo knows no road to its aws identity
+
+  why: a grove body names the endpoint that serves the box's identity, and this
+       platform has none mapped; a laptop's sso body would not work here
+  fix: teach grove_aws_identity_endpoint (src/grove.aws.sh) this platform's road
+
+## aws.reach.set · laptop plan (rc 2)
+🐢 heres the wave...
+
+🔭 aws.reach.set --org acme --env test --mode plan
+   ├─ profile: acme.test.ehmpath
+   ├─ box:     laptop (local@unix — no platform identity)
+   └─ ✋ ConstraintError: a laptop, and 'acme.test.ehmpath' is NOT declared
+
+  why: on a laptop this profile is an SSO login, whose sso_start_url
+       this skill has no truthful source for. it will not invent one.
+  fix: declare it with aws's own tool, naming the profile exactly —
+    aws configure sso --profile acme.test.ehmpath
+  then re-run this to set the rack half.
+
+

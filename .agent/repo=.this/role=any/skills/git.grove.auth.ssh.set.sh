@@ -212,14 +212,28 @@ KEY_FINGERPRINT=$(ssh-keygen -lf "$IDENTITY" 2>/dev/null | head -1 || echo "unre
 # registry already answers *which seats does this box hold*, and a hand-typed
 # list here would be a second holder of that fact, free to drift
 # (`rule.require.identical-bundle-composition`).
+#
+# ⚠️ on the TAILNET the host names the box too: `git grove set` defaults an exid to
+#   the entry's own name, so a `<grove>.ground` entry registered with no --exid
+#   shares none — and a second laptop's key would land on the camper alone, then
+#   halt at the ground seat it was never placed on. an entry on the same tailnet
+#   host IS a seat of this box; a tunnel's host (localhost) names no box, so the
+#   ec2 path keeps the exid alone
 ######################################################################
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.ssh.operations.sh"
+REACH_HOST=$(jq -r '.host // empty' "$REGISTRY")
+SEAT_HOST=""
+grove_ssh_host_is_tailnet "$REACH_HOST" && SEAT_HOST="$REACH_HOST"
 if [[ "${#SEATS[@]}" -eq 0 ]]; then
   while read -r _seat; do
     [[ -n "$_seat" ]] && SEATS+=("$_seat")
   done < <(
     for _e in "$_GROVE_DIR"/*.json; do
       [[ -f "$_e" ]] || continue
-      [[ "$(jq -r '.exid // .name' "$_e" 2>/dev/null)" == "$EXID" ]] || continue
+      if [[ "$(jq -r '.exid // .name' "$_e" 2>/dev/null)" != "$EXID" ]]; then
+        [[ -n "$SEAT_HOST" && "$(jq -r '.host // empty' "$_e" 2>/dev/null)" == "$SEAT_HOST" ]] || continue
+      fi
       jq -r '.user // empty' "$_e" 2>/dev/null
     done | sort -u
   )
@@ -251,6 +265,41 @@ echo "   ├─ key:   $KEY_FINGERPRINT"
 echo "   ├─ from:  $IDENTITY"
 echo "   ├─ seats: ${SEATS[*]}"
 
+######################################################################
+# 🛑 the REACH picks the transport — a tailnet box holds no ssm agent and no aws
+#   instance, so the ec2 path below would tell its human "no box tagged exid… wake
+#   it", and the wake answers ✔ over ssh: a loop with no exit. on the tailnet the
+#   procedure runs over ssh to the GROUND seat (it holds root), the same procedure
+#   text, read back through the same verdicts
+######################################################################
+TRANSPORT=ssm
+if grove_ssh_host_is_tailnet "$REACH_HOST"; then
+  TRANSPORT=ssh
+  # a call on the ground entry itself is already the ground seat — never `X.ground.ground`
+  _box="${GROVE%.ground}"
+  _ground_reg="$_GROVE_DIR/$_box.ground.json"
+  GROUND_ALIAS="$_box.ground"
+  [[ -f "$_ground_reg" ]] && GROUND_ALIAS=$(jq -r '.sshAlias // .name // empty' "$_ground_reg")
+  GROUND_ALIAS="${GROUND_ALIAS:-$_box.ground}"
+  echo "   ├─ reach: the tailnet ($REACH_HOST) — via the ground seat '$GROUND_ALIAS', no aws"
+  echo "   └─ drive"
+fi
+
+# .what = run one procedure on the box as root over the ground seat's ssh (a communicator)
+# .why  = the tailnet twin of `_ssm_says`: the same markers, so the verdicts below read
+#   one channel. bounded, and BatchMode so a prompt can never wedge the run
+_ssh_says() {
+  local proc="$1" out rc
+  out=$(printf '%s\n' "$proc" | timeout -k 5 30 ssh -o BatchMode=yes -o ConnectTimeout=10 \
+          "$GROUND_ALIAS" 'sudo -n bash -s' 2>&1); rc=$?
+  if [[ $rc -ne 0 ]]; then
+    echo "__SSH_REFUSED__ rc=$rc: $(printf '%s' "$out" | head -2 | tr '\n' ' ')"
+    return 0
+  fi
+  printf '%s\n' "$out"
+}
+
+if [[ "$TRANSPORT" == ssm ]]; then
 # source credentials for the grove's env (skip when the shell already carries them)
 #
 # ⚠️ the rack's stderr is NOT redirected, on purpose: `keyrack get` answers
@@ -296,6 +345,7 @@ if [[ -z "$INSTANCE_ID" || "$INSTANCE_ID" == "None" ]]; then
 fi
 echo "   ├─ box:   $INSTANCE_ID"
 echo "   └─ drive"
+fi
 
 ######################################################################
 # the remote step, per seat
@@ -389,12 +439,18 @@ _ssm_says() {
 FAILED=0
 for _seat in "${SEATS[@]}"; do
   if [[ "$MODE" == "plan" ]]; then
-    _out=$(_ssm_says "$(_remote_procedure_plan "$_seat")")
+    _out=$("_${TRANSPORT}_says" "$(_remote_procedure_plan "$_seat")")
   else
-    _out=$(_ssm_says "$(_remote_procedure_apply "$_seat")")
+    _out=$("_${TRANSPORT}_says" "$(_remote_procedure_apply "$_seat")")
   fi
 
   case "$_out" in
+    __SSH_REFUSED__*)
+      echo "      ├─ $_seat ✋ the ground seat '$GROUND_ALIAS' could not run the procedure as root" >&2
+      echo "      │  said: ${_out#__SSH_REFUSED__ }" >&2
+      echo "      │  ⇒ the seat must answer over ssh and hold passwordless sudo" >&2
+      echo "      │  read it: rhx git.grove.wake ${GROVE%.ground}.ground" >&2
+      FAILED=1 ;;
     __SSM_REFUSED__)
       echo "      ├─ $_seat ✋ ssm refused the send" >&2
       echo "      │  ⇒ the box may hold no ssm agent, or this identity lacks" >&2
@@ -439,7 +495,8 @@ fi
 
 if [[ "$MODE" == "plan" ]]; then
   echo "🍃 plan only — no key was placed"
-  echo "   └─ grant it: rhx git.grove.auth.ssh.set $GROVE --mode apply"
+  # the SAME key the plan read — a footer with no --identity would place the default one
+  echo "   └─ grant it: rhx git.grove.auth.ssh.set $GROVE --identity $IDENTITY --mode apply"
   exit 0
 fi
 

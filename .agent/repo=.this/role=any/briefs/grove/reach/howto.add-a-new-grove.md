@@ -90,12 +90,27 @@ one box, two seats, two registry entries — the exid is the same for both:
 # the work seat (agent, ducts, trees) — address by exid, wake writes the alias
 rhx git.grove.set <name>        --exid <tag> --env camp --account <id> --nat <nat>
 
-# the convergence seat — --at pins the user, so its Host block says `User ground`
+# the convergence seat — --at pins the user; the wake writes its Host block (`User ground`)
 rhx git.grove.set <name>.ground --at ground@localhost:36901 \
   --exid <tag> --env camp --account <id> --nat <nat>
 ```
 
-⚠️ the `.ground` seat rides the **same tunnel**, so wake the box once and both work.
+⚠️ `git.grove.set` writes **no** Host block — the alias is the wake's alone, through its one
+writer. so wake EACH seat once: `rhx git.grove.wake <name>`, then `rhx git.grove.wake <name>.ground`.
+the `.ground` seat rides the same tunnel. `git.grove.provision boot` writes the `.ground`
+alias itself.
+
+### a hetzner box — the tailnet, no exid
+
+infra lays the box and joins it to the tailnet; register both seats by their tailnet host,
+and declare the platform, so every reader knows it is no ec2 instance:
+
+```sh
+rhx git.grove.set <name>        --at camper@<host>:22 --env camp --platform hetzner.hetzbot
+rhx git.grove.set <name>.ground --at ground@<host>:22 --env camp --platform hetzner.hetzbot
+```
+
+there is no tunnel, no ssm, and naught to hibernate (`git.grove.stop` refuses a tailnet grove).
 
 ## .3. trust it, once
 
@@ -111,8 +126,9 @@ the scanned key against the box's own boot record over ssm
 (`howto.adopt-a-replacement-grove.md`, `.the trust ladder`).
 
 `wake` is idempotent and free — reach for it freely
-(`rule.require.wake-the-grove-freely`). it resumes the nat, resumes the box, awaits the
-ssm gate, binds the tunnel, and writes the ssh alias.
+(`rule.require.wake-the-grove-freely`). on ec2 it resumes the nat, resumes the box, awaits
+the ssm gate, binds the tunnel, and writes the ssh alias; on the tailnet it writes the alias
+and proves reach over ssh.
 
 ## .4. converge it, from the GROUND seat
 

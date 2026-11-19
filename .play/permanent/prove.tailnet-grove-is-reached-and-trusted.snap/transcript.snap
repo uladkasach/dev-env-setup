@@ -1,0 +1,616 @@
+## arm 0 · alias set on a fresh seat
+[SET] camper@grove-fixture-hetzner-1:22
+
+## arm 0 · alias set with no user= or identity=
+✋ ConstraintError: grove_ssh_alias_set needs alias=, host=, port=, user=, identity=
+
+## arm 3 · git grove set --platform hetzner.hetzbot
+🌲 grove 'grove-fixture-hetzner' registered → ssh alias 'grove-fixture-hetzner' (ssh config untouched)
+
+## arm 3 · git grove set --platform aws.ec2 (refused)
+✋ ConstraintError: --platform 'aws.ec2' is not a platform a box declares
+   want: hetzner.hetzbot (ec2 answers from its hardware; a laptop declares none)
+
+## arm 3 · git grove --help
+git grove - manage groves (machines that hold trees)
+
+usage: git grove <command> [options]
+
+commands:
+  set <name> --at <user@host:port>  register a grove (its wake writes the ssh alias)
+  set <name> --alias <ssh-alias>    register a grove on an EXTANT ssh alias
+  set <name> --exid <tag> --env <e> register a cloud grove, found by tag
+  wake <name>                       resume the box + open its duct
+  stop <name>                       hibernate the box
+  list                              list registered groves
+  get <name>                        show one grove
+  del <name>                        unregister a grove
+  del --orphaned [--mode apply]     unregister every grove whose instance is gone
+  send <name> --what "<cmd>"        run a command in the grove's duct
+  read <name>                       read the grove's duct output
+
+## arm 3 · git grove set --help
+usage: git grove set <name> [--at <user@host:port>] [--alias <ssh-alias>]
+                            [--exid <tag>] [--env <env>] [--account <id>] [--nat <exid>]
+                            [--org <keyrack-org>] [--platform hetzner.hetzbot]
+
+  ⚠️ every flag is a FIELD-LEVEL upsert: a flag given overwrites its own
+     field, a flag absent KEEPS what the entry holds, and `--nat ''` clears
+     one (`gotcha.a-partial-write-discards-what-it-never-read`)
+
+## arm 3 · git grove set --platform hetzner.hetzbot --at localhost (refused)
+✋ ConstraintError: grove 'grove-fixture-hetzner-loop' declares --platform hetzner.hetzbot with a loopback host 'localhost'
+   ⇒ a hetzner box answers on the tailnet; a loopback or absent host routes it as an ec2 tunnel
+   fix: git grove set grove-fixture-hetzner-loop --at <user>@<tailnet host>:22 --platform hetzner.hetzbot
+
+## arm 3 · git grove set --env on an --alias hetzner entry with a tailnet host
+🌲 grove 'grove-fixture-hetzner-seat' registered → exid 'grove-fixture-hetzner-seat' in camp
+   └─ wake it to open its duct: git grove wake grove-fixture-hetzner-seat
+
+## arm 3 · git grove set --at, no --alias
+🌲 grove 'grove-fixture-hetzner-solo' registered → camper@grove-fixture-hetzner-1:22
+   └─ wake it to write its alias and open its duct: git grove wake grove-fixture-hetzner-solo
+
+## arm 3 · git grove del, a tailnet entry, a block in each ssh file
+   🌙 no crew ledger at <fix>/home/.rhachet/fleet/crews.snapshot.json — no crew is checked
+   💾 saved → <fix>/home/.git.forest/.trash/grove-fixture-hetzner-solo.<stamp>.json (+ .ssh)
+🍃 grove 'grove-fixture-hetzner-solo' unregistered
+
+## arm 3 · git grove del, a tunnel entry an older writer laid
+   🌙 no crew ledger at <fix>/home/.rhachet/fleet/crews.snapshot.json — no crew is checked
+   💾 saved → <fix>/home/.git.forest/.trash/grove-fixture-hetzner-tunnel.<stamp>.json (+ .ssh)
+🍃 grove 'grove-fixture-hetzner-tunnel' unregistered
+
+## arm 3 · git grove del, a name no longer registered
+✋ ConstraintError: grove 'grove-fixture-hetzner-solo' not found
+   see the registered groves: git grove list
+
+## arm 1 · wake, first run
+🐢 heres the wave...
+
+🌳 git.grove.wake grove-fixture-hetzner --mode apply
+   ├─ reach: the tailnet (camper@grove-fixture-hetzner-1:22) — no aws, no tunnel
+   ├─ alias: grove-fixture-hetzner
+   ├─ ssh  [SET] alias 'grove-fixture-hetzner' → camper@grove-fixture-hetzner-1:22 (the registry's seat, read first)
+   └─ ✔ answers over ssh — the box is always on, so it is awake
+
+## arm 1 · wake, re-run
+🐢 heres the wave...
+
+🌳 git.grove.wake grove-fixture-hetzner --mode apply
+   ├─ reach: the tailnet (camper@grove-fixture-hetzner-1:22) — no aws, no tunnel
+   ├─ alias: grove-fixture-hetzner
+   ├─ ssh  [KEEP] alias 'grove-fixture-hetzner' → camper@grove-fixture-hetzner-1:22 (the registry's seat, read first)
+   └─ ✔ answers over ssh — the box is always on, so it is awake
+
+## arm 1 · wake, the box does not answer
+🐢 heres the wave...
+
+🌳 git.grove.wake grove-fixture-hetzner --mode apply
+   ├─ reach: the tailnet (camper@grove-fixture-hetzner-1:22) — no aws, no tunnel
+   ├─ alias: grove-fixture-hetzner
+   ├─ ssh  [KEEP] alias 'grove-fixture-hetzner' → camper@grove-fixture-hetzner-1:22 (the registry's seat, read first)
+   └─ 💥 MalfunctionError: 'grove-fixture-hetzner' did not answer over ssh within 30s
+
+  ssh said:
+    ssh: connect to host grove-fixture-hetzner-1 port 22: Connection timed out
+  ⇒ a tailnet grove has no box to resume; a silence is reach, not sleep
+  fix: confirm this laptop is on the tailnet and 'grove-fixture-hetzner-1' is up, then re-run
+
+## arm 1 · wake, the box answers with a host key not yet trusted
+🐢 heres the wave...
+
+🌳 git.grove.wake grove-fixture-hetzner --mode apply
+   ├─ reach: the tailnet (camper@grove-fixture-hetzner-1:22) — no aws, no tunnel
+   ├─ alias: grove-fixture-hetzner
+   ├─ ssh  [KEEP] alias 'grove-fixture-hetzner' → camper@grove-fixture-hetzner-1:22 (the registry's seat, read first)
+   └─ ✔ answers over ssh — and its host key is not yet trusted here
+      ⇒ a first contact, or a rebuilt box. trust is the next step, never a wake's:
+        rhx git.grove.trust.gen --grove grove-fixture-hetzner --mode plan
+
+## arm 1 · wake, the box refuses this laptop's key
+🐢 heres the wave...
+
+🌳 git.grove.wake grove-fixture-hetzner --mode apply
+   ├─ reach: the tailnet (camper@grove-fixture-hetzner-1:22) — no aws, no tunnel
+   ├─ alias: grove-fixture-hetzner
+   ├─ ssh  [KEEP] alias 'grove-fixture-hetzner' → camper@grove-fixture-hetzner-1:22 (the registry's seat, read first)
+   └─ ✋ ConstraintError: 'grove-fixture-hetzner' answered, and refused this laptop's key
+
+  ssh said:
+    camper@grove-fixture-hetzner-1: Permission denied (publickey).
+  ⇒ the tailnet holds and the box is up: camper@grove-fixture-hetzner-1 does not list this key
+    (<fix>/home/.ssh/id_ed25519) in its authorized_keys
+  fix: a laptop that already reaches 'grove-fixture-hetzner.ground' places this one's PUBLIC key on
+    every seat — on that laptop, with this laptop's .pub copied to it:
+    rhx git.grove.auth.ssh.set grove-fixture-hetzner --identity <this laptop's key>.pub --mode plan
+    rhx git.grove.auth.ssh.set grove-fixture-hetzner --identity <this laptop's key>.pub --mode apply
+
+## arm 1 · wake, the alias file cannot be written
+🐢 heres the wave...
+
+🌳 git.grove.wake grove-fixture-hetzner --mode apply
+   ├─ reach: the tailnet (camper@grove-fixture-hetzner-1:22) — no aws, no tunnel
+   ├─ alias: grove-fixture-hetzner
+   └─ alias 'grove-fixture-hetzner' could not be set to the registry's seat
+      💥 MalfunctionError: could not make a tmp file in <fix>/home/.ssh/config.d
+         ⇒ it said: mktemp: failed to create file via template ‘<fix>/home/.ssh/config.d/.grove.XXXXXX’: Permission denied
+
+## arm 1 · wake, a registry exid outside its grammar
+✋ ConstraintError: the registry's exid holds a byte outside its grammar
+   allowed: [A-Za-z0-9._-]
+   ⇒ this value is written into ~/.ssh/config, and a newline there
+     adds a directive — ProxyCommand runs a command on THIS box
+   fix: rhx git.grove.set grove-fixture-hetzner-grammar --at <user>@<host>:<port>   (an ec2 tunnel's host is localhost; a tailnet grove's is its own name)
+
+## arm 1 · wake, a registry sshAlias whose first byte is '-'
+✋ ConstraintError: the registry's sshAlias starts with '-'
+   ⇒ it reaches ssh as a positional, and ssh reads a '-' at the front
+     as an OPTION — one of them, -oProxyCommand=, runs a command here
+   fix: rhx git.grove.set grove-fixture-hetzner-dash --at <user>@<host>:<port>   (an ec2 tunnel's host is localhost; a tailnet grove's is its own name)
+
+## arm 1 · wake, a registry host whose first byte is '-'
+✋ ConstraintError: the registry's host starts with '-' — ssh would read it as an option
+   fix: rhx git.grove.set grove-fixture-hetzner-hostdash --at <user>@<host>:<port>
+
+## arm 2 · trust.gen, plan
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-hetzner --mode plan --trust verified
+   ├─ alias:    grove-fixture-hetzner
+   ├─ endpoint: grove-fixture-hetzner-1:22
+   ├─ tailnet:  no local tunnel — scan grove-fixture-hetzner-1 direct
+   ├─ scanned:  3 key(s) offered
+   ├─ attest:   the box itself, over ssh pinned to its trusted key (ssh-ed25519)
+   ├─ fingerprints
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   └─ plan: run with --mode apply to trust these key(s)
+
+## arm 2 · trust.gen, apply
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-hetzner --mode apply --trust verified
+   ├─ alias:    grove-fixture-hetzner
+   ├─ endpoint: grove-fixture-hetzner-1:22
+   ├─ tailnet:  no local tunnel — scan grove-fixture-hetzner-1 direct
+   ├─ scanned:  3 key(s) offered
+   ├─ attest:   the box itself, over ssh pinned to its trusted key (ssh-ed25519)
+   ├─ fingerprints
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   └─ 🌴 trusted — grove-fixture-hetzner-1 added to known_hosts
+
+## arm 2 · trust.gen, an unreported key (refused)
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-hetzner --mode apply --trust verified
+   ├─ alias:    grove-fixture-hetzner
+   ├─ endpoint: grove-fixture-hetzner-1:22
+   ├─ tailnet:  no local tunnel — scan grove-fixture-hetzner-1 direct
+   ├─ scanned:  2 key(s) offered
+   ├─ attest:   the box itself, over ssh pinned to its trusted key (ssh-ed25519)
+   ├─ fingerprints
+   │  ├─ SHA256:<fp> ✋ NO boot record match
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   └─ ✋ the boot record answered, and does NOT attest every offered key
+
+  why: this endpoint offered a key the box's own record does not hold:
+       SHA256:<fp>
+
+       a host's public keys are public, so a real key beside a forged one
+       is the cheap attack — every offered key is checked, never just one.
+       ⇒ treat this as a security event, NOT as a stale record.
+         the name 'grove-fixture-hetzner-1' may answer from a host that is not the box
+  fix: confirm the tailnet names that box before you trust any key here —
+    tailscale status | grep 'grove-fixture-hetzner-1'
+
+## arm 2 · trust.gen, the pinned ssh fails
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-hetzner --mode apply --trust verified
+   ├─ alias:    grove-fixture-hetzner
+   ├─ endpoint: grove-fixture-hetzner-1:22
+   ├─ tailnet:  no local tunnel — scan grove-fixture-hetzner-1 direct
+   ├─ scanned:  2 key(s) offered
+   └─ 💥 MalfunctionError: the ssh pinned to the trusted key (ssh-ed25519) did not answer (rc 255)
+
+  why: that channel is what attests every other key, so no key was attested
+  it said:
+    Host key verification failed.
+  fix: if it names a CHANGED host key or a failed verification, the trusted
+       key itself no longer matches — a security event; confirm the box first:
+    tailscale status | grep 'grove-fixture-hetzner-1'
+  else wake the seat, then re-run —
+    rhx git.grove.wake grove-fixture-hetzner
+
+## arm 2 · trust.gen, the tailnet name offers no key
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-hetzner --mode plan --trust verified
+   ├─ alias:    grove-fixture-hetzner
+   ├─ endpoint: grove-fixture-hetzner-1:22
+   ├─ tailnet:  no local tunnel — scan grove-fixture-hetzner-1 direct
+   └─ 💥 grove-fixture-hetzner-1:22 offered no host keys in 1s
+
+  why: the box did not answer at its tailnet name. either it is offline, this
+       laptop is off the tailnet, or the box was replaced — a replacement
+       joins under a NEW tailnet name, and the registry still names the old one
+  fix: ask the tailnet which name is online —
+    rhx network.tailnet.peers.get --match grove-fixture-hetzner
+  a new name → adopt it (howto.adopt-a-replacement-grove); an offline one → wake it —
+    rhx git.grove.wake grove-fixture-hetzner
+
+## arm 2 · trust.gen, first contact, plan
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-hetzner --mode plan --trust verified
+   ├─ alias:    grove-fixture-hetzner
+   ├─ endpoint: grove-fixture-hetzner-1:22
+   ├─ tailnet:  no local tunnel — scan grove-fixture-hetzner-1 direct
+   ├─ scanned:  2 key(s) offered
+   ├─ 🌙 a tailnet grove with no trusted key yet — no channel attests a first contact
+   ├─ fingerprints
+   │  ├─ SHA256:<fp> ✋ NO boot record match
+   │  ├─ SHA256:<fp> ✋ NO boot record match
+   └─ plan: would need --trust tofu — a tailnet box has no boot record to attest
+      ├─ a NEW box: confirm the tailnet names it, then accept its keys —
+      │  rhx git.grove.trust.gen --grove grove-fixture-hetzner --mode apply --trust tofu
+      └─ a REBUILT box: compare the rows above to infra's fingerprints first
+
+## arm 2 · trust.gen, first contact, apply
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-hetzner --mode apply --trust verified
+   ├─ alias:    grove-fixture-hetzner
+   ├─ endpoint: grove-fixture-hetzner-1:22
+   ├─ tailnet:  no local tunnel — scan grove-fixture-hetzner-1 direct
+   ├─ scanned:  2 key(s) offered
+   ├─ 🌙 a tailnet grove with no trusted key yet — no channel attests a first contact
+   ├─ fingerprints
+   │  ├─ SHA256:<fp> ✋ NO boot record match
+   │  ├─ SHA256:<fp> ✋ NO boot record match
+   └─ ✋ a tailnet box has no boot record, so these keys are unattested
+
+  why: a tailnet grove has no console channel; the first contact is trust on
+       first use, and only you may grant it
+  fix: confirm the tailnet names the box, then accept its keys —
+    tailscale status | grep 'grove-fixture-hetzner-1'
+    rhx git.grove.trust.gen --grove grove-fixture-hetzner --mode apply --trust tofu
+  a REBUILT box: compare the fingerprints above to infra's before you accept
+
+## arm 2 · trust.gen, first contact, apply --trust tofu
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-hetzner --mode apply --trust tofu
+   ├─ alias:    grove-fixture-hetzner
+   ├─ endpoint: grove-fixture-hetzner-1:22
+   ├─ tailnet:  no local tunnel — scan grove-fixture-hetzner-1 direct
+   ├─ scanned:  2 key(s) offered
+   ├─ fingerprints
+   │  ├─ SHA256:<fp> ✋ NO boot record match
+   │  ├─ SHA256:<fp> ✋ NO boot record match
+   └─ 🌴 trusted — grove-fixture-hetzner-1 added to known_hosts
+
+## arm 2 · trust.gen, a changed key
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-hetzner --mode apply --trust verified
+   ├─ alias:    grove-fixture-hetzner
+   ├─ endpoint: grove-fixture-hetzner-1:22
+   ├─ tailnet:  no local tunnel — scan grove-fixture-hetzner-1 direct
+   ├─ scanned:  2 key(s) offered
+   └─ ✋ ConstraintError: host key CHANGED for grove-fixture-hetzner-1 (ssh-ed25519)
+
+  why: the tailnet name answered with a key other than the one on record —
+       a REBUILT box, or a host that is not the box. a tailnet box has no
+       console; the one attestation is the box's own report, over ssh
+       pinned to a key still on record
+  fix: confirm the tailnet names the box, then let a key still on record decide —
+    tailscale status | grep 'grove-fixture-hetzner-1'
+    rhx git.grove.trust.gen --grove grove-fixture-hetzner --mode apply --on-changed replace
+  if NO key on record still matches (a full rebuild), no channel here attests it:
+  compare the fingerprints to infra's (its bootstrap prints them) before any write
+
+## arm 2 · trust.gen, a changed key, replace
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-hetzner --mode apply --trust verified
+   ├─ alias:    grove-fixture-hetzner
+   ├─ endpoint: grove-fixture-hetzner-1:22
+   ├─ tailnet:  no local tunnel — scan grove-fixture-hetzner-1 direct
+   ├─ scanned:  2 key(s) offered
+   ├─ changed:  ssh-ed25519 (a replace is asked for; the boot record decides)
+   ├─ attest:   the box itself, over ssh pinned to its trusted key (ecdsa-sha2-nistp256)
+   ├─ fingerprints
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   ├─ replaced: stale entry for grove-fixture-hetzner-1 dropped
+   └─ 🌴 trusted — grove-fixture-hetzner-1 re-trusted for the new box
+
+## arm 2 · trust.gen, a full rebuild (no key still on record), replace
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-hetzner --mode apply --trust verified
+   ├─ alias:    grove-fixture-hetzner
+   ├─ endpoint: grove-fixture-hetzner-1:22
+   ├─ tailnet:  no local tunnel — scan grove-fixture-hetzner-1 direct
+   ├─ scanned:  2 key(s) offered
+   ├─ changed:  ssh-ed25519 ecdsa-sha2-nistp256 (a replace is asked for; the boot record decides)
+   ├─ 🌙 a REBUILT tailnet box — no key on record still matches, so no channel attests the change
+   ├─ fingerprints
+   │  ├─ SHA256:<fp> ✋ NO boot record match
+   │  ├─ SHA256:<fp> ✋ NO boot record match
+   └─ ✋ ConstraintError: a rebuilt tailnet box, and no key on record still matches (ssh-ed25519 ecdsa-sha2-nistp256)
+
+  why: no console, no boot record, and no trusted key left to pin ssh to —
+       so no channel here attests the new keys, and none may be accepted on faith
+  fix: compare the fingerprints above to infra's (its bootstrap prints them)
+       before any write; a key that does not match is not the box
+
+## arm 2s · trust.gen, an ssm grove, apply
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-ec2 --mode apply --trust verified
+   ├─ alias:    grove-fixture-ec2
+   ├─ endpoint: localhost:<port>
+   ├─ tunnel:   bound on ipv4 only (scan via 127.0.0.1)
+   ├─ scanned:  2 key(s) offered
+   ├─ labeled:  [localhost]:<port> (the name ssh looks up)
+   ├─ box:      i-fixture-ssm
+   ├─ attest:   ssm (the box's own /etc/ssh keys)
+   ├─ fingerprints
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   └─ 🌴 trusted — [localhost]:<port> added to known_hosts
+
+## arm 2s · trust.gen, an ssm grove, apply again
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-ec2 --mode apply --trust verified
+   ├─ alias:    grove-fixture-ec2
+   ├─ endpoint: localhost:<port>
+   ├─ tunnel:   bound on ipv4 only (scan via 127.0.0.1)
+   ├─ scanned:  2 key(s) offered
+   ├─ labeled:  [localhost]:<port> (the name ssh looks up)
+   └─ 🌊 already trusted (ssh-ed25519 ecdsa-sha2-nistp256) — no change
+
+## arm 2s · trust.gen, an ssm grove, a changed key
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-ec2 --mode apply --trust verified
+   ├─ alias:    grove-fixture-ec2
+   ├─ endpoint: localhost:<port>
+   ├─ tunnel:   bound on ipv4 only (scan via 127.0.0.1)
+   ├─ scanned:  2 key(s) offered
+   ├─ labeled:  [localhost]:<port> (the name ssh looks up)
+   └─ ✋ ConstraintError: host key CHANGED for [localhost]:<port> (ssh-ed25519)
+
+  why: this port previously answered with a different key. either the
+       grove was rebuilt (or the port was reused by a NEW box), or
+       another process now holds the local port
+  fix: if the box is new, let this skill verify and replace the stale
+       entry — it writes only when the box's OWN boot record confirms
+       the key it just scanned —
+    rhx git.grove.trust.gen --grove grove-fixture-ec2 --mode apply --on-changed replace
+  and if THAT refuses, the boot record did not attest the scanned key —
+  which is the second row above, so read what holds the port before you
+  trust any key here —
+    ss -tlnp | grep ':<port>'
+
+## arm 2s · trust.gen, an ssm grove, a changed key, replace
+🐢 heres the wave...
+
+🔑 git.grove.trust.gen --grove grove-fixture-ec2 --mode apply --trust verified
+   ├─ alias:    grove-fixture-ec2
+   ├─ endpoint: localhost:<port>
+   ├─ tunnel:   bound on ipv4 only (scan via 127.0.0.1)
+   ├─ scanned:  2 key(s) offered
+   ├─ labeled:  [localhost]:<port> (the name ssh looks up)
+   ├─ changed:  ssh-ed25519 (a replace is asked for; the boot record decides)
+   ├─ box:      i-fixture-ssm
+   ├─ attest:   ssm (the box's own /etc/ssh keys)
+   ├─ fingerprints
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   │  ├─ SHA256:<fp> ✔ matches the boot record
+   ├─ replaced: stale entry for [localhost]:<port> dropped
+   └─ 🌴 trusted — [localhost]:<port> re-trusted for the new box
+
+## arm 4 · ready.verify --upto 2, the box answers
+🐢 heres the wave...
+
+🪜 git.grove.ready.verify grove-fixture-hetzner
+   ├─ rungs: 1..2
+   └─ climb
+      ├─ 1. registry
+      │  ├─ exid:    grove-fixture-hetzner
+      │  ├─ account: <unset>
+      │  └─ env:     camp
+      │     ⇒ a tailnet grove (grove-fixture-hetzner-1): no aws account is owed
+      ├─ 2. reach
+      │  └─ ✔ awake — answers over ssh on the tailnet
+
+🌳 cowabunga! grove-fixture-hetzner is ready
+   ├─ rungs:  1..2, every one held
+   └─ next:   rhx git.grove.provision test grove-fixture-hetzner
+
+## arm 4 · ready.verify --upto 2, the box does not answer
+🐢 heres the wave...
+
+🪜 git.grove.ready.verify grove-fixture-hetzner
+   ├─ rungs: 1..2
+   └─ climb
+      ├─ 1. registry
+      │  ├─ exid:    grove-fixture-hetzner
+      │  ├─ account: <unset>
+      │  └─ env:     camp
+      │     ⇒ a tailnet grove (grove-fixture-hetzner-1): no aws account is owed
+      ├─ 2. reach
+      └─ ✋ rung 2 (reach) does not hold
+
+  why: the grove did not answer over ssh on the tailnet (grove-fixture-hetzner-1) — so this is the box, or the tailnet between
+  fix:
+    rhx git.grove.wake grove-fixture-hetzner
+
+      a hetzner box is always on, so a miss is no hibernate: either this
+      laptop is off the tailnet, or the box's sshd or tailscale is down.
+
+      read what it said —
+    tail -30 <fix>/home/.local/state/grove.ready/grove-fixture-hetzner/wake.log
+
+  then climb again from here —
+    rhx git.grove.ready.verify grove-fixture-hetzner --from 2
+
+## arm 4 · ready.verify --upto 2, the wake refuses this laptop's key
+🐢 heres the wave...
+
+🪜 git.grove.ready.verify grove-fixture-hetzner
+   ├─ rungs: 1..2
+   └─ climb
+      ├─ 1. registry
+      │  ├─ exid:    grove-fixture-hetzner
+      │  ├─ account: <unset>
+      │  └─ env:     camp
+      │     ⇒ a tailnet grove (grove-fixture-hetzner-1): no aws account is owed
+      ├─ 2. reach
+      └─ ✋ rung 2 (reach) does not hold
+
+  why: the grove answered over the tailnet and the wake refused — its own words name the fix
+  fix:
+    tail -30 <fix>/home/.local/state/grove.ready/grove-fixture-hetzner/wake.log
+
+      a refused key is placed from a laptop that already reaches the ground seat —
+    rhx git.grove.auth.ssh.set grove-fixture-hetzner --identity <this laptop's key>.pub --mode plan
+
+  then climb again from here —
+    rhx git.grove.ready.verify grove-fixture-hetzner --from 2
+
+## arm 4 · ready.verify --upto 3, no session rides
+🐢 heres the wave...
+
+🪜 git.grove.ready.verify grove-fixture-hetzner
+   ├─ rungs: 1..3
+   └─ climb
+      ├─ 1. registry
+      │  ├─ exid:    grove-fixture-hetzner
+      │  ├─ account: <unset>
+      │  └─ env:     camp
+      │     ⇒ a tailnet grove (grove-fixture-hetzner-1): no aws account is owed
+      ├─ 2. reach
+      │  └─ ✔ awake — answers over ssh on the tailnet
+      ├─ 3. duct
+      └─ ✋ rung 3 (duct) does not hold
+
+  why: the box is awake per rung 2 and answers no ssh session — on the tailnet that is a host key not yet trusted (a first contact, or a REBUILT box), or a seat that refuses this laptop's key
+  fix:
+    rhx git.grove.trust.gen --grove grove-fixture-hetzner --mode plan
+      a FIRST contact: rhx git.grove.provision boot grove-fixture-hetzner --mode apply --trust tofu
+      a REBUILT box: ask infra for its host fingerprints; no flag settles a changed key here
+
+      read what the ride said — it names which it was —
+    tail -20 <fix>/home/.local/state/grove.ready/grove-fixture-hetzner/duct.log
+
+  then climb again from here —
+    rhx git.grove.ready.verify grove-fixture-hetzner --from 3
+
+## arm 5 · stop --what all --mode apply
+✋ ConstraintError: grove 'grove-fixture-hetzner' is reached over the tailnet (grove-fixture-hetzner-1) — there is naught here to stop
+   ⇒ no instance to hibernate: the box is always on, and its power is infrastructure's
+   ⇒ no ssm tunnel to close: every duct dials the box's own name over ssh
+   fix: none owed. a duct pane closes with its tmux session; the box stays up by design
+
+## arm 5 · stop --what duct --mode apply
+✋ ConstraintError: grove 'grove-fixture-hetzner' is reached over the tailnet (grove-fixture-hetzner-1) — there is naught here to stop
+   ⇒ no instance to hibernate: the box is always on, and its power is infrastructure's
+   ⇒ no ssm tunnel to close: every duct dials the box's own name over ssh
+   fix: none owed. a duct pane closes with its tmux session; the box stays up by design
+
+## arm 6 · auth.ssh.set --mode plan, tailnet
+🐢 heres the wave...
+
+🔑 git.grove.auth.ssh.set grove-fixture-hetzner --mode plan
+   ├─ exid:  grove-fixture-hetzner
+   ├─ env:   camp
+   ├─ key:   256 SHA256:<fp> no comment (ED25519)
+   ├─ from:  <fix>/keys/host_ed25519.pub
+   ├─ seats: camper
+   ├─ reach: the tailnet (grove-fixture-hetzner-1) — via the ground seat 'grove-fixture-hetzner.ground', no aws
+   └─ drive
+      ├─ camper [KEEP] already authorized
+
+🍃 plan only — no key was placed
+   └─ grant it: rhx git.grove.auth.ssh.set grove-fixture-hetzner --identity <fix>/keys/host_ed25519.pub --mode apply
+
+## arm 6 · auth.ssh.set --mode apply, the ground seat holds no passwordless sudo
+🐢 heres the wave...
+
+🔑 git.grove.auth.ssh.set grove-fixture-hetzner --mode apply
+   ├─ exid:  grove-fixture-hetzner
+   ├─ env:   camp
+   ├─ key:   256 SHA256:<fp> no comment (ED25519)
+   ├─ from:  <fix>/keys/host_ed25519.pub
+   ├─ seats: camper
+   ├─ reach: the tailnet (grove-fixture-hetzner-1) — via the ground seat 'grove-fixture-hetzner.ground', no aws
+   └─ drive
+      ├─ camper ✋ the ground seat 'grove-fixture-hetzner.ground' could not run the procedure as root
+      │  said: rc=1: sudo: a password is required
+      │  ⇒ the seat must answer over ssh and hold passwordless sudo
+      │  read it: rhx git.grove.wake grove-fixture-hetzner.ground
+
+✋ at least one seat was not authorized
+
+## arm 6 · auth.ssh.set --mode plan, a second laptop, both seats
+🐢 heres the wave...
+
+🔑 git.grove.auth.ssh.set grove-fixture-hetzner --mode plan
+   ├─ exid:  grove-fixture-hetzner
+   ├─ env:   camp
+   ├─ key:   256 SHA256:<fp> no comment (ED25519)
+   ├─ from:  <fix>/keys/rebuilt.pub
+   ├─ seats: camper ground
+   ├─ reach: the tailnet (grove-fixture-hetzner-1) — via the ground seat 'grove-fixture-hetzner.ground', no aws
+   └─ drive
+      ├─ camper [PLAN] would authorize
+      ├─ ground [PLAN] would authorize
+
+🍃 plan only — no key was placed
+   └─ grant it: rhx git.grove.auth.ssh.set grove-fixture-hetzner --identity <fix>/keys/rebuilt.pub --mode apply
+
+## arm 6 · auth.ssh.set --mode apply, a second laptop, both seats
+🐢 heres the wave...
+
+🔑 git.grove.auth.ssh.set grove-fixture-hetzner --mode apply
+   ├─ exid:  grove-fixture-hetzner
+   ├─ env:   camp
+   ├─ key:   256 SHA256:<fp> no comment (ED25519)
+   ├─ from:  <fix>/keys/rebuilt.pub
+   ├─ seats: camper ground
+   ├─ reach: the tailnet (grove-fixture-hetzner-1) — via the ground seat 'grove-fixture-hetzner.ground', no aws
+   └─ drive
+      ├─ camper [SET] authorized ✔ confirmed present once
+      ├─ ground [SET] authorized ✔ confirmed present once
+
+🌲 authorized — every named seat holds this box's key ✔
+   ├─ key:  256 SHA256:<fp> no comment (ED25519)
+   └─ reach it: rhx git.grove.send grove-fixture-hetzner --reply --what 'whoami'
+
+## arm 6 · auth.ssh.set on the ground entry itself
+🐢 heres the wave...
+
+🔑 git.grove.auth.ssh.set grove-fixture-hetzner.ground --mode plan
+   ├─ exid:  grove-fixture-hetzner.ground
+   ├─ env:   camp
+   ├─ key:   256 SHA256:<fp> no comment (ED25519)
+   ├─ from:  <fix>/keys/rebuilt.pub
+   ├─ seats: camper ground
+   ├─ reach: the tailnet (grove-fixture-hetzner-1) — via the ground seat 'grove-fixture-hetzner.ground', no aws
+   └─ drive
+      ├─ camper [PLAN] would authorize
+      ├─ ground [PLAN] would authorize
+
+🍃 plan only — no key was placed
+   └─ grant it: rhx git.grove.auth.ssh.set grove-fixture-hetzner.ground --identity <fix>/keys/rebuilt.pub --mode apply
+
+

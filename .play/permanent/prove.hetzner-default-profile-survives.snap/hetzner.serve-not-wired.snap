@@ -1,0 +1,8 @@
+   • ~/.aws/credentials created, EMPTY ✔ (aws-sdk v2 opens it unconditionally)
+   ✋ ConstraintError: [default] in <home>/.aws/config names no ec2_metadata_service_endpoint, so this seat has no aws identity
+      ⇒ a camp grove carries the camp identity on EVERY seat; on hetzner that
+        line is this seat's one road to infra's IAM Roles Anywhere signer
+      ⇒ this bundle mirrors that line and never invents it: [default] is infra's
+      fix (infra): run ahbode/infrastructure's grove identity skill for THIS seat,
+        with serve wired; then
+        rhx grove.provision --what 5.6.aws --mode apply

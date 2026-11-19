@@ -74,11 +74,19 @@
 #
 # ⚠️ .why this file writes to `~/.aws/config`, which `5.6.aws` also owns
 #      `rule.forbid.two-writers-on-one-artifact` bites when two writers can
-#      touch the same BYTES. they cannot here: `5.6.aws` owns exactly the
-#      `# grove: begin`…`# grove: end` fence (ambient + default), and this
-#      skill owns one `# grove: reach <profile>` fence per profile. each
-#      rewrites only its own fence and copies every other line through.
-#      aws offers no second file for profiles, so the fence is the boundary.
+#      touch the same BYTES. they cannot here: `5.6.aws` owns exactly its
+#      `# grove: the ambient …`…`# grove: end` fence (ambient, plus [default]
+#      on ec2), and this skill owns one `# grove: reach <profile>` fence per
+#      profile. each rewrites only its own fence and copies every other line
+#      through. aws offers no second file for profiles, so the fence is the
+#      boundary.
+#
+# 🛑 .and [default] is a THIRD writer's on a hetzner grove
+#      infra's identity skill rewrites [default] there on its own schedule.
+#      every write this skill makes re-reads [default] at the last moment and
+#      refuses to land if it moved, or if the new body would change it
+#      (`src/grove.aws.sh`). the box kind comes from the platform, and the
+#      body names the endpoint [default] names
 #
 # usage:
 #   rhx aws.reach.set --org ahbode --env test --assume <prep-oidc-role>
@@ -106,7 +114,8 @@
 #     `sts get-caller-identity` through the profile it just wrote
 #   - exit 0 = the profile answers, and names the expected account
 #   - exit 1 = malfunction (aws refused, keyrack broke)
-#   - exit 2 = constraint (bad args, undeclarable account, laptop with no sso)
+#   - exit 2 = constraint (bad args, undeclarable account, laptop with no sso,
+#     a camp grove with no identity road, a wrong account, a shadowed rack)
 ######################################################################
 set -uo pipefail
 
@@ -181,12 +190,12 @@ while [[ $# -gt 0 ]]; do
     ###################################################################
     --skill|--repo|--role) shift 2 ;;
     --) shift ;;
-    *) echo "✋ unknown argument '$1'" >&2; echo "   see: rhx aws.reach.set help" >&2; exit 2 ;;
+    *) echo "✋ ConstraintError: unknown argument '$1'" >&2; echo "   see: rhx aws.reach.set help" >&2; exit 2 ;;
   esac
 done
 
-[[ -n "$ORG" ]] || { echo "✋ --org is required (e.g. --org ahbode)" >&2; exit 2; }
-[[ -n "$ENV" ]] || { echo "✋ --env is required (test|prep|prod|camp)" >&2; exit 2; }
+[[ -n "$ORG" ]] || { echo "✋ ConstraintError: --org is required (e.g. --org ahbode)" >&2; exit 2; }
+[[ -n "$ENV" ]] || { echo "✋ ConstraintError: --env is required (test|prep|prod|camp)" >&2; exit 2; }
 ####################################################################
 # 🛑 this list MIRRORS keyrack's `KEYRACK_VALID_ENVS` — it never extends it
 #   this skill writes BOTH halves, and the rack half is a `keyrack set`. so an
@@ -205,9 +214,9 @@ done
 ####################################################################
 case "$ENV" in
   test|prep|prod|camp) ;;
-  *) echo "✋ invalid --env '$ENV' (test|prep|prod|camp)" >&2; exit 2 ;;
+  *) echo "✋ ConstraintError: invalid --env '$ENV' (test|prep|prod|camp)" >&2; exit 2 ;;
 esac
-[[ "$MODE" == "plan" || "$MODE" == "apply" ]] || { echo "✋ invalid --mode '$MODE' (plan|apply)" >&2; exit 2 ;}
+[[ "$MODE" == "plan" || "$MODE" == "apply" ]] || { echo "✋ ConstraintError: invalid --mode '$MODE' (plan|apply)" >&2; exit 2 ;}
 
 ####################################################################
 # 🛑 every value that reaches ~/.aws/config is GRAMMAR-CLAMPED first
@@ -269,21 +278,55 @@ echo "   ├─ profile: $PROFILE"
 ####################################################################
 # 1. which BODY does this box need?
 #
-# ⚠️ .why the box is asked and not told by a flag
+# ⚠️ .why the box is derived and not told by a flag
 #      a `--for cloud` flag would let a human declare a grove body on a
 #      laptop, which produces a profile that cannot work and reads fine in
-#      the file. IMDS is the fact itself, and it is the same probe
-#      `5.6.aws` uses for its own applicability gate
+#      the file. the PLATFORM is the fact, derived once by `src/grove.env.sh`
+#      — the same answer `5.6.aws` reads for its own gate
+#
+# 🛑 .why not a probe of 169.254.169.254, as this section once ran
+#      a hetzner grove has no route there, so that probe called it a laptop
+#      and the skill asked for an sso login on a headless box. the platform
+#      names both grove kinds, and `grove_aws_identity_endpoint` names the one
+#      fact their bodies differ by
 ####################################################################
-if curl -sS -m 3 -X PUT 'http://169.254.169.254/latest/api/token' \
-  -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' >/dev/null 2>&1; then
-  HOSTKIND="grove"
-  HOSTWHY="IMDS answers"
-else
-  HOSTKIND="laptop"
-  HOSTWHY="no IMDS"
-fi
+aws_reach_runtime_load || exit 2
+grove_env_derive || exit 2
+
+ENDPOINT="$(grove_aws_identity_endpoint)"; ROAD="$(grove_aws_identity_road "$?")"
+case "$ROAD" in
+  known)       HOSTKIND="grove";  HOSTWHY="$GROVE_ENV_SERVER" ;;
+  no-identity) HOSTKIND="laptop"; HOSTWHY="$GROVE_ENV_SERVER — no platform identity" ;;
+  unmapped)
+    # a camp grove read as a laptop would get an sso body on a box with no browser
+    echo "   └─ ✋ ConstraintError: $GROVE_ENV_SERVER is a camp grove, and this repo knows no road to its aws identity" >&2
+    echo "" >&2
+    echo "  why: a grove body names the endpoint that serves the box's identity, and this" >&2
+    echo "       platform has none mapped; a laptop's sso body would not work here" >&2
+    echo "  fix: teach grove_aws_identity_endpoint (src/grove.aws.sh) this platform's road" >&2
+    exit 2 ;;
+  serve-unwired)
+    echo "   └─ ✋ ConstraintError: a hetzner grove, and [default] in $CFG names no ec2_metadata_service_endpoint" >&2
+    echo "" >&2
+    echo "  why: every grove body here names the endpoint that serves the box's identity," >&2
+    echo "       and on hetzner that line is infra's to write. this skill mirrors it, and" >&2
+    echo "       will not invent a port" >&2
+    echo "  fix: run infra's grove identity skill with serve wired, then re-run this" >&2
+    exit 2 ;;
+  bad-endpoint)
+    echo "   └─ ✋ ConstraintError: [default] in $CFG names a non-loopback ec2_metadata_service_endpoint ('$ENDPOINT')" >&2
+    echo "" >&2
+    echo "  why: that line would be copied into this profile, and the sdk would send" >&2
+    echo "       its identity requests to another host" >&2
+    echo "  fix: re-run infra's grove identity skill, then re-run this" >&2
+    exit 2 ;;
+esac
+# the rack's vault, decided ONCE so the plan names the vault the apply writes: a laptop
+#   unlocks by sso (aws.config); a grove has no sso, so a plain reference store is the
+#   honest vault. see the ⚠️ block in the header
+VAULT="os.direct"; [[ "$HOSTKIND" == "laptop" ]] && VAULT="aws.config"
 echo "   ├─ box:     $HOSTKIND ($HOSTWHY)"
+[[ -n "$ENDPOINT" ]] && echo "   ├─ identity: $ENDPOINT (mirrored from [default])"
 
 ####################################################################
 # 2. a laptop's body is an SSO login this skill must NOT author
@@ -305,7 +348,7 @@ if [[ "$HOSTKIND" == "laptop" ]]; then
     echo "   └─ prove it:  aws sts get-caller-identity --profile $PROFILE"
     exit 0
   fi
-  echo "   └─ ✋ a laptop, and '$PROFILE' is NOT declared" >&2
+  echo "   └─ ✋ ConstraintError: a laptop, and '$PROFILE' is NOT declared" >&2
   echo "" >&2
   echo "  why: on a laptop this profile is an SSO login, whose sso_start_url" >&2
   echo "       this skill has no truthful source for. it will not invent one." >&2
@@ -335,7 +378,7 @@ if [[ -z "$ACCOUNT" && "$ENV" != "camp" ]]; then
 fi
 
 if [[ -z "$ACCOUNT" && "$ENV" != "camp" ]]; then
-  echo "   └─ ✋ no account for org=$ORG env=$ENV" >&2
+  echo "   └─ ✋ ConstraintError: no account for org=$ORG env=$ENV" >&2
   echo "" >&2
   echo "  why: no --account was passed, and no declapract.use.yml under" >&2
   echo "       '$FROM' declares awsAccountId.$DECL_ENV" >&2
@@ -386,12 +429,12 @@ fi
 #      dressed as a config error
 ####################################################################
 if [[ "$ENV" == "camp" ]]; then
-  [[ -z "$ROLE" ]] || { echo "   └─ ✋ --env camp takes no --assume: camp is the grove's own account" >&2; exit 2; }
+  [[ -z "$ROLE" ]] || { echo "   └─ ✋ ConstraintError: --env camp takes no --assume: camp is the grove's own account" >&2; exit 2; }
   BODY=$'credential_source = Ec2InstanceMetadata\nregion = '"$REGION"
   echo "   ├─ reach:   the grove's own badge (camp — no hop)"
 else
   [[ -n "$ROLE" ]] || {
-    echo "   └─ ✋ --assume is required for --env $ENV" >&2
+    echo "   └─ ✋ ConstraintError: --assume is required for --env $ENV" >&2
     echo "" >&2
     echo "  why: a grove reaches another account by ASSUMING a role there," >&2
     echo "       and a guessed role name refuses in a way that reads exactly" >&2
@@ -407,6 +450,19 @@ else
   echo "   ├─ reach:   the grove's badge ⇒ $ROLE_ARN"
 fi
 
+####################################################################
+# ⚠️ on hetzner, the body names WHERE the badge is served
+#   - `credential_source = Ec2InstanceMetadata` asks the sdk default,
+#     169.254.169.254, which a hetzner grove has no route to
+#   - the one line below points that same source at infra's signer, so the
+#     body stays ec2's shape plus one line (route F5)
+#   - 📌 a `source_profile = default` hop was the first shape asked for; from
+#     recall of botocore, a source profile resolves only through the PROFILE
+#     providers, which exclude instance metadata. the live sts call in
+#     section 8 is what proves this body
+####################################################################
+[[ -n "$ENDPOINT" ]] && BODY+=$'\nec2_metadata_service_endpoint = '"$ENDPOINT"
+
 # ⚠️ the fence grammar is SOURCED, never spelled here
 #   - `aws.reach.del` reaps by this exact pair of lines, and `aws.reach.get`
 #     lists by it. three holders of one string is an m.9 drift that has not
@@ -415,6 +471,31 @@ fi
 #     its own affixes from `_fence_open` so it cannot drift either
 FENCE_OPEN="$(aws_reach_fence_open "$PROFILE")"
 FENCE_SHUT="$(aws_reach_fence_shut "$PROFILE")"
+
+####################################################################
+# 🛑 a [profile] of this NAME outside this skill's fence is refused, never adopted
+#
+# .why
+#   - a second `[profile <name>]` in one file is legal ini, and the sdk lets
+#     the LAST one win — so the file reads as two bodies and acts as one, in
+#     silence, and which one depends on order
+#   - a hand-laid block is a human's (or infra's) decision: to delete it is to
+#     overrule them, and to append beside it is the silent shadow above
+#   - ⇒ the honest move is to stop and name both, before either half is written
+#     (route F4)
+####################################################################
+TWINS="$(aws_reach_twin_count "$PROFILE")"
+if [[ "${TWINS:-0}" != "0" ]]; then
+  echo "   └─ ✋ ConstraintError: $CFG already declares [profile $PROFILE] OUTSIDE this skill's fence" >&2
+  echo "" >&2
+  echo "  where: $CFG, lines $(aws_reach_unfenced_ranges_csv "$PROFILE")" >&2
+  echo "  why: a second block of one name is silent — the sdk reads the last one," >&2
+  echo "       so this skill would either shadow that block or be shadowed by it" >&2
+  echo "  ⇒ the block was laid by hand (or by another writer), so it is not this" >&2
+  echo "    skill's to delete" >&2
+  echo "  fix: remove that unfenced [profile $PROFILE] block from $CFG, then re-run this" >&2
+  exit 2
+fi
 
 ####################################################################
 # 5. plan
@@ -430,7 +511,7 @@ if [[ "$MODE" == "plan" ]]; then
   echo ""
   echo "      2. onto the rack"
   echo "         rhx keyrack set --owner $OWNER --key AWS_PROFILE \\"
-  echo "                         --org $ORG --env $ENV --vault aws.config"
+  echo "                         --org $ORG --env $ENV --vault $VAULT"
   echo ""
   echo "      then it PROVES the pair with a live call:"
   echo "         aws sts get-caller-identity --profile $PROFILE"
@@ -445,31 +526,38 @@ fi
 # ⚠️ every line outside THIS fence is copied through byte for byte, so a
 #    re-run is an upsert of one block and not a rewrite of the file
 ####################################################################
+#
+# 🛑 [default] is never this skill's, on any platform
+#   - ec2: `5.6.aws` writes it; hetzner: infra's identity skill writes it
+#   - ⇒ the swap refuses a body that would change it, and refuses to land if
+#     another writer moved it after this run read the file (`src/grove.aws.sh`)
+####################################################################
 echo "   └─ apply"
 mkdir -p "$HOME/.aws"
 touch "$CFG"
 
-TMP="$(mktemp)"
-awk -v open="$FENCE_OPEN" -v shut="$FENCE_SHUT" '
-  $0 == open { skip = 1; next }
-  $0 == shut { skip = 0; next }
-  !skip { print }
-' "$CFG" > "$TMP"
-
-{
-  printf '\n%s\n' "$FENCE_OPEN"
+DEFAULT_BEFORE="$(grove_aws_config_section cfg="$CFG" name=default)"
+TMP="$(grove_aws_config_tmp)" || { echo "      └─ 💥 MalfunctionError: no tmp file beside $CFG" >&2; exit 1; }
+# 🛑 set IN PLACE, never drop-then-append: an append moved `5.6.aws`'s block and
+#   stranded a blank line mid-file, so each run rewrote the file the other
+#   bundle left (`grove_aws_config_fence_set`, `src/grove.aws.sh`)
+aws_reach_fence_set "$PROFILE" "$(
+  printf '%s\n' "$FENCE_OPEN"
   printf '[profile %s]\n' "$PROFILE"
   printf '%s\n' "$BODY"
-  printf '%s\n' "$FENCE_SHUT"
-} >> "$TMP"
+  printf '%s' "$FENCE_SHUT"
+)" > "$TMP"
 
 if cmp -s "$TMP" "$CFG"; then
   echo "      ├─ ~/.aws/config already current for [profile $PROFILE]"
   rm -f "$TMP"
 else
-  cat "$TMP" > "$CFG"
-  rm -f "$TMP"
-  chmod 600 "$CFG"
+  grove_aws_config_swap cfg="$CFG" new="$TMP" default_before="$DEFAULT_BEFORE" default=keep; SWAP_RC=$?
+  if (( SWAP_RC != 0 )); then
+    echo "      └─ 💥 MalfunctionError: ~/.aws/config was NOT written: $(grove_aws_config_swap_why "$SWAP_RC")" >&2
+    grove_aws_config_swap_said "         " >&2
+    exit 1
+  fi
   echo "      ├─ ~/.aws/config now declares [profile $PROFILE] ✔"
 fi
 
@@ -563,7 +651,7 @@ GITROOT="$PWD"
 if ! git -C "$PWD" rev-parse --git-dir >/dev/null 2>&1; then
   GITROOT="$HOME/.local/state/keyrack.gitroot"
   if [[ ! -d "$GITROOT/.git" ]]; then
-    echo "      └─ ✋ the cwd is not a git repo, and the box has no rack root" >&2
+    echo "      └─ 💥 MalfunctionError: the cwd is not a git repo, and the box has no rack root" >&2
     echo "" >&2
     echo "  why: rhachet's cli refuses every keyrack subcommand outside a git root" >&2
     echo "  fix: rhx grove.provision --what 5.12.rack --mode apply" >&2
@@ -583,9 +671,6 @@ else
     && echo "      ├─ ⚠️ rack answers '$RACK_SEEN', expected '$PROFILE' — it will be re-set" \
     || echo "      ├─ rack does not answer ${ORG}.${ENV}.AWS_PROFILE yet"
 
-  # laptop unlocks by sso (aws.config); a grove has no sso, so a plain
-  # reference store is the honest vault. see the ⚠️ block in the header
-  VAULT="os.direct"; [[ "$HOSTKIND" == "laptop" ]] && VAULT="aws.config"
   echo "      │  vault: $VAULT  (a $HOSTKIND)"
 
   # ⚠️ .why the value is FED on stdin, when a pat never may be
@@ -604,9 +689,17 @@ else
   #      print `✔ set` regardless (measured with a pat, 2026-08-02). that is
   #      why the re-read below is not optional — it is the one rung that
   #      separates this from a claim
-  if ! printf '%s\n' "$PROFILE" | env -C "$GITROOT" rhx keyrack set --owner "$OWNER" --key AWS_PROFILE \
-        --org "$ORG" --env "$ENV" --vault "$VAULT"; then
-    echo "      └─ 💥 keyrack refused the set" >&2
+  # keyrack's own words are KEPT, then shown inside this tree: raw, they land at
+  #   column 0 between two branches. its `✔ set` is dropped on success, since a
+  #   set's claim is no proof — the re-read below is
+  SET_RC=0
+  SET_SAID="$(printf '%s\n' "$PROFILE" | env -C "$GITROOT" rhx keyrack set --owner "$OWNER" --key AWS_PROFILE \
+        --org "$ORG" --env "$ENV" --vault "$VAULT" 2>&1)" || SET_RC=$?
+  if (( SET_RC != 0 )); then
+    echo "      └─ 💥 MalfunctionError: keyrack refused the set" >&2
+    while IFS= read -r line; do
+      [[ -n "${line//[[:space:]]/}" ]] && echo "         ⇒ it said: $line" >&2
+    done <<< "$SET_SAID"
     echo "" >&2
     echo "  why: AWS_PROFILE may not be DECLARED for env=$ENV in this repo's" >&2
     echo "       .agent/keyrack.yml — an undeclared key stores and then reads" >&2
@@ -622,7 +715,7 @@ else
   RACK_SEEN="$(env -C "$GITROOT" rhx keyrack get --owner "$OWNER" --org "$ORG" --env "$ENV" --key AWS_PROFILE \
     --value --unlock 2>/dev/null | tail -1)"
   if [[ "$RACK_SEEN" != "$PROFILE" ]]; then
-    echo "      └─ ✋ the set reported success and the rack still answers '$RACK_SEEN'" >&2
+    echo "      └─ ✋ ConstraintError: the set reported success and the rack still answers '$RACK_SEEN'" >&2
     echo "" >&2
     echo "  expected: $PROFILE" >&2
     echo "  ⇒ every consumer reads the rack, so each will act as '$RACK_SEEN'" >&2
@@ -634,7 +727,7 @@ else
     echo "  fix: set it by hand, and answer '$PROFILE' at the value prompt —" >&2
     echo "    rhx keyrack set --owner $OWNER --key AWS_PROFILE \\" >&2
     echo "                    --org $ORG --env $ENV --vault $VAULT" >&2
-    exit 1
+    exit 2
   fi
   echo "      ├─ rack now answers ${ORG}.${ENV}.AWS_PROFILE = $PROFILE ✔"
 fi
@@ -650,13 +743,40 @@ fi
 ####################################################################
 echo "      ├─ prove: aws sts get-caller-identity --profile $PROFILE"
 if ! WHOAMI="$(timeout -k 10 30 aws sts get-caller-identity --profile "$PROFILE" --output json 2>&1)"; then
-  echo "      └─ 💥 the profile is declared and does NOT answer" >&2
+  echo "      └─ 💥 MalfunctionError: the profile is declared and does NOT answer" >&2
   echo "" >&2
   echo "  aws said:" >&2
   printf '%s\n' "$WHOAMI" | head -4 | sed 's/^/    /' >&2
   echo "" >&2
+  # name WHO asked: on hetzner the badge is a roles-anywhere session, and a
+  # trust policy written for ec2 alone refuses it while it reads like a typo
+  ASKER="$(timeout -k 5 20 aws sts get-caller-identity --profile ambient --query Arn --output text 2>/dev/null)"
+  # a roles-anywhere session's source identity or tags refused: name every action owed
+  # at once (`grove_aws_trust_refused`, `grove_aws_trust_actions_owed`)
+  if refused="$(grove_aws_trust_refused "$WHOAMI")"; then
+    echo "  ⇒ the role TRUSTS this box, and refuses what its session carries ($refused)" >&2
+    echo "    the principal that asked: ${ASKER:-<unknown — the ambient profile did not answer>}" >&2
+    echo "    ⇒ an IAM Roles Anywhere session carries a source identity and session tags," >&2
+    echo "      and a chained AssumeRole passes both on. the role's trust statement for" >&2
+    echo "      that principal must allow all three actions — an ask of $ORG/infrastructure:" >&2
+    echo "        $(grove_aws_trust_actions_owed)" >&2
+    exit 1
+  fi
+  # 🛑 only a refusal BY THE ROLE is an ask of infra. a hop whose SOURCE does not
+  #   answer (a dead signer, a lapsed session, no credentials, a timeout) fails here
+  #   too — and to blame the role's trust policy for that sends the human to infra
+  #   over a fault on this box
+  if [[ "$WHOAMI" != *AccessDenied* ]]; then
+    echo "  ⇒ the hop's SOURCE did not answer: this is no refusal by the role" >&2
+    echo "    the ambient identity it chains from: ${ASKER:-<it did not answer either>}" >&2
+    echo "    ⇒ a stopped signer, a lapsed session, or absent credentials reads exactly so" >&2
+    echo "    fix: rhx grove.provision --what 5.6.aws --mode plan" >&2
+    exit 1
+  fi
   echo "  ⇒ AccessDenied on sts:AssumeRole means the ROLE exists and this box" >&2
-  echo "    is not in its trust policy — an infra ask, not a box defect" >&2
+  echo "    is not in its trust policy — an ask of $ORG/infrastructure, not a box defect" >&2
+  echo "    the principal that asked: ${ASKER:-<unknown — the ambient profile did not answer>}" >&2
+  echo "    ⇒ the role's trust policy must name that principal" >&2
   echo "  ⇒ a role arn that does not exist refuses the same way. confirm the" >&2
   echo "    name first:" >&2
   echo "      rhx git.repo.get lines --in $ORG/infrastructure --words 'ROLE_NAME'" >&2
@@ -667,13 +787,13 @@ SEEN_ACCT="$(printf '%s' "$WHOAMI" | jq -r '.Account')"
 SEEN_ARN="$(printf '%s' "$WHOAMI" | jq -r '.Arn')"
 
 if [[ "$ENV" != "camp" && "$SEEN_ACCT" != "$ACCOUNT" ]]; then
-  echo "      └─ ✋ the profile answers as the WRONG account" >&2
+  echo "      └─ ✋ ConstraintError: the profile answers as the WRONG account" >&2
   echo "" >&2
   echo "  expected: $ACCOUNT" >&2
   echo "  detected: $SEEN_ACCT  ($SEEN_ARN)" >&2
   echo "  ⇒ this is the silent failure --account exists to prevent: a valid" >&2
   echo "    identity in somewhere else. re-check the account for env=$ENV" >&2
-  exit 1
+  exit 2
 fi
 
 echo "      └─ ✔ answers, in account $SEEN_ACCT"

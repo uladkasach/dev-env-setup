@@ -1,0 +1,19 @@
+{
+  "key": "6f4cf8699c309496",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-ehmpathy"
+  },
+  "exid": null,
+  "title": "git.repo.test: export ACCESS from --env, so getEnvironment makes no Account API call per test file",
+  "description": "## .what\n\ngit.repo.test exports `ACCESS=<env>` beside the `CONFIG=<env>` it already sets when `--env` is given.\n\n## .why\n\nsdk-environment's `getEnvironment` resolves access through a parser chain: the `ACCESS` env var first, then `iam:ListAccountAliases`, then `account:GetAccountInformation`. with `ACCESS` unset, every test FILE calls the Account API at setup (the cache is per process, and jest gives each file a fresh module registry). that API has a tiny request quota, so parallel suites throw `TooManyRequestsException` at setup.\n\nmeasured 2026-11-18 on a 36-core grove: the svc-chat integration suite failed 5-11 tests per run, the victims moved each run, and every one was `TooManyRequestsException` from `getEnvAccessFromAwsAccountName`. a worker cap does not cure it: the quota is per account, so 9 crews x 4 workers is the same burst. `ACCESS` removes the call entirely.\n\n## .done when\n\n- `--env X` exports `ACCESS=X` to the test process\n- a test pins it",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 14,
+  "recordStatus": "QUEUED",
+  "reason": "radio.uses:blocked — global",
+  "deliveredExid": null
+}

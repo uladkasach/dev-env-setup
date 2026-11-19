@@ -140,23 +140,92 @@ grove_provision_4_5_nvim_configure_upsert() {
   fi
   echo "   • super+v selector setup declared → $sel_dst"
 
-  # 🛑 the imagemagick POLICY — owned since this bundle installs the tool. the
-  #    debian default permits every coder. a SEAT path that bites with no root;
-  #    not fatal, and `configure.verify` asks that it bites (m4)
-  local pol_src="$bundle_dir/imagemagick.policy.xml"
-  local pol_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ImageMagick"
-  local pol_dst="$pol_dir/policy.xml"
+  grove_provision_4_5_nvim_policy_upsert "$bundle_dir/imagemagick.policy.xml"
+}
+
+######################################################################
+# .what = fence this bundle's imagemagick rules INTO the policy file the tool reads
+#
+# .why  = owned since this bundle installs the tool for image.nvim. debian's default
+#   declares no coder rule, so a tree `git.grove.pull` wrote can hand an eps to
+#   ghostscript. measured 2026-11-15, im6 6.9.12: ONLY rules inlined in
+#   `/etc/ImageMagick-6/policy.xml` bite — the seat path, MAGICK_CONFIGURE_PATH, and
+#   <include> are all ignored. so this is a BOX-WIDE fact (`bundle.root.declines`):
+#   ground sets it on a grove; the laptop's human sets it with `sudo -v &&`
+#
+# .note = not fatal, as the install is not; `configure.verify` asks that it BITES
+######################################################################
+# .what = is the seat-path policy the inert copy an earlier version of this bundle
+#         wrote? byte-equal to the checkout, so a human's own file never matches
+grove_provision_4_5_nvim_policy_seat_is_ours() {
+  local seat="$1" src="$2"
+  [[ -f "$seat" && -r "$src" ]] && cmp -s "$src" "$seat"
+}
+
+grove_provision_4_5_nvim_policy_upsert() {
+  local pol_src="$1" pol_dst want
+
+  # the inert seat copy an earlier version of this bundle wrote — removed only when it
+  #   is byte-equal to the checkout, so a human's own file is never touched
+  local pol_seat="${XDG_CONFIG_HOME:-$HOME/.config}/ImageMagick/policy.xml"
+  if grove_provision_4_5_nvim_policy_seat_is_ours "$pol_seat" "$pol_src"; then
+    rm -f "$pol_seat" && echo "   • removed the inert seat copy at $pol_seat (imagemagick never read it)"
+  fi
 
   if [[ ! -r "$pol_src" ]]; then
     echo "   🌙 this checkout has no imagemagick.policy.xml, so the coder policy"
     echo "      is left as the box found it (looked in: $pol_src)"
-  elif ! mkdir -p "$pol_dir"; then
-    echo "   🌙 could not create $pol_dir — the imagemagick coder policy stays"
-    echo "      as the box found it, which on debian is the vendor's OPEN default"
-  elif ! cp "$pol_src" "$pol_dst"; then
-    echo "   🌙 could not write $pol_dst — the imagemagick coder policy stays"
-    echo "      as the box found it, which on debian is the vendor's OPEN default"
-  else
-    echo "   • imagemagick coder policy declared → $pol_dst"
+    return 0
   fi
+  if ! pol_dst="$(grove_provision_4_5_nvim_policy_path_readable)"; then
+    echo "   🌙 imagemagick names no readable policy file, so there is no place for its rules"
+    echo "      read why: identify -list policy | grep '^Path:'"
+    return 0
+  fi
+
+  # 0. read first — root is asked only when the file must change
+  want="$(mktemp)" || { echo "   🌙 could not make a temp file; the policy stays as found"; return 0; }
+  local rc=0
+  grove_provision_4_5_nvim_policy_render "$pol_dst" "$pol_src" > "$want" || rc=$?
+  if [[ "$rc" -eq 3 ]]; then
+    rm -f "$want"
+    echo "   ✋ ConstraintError: $pol_dst holds a broken grove fence (a lone marker, or two fences); left as found" >&2
+    echo "      a render would drop '</policymap>', so this bundle writes no byte of it" >&2
+    echo "      fix: delete every line from '$GROVE_PROVISION_4_5_NVIM_POLICY_OPEN'" >&2
+    echo "           to '$GROVE_PROVISION_4_5_NVIM_POLICY_SHUT' (or the lone one), then:" >&2
+    echo "           sudo -v && rhx grove.provision --what 4.5.nvim --mode apply" >&2
+    return 1
+  fi
+  if [[ "$rc" -ne 0 ]]; then
+    rm -f "$want"
+    echo "   🌙 $pol_dst holds no '<policymap>' line to anchor the rules on; left as found"
+    return 0
+  fi
+  if cmp -s "$want" "$pol_dst"; then
+    rm -f "$want"
+    echo "   • imagemagick rules already fenced into $pol_dst ✔"
+    return 0
+  fi
+
+  if ! pkg_can_sudo; then
+    rm -f "$want"
+    bundle.root.declines "the imagemagick coder policy" "$pol_dst lacks this bundle's current rules"
+    return 0
+  fi
+  pkg_assert_sudo || { rm -f "$want"; return 1; }
+
+  # one atomic swap, mode kept. a dpkg conffile: `1.14.updates` has the UNATTENDED run keep
+  #   our copy; a human's own apt asks, and the next apply re-fences whatever they take
+  # sudo held one line above, so a refused write here is a fault, never a decline
+  if ! bundle.run sudo install -m 644 -o root -g root "$want" "$pol_dst"; then
+    rm -f "$want"
+    echo "   💥 MalfunctionError: could not write $pol_dst with root held — the policy stays as found" >&2
+    bundle.said "      " "$BUNDLE_SAID" >&2
+    echo "      read why: ls -l $pol_dst ; df -h $(dirname "$pol_dst")" >&2
+    return 1
+  fi
+  rm -f "$want"
+  echo "   • imagemagick rules fenced into $pol_dst"
+  echo "     ⇒ box-wide: EPS, PS, PDF, XPS, MVG, MSL, TEXT and the shell delegates now read"
+  echo "       'not authorized' for every user; the fence sits between this bundle's markers"
 }

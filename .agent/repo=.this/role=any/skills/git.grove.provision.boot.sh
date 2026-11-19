@@ -69,7 +69,9 @@
 #   --mode    plan | apply             default plan
 #   --from    first step to run (0-4)  default 0
 #   --trust   verified | replace | tofu | keep    default verified — the host key
-#             is checked against the box's OWN boot record (ec2 console / ssm).
+#             is checked against the box's OWN report: on ec2 its boot record
+#             (console / ssm), on the tailnet its keys over ssh pinned to a key
+#             already trusted. a tailnet FIRST contact has no report: `tofu`.
 #             `replace` for a REBUILT box whose key changed (still verified);
 #             `tofu` accepts a scan with NO attestation, and is a human's call
 #             to make explicitly — see the 🛑 at the trust step below
@@ -96,11 +98,29 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "git.grove.provision boot — bare box to acceptance-grade, in ONE command"
   echo ""
   echo "usage:"
-  echo "  rhx git.grove.provision boot <name> [--mode plan|apply] [--from N] [--trust verified|replace|tofu|keep]"
+  echo "  rhx git.grove.provision boot <name> [--mode plan|apply] [--from N] [--trust verified|replace|tofu|keep] [--within S]"
+  echo ""
+  echo "inputs:"
+  echo "  <name>    the grove, as rhx git.grove.list names it      (required)"
+  echo "  --mode    plan names the steps and runs none; apply runs them  (default plan)"
+  echo "  --from    the first step to run, 0-4                      (default 0)"
+  echo "  --trust   how the host key is trusted at step 1           (default verified)"
+  echo "            verified — checked against the box's own report; an unattested key halts"
+  echo "            replace  — verified, and a CHANGED key is re-trusted (a rebuilt box)"
+  echo "            tofu     — the check is skipped: a tailnet first contact, by your word"
+  echo "            keep     — the trust step is not run"
+  echo "  --within  seconds to allow one seat's apply               (default 2700)"
+  echo ""
+  echo "examples:"
+  echo "  rhx git.grove.provision boot <name>                                    # plan"
+  echo "  rhx git.grove.provision boot <name> --mode apply                       # the whole boot"
+  echo "  rhx git.grove.provision boot <name> --mode apply --trust tofu          # a tailnet first contact"
+  echo "  rhx git.grove.provision boot <name> --mode apply --from 3 --trust keep # resume at the camper"
   echo ""
   echo "the steps:"
   echo "  0. grants  — ask the HUMAN-ONLY credentials first, before any reach"
-  echo "  1. reach   — wake the tunnel, trust the host key"
+  echo "  1. reach   — wake the road (an ec2 tunnel, or the tailnet), trust the host key"
+  echo "               (a tailnet first contact: --trust tofu, by your word)"
   echo "  2. ground  — push, then ONE apply (the seat WITH sudo goes first)"
   echo "  3. camper  — push, then ONE apply (the seat that does the work)"
   echo "  4. gate    — git.grove.provision test, with no command in between"
@@ -123,8 +143,9 @@ FROM=0
 # 🛑 the default is VERIFIED, and never `tofu`
 #
 # .why = `git.grove.trust.gen` checks that EVERY offered host key appears in the
-#      box's own boot record (`FINGERPRINTS_SCAN ⊆ FINGERPRINTS_BOOT`, via ec2
-#      console output or ssm) — and `--trust tofu` is the flag that skips that
+#      box's own report (`FINGERPRINTS_SCAN ⊆ FINGERPRINTS_BOOT`, via ec2
+#      console output or ssm, or a tailnet box's own keys over a pinned ssh) —
+#      and `--trust tofu` is the flag that skips that
 #      check entirely. a tofu DEFAULT walks the PAVED ONE-COMMAND PATH, the one
 #      a human is told to run, around the strongest control this repo has over a
 #      trust anchor.
@@ -148,7 +169,19 @@ FROM=0
 TRUST="verified"
 WITHIN=2700
 
+# a bad input names itself, the fix, and the help — then exits 2 (the caller fixes it)
+boot_input_refused() {
+  local what="$1" hint="${2:-}"
+  echo "✋ ConstraintError: $what" >&2
+  [[ -n "$hint" ]] && echo "   ├─ $hint" >&2
+  echo "   ├─ fix: rhx git.grove.provision boot <name> --mode apply" >&2
+  echo "   └─ every input: rhx git.grove.provision boot --help" >&2
+  exit 2
+}
+
 while [[ $# -gt 0 ]]; do
+  # a value flag with no value names itself, never a bash `unbound variable`
+  [[ "$1" =~ ^--(mode|from|trust|within)$ && $# -lt 2 ]] && boot_input_refused "$1 needs a value"
   case "$1" in
     --mode)   MODE="$2";   shift 2 ;;
     --from)   FROM="$2";   shift 2 ;;
@@ -156,24 +189,18 @@ while [[ $# -gt 0 ]]; do
     --within) WITHIN="$2"; shift 2 ;;
     --skill|--repo|--role) shift 2 ;;
     --) shift; [[ -z "$GROVE" ]] && { GROVE="${1:-}"; shift 2>/dev/null || true; } ;;
-    -*) echo "✋ unknown flag '$1'" >&2; exit 2 ;;
+    -*) boot_input_refused "unknown flag '$1'" \
+          "valid: --mode plan|apply  --from 0-4  --trust verified|replace|tofu|keep  --within <secs>  --help" ;;
     *) [[ -z "$GROVE" ]] && GROVE="$1"; shift ;;
   esac
 done
 
-[[ -n "$GROVE" ]] || {
-  echo "✋ usage: rhx git.grove.provision <name> [--mode apply]" >&2
-  echo "   list them: rhx git.grove.list" >&2
-  exit 2
-}
-[[ "$MODE" == "plan" || "$MODE" == "apply" ]] || {
-  echo "✋ --mode must be plan or apply" >&2; exit 2; }
-[[ "$FROM" =~ ^[0-4]$ ]] || {
-  echo "✋ --from must be 0-4" >&2; exit 2; }
-[[ "$TRUST" =~ ^(verified|tofu|replace|keep)$ ]] || {
-  echo "✋ --trust must be verified, replace, tofu, or keep" >&2; exit 2; }
-[[ "$WITHIN" =~ ^[0-9]+$ ]] || {
-  echo "✋ --within must be a whole number of seconds" >&2; exit 2; }
+[[ -n "$GROVE" ]] || boot_input_refused "no grove named" "list them: rhx git.grove.list"
+[[ "$MODE" == "plan" || "$MODE" == "apply" ]] || boot_input_refused "--mode '$MODE' is not plan or apply"
+[[ "$FROM" =~ ^[0-4]$ ]] || boot_input_refused "--from '$FROM' is not a step 0-4"
+[[ "$TRUST" =~ ^(verified|tofu|replace|keep)$ ]] ||
+  boot_input_refused "--trust '$TRUST' is not verified, replace, tofu, or keep"
+[[ "$WITHIN" =~ ^[0-9]+$ ]] || boot_input_refused "--within '$WITHIN' is not a whole number of seconds"
 
 # the transport, shared so it cannot drift from every other grove read
 # (`rule.forbid.two-writers-on-one-artifact`)
@@ -183,6 +210,14 @@ source "$(dirname "${BASH_SOURCE[0]}")/git.grove.operations.sh"
 # axis and RELAYS keyrack's stderr, and `_rack_profile_fix` names the one repair
 # each state wants. seven other skills already read the rack through it
 source "$(dirname "${BASH_SOURCE[0]}")/git.grove.rack.operations.sh"
+
+# the platform findsert over a seat — an ssh communicator, kept with the other
+# seat writes so `prove.platform-findsert-names-each-verdict` can drive it alone
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.ssh.operations.sh"
+
+# the step printers (`say`, `halt`) and the steps a play must render — the
+# platform declaration and the key placement (`prove.boot-steps-name-each-verdict`)
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.provision.boot.operations.sh"
 
 RHX="${RHX:-rhx}"
 
@@ -262,47 +297,6 @@ fi
 echo "   └─ run"
 
 ######################################################################
-# halt — name the step, why it did not hold, and the command that repairs it
-######################################################################
-#
-# 🛑 EVERY line it prints goes through `__duct_strip_escapes`
-#
-# .why = several callers hand it a captured `$sent` — a step's own stdout+stderr
-#        — and a step reaches a GROVE, which is assumed compromised. so a halt's
-#        `fix:` block is a channel that carries remote-chosen bytes to a
-#        terminal, and a terminal OBEYS them: with `set-clipboard on` an OSC 52
-#        in that text writes this human's clipboard, at the exact moment they
-#        are about to copy a fix command out of it.
-#
-#        the strip goes HERE, in the one printer, rather than at each caller —
-#        a caller that forgets is silent, and there is no reason for any line of
-#        a halt to carry a control byte (`rule.require.solve-at-cause`).
-halt() {
-  local step="$1" label="$2" why="$3"; shift 3
-  echo "      └─ ✋ step $step ($label) does not hold"
-  echo ""
-  echo "  why: $why" | __duct_strip_escapes
-  echo "  fix:"
-  local line
-  for line in "$@"; do echo "    $line" | __duct_strip_escapes; done
-  echo ""
-  echo "  then run again from here —"
-  # 🛑 the VERB is not optional, and its absence is silent until a human types it
-  #   - `git.grove.provision` dispatches on a verb and refuses without one, so
-  #     a resume line that omits `boot` exits 2 with "needs a verb"
-  #   - ⇒ a halt hands a human the one command that repairs the box; a command
-  #     that cannot run leaves them to guess the shape of the resume
-  #   - 📜 measured 2026-09-13: this line printed
-  #     `git.grove.provision <grove> --mode apply --from 2 --trust keep`,
-  #     which refuses — the halt's own fix-text was unrunnable
-  #   - (`rule.require.prove-the-path-the-human-runs`)
-  echo "    $RHX git.grove.provision boot $GROVE --mode apply --from $step --trust keep"
-  exit 3
-}
-
-say() { echo "      $*"; }
-
-######################################################################
 # _prior_apply_at — did an apply ALREADY run on THIS box, for this seat?
 #
 # 🛑 the subject is the BOX, never the grove NAME. a name survives a rebuild —
@@ -375,7 +369,7 @@ _prior_apply_at() {
 #    a detached run owns its own session, so the wait is ours to extend.
 ######################################################################
 drive_seat() {
-  local seat="$1" label="$2" step="$3"
+  local seat="$1" label="$2" step="$3" upgrade="${4:-$UPGRADE}"
   local log='$HOME/grove.provision.'"$label"'.log'
 
   case "$(_prior_apply_at "$seat" "$log")" in
@@ -412,7 +406,7 @@ drive_seat() {
     halt "$step" "$label" \
       "the push to $seat did not land" \
       "$RHX git.grove.wake $seat --mode apply" \
-      "$RHX keyrack unlock --owner ehmpath --env camp   # camp lapses in ~55m" \
+      "$(boot_reach_road_line)" \
       "$RHX git.grove.push $seat --from . --into '$INTO' --mode apply"
   fi
   say "│  ├─ push ✔"
@@ -487,13 +481,8 @@ drive_seat() {
 
   # ── ONE apply, detached, so it outlives this connection
   local sent rc=0
-  sent="$("$RHX" git.grove.send "$seat" --detach --log "$log" --what "$UPGRADE" 2>&1)" || rc=$?
-  if [[ "$rc" -eq 97 ]]; then
-    halt "$step" "$label" \
-      "the text landed and NO JOB STARTED — an unproven delivery, not a failure" \
-      "look before you re-send; a blind re-send starts a second copy —" \
-      "$RHX git.grove.send $seat --reply --what '$slice'"
-  fi
+  sent="$("$RHX" git.grove.send "$seat" --detach --log "$log" --what "$upgrade" 2>&1)" || rc=$?
+  [[ "$rc" -eq 97 ]] && boot_seat_unproven_halt "$seat" "$step" "$label" "$slice"
   if [[ "$rc" -ne 0 ]]; then
     halt "$step" "$label" "the apply could not be sent (rc=$rc)" "$sent"
   fi
@@ -555,19 +544,14 @@ drive_seat() {
     ####################################################################
     if [[ "$ask_rc" -eq 97 || -z "${tail//[[:space:]]/}" ]]; then
       faults=$(( faults + 1 ))
-      [[ "$faults" -ge 10 ]] && halt "$step" "$label" \
-        "the probe gave no verdict 10 times over — the apply may still be at work" \
-        "⚠️ an EMPTY reply is a fault, not a 'not yet'. read the box directly," \
-        "   and do NOT re-send; a blind re-send starts a second copy —" \
-        "$RHX git.grove.send $seat --what 'tail -20 $log'" \
-        "⚠️ that read is UNBOUNDED on purpose: a marker that never landed is one" \
-        "   cause of this halt, so a slice from it would render empty too"
+      [[ "$faults" -ge 10 ]] && boot_seat_silent_halt "$seat" "$step" "$label" "$log"
       continue
     fi
     faults=0
 
     if grep -q '🌲 grove.provision done' <<< "$tail"; then
-      say "│  └─ ✔ converged in ~$(( waited / 60 ))m"
+      say "│  ├─ ✔ converged in ~$(( waited / 60 ))m"
+      boot_seat_duct_reborn "$seat" "$step" "$label"
       return 0
     fi
     if grep -q '✋ grove.provision finished with failures' <<< "$tail"; then
@@ -593,12 +577,7 @@ drive_seat() {
     [[ $(( waited % 120 )) -eq 0 ]] && say "│  │  · ${waited}s — at work"
   done
 
-  halt "$step" "$label" \
-    "the apply outran ${WITHIN}s — that is a BOUND, not a verdict. it may still be at work" \
-    "read whether the log still grows; if it does, wait —" \
-    "$RHX git.grove.send $seat --reply --what 'stat -c %y $log'" \
-    "then resume the GATE alone, once it reports done —" \
-    "$RHX git.grove.provision boot $GROVE --mode apply --from 4 --trust keep"
+  boot_seat_outran_halt "$seat" "$step" "$label" "$log" "$slice"
 }
 
 ######################################################################
@@ -764,17 +743,12 @@ if [[ "$FROM" -le 1 ]]; then
   else
     # ⚠️ stderr flows through — see drive_seat for why a sequencer must not
     #    swallow its steps' own reasons
-    if ! "$RHX" git.grove.wake "$GROVE" --mode apply >/dev/null; then
-      halt 1 reach \
-        "the grove did not wake — the tunnel is the only road in" \
-        "camp credentials lapse in ~55m, and a lapsed read reports as an absent key —" \
-        "$RHX keyrack unlock --owner ehmpath --env camp" \
-        "$RHX git.grove.wake $GROVE --mode apply"
-    fi
+    "$RHX" git.grove.wake "$GROVE" --mode apply >/dev/null || boot_wake_halt "$?"
     say "│  ├─ wake ✔"
 
     if [[ "$TRUST" == "keep" ]]; then
-      say "│  └─ trust · kept (asked for)"
+      say "│  ├─ trust · kept (asked for)"
+      BOOT_TRUST_HELD=1
     else
       ############################################################
       # ⚠️ `verified` passes NO --trust flag, on purpose
@@ -786,26 +760,21 @@ if [[ "$FROM" -le 1 ]]; then
       TRUST_FLAGS=""
       [[ "$TRUST" == "replace" ]] && TRUST_FLAGS="--on-changed replace"
       [[ "$TRUST" == "tofu" ]] && TRUST_FLAGS="--trust tofu"
+      # a pass prints one line; a refusal replays trust.gen's own rows, since the
+      #   halt sends the human to them (escape bytes from a box are stripped)
       # shellcheck disable=SC2086
-      if ! "$RHX" git.grove.trust.gen --grove "$GROVE" --mode apply $TRUST_FLAGS >/dev/null; then
-        halt 1 reach \
-          "the host key was not trusted, so this refuses to reach the box" \
-          "the key offered on the tunnel was NOT attested by the box's own boot" \
-          "record — read trust.gen's own rows above; they name each fingerprint" \
-          "a REBUILT box presents a NEW key, and that is the benign cause —" \
-          "$RHX git.grove.provision boot $GROVE --mode apply --trust replace" \
-          "🛑 if the boot record cannot be read AT ALL, there is no flag for it." \
-          "--trust tofu is refused on a CHANGED key: a prior key is on record" \
-          "and disagrees, so there is no 'first use' for tofu to be about, and" \
-          "a scan alone settles no question. read what holds the port instead —" \
-          "ss -tlnp | grep ':<the port from git.grove.list>'" \
-          "⚠️ tofu remains right for FIRST contact, where no prior key exists." \
-          "even then the endpoint is a shared localhost port, so 'first use'" \
-          "there is not first use of a HOST (howto.adopt-a-replacement-grove)"
-      fi
-      say "│  └─ trust ✔ ($TRUST)"
+      TRUST_OUT="$("$RHX" git.grove.trust.gen --grove "$GROVE" --mode apply $TRUST_FLAGS)" \
+        || { printf '%s\n' "$TRUST_OUT" | tr -d '\033\007' | sed 's/^/│  │  /'; boot_trust_halt; }
+      say "│  ├─ trust ✔ ($TRUST)"
+      BOOT_TRUST_HELD=1
     fi
   fi
+
+  # the GROUND seat's alias — the platform declaration and step 2 both dial it
+  boot_ground_alias
+
+  # the platform DECLARATION — for a box that cannot answer it alone
+  boot_platform_declare
 fi
 
 ######################################################################
@@ -821,7 +790,15 @@ fi
 ######################################################################
 if [[ "$FROM" -le 3 ]]; then
   say "├─ 3. camper"
-  drive_seat "$GROVE" camper 3
+  # the keys are this step's NEXT act, so the apply defers an unplaced key row to it
+  #   rather than halt one step short of the step that places it (`5.16.keys` verify)
+  drive_seat "$GROVE" camper 3 "GROVE_BOOT_PLACES_KEYS=1 $UPGRADE"
+
+  # 🛑 then the KEYS, on the camper — the boot places them, never a human
+  boot_keys_place
+
+  # 🛑 then the ADMIN seat is read, so ground's cleanliness is proven by the boot itself
+  boot_admin_seat_clean
 fi
 
 ######################################################################

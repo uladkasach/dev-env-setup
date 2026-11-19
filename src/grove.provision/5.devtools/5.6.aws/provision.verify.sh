@@ -47,14 +47,15 @@ grove_provision_5_6_aws_provision_verify() {
       echo "      read it by hand, unbounded: aws --version"
       ;;
     absent)
-      echo "   ✋ the aws cli is absent from PATH" >&2
-      echo "      ⇒ no grove can be woken — git.grove.wake opens its tunnel" >&2
-      echo "        through 'aws ssm start-session'" >&2
+      echo "   ✋ ConstraintError: the aws cli is absent from PATH" >&2
+      echo "      ⇒ no aws identity can answer on this box, and from a laptop no ec2" >&2
+      echo "        grove can be woken — git.grove.wake opens its tunnel through" >&2
+      echo "        'aws ssm start-session' (a tailnet grove's wake needs no aws)" >&2
       echo "      fix: rhx grove.provision --what 5.6.aws --mode apply" >&2
       failed=1
       ;;
     adrift)
-      echo "   ✋ aws is v2, and NOT at the version this repo declares" >&2
+      echo "   ✋ ConstraintError: aws is v2, and NOT at the version this repo declares" >&2
       echo "      ⇒ two boxes then run different cli code from one unchanged" >&2
       echo "        line — the deterministic clause of one-command provision" >&2
       echo "      ⇒ a command -v guard cannot see a version at all, so a" >&2
@@ -65,7 +66,7 @@ grove_provision_5_6_aws_provision_verify() {
       failed=1
       ;;
     *)
-      echo "   ✋ the aws on PATH is NOT v2" >&2
+      echo "   ✋ ConstraintError: the aws on PATH is NOT v2" >&2
       echo "      ⇒ debian's awscli package is v1, which answers command -v" >&2
       echo "        and then fails every v2-only call with an opaque arg error" >&2
       echo "      ⇒ a presence-check guard counts it done and skips, so this" >&2
@@ -81,7 +82,7 @@ grove_provision_5_6_aws_provision_verify() {
   if command -v session-manager-plugin >/dev/null 2>&1; then
     echo "   • the ssm session-manager plugin is present ✔"
   else
-    echo "   ✋ the ssm session-manager plugin is absent" >&2
+    echo "   ✋ ConstraintError: the ssm session-manager plugin is absent" >&2
     echo "      ⇒ 'aws ssm start-session' fails with 'SessionManagerPlugin is" >&2
     echo "        not found' — the cli alone cannot open a session" >&2
     echo "      fix: rhx grove.provision --what 5.6.aws --mode apply" >&2

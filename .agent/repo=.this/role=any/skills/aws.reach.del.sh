@@ -71,6 +71,7 @@ fi
 
 # shellcheck source=./aws.reach.operations.sh
 source "$(dirname "${BASH_SOURCE[0]}")/aws.reach.operations.sh"
+aws_reach_runtime_load || exit 2
 
 ORG=""
 ENV=""
@@ -87,14 +88,14 @@ while [[ $# -gt 0 ]]; do
     #   on `--role` in `aws.reach.set`, which this family learned the hard way
     --skill|--repo|--role) shift 2 ;;
     --) shift ;;
-    *) echo "✋ unknown argument '$1'" >&2; echo "   see: rhx aws.reach.del help" >&2; exit 2 ;;
+    *) echo "✋ ConstraintError: unknown argument '$1'" >&2; echo "   see: rhx aws.reach.del help" >&2; exit 2 ;;
   esac
 done
 
-[[ -n "$ORG" ]] || { echo "✋ --org is required (e.g. --org ehmpathy)" >&2; exit 2; }
-[[ -n "$ENV" ]] || { echo "✋ --env is required (e.g. --env demo)" >&2; exit 2; }
+[[ -n "$ORG" ]] || { echo "✋ ConstraintError: --org is required (e.g. --org ehmpathy)" >&2; exit 2; }
+[[ -n "$ENV" ]] || { echo "✋ ConstraintError: --env is required (e.g. --env demo)" >&2; exit 2; }
 [[ "$MODE" == "plan" || "$MODE" == "apply" ]] \
-  || { echo "✋ invalid --mode '$MODE' (plan|apply)" >&2; exit 2; }
+  || { echo "✋ ConstraintError: invalid --mode '$MODE' (plan|apply)" >&2; exit 2; }
 
 ####################################################################
 # 🛑 the three values below compose a profile NAME that is handed to `awk -v`
@@ -106,7 +107,7 @@ done
 reach_clamp() {
   local flag="$1" value="$2"
   if [[ "$value" == *[!A-Za-z0-9._-]* ]]; then
-    echo "✋ $flag holds a byte outside its grammar" >&2
+    echo "✋ ConstraintError: $flag holds a byte outside its grammar" >&2
     echo "   given:   '$value'" >&2
     echo "   allowed: [A-Za-z0-9._-]" >&2
     echo "   ⇒ these compose a profile NAME, and a name that can hold a newline" >&2
@@ -187,8 +188,13 @@ echo "   └─ apply"
 ####################################################################
 # 3. apply — half one: the profile body
 ####################################################################
+#
+# 🛑 [default] is never this skill's — the swap re-reads it at the last moment,
+#   so a rewrite by infra's identity skill mid-run is never put back
+#   (`src/grove.aws.sh`)
 if [[ "$HAS_BODY" -eq 1 ]]; then
-  TMP="$(mktemp)"
+  DEFAULT_BEFORE="$(grove_aws_config_section cfg="$CFG" name=default)"
+  TMP="$(grove_aws_config_tmp)" || { echo "      └─ 💥 MalfunctionError: no tmp file beside $CFG" >&2; exit 1; }
   aws_reach_fence_drop "$PROFILE" > "$TMP"
 
   # ⚠️ a reap that empties the file removed more than one fence — the drop
@@ -203,9 +209,12 @@ if [[ "$HAS_BODY" -eq 1 ]]; then
     exit 1
   fi
 
-  cat "$TMP" > "$CFG"
-  rm -f "$TMP"
-  chmod 600 "$CFG"
+  grove_aws_config_swap cfg="$CFG" new="$TMP" default_before="$DEFAULT_BEFORE" default=keep; SWAP_RC=$?
+  if (( SWAP_RC != 0 )); then
+    echo "      └─ 💥 MalfunctionError: ~/.aws/config was NOT written: $(grove_aws_config_swap_why "$SWAP_RC")" >&2
+    grove_aws_config_swap_said "         " >&2
+    exit 1
+  fi
   echo "      ├─ ~/.aws/config no longer declares [profile $PROFILE] ✔"
 else
   echo "      ├─ ~/.aws/config already declares no [profile $PROFILE]"
@@ -220,7 +229,7 @@ fi
 ####################################################################
 if [[ "$RACK_REACHABLE" -eq 1 ]]; then
   if ! command -v rhx >/dev/null 2>&1; then
-    echo "      └─ ✋ rhx is absent, so the rack half cannot be removed" >&2
+    echo "      └─ ✋ ConstraintError: rhx is absent, so the rack half cannot be removed" >&2
     echo "         ⇒ the config half is gone and the rack may still NAME this" >&2
     echo "           profile — a name with no body, which is the half-applied" >&2
     echo "           pair inverted" >&2
@@ -232,7 +241,7 @@ if [[ "$RACK_REACHABLE" -eq 1 ]]; then
   if ! git -C "$PWD" rev-parse --git-dir >/dev/null 2>&1; then
     GITROOT="$HOME/.local/state/keyrack.gitroot"
     if [[ ! -d "$GITROOT/.git" ]]; then
-      echo "      └─ ✋ the cwd is not a git repo, and the box has no rack root" >&2
+      echo "      └─ 💥 MalfunctionError: the cwd is not a git repo, and the box has no rack root" >&2
       echo "         fix: rhx grove.provision --what 5.12.rack --mode apply" >&2
       exit 1
     fi
@@ -257,7 +266,7 @@ if [[ "$RACK_REACHABLE" -eq 1 ]]; then
   #   - ⇒ only an answer equal to THIS PROFILE proves the entry is still there
   ##################################################################
   if [[ "$RACK_SEEN" == "$PROFILE" ]]; then
-    echo "      └─ ✋ the rack still names ${ORG}.${ENV}.AWS_PROFILE = $PROFILE" >&2
+    echo "      └─ ✋ ConstraintError: the rack still names ${ORG}.${ENV}.AWS_PROFILE = $PROFILE" >&2
     echo "         ⇒ the body is gone, so that name now points at no profile" >&2
     echo "         read the refusal in full:" >&2
     echo "           env -C $GITROOT rhx keyrack del --owner $OWNER \\" >&2

@@ -91,8 +91,7 @@ grove.provision --what 2.7.aliases --mode apply
 grove.provision --what 2.5.zsh     --mode apply
 ```
 
-(`grove.provision.bashaliases` and friends still exist, but they are pure synonyms for
-`--what <slug>`, kept only so `<TAB>` completes. they are deliberately not grown.)
+(the `grove.provision.<part>` synonyms: see `repo.overview`, `.the one entrypoint`.)
 
 ## .enforcement
 

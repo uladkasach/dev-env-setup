@@ -1,0 +1,11 @@
+[profile human.sso]
+region = us-west-2
+# grove: the ambient ec2 instance role, as a profile
+[profile ambient]
+credential_source = Ec2InstanceMetadata
+region = us-east-1
+
+[default]
+credential_source = Ec2InstanceMetadata
+region = us-east-1
+# grove: end

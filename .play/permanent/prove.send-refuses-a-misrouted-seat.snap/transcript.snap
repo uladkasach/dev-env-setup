@@ -1,0 +1,54 @@
+
+## another Host block names ground → refused, no duct touched
+rc=2 duct-calls=0
+✋ ConstraintError: ssh alias 'grove-fix' dials another seat than the registry declares
+   ├─ registry: camper@grove-fix:22
+   ├─ ssh -G:   ground@grove-fix:22
+   ├─ why: another Host block for 'grove-fix' answers first, so this send would run as the wrong seat
+   └─ fix: lay the registry's seat where ssh reads it first —
+        rhx git.grove.wake grove-fix
+
+## the refusal names the fix
+rc=2 duct-calls=0
+✋ ConstraintError: ssh alias 'grove-fix' dials another seat than the registry declares
+   ├─ registry: camper@grove-fix:22
+   ├─ ssh -G:   ground@grove-fix:22
+   ├─ why: another Host block for 'grove-fix' answers first, so this send would run as the wrong seat
+   └─ fix: lay the registry's seat where ssh reads it first —
+        rhx git.grove.wake grove-fix
+
+## the alias dials another host → refused
+rc=2 duct-calls=0
+✋ ConstraintError: ssh alias 'grove-fix' dials another seat than the registry declares
+   ├─ registry: camper@grove-fix:22
+   ├─ ssh -G:   camper@grove-elsewhere:22
+   ├─ why: another Host block for 'grove-fix' answers first, so this send would run as the wrong seat
+   └─ fix: lay the registry's seat where ssh reads it first —
+        rhx git.grove.wake grove-fix
+
+## the alias dials another port → refused
+rc=2 duct-calls=0
+✋ ConstraintError: ssh alias 'grove-fix' dials another seat than the registry declares
+   ├─ registry: camper@grove-fix:22
+   ├─ ssh -G:   camper@grove-fix:2222
+   ├─ why: another Host block for 'grove-fix' answers first, so this send would run as the wrong seat
+   └─ fix: lay the registry's seat where ssh reads it first —
+        rhx git.grove.wake grove-fix
+
+## the alias dials the registry's seat → the send reaches the duct
+rc=0 duct-calls=2
+
+
+## an --alias seat (no host) whose block names another user → refused
+rc=2 duct-calls=0
+✋ ConstraintError: ssh alias 'grove-fix-infra' dials another seat than the registry declares
+   ├─ registry: camper@<its own Host block>
+   ├─ ssh -G:   ground@infra-host:22
+   ├─ why: another Host block for 'grove-fix-infra' answers first, so this send would run as the wrong seat
+   └─ fix: lay the registry's seat where ssh reads it first —
+        rhx git.grove.wake grove-fix-infra
+
+## an --alias seat whose block names its user → the send reaches the duct
+rc=0 duct-calls=2
+
+

@@ -218,7 +218,7 @@ if [[ "$ZSH_OK" == 1 ]]; then
     echo "      🌙 fnm holds no installed node version here, so none can be pinned"
     echo "         ⇒ this arm is unproven on this box; arms 0 and 0b still hold"
   else
-    fixture="$(mktemp -d)"
+    fixture="$(mktemp -d)" || { echo "💥 MalfunctionError: could not make a temp dir" >&2; exit 1; }
     trap 'rm -rf "$fixture"' EXIT
     printf '%s\n' "$want_version" > "$fixture/.nvmrc"
     if _zsh_c "cd '$fixture' && fnm use" >/dev/null; then

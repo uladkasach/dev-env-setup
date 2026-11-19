@@ -11,10 +11,10 @@
 #         also samples /proc ticks over a live window; both clocks must clear
 #
 # .the arms — the old arm must go red, or this play is blind (term=bite)
-#   control-burn       a busy loop, still on cpu   → 🦎, in the kill list
-#   quiet-now          a 2s burst, then sleep      → 💤, NOT in the kill list
-#   old-lifetime-only  the same quiet pid, judged by the finder at 9f9f2e0
+#   old-lifetime-only  the quiet pid, judged by the finder at 9f9f2e0
 #                      (before the window)         → in the kill list
+#   control-burn       a busy loop, still on cpu   → 🦎, in the kill list
+#   quiet-now          a 4s cpu burst, then sleep  → 💤, NOT in the kill list
 #
 # .it starts two scratch processes; a trap kills both
 #
@@ -34,6 +34,10 @@ OLD_FINDER="$(mktemp -t spinner-old.XXXXXX)"
 cleanup() {
   [[ -n "$BURN" ]] && kill "$BURN" 2>/dev/null
   [[ -n "$QUIET" ]] && kill "$QUIET" 2>/dev/null
+  # a signal is async: reap both before the check, or a pid mid-exit reads as a survivor
+  #   (📜 2026-11-17: "a scratch process SURVIVED" printed once on a loaded box)
+  [[ -n "$BURN" ]] && wait "$BURN" 2>/dev/null
+  [[ -n "$QUIET" ]] && wait "$QUIET" 2>/dev/null
   rm -f "$OLD_FINDER"
   echo ""
   if { [[ -n "$BURN" ]] && kill -0 "$BURN" 2>/dev/null; } || { [[ -n "$QUIET" ]] && kill -0 "$QUIET" 2>/dev/null; }; then
@@ -52,11 +56,23 @@ git show "$OLD_REV:src/machine/machine_resource_procs_find_spinner" >"$OLD_FINDE
 # the two subjects
 bash -c 'while :; do :; done' &
 BURN=$!
-bash -c 'end=$((SECONDS + 2)); while (( SECONDS < end )); do :; done; exec sleep 300' &
+# the burst burns a fixed CPU budget (4s of its own utime+stime), never a wall span
+#   ⚠️ the lifetime ratio is cpu / elapsed, and the finder reads cpu in WHOLE seconds.
+#     a wall-clock burst on a loaded box (a full play.run, plus BURN on a peer core)
+#     got 1–2s of cpu, so by the third arm the ratio read under the 15% gate and the
+#     quiet pid went absent — a clock race, not a finder verdict. 📜 measured
+#     2026-11-17: green alone, red twice inside `play.run --all`
+bash -c 'hz=$(getconf CLK_TCK); while :; do for _ in {1..20000}; do :; done; read -r -a s < /proc/$$/stat; (( s[13] + s[14] >= 4 * hz )) && break; done; exec sleep 300' &
 QUIET=$!
 
-# let the burst end, so the quiet pid has a high lifetime ratio and no live burn
-sleep 4
+# wait for the burst to END, by state: the exec makes the pid's comm `sleep`
+#   bounded at 60s, so a starved box fails loud rather than hang
+for _ in $(seq 1 600); do
+  [[ "$(cat "/proc/$QUIET/comm" 2>/dev/null)" == sleep ]] && break
+  sleep 0.1
+done
+[[ "$(cat "/proc/$QUIET/comm" 2>/dev/null)" == sleep ]] \
+  || { echo "💥 the quiet pid never finished its 4s cpu burst within 60s — this play measured no world"; exit 1; }
 
 # one arm: run a finder, then read where a pid landed
 #   verdict = kill (🦎 + kill list) | quiet (💤) | host | absent
@@ -73,7 +89,9 @@ verdict_of() {
 
 arm() {
   local name="$1" finder="$2" pid="$3" want="$4" out got
-  out="$(bash "$finder" --min-minutes 0 --min-ratio 15 ${5:-} 2>&1)"
+  # --min-ratio 5: the gate is this play's input, not its subject. at 5% the 4s
+  #   burn stays a candidate for 80s of elapsed, a margin no loaded box spends
+  out="$(bash "$finder" --min-minutes 0 --min-ratio 5 ${5:-} 2>&1)"
   got="$(verdict_of "$out" "$pid")"
   if [[ "$got" == "$want" ]]; then
     echo "   ├─ ✔ $name: pid $pid → $got"
@@ -87,9 +105,9 @@ arm() {
 echo "🐢 does the spinner finder judge the burn now?"
 echo ""
 echo "🐚 prove.spinner-judges-the-burn-now"
+arm old-lifetime-only "$OLD_FINDER" "$QUIET" kill
 arm control-burn      "$FINDER"     "$BURN"  kill  "--window 2"
 arm quiet-now         "$FINDER"     "$QUIET" quiet "--window 2"
-arm old-lifetime-only "$OLD_FINDER" "$QUIET" kill
 if (( FAILED )); then
   echo "   └─ ✋ red"
   exit 1

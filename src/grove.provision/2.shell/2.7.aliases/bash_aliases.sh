@@ -2757,7 +2757,7 @@ git_alias_grove() {
       echo "usage: git grove <command> [options]"
       echo ""
       echo "commands:"
-      echo "  set <name> --at <user@host:port>  register a grove (writes an ssh Host block)"
+      echo "  set <name> --at <user@host:port>  register a grove (its wake writes the ssh alias)"
       echo "  set <name> --alias <ssh-alias>    register a grove on an EXTANT ssh alias"
       echo "  set <name> --exid <tag> --env <e> register a cloud grove, found by tag"
       echo "  wake <name>                       resume the box + open its duct"
@@ -2786,10 +2786,10 @@ git_alias_grove() {
   esac
 }
 
-# .what: register a grove — write registry json, and an ssh Host block when we own the alias
+# .what: register a grove — write its registry json; its wake writes the ssh alias
 #
 # two modes:
-#   --at <user@host:port>   we own the alias: write an ssh Host block named after the grove
+#   --at <user@host:port>   we own the alias: `git grove wake` writes its ssh Host block
 #   --alias <name>          ssh owns the alias: reuse an extant ssh Host, write no block
 #                           (use when infra/declastruct already wrote the ssh config —
 #                            keys, ProxyCommand, SSM tunnel, etc)
@@ -2812,7 +2812,7 @@ git_alias_grove() {
 _git_grove_set_usage() {
   echo "usage: git grove set <name> [--at <user@host:port>] [--alias <ssh-alias>]"
   echo "                            [--exid <tag>] [--env <env>] [--account <id>] [--nat <exid>]"
-  echo "                            [--org <keyrack-org>]"
+  echo "                            [--org <keyrack-org>] [--platform hetzner.hetzbot]"
   echo ""
   echo "  ⚠️ every flag is a FIELD-LEVEL upsert: a flag given overwrites its own"
   echo "     field, a flag absent KEEPS what the entry holds, and \`--nat ''\` clears"
@@ -2831,12 +2831,12 @@ _git_grove_set() {
     return 0
   fi
 
-  local name="" at="" alias="" exid="" env="" account="" nat="" org=""
+  local name="" at="" alias="" exid="" env="" account="" nat="" org="" platform=""
   # ⚠️ a `*_given` marker per flag, because "absent" and "empty" must differ:
   #    an absent flag INHERITS the extant entry's field, and `--nat ''` CLEARS
   #    it. a test on the value alone cannot tell those two apart — see the
   #    ⚠️ block below the parse for the entry this distinction protects
-  local at_given=0 alias_given=0 exid_given=0 env_given=0 account_given=0 nat_given=0 org_given=0
+  local at_given=0 alias_given=0 exid_given=0 env_given=0 account_given=0 nat_given=0 org_given=0 platform_given=0
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --at) at="$2"; at_given=1; shift 2 ;;
@@ -2857,6 +2857,10 @@ _git_grove_set() {
       #      correct verdict with a phantom remedy
       #      (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.4)
       --org) org="$2"; org_given=1; shift 2 ;;
+      # the PLATFORM a box cannot declare itself. a hetzner box carries no
+      #   metadata, so its declaration (`/etc/grove/platform`) is laid from
+      #   this field by `git.grove.provision boot`, never guessed from the reach
+      --platform) platform="$2"; platform_given=1; shift 2 ;;
       --) shift ;;
       -*) echo "✋ unknown flag '$1'" >&2; return 2 ;;
       *) [[ -z "$name" ]] && name="$1"; shift ;;
@@ -2947,6 +2951,7 @@ _git_grove_set() {
     [[ "$account_given" != 1 ]] && { keep="$(jq -r '.account // empty' "$prior")"; [[ "$keep" != "null" ]] && account="${account:-$keep}"; }
     [[ "$nat_given"     != 1 ]] && { keep="$(jq -r '.nat // empty'     "$prior")"; [[ "$keep" != "null" ]] && nat="${nat:-$keep}"; }
     [[ "$org_given"     != 1 ]] && { keep="$(jq -r '.org // empty'     "$prior")"; [[ "$keep" != "null" ]] && org="${org:-$keep}"; }
+    [[ "$platform_given" != 1 ]] && { keep="$(jq -r '.platform // empty' "$prior")"; [[ "$keep" != "null" ]] && platform="${platform:-$keep}"; }
     [[ "$alias_given"   != 1 ]] && { keep="$(jq -r '.sshAlias // empty' "$prior")"; [[ -n "$keep" && "$keep" != "null" ]] && ssh_alias="$keep"; }
   fi
   # 🛑 this is the ONE point where every field is final — argv has been read and
@@ -2967,6 +2972,31 @@ _git_grove_set() {
   #    namespace holds `@all` and `@this`, so a clamp without it would refuse a
   #    legitimate value (`rule.require.github-token-at-all-camp`)
   _git_grove_clamp "--org"          "$org"       'A-Za-z0-9._@-' '[A-Za-z0-9._@-]' || return 2
+  # the closed set `src/grove.env.sh` reads off a declaration — one value today
+  if [[ -n "$platform" && "$platform" != "hetzner.hetzbot" ]]; then
+    echo "✋ ConstraintError: --platform '$platform' is not a platform a box declares" >&2
+    echo "   want: hetzner.hetzbot (ec2 answers from its hardware; a laptop declares none)" >&2
+    return 2
+  fi
+  # 🛑 a hetzner box is reached on the tailnet, never through an ssm tunnel: a loopback
+  #   or absent host reads as an ec2 tunnel to every reader (wake would ask aws for a
+  #   box that is up)
+  #
+  # ⚠️ judged on the MERGED entry, never this call's flags: `--alias` excuses no
+  #   host. every reader picks the reach off the host, so a hostless entry is an ec2
+  #   tunnel to wake, stop, and trust alike — an --alias with no --at is a hetzner
+  #   entry no reader serves. `--alias` with a tailnet `--at` is served
+  local host_loopback=0
+  # an ADDRESS test, as `grove_ssh_host_is_loopback` reads it; the regex in a variable
+  #   parses alike in bash and zsh
+  local loopback_re='^127(\.[0-9]{1,3}){3}$'
+  [[ -z "$host" || "$host" == localhost || "$host" =~ $loopback_re || "$host" == "::1" ]] && host_loopback=1
+  if [[ "$platform" == "hetzner.hetzbot" && "$host_loopback" == 1 ]]; then
+    echo "✋ ConstraintError: grove '$name' declares --platform hetzner.hetzbot with ${host:+a loopback }host '${host:-<none>}'" >&2
+    echo "   ⇒ a hetzner box answers on the tailnet; a loopback or absent host routes it as an ec2 tunnel" >&2
+    echo "   fix: git grove set $name --at <user>@<tailnet host>:22 --platform hetzner.hetzbot" >&2
+    return 2
+  fi
 
   # the cloud fields (exid, env, account, nat) are what let `git grove wake` be
   # portable: it finds the box by exid TAG and pins the account per grove, so one
@@ -3004,6 +3034,7 @@ _git_grove_set() {
     --arg account "$account" \
     --arg nat "$nat" \
     --arg org "$org" \
+    --arg platform "$platform" \
     --argjson addedAt "$added_at" \
     '{
       name:     $name,
@@ -3016,7 +3047,8 @@ _git_grove_set() {
       account:  (if $account == "" then null else $account end),
       nat:      (if $nat     == "" then null else $nat     end),
       org:      (if $org     == "" then null else $org     end),
-      type:     "ec2",
+      platform: (if $platform == "" then null else $platform end),
+      type:     (if $platform == "" then "ec2" else null end),
       status:   "active",
       addedAt:  $addedAt
     }' > "$dir/$name.json.tmp"; then
@@ -3045,36 +3077,15 @@ _git_grove_set() {
     return 0
   fi
 
-  # else findsert our own Host block, so the alias carries the port
-  # (ductwork rides plain 'ssh <alias>')
-  local sshcfg="$HOME/.ssh/config"
-  mkdir -p "$HOME/.ssh"; touch "$sshcfg"
-  if ! grep -q "^Host $ssh_alias\$" "$sshcfg" 2>/dev/null; then
-    {
-      echo ""
-      echo "Host $ssh_alias"
-      echo "  HostName $host"
-      echo "  Port $port"
-      echo "  User $user"
-      # ⚠️ the keepalive is what stops the SSM tunnel from expiry under an idle
-      #    session. `git grove wake` reaches the box through `aws ssm
-      #    start-session` with the port-forward document, so `ssh <alias>` rides a
-      #    LOCAL port that session-manager-plugin relays. session manager applies
-      #    its own `idleSessionTimeout` (default 20m) and counts SILENCE as idle —
-      #    so an ssh session that sends no bytes is what makes SSM end the session,
-      #    which drops the port, which kills the ssh.
-      #    the human then sees "the connection died" with no error and no cause,
-      #    and it looks like the box slept (it did not: 1.2.power sets
-      #    IdleAction=ignore and AllowHibernation=no, and no timer stops a grove).
-      #    60s of traffic keeps the channel non-idle; 3 misses ends a truly dead one
-      echo "  ServerAliveInterval 60"
-      echo "  ServerAliveCountMax 3"
-      echo "  TCPKeepAlive yes"
-    } >> "$sshcfg"
-    echo "🌲 grove '$name' registered (+ ssh alias '$ssh_alias') → $user@$host:$port"
-  else
-    echo "🌲 grove '$name' registered (ssh alias '$ssh_alias' already present) → $user@$host:$port"
-  fi
+  # 🛑 the Host block is `git grove wake`'s to write, never this command's
+  #   - wake writes every seat's alias through ONE writer, into a file ssh reads
+  #     ahead of every other block, then reads it back via `ssh -G`
+  #     (`git.grove.ssh.operations.sh`). a block appended here to `~/.ssh/config`
+  #     was a second writer: shadowed by wake's, and stale the day the registry
+  #     moved — two writers on one artifact (`rule.forbid.two-writers-on-one-artifact`)
+  #   - so an `--at` registration takes the exid path's contract: register, then wake
+  echo "🌲 grove '$name' registered → $user@$host:$port"
+  echo "   └─ wake it to write its alias and open its duct: git grove wake $name"
 }
 
 # .what: list registered groves
@@ -3109,12 +3120,43 @@ _git_grove_list() {
   done < <(find "$dir" -maxdepth 1 -type f -name '*.json' 2>/dev/null | sort)
 }
 
-# .what: the ssh alias to reach a grove by name
+# .what: the ssh alias to reach a grove by name — refused when ssh would dial another seat
+# 🛑 .why the read-back lives HERE, in the resolver every send and read dials through
+#   - a block for the same name in ~/.ssh/config, laid by another writer (infra's),
+#     answers for the alias whenever the owned config.d block is absent
+#   - 📜 2026-11-18, grove-ahbode-hetzner-v20261022: the registry named `camper`,
+#     infra's block named `ground`, and no camper alias was ever laid, so every
+#     "camper" send ran as ground and no command errored
+#   - the alias writer reads ssh back only when IT writes; a send never writes, so
+#     the check must ride the send. `ssh -G` is local and bounded: no network
+# exit: 0 = the alias dials the registry's seat · 1 = not in the registry ·
+#       2 = ssh would dial another seat (named on stderr, with the fix)
 _git_grove_ssh_alias() {
   local name="${1:-}"
   local f; f="$(_git_grove_dir)/$name.json"
   [[ -f "$f" ]] || return 1
-  jq -r '.sshAlias // .name' "$f"
+  local alias want_user want_host want_port eff got_user got_host got_port
+  alias="$(jq -r '.sshAlias // .name' "$f")"
+  want_user="$(jq -r '.user // empty' "$f")"
+  want_host="$(jq -r '.host // empty' "$f")"
+  want_port="$(jq -r '.port // empty' "$f")"
+  # bounded, stdin closed: `ssh -G` runs any `Match exec` in the human's config
+  eff="$(timeout -k 5 10 ssh -G "$alias" </dev/null 2>/dev/null)" || eff=""
+  got_user="$(printf '%s\n' "$eff" | awk '$1 == "user" { print $2; exit }')"
+  got_host="$(printf '%s\n' "$eff" | awk '$1 == "hostname" { print $2; exit }')"
+  got_port="$(printf '%s\n' "$eff" | awk '$1 == "port" { print $2; exit }')"
+  if [[ ( -n "$want_user" && "$got_user" != "$want_user" ) \
+     || ( -n "$want_host" && "$got_host" != "$want_host" ) \
+     || ( -n "$want_host" && -n "$want_port" && "$got_port" != "$want_port" ) ]]; then
+    echo "✋ ConstraintError: ssh alias '$alias' dials another seat than the registry declares" >&2
+    echo "   ├─ registry: ${want_user:-?}@${want_host:-<its own Host block>}${want_host:+:$want_port}" >&2
+    echo "   ├─ ssh -G:   ${got_user:-?}@${got_host:-?}:${got_port:-?}" >&2
+    echo "   ├─ why: another Host block for '$alias' answers first, so this send would run as the wrong seat" >&2
+    echo "   └─ fix: lay the registry's seat where ssh reads it first —" >&2
+    echo "        rhx git.grove.wake $name" >&2
+    return 2
+  fi
+  printf '%s\n' "$alias"
 }
 
 # .what: show one grove
@@ -3224,16 +3266,26 @@ _git_grove_del_orphaned() {
   #    live instances is a rule nobody enforces.
   while IFS= read -r f; do
     [[ -f "$f" ]] || continue
-    local n x e t
+    local n x e t p h
     n="$(jq -r '.name' "$f")"
     x="$(jq -r '.exid // empty' "$f")"
     e="$(jq -r '.env // "camp"' "$f")"
     t="$(jq -r '.type // empty' "$f")"
+    p="$(jq -r '.platform // empty' "$f")"
+    h="$(jq -r '.host // empty' "$f")"
 
     # a grove registered by --at alone has no cloud instance to ask about, so
     # no verdict is possible. it is SKIPPED, never swept — an entry this reader
     # cannot judge is not an entry it may delete
-    if [[ "$t" != "ec2" || -z "$x" ]]; then
+    # 🛑 a declared non-ec2 platform (a hetzner box) is no ec2 instance either: set
+    #   stamps an exid on every entry, so ec2 would answer "absent" and the sweep
+    #   would unregister a live box
+    #   and an entry with a NON-loopback host is reached on the tailnet whatever its
+    #   type stamp says (one registered before --platform existed): an ec2 grove is
+    #   reached through its ssm tunnel alone, on loopback
+    local loopback_re='^127(\.[0-9]{1,3}){3}$'
+    if [[ "$t" != "ec2" || -z "$x" || ( -n "$p" && "$p" != "aws.ec2" ) ]] \
+       || [[ -n "$h" && "$h" != localhost && ! "$h" =~ $loopback_re && "$h" != "::1" ]]; then
       echo "   · $n — not a cloud grove, so no verdict is possible; skipped"
       continue
     fi
@@ -3299,6 +3351,70 @@ _git_grove_del_orphaned() {
 }
 
 # .what: unregister a grove — drop registry json + ssh config Host block
+######################################################################
+# .what = refuse a del of a grove that any crew in the fleet's crew ledger still names
+# .why  = a registry row and its Host block are how every crew on a box reaches it.
+#         📜 2026-11-19: a live camp ec2 grove was judged dead from this laptop's view
+#         and dropped; ~20 crews on it then failed `Permission denied (publickey)`.
+#         the crews were in the ledger the whole time; del never read it
+# .note = a seat (`<box>.ground`) is judged by its box: the seats share one machine
+# .note = no ledger on this machine → no crew can name the grove here, and it says so;
+#         a ledger it cannot read → 💥, never a silent pass
+# exit:   0 = no crew names it · 1 = the ledger is unreadable · 2 = crews name it
+######################################################################
+_git_grove_del_crews_refuse() {
+  local name="$1" box ledger trees count
+  box="${name%.ground}"
+  ledger="${GIT_GROVE_CREW_LEDGER:-$HOME/.rhachet/fleet/crews.snapshot.json}"
+  if [[ ! -f "$ledger" ]]; then
+    echo "   🌙 no crew ledger at $ledger — no crew is checked" >&2
+    return 0
+  fi
+  if ! trees="$(jq -r --arg box "$box" '
+      .crews[]? | select(((.grove // "") | sub("^[a-z]+://"; "")) == $box) | .tree // "?"
+    ' "$ledger" 2>/dev/null)"; then
+    echo "💥 MalfunctionError: the crew ledger could not be read: $ledger" >&2
+    echo "   ⇒ a del is refused while it cannot tell whether a crew still rides '$box'" >&2
+    return 1
+  fi
+  [[ -z "$trees" ]] && return 0
+  count="$(printf '%s\n' "$trees" | wc -l | tr -d ' ')"
+  echo "✋ ConstraintError: grove '$name' is still named by $count crew(s) in the ledger" >&2
+  echo "   ├─ ledger: $ledger" >&2
+  echo "   ├─ crews" >&2
+  printf '%s\n' "$trees" | head -n 5 | sed 's/^/   │  ├─ /' >&2
+  (( count > 5 )) && echo "   │  └─ … and $((count - 5)) more" >&2
+  echo "   └─ fix: move or close every crew on '$box' first; its row and block are how they reach it" >&2
+  return 2
+}
+
+######################################################################
+# .what = save a grove's registry row and its ssh Host block(s) before a del drops them
+# .why  = a del that turns out wrong is then one copy back, never a reconstruction
+#         from logs (📜 2026-11-19: the 0901 rows were rebuilt by hand from tunnel state)
+# .note = saved under ~/.git.forest/.trash/<name>.<utc stamp>.{json,ssh}
+######################################################################
+_git_grove_del_save() {
+  local name="$1" row="$2" alias="$3" trash stem cfg
+  [[ -n "$alias" ]] || alias="$(jq -r '.sshAlias // .name' "$row")"
+  trash="$(dirname "$(_git_grove_dir)")/.trash"
+  stem="$trash/$name.$(date -u +%Y%m%dT%H%M%SZ)"
+  if ! { mkdir -p "$trash" && cp "$row" "$stem.json"; }; then
+    echo "💥 MalfunctionError: could not save grove '$name' to $trash before its del — the del is refused" >&2
+    return 1
+  fi
+  : > "$stem.ssh" || { echo "💥 MalfunctionError: could not save the Host block of '$alias' — the del is refused" >&2; return 1; }
+  for cfg in "$HOME/.ssh/config.d/grove.conf" "$HOME/.ssh/config"; do
+    [[ -f "$cfg" ]] || continue
+    awk -v a="Host $alias" -v src="$cfg" '
+      $0 == a     { inblock = 1; print "# from " src; print; next }
+      /^Host /    { inblock = 0 }
+      inblock     { print }
+    ' "$cfg" >> "$stem.ssh"
+  done
+  echo "   💾 saved → $stem.json (+ .ssh)" >&2
+}
+
 _git_grove_del() {
   # `--orphaned` sweeps a DISCOVERED set; a bare name drops ONE. both end at
   # the same delete below, so the ssh-block strip has a single holder
@@ -3311,17 +3427,38 @@ _git_grove_del() {
   local name="${1:-}"
   local f; f="$(_git_grove_dir)/$name.json"
   if [[ -z "$name" || ! -f "$f" ]]; then
-    echo "✋ grove '$name' not found" >&2
+    echo "✋ ConstraintError: grove '$name' not found" >&2
+    echo "   see the registered groves: git grove list" >&2
     return 2
   fi
+  # 🛑 a grove a crew still names is never dropped
+  #    📜 2026-11-19: a cleanup judged a live camp grove dead and dropped its two rows
+  #    and its Host blocks; ~20 crews on that box then failed `Permission denied (publickey)`
+  _git_grove_del_crews_refuse "$name" || return $?
+
   # only strip an ssh Host block we wrote ourselves (host recorded => we owned it)
-  local owned_alias=""
-  if [[ "$(jq -r '.host' "$f")" != "null" ]]; then
+  local owned_alias="" host
+  host="$(jq -r '.host // ""' "$f")"
+  if [[ -n "$host" ]]; then
     owned_alias="$(jq -r '.sshAlias // .name' "$f")"
   fi
+
+  # the row and its block are saved BEFORE the drop, so a wrong del is one copy back
+  _git_grove_del_save "$name" "$f" "$owned_alias" || return 1
   rm -f "$f"
   if [[ -n "$owned_alias" ]]; then
-    local sshcfg="$HOME/.ssh/config"
+    # ⚠️ TWO files can hold our block, and only one is always ours:
+    #    - `~/.ssh/config.d/grove.conf` is the file `git.grove.wake` owns, for every seat
+    #    - `~/.ssh/config` holds a block of ours only where an older wake, or an older
+    #      `git grove set`, wrote one — and those wrote only a TUNNEL alias (a loopback host)
+    #    🛑 a tailnet grove's name in `~/.ssh/config` is INFRA's block, laid under the same
+    #      bare name. to strip it would delete another writer's bytes, so the legacy sweep
+    #      reads `~/.ssh/config` for a loopback entry alone
+    local sshcfgs=("$HOME/.ssh/config.d/grove.conf")
+    local loopback_re='^127(\.[0-9]{1,3}){3}$'
+    [[ "$host" == "localhost" || "$host" =~ $loopback_re || "$host" == "::1" ]] && sshcfgs+=("$HOME/.ssh/config")
+    local sshcfg
+    for sshcfg in "${sshcfgs[@]}"; do
     ####################################################################
     # 🛑 the alias is DATA here, never part of a program
     #
@@ -3345,22 +3482,29 @@ _git_grove_del() {
     # ⚠️ `grep -qxF` — `-x` whole line, `-F` fixed string. the guard must not be
     #    a second place where the alias is read as a pattern
     ####################################################################
+    # 🛑 the read and the swap run under the lock every writer of these files takes
+    #    (`grove_ssh_config_lock_path` in git.grove.ssh.operations.sh names the same path),
+    #    so a wake that writes its block at the same instant cannot lose it to this swap
     if [[ -f "$sshcfg" ]] && grep -qxF "Host $owned_alias" "$sshcfg"; then
-      if awk -v a="Host $owned_alias" '
-        $0 == a  { inblock = 1; next }
-        /^Host /  { inblock = 0 }
-        !inblock  { print }
-      ' "$sshcfg" > "$sshcfg.del.tmp"; then
-        mv "$sshcfg.del.tmp" "$sshcfg"
+      if (
+        command -v flock >/dev/null 2>&1 && flock -w 30 9 || exit 1
+        awk -v a="Host $owned_alias" '
+          $0 == a  { inblock = 1; next }
+          /^Host /  { inblock = 0 }
+          !inblock  { print }
+        ' "$sshcfg" > "$sshcfg.del.tmp" && mv "$sshcfg.del.tmp" "$sshcfg"
+      ) 9>"$HOME/.ssh/.grove.conf.lock"; then
+        :
       else
         rm -f "$sshcfg.del.tmp"
-        echo "✋ grove '$name' unregistered, but $sshcfg still holds its Host block" >&2
+        echo "💥 MalfunctionError: grove '$name' unregistered, but $sshcfg still holds its Host block" >&2
         echo "   ⇒ every ssh to '$owned_alias' keeps a block that names a port" >&2
         echo "     no tunnel serves any more" >&2
         echo "   fix: drop the 'Host $owned_alias' block by hand" >&2
         return 1
       fi
     fi
+    done
   fi
   echo "🍃 grove '$name' unregistered"
 }
@@ -3423,9 +3567,10 @@ _git_grove_send() {
     echo "✋ usage: git grove send <name> --what \"<cmd>\" [--await <secs>] [--anyway]" >&2
     return 2
   fi
-  local alias; alias="$(_git_grove_ssh_alias "$name")" || {
-    echo "✋ grove '$name' not found — run 'git grove list'" >&2; return 2;
-  }
+  local alias rc=0; alias="$(_git_grove_ssh_alias "$name")" || rc=$?
+  # rc 2 = a misrouted alias, already named above by the resolver
+  (( rc == 2 )) && return 2
+  (( rc != 0 )) && { echo "✋ grove '$name' not found — run 'git grove list'" >&2; return 2; }
   local uri; uri="$(_git_grove_duct_uri "$alias")"
   duct.open --on "$uri" >/dev/null
   duct.send --on "$uri" --what "$what" "${rest[@]}"
@@ -3438,9 +3583,9 @@ _git_grove_read() {
     echo "✋ usage: git grove read <name> [--lines <n>]" >&2
     return 2
   fi
-  local alias; alias="$(_git_grove_ssh_alias "$name")" || {
-    echo "✋ grove '$name' not found — run 'git grove list'" >&2; return 2;
-  }
+  local alias rc=0; alias="$(_git_grove_ssh_alias "$name")" || rc=$?
+  (( rc == 2 )) && return 2
+  (( rc != 0 )) && { echo "✋ grove '$name' not found — run 'git grove list'" >&2; return 2; }
   # forward the rest, same reason as _git_grove_send: a wrapper that reads only
   # the name and drops each arg after it keeps `--lines 40` from ever reaching
   # `duct.read`, so every read dumps the full 500-line default

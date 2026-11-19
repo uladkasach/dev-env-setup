@@ -16,11 +16,12 @@
      GROVE_ENV_SERVER=cloud@aws.ec2         grove.provision   # an ec2 grove
      GROVE_ENV_SERVER=cloud@hetzner.hetzbot grove.provision   # a hetzner grove
 
-   on a hetzner grove, the durable fix is its bootstrap: it writes one
-   line, 'hetzner.hetzbot', into the platform declaration:
+   on a hetzner grove, the durable fix is one line, 'hetzner.hetzbot',
+   in the platform declaration:
      <fixture>/platform
-   infra's hetzner bootstrap owns that write — ask 3 of this repo's
-     .behavior/v2026_10_25.feat-tailscale-on-every-machine/handoff.infra.grove-tailnet-join.md
+   the grove's boot lays it, from the registry, over the ground seat:
+     rhx git.grove.set <grove> --platform hetzner.hetzbot
+     rhx git.grove.provision boot <grove> --mode apply
    the override above serves one run until that file lands.
    on your laptop over ssh: the desktop rung declines an ssh seat, so
    name it local@unix, or run at the laptop's own keyboard.

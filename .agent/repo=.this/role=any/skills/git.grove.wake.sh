@@ -142,6 +142,7 @@ source ~/.bash_aliases 2>/dev/null || true
 #    and the read that gets past it (`term=keyrack.gitroot`)
 # shellcheck source=/dev/null
 source "$(dirname "${BASH_SOURCE[0]}")/git.grove.rack.operations.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.ssh.operations.sh"
 REGISTRY="${GIT_FOREST_DIR:-$HOME/.git.forest}/groves/$GROVE.json"
 if [[ ! -f "$REGISTRY" ]]; then
   echo "🐢 bummer dude — grove '$GROVE' is not registered" >&2
@@ -249,11 +250,11 @@ wake_clamp() {
   local what="$1" value="$2" allowed="$3" shape="$4"
   [[ -z "$value" ]] && return 0
   if [[ "$value" == *[!$allowed]* ]]; then
-    echo "✋ $what holds a byte outside its grammar" >&2
+    echo "✋ ConstraintError: $what holds a byte outside its grammar" >&2
     echo "   allowed: $shape" >&2
     echo "   ⇒ this value is written into ~/.ssh/config, and a newline there" >&2
     echo "     adds a directive — ProxyCommand runs a command on THIS box" >&2
-    echo "   fix: rhx git.grove.set $GROVE --at <user>@localhost:<port>" >&2
+    echo "   fix: rhx git.grove.set $GROVE --at <user>@<host>:<port>   (an ec2 tunnel's host is localhost; a tailnet grove's is its own name)" >&2
     exit 2
   fi
 }
@@ -272,14 +273,101 @@ wake_clamp "the registry's sshAlias" "$SSH_ALIAS"    'A-Za-z0-9._-'  '[A-Za-z0-9
 wake_clamp "--identity"              "$IDENTITY"     'A-Za-z0-9._/~-' '[A-Za-z0-9._/~-] (a path)'
 for _wake_dashed in "sshAlias:$SSH_ALIAS" "user:$USER_NAME"; do
   if [[ "${_wake_dashed#*:}" == -* ]]; then
-    echo "✋ the registry's ${_wake_dashed%%:*} starts with '-'" >&2
+    echo "✋ ConstraintError: the registry's ${_wake_dashed%%:*} starts with '-'" >&2
     echo "   ⇒ it reaches ssh as a positional, and ssh reads a '-' at the front" >&2
     echo "     as an OPTION — one of them, -oProxyCommand=, runs a command here" >&2
-    echo "   fix: rhx git.grove.set $GROVE --at <user>@localhost:<port>" >&2
+    echo "   fix: rhx git.grove.set $GROVE --at <user>@<host>:<port>   (an ec2 tunnel's host is localhost; a tailnet grove's is its own name)" >&2
     exit 2
   fi
 done
 unset _wake_dashed
+
+######################################################################
+# 🛑 a grove whose HOST is not `localhost` is reached over the tailnet — no
+#    aws, no ssm, no tunnel. wake then only proves it answers
+#
+# .why the registry's `host` decides, and not the platform
+#   - an ec2 grove's entry reads `<user>@localhost:<port>`: the port is the
+#     local end of the ssm tunnel THIS skill opens, so a wake must open it
+#   - a hetzner grove's entry reads `<user>@<tailnet name>:22`: the box is
+#     always on and the tailnet already routes to it. there is no instance to
+#     resume, no agent to await, and no tunnel to bind
+#   - ⇒ the aws half below would ask for a camp profile and an ec2 describe
+#     that name no part of this box — and refuse a box that is already up
+#
+# .why it still PROVES reach, and never just returns 0
+#   - a wake's ✔ is read by `git.grove.provision boot` as "this box answers".
+#     a ✔ printed over an ssh that fails would hand the boot a dead seat
+#   - ⇒ one bounded, batch-mode ssh round trip, through the alias every duct uses
+######################################################################
+HOST_NAME=$(jq -r '.host // "localhost"' "$REGISTRY")
+[[ "$HOST_NAME" == "null" ]] && HOST_NAME="localhost"
+wake_clamp "the registry's host" "$HOST_NAME" 'A-Za-z0-9._-' '[A-Za-z0-9._-] (a hostname)'
+if [[ "$HOST_NAME" == -* ]]; then
+  echo "✋ ConstraintError: the registry's host starts with '-' — ssh would read it as an option" >&2
+  echo "   fix: rhx git.grove.set $GROVE --at <user>@<host>:<port>" >&2
+  exit 2
+fi
+
+if grove_ssh_host_is_tailnet "$HOST_NAME"; then
+  echo "🐢 heres the wave..."
+  echo ""
+  echo "🌳 git.grove.wake $GROVE --mode $MODE"
+  echo "   ├─ reach: the tailnet ($USER_NAME@$HOST_NAME:$PORT) — no aws, no tunnel"
+  echo "   ├─ alias: $SSH_ALIAS"
+  if [[ "$MODE" == "plan" ]]; then
+    echo "   └─ plan — apply would findsert the alias, then prove one ssh round trip through it"
+    exit 0
+  fi
+
+  # 🛑 the alias: the REGISTRY's seat, written where ssh reads it FIRST
+  #   - infra lays its own block for a name this repo also dials, and once that
+  #     block named another seat, so every send to the camper landed on ground
+  #     (📜 2026-11-15, grove-ahbode-hetzner-v20261022)
+  #   - ⇒ `grove_ssh_alias_set` writes the block into a file this repo owns, read
+  #     ahead of every other block; infra's bytes are left as they stand
+  # the writer's fault prints nested under this tree's own `└─` line
+  grove_ssh_alias_set_under head='   └─ ' alias="$SSH_ALIAS" host="$HOST_NAME" port="$PORT" user="$USER_NAME" identity="$IDENTITY" || exit 1
+  _wake_alias="$GROVE_SSH_ALIAS_SAID"
+  echo "   ├─ ssh  ${_wake_alias%% *} alias '$SSH_ALIAS' → ${_wake_alias#* } (the registry's seat, read first)"
+
+  # the proof a tailnet grove is reachable: one bounded round trip
+  _wake_rc=0; _wake_said="$(grove_ssh_round_trip "$SSH_ALIAS")" || _wake_rc=$?
+  if [[ "$_wake_rc" -eq 0 ]]; then
+    echo "   └─ ✔ answers over ssh — the box is always on, so it is awake"
+    exit 0
+  fi
+  # the box answered and its host key is not yet trusted: reach holds, trust is owed
+  if [[ "$_wake_rc" -eq 2 ]]; then
+    echo "   └─ ✔ answers over ssh — and its host key is not yet trusted here"
+    echo "      ⇒ a first contact, or a rebuilt box. trust is the next step, never a wake's:"
+    echo "        rhx git.grove.trust.gen --grove $GROVE --mode plan"
+    exit 0
+  fi
+  # the box answered and refused this laptop's key: no reach fault, an authorization one
+  if [[ "$_wake_said" == *"Permission denied"* ]]; then
+    echo "   └─ ✋ ConstraintError: '$SSH_ALIAS' answered, and refused this laptop's key" >&2
+    echo "" >&2
+    echo "  ssh said:" >&2
+    printf '%s\n' "$_wake_said" | sed 's/^/    /' >&2
+    echo "  ⇒ the tailnet holds and the box is up: $USER_NAME@$HOST_NAME does not list this key" >&2
+    echo "    (${IDENTITY:-the default key}) in its authorized_keys" >&2
+    # the BOX's name, whichever seat was called — never `X.ground.ground`
+    _box="${GROVE%.ground}"
+    echo "  fix: a laptop that already reaches '$_box.ground' places this one's PUBLIC key on" >&2
+    echo "    every seat — on that laptop, with this laptop's .pub copied to it:" >&2
+    echo "    rhx git.grove.auth.ssh.set $_box --identity <this laptop's key>.pub --mode plan" >&2
+    echo "    rhx git.grove.auth.ssh.set $_box --identity <this laptop's key>.pub --mode apply" >&2
+    exit 2
+  fi
+  echo "   └─ 💥 MalfunctionError: '$SSH_ALIAS' did not answer over ssh within 30s" >&2
+  echo "" >&2
+  echo "  ssh said:" >&2
+  printf '%s\n' "$_wake_said" | sed 's/^/    /' >&2
+  echo "  ⇒ a tailnet grove has no box to resume; a silence is reach, not sleep" >&2
+  echo "  fix: confirm this laptop is on the tailnet and '$HOST_NAME' is up, then re-run" >&2
+  exit 1
+fi
 
 ######################################################################
 # 🛑 the port must be THIS BOX'S to take — judged on the REGISTRY, not the wire
@@ -960,8 +1048,6 @@ fi
 #    registry does not hold cannot survive here — `git.grove.set <name>
 #    --at <user>@localhost:<port>` is where a seat's user is declared, and an
 #    entry with `"user": null` yields `ec2-user` by design, never by accident
-SSHCFG="$HOME/.ssh/config"
-mkdir -p "$HOME/.ssh"; touch "$SSHCFG"
 
 # ⚠️ the keepalive is what stops the tunnel opened just above from expiry.
 #    `HostName localhost` is the tell: ssh does not reach the box, it reaches the
@@ -978,49 +1064,14 @@ mkdir -p "$HOME/.ssh"; touch "$SSHCFG"
 #    box never slept: 1.2.power sets IdleAction=ignore and AllowHibernation=no,
 #    and no timer or alarm stops a grove. only `git.grove.stop` does. the two
 #    events are unrelated; one did not happen
-ALIAS_DECLARED="$(
-  echo "Host $SSH_ALIAS"
-  echo "  HostName localhost"
-  echo "  Port $PORT"
-  echo "  User $USER_NAME"
-  echo "  IdentityFile $IDENTITY"
-  echo "  ServerAliveInterval 60"
-  echo "  ServerAliveCountMax 3"
-  echo "  TCPKeepAlive yes"
-)"
-
-# the block on disk, blank lines dropped so a stray newline is no difference
-ALIAS_ON_DISK="$(awk -v a="Host $SSH_ALIAS" '
-  $0 == a  { inblock = 1; print; next }
-  /^Host /  { inblock = 0 }
-  inblock && NF { print }
-' "$SSHCFG")"
-
-if [[ "$ALIAS_ON_DISK" == "$ALIAS_DECLARED" ]]; then
-  echo "      └─ ssh  [KEEP] alias '$SSH_ALIAS' matches the registry ($USER_NAME@localhost:$PORT)"
-else
-  # a block that differs in ANY field is stripped, so the append below is the one
-  # declaration left. two `Host` blocks of one name would leave ssh with the
-  # first, which is the stale one
-  if [[ -n "$ALIAS_ON_DISK" ]]; then
-    echo "      ├─ ssh  [REPLACE] alias '$SSH_ALIAS' differs from the registry ($USER_NAME@localhost:$PORT)"
-    if awk -v a="Host $SSH_ALIAS" '
-      $0 == a  { inblock = 1; next }
-      /^Host /  { inblock = 0 }
-      !inblock  { print }
-    ' "$SSHCFG" > "$SSHCFG.wake.tmp"; then
-      mv "$SSHCFG.wake.tmp" "$SSHCFG"
-    else
-      rm -f "$SSHCFG.wake.tmp"
-      echo "      └─ ✋ could not rewrite $SSHCFG to drop the stale alias" >&2
-      echo "         ⇒ every send to '$SSH_ALIAS' keeps the stale block, and the" >&2
-      echo "           duct itself is healthy on $PORT" >&2
-      exit 1
-    fi
-  fi
-  printf '\n%s\n' "$ALIAS_DECLARED" >> "$SSHCFG"
-  echo "      └─ ssh  [SET] alias '$SSH_ALIAS' written ($USER_NAME@localhost:$PORT)"
+# 🛑 the ONE writer (`git.grove.ssh.operations.sh`): the whole block compared,
+#    written where ssh reads it first, then read back through `ssh -G`
+if ! grove_ssh_alias_set_under head='      └─ ' alias="$SSH_ALIAS" host=localhost port="$PORT" user="$USER_NAME" identity="$IDENTITY"; then
+  echo "         ⇒ the duct itself is healthy on $PORT" >&2
+  exit 1
 fi
+_wake_alias="$GROVE_SSH_ALIAS_SAID"
+echo "      └─ ssh  ${_wake_alias%% *} alias '$SSH_ALIAS' → ${_wake_alias#* } (the registry's seat, read first)"
 
 echo ""
 echo "🌳 grove's awake!"

@@ -9,11 +9,12 @@
 #   - identical on every machine (`rule.require.identical-bundle-composition`)
 ######################################################################
 
-# .what = the vault this box's github token lives in: ec2 → aws.params, else os.secure
-# .why  = the vault follows the platform (`rule.forbid.aws-params-off-ec2`); one
-#   function, so the upsert's fix-text and the verify's never name two vaults
+# .what = the vault this box's github token lives in: a camp grove → aws.params, else os.secure
+# .why  = a camp grove (the `cloud` tier) holds the camp identity by mandate, on
+#   any platform (`rule.require.aws-params-on-camp-groves-only`); one function, so
+#   the upsert's fix-text and the verify's never name two vaults
 grove_provision_5_4_gh_keyrack_vault() {
-  [[ "$GROVE_ENV_SERVER" == *@aws.ec2 ]] && { printf 'aws.params'; return 0; }
+  [[ "$GROVE_ENV_SERVER" == cloud@* ]] && { printf 'aws.params'; return 0; }
   printf 'os.secure'
 }
 

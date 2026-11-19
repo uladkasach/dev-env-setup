@@ -80,17 +80,16 @@ grove_provision_5_1_node_provision_upsert() {
   fi
   eval "$(fnm env --shell bash)"
 
+  # 🛑 node 24+ links libatomic.so.1, absent on a minimal ubuntu image — owned
+  #    here, before any node lands (the reason: `grove_node_libatomic_findsert`)
+  grove_node_libatomic_findsert || return 1   # its own 💥 names the cause
+
   fnm install --lts || return 1
 
-  # the default is the `lts-latest` ALIAS, never a `fnm list` scrape (m3)
-  if ! fnm default lts-latest; then
-    echo "   ✋ fnm has no 'lts-latest' alias after 'fnm install --lts'" >&2
-    echo "      ⇒ with no default, node is on PATH in no shell. read what it" >&2
-    echo "        holds: fnm list" >&2
-    return 1
-  fi
-  fnm use lts-latest
-  echo "   • node $(fnm current 2>/dev/null) set as the fnm default"
+  # the DECLARED node becomes the default, and a move is named (`_.sh`)
+  local node_default
+  node_default="$(grove_node_version_default)"
+  grove_node_default_findsert "$node_default" || return 1
 
   # the BASELINE versions land BESIDE the lts — an absent pin opens a prompt a
   # duct cannot answer. declared in `_.sh`, which the verify reads too (m4)
@@ -106,11 +105,12 @@ grove_provision_5_1_node_provision_upsert() {
       continue
     fi
 
-    if fnm install "$want"; then
+    if bundle.run fnm install "$want"; then
       echo "   • node v$want installed"
       roster="$roster"$'\n'"v$want"
     else
-      echo "   ✋ fnm could not install node v$want" >&2
+      echo "   💥 MalfunctionError: fnm could not install node v$want" >&2
+      bundle.said "      " "$BUNDLE_SAID" >&2
       echo "      ⇒ a repo that pins it opens fnm's interactive install prompt on" >&2
       echo "        every 'cd', which a duct cannot answer" >&2
       echo "      ⇒ check the version is real: fnm list-remote | grep v$want" >&2
@@ -133,7 +133,7 @@ grove_provision_5_1_node_provision_upsert() {
 
   # empty means the manifest is ABSENT (a partial checkout, the head of a
   # cascade) or declares none (the repo at fault) — told apart below (m6)
-  local pnpm_manifest; pnpm_manifest="$(dirname "$GROVE_SRC")/package.json"
+  local pnpm_manifest; pnpm_manifest="$(grove_node_checkout_root)/package.json"
   if [[ ! -f "$pnpm_manifest" ]]; then
     echo "   ✋ no package.json beside this checkout's src/ ($pnpm_manifest)" >&2
     echo "      ⇒ checkout is PARTIAL — package.json and .nvmrc sit beside src/," >&2
@@ -158,9 +158,16 @@ grove_provision_5_1_node_provision_upsert() {
   while read -r ver; do
     [[ -n "$ver" ]] || continue
     fnm use "$ver" --silent-if-unchanged >/dev/null 2>&1 || continue
+    # 🛑 forget bash's cached command paths. fnm swaps the node under ONE
+    #    multishell dir, so a `corepack` hashed while a node that bundles it was
+    #    in use still answers `command -v` after a swap to one that bundles none
+    #    — and every call then dies "No such file" (measured 2026-11-14, v22 →
+    #    v26, grove-ahbode-hetzner-v20261022)
+    hash -r
 
     # `web_corepack`/`web_npm`, BOUNDED — a stall multiplies per node. `corepack
     # enable` stays bare, since it reaches no registry (m7)
+    grove_node_corepack_findsert "$ver"
     corepack enable || true
     if ! web_corepack install -g "pnpm@$pnpm_want"; then
       echo "   • corepack declined pnpm for node v$ver — fall back to npm"
@@ -168,7 +175,8 @@ grove_provision_5_1_node_provision_upsert() {
     fi
   done < <(grove_node_versions_wanted; echo "lts-latest")
 
-  fnm use lts-latest --silent-if-unchanged >/dev/null 2>&1 || true   # back to the box's default
+  fnm use "$node_default" --silent-if-unchanged >/dev/null 2>&1 || true   # back to the box's default
+  hash -r   # the same stale-path hazard as the loop above
 
   # CACHE every pnpm this box may be ASKED for, so corepack's shim never asks to
   # fetch one — on a duct that question eats the run (m11)
@@ -218,23 +226,6 @@ grove_provision_5_1_node_provision_upsert() {
     echo "      read why: cd ~ && pnpm --version   # away from any declaration"
   fi
 
-  # prune the SHADOWED shims — pnpm's own fossils from its 10.x→11.x dir move,
-  # in pnpm's OWN dirs only; the live dir is pnpm's ANSWER, never a constant (m10)
-  local shadow shadows=() pruned=() live_dir fossil_dir
-  live_dir="$(grove_pnpm_shim_dir_live)"
-  while read -r shadow; do
-    [[ -n "$shadow" ]] || continue
-    shadows+=("$shadow")
-  done < <(grove_pnpm_shim_shadows)
-
-  if [[ "${#shadows[@]}" -eq 0 ]]; then
-    echo "   • no shadowed pnpm shims ✔ (live dir: ${live_dir:-<pnpm did not answer>})"
-  else
-    if [[ "$live_dir" == "$PNPM_HOME/bin" ]]; then fossil_dir="$PNPM_HOME"; else fossil_dir="$PNPM_HOME/bin"; fi
-    for shadow in "${shadows[@]}"; do
-      rm -f "$fossil_dir/$shadow" && pruned+=("$shadow")
-    done
-    echo "   • pruned ${#pruned[@]} shadowed shim(s) from $fossil_dir: ${pruned[*]}"
-    echo "     (each also lives in $live_dir, which is the dir pnpm writes)"
-  fi
+  # prune the SHADOWED shims — pnpm's own fossils (`_.sh`, m10)
+  grove_pnpm_shim_shadows_prune
 }

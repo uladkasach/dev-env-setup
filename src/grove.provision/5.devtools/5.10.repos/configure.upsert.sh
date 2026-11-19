@@ -25,6 +25,7 @@
 GROVE_REPOS_ORIGIN_SSH="git@github.com:uladkasach/dev-env-setup.git"
 
 grove_provision_5_10_repos_configure_upsert() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "the org repos"; return 0; }
   ####################################################################
   # 0. is there a key at all? without one, no claim below can be true
   #   - it declines rather than fails, since an https origin WORKS

@@ -1,0 +1,46 @@
+## a session-tag refusal
+   ✋ ahbode.prep — the role TRUSTS this box, and refuses what its session carries (sts:TagSession)
+      ⇒ an IAM Roles Anywhere session carries a source identity and session tags,
+        and a chained AssumeRole passes both on
+      ⇒ an ask of ahbode/infrastructure: the trust statement on '<role>'
+        for this box's principal must allow all three at once:
+        "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession"
+      ⇒ read the refusal in full, on the box (it names the ids):
+        aws sts get-caller-identity --profile <profile>
+
+## a source-identity refusal
+   ✋ ahbode.prep — the role TRUSTS this box, and refuses what its session carries (sts:SetSourceIdentity)
+      ⇒ an IAM Roles Anywhere session carries a source identity and session tags,
+        and a chained AssumeRole passes both on
+      ⇒ an ask of ahbode/infrastructure: the trust statement on '<role>'
+        for this box's principal must allow all three at once:
+        "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession"
+      ⇒ read the refusal in full, on the box (it names the ids):
+        aws sts get-caller-identity --profile <profile>
+
+## a bare AssumeRole refusal
+   ✋ ahbode.prep — the hop is declared, and this box is REFUSED it
+      ⇒ a re-apply of this bundle refuses identically
+      ⇒ TWO causes wear this one message, and they want OPPOSITE repairs:
+      1. does a 'ahbode' row belong on a grove of THIS org at all?
+         no  ⇒ 🔴 OURS. delete the row; no grant is owed, and none may
+               be sought (rule.require.a-grove-reaches-its-own-org-only)
+      2. only if yes — the role EXISTS and this box sits outside its
+         trust policy ⇒ an ask of ahbode/infrastructure: trust this box's
+         principal on '<role>', with all three actions at once:
+         "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession"
+      ⇒ ask 1 FIRST. its answer is the ORG's, and the refusal says no
+        word about it — an ask filed on a no buys a durable hop into
+        another org's accounts, to silence a check that was right
+      ⇒ read the refusal in full, on the box (it names the ids):
+        aws sts get-caller-identity --profile <profile>
+
+## a profile aws cannot find
+   ✋ the rack names '<profile>' for ahbode.prep, and it does not answer
+      ⇒ a named profile with no live body is a profile aws cannot find
+        — the half-applied pair aws.reach.set exists to prevent
+      ⇒ read the refusal in full:
+        aws sts get-caller-identity --profile <profile>
+      fix: rhx grove.provision --what 5.13.reach --mode apply
+
+

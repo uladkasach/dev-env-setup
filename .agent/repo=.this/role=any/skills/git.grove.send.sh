@@ -158,6 +158,26 @@ for _fn in "${GROVE_SEND_BORROWS[@]}"; do
   exit 2
 done
 
+######################################################################
+# 🛑 this skill's stdout is made BLOCKING before any grove output is relayed
+#
+# .why  = a caller may hand it a NON-BLOCKING stdout: a node parent (rhx, an
+#         agent harness) shares its pipe's open file description, and the
+#         O_NONBLOCK flag rides that description into every child. the relay
+#         sink then writes a burst, the reader lags, write(2) answers EAGAIN,
+#         and the sink drops the rest:
+#           sed: couldn't write 56 items to stdout: Resource temporarily unavailable
+#         📜 2026-11-18, grove-ahbode-hetzner-v20261022: a whole-tree plan relayed
+#         ~8KB and stopped mid-word, three times, with the command green on the box
+# .how  = clear the flag on fd 1 (perl-base is essential on debian; no other
+#         tool can call fcntl). a box with no perl keeps the old behavior
+######################################################################
+__grove_send_stdout_set_sync() {
+  command -v perl >/dev/null 2>&1 || return 0
+  perl -MFcntl -e 'my $f = fcntl(STDOUT, F_GETFL, 0); fcntl(STDOUT, F_SETFL, $f & ~O_NONBLOCK) if defined $f && ($f & O_NONBLOCK)' 2>/dev/null || true
+}
+__grove_send_stdout_set_sync
+
 # rhachet forwards its own --skill/--repo/--role flags; drop them.
 # a bare `--` ends the strip — every arg after it is literal, so a value that
 # looks like a flag (e.g. a grove literally named `--skill`) still reaches through.
@@ -198,6 +218,12 @@ if [[ -n "$WHAT" && -n "$PLAY" ]]; then
   echo "✋ pass --what OR --play, not both" >&2
   exit 2
 fi
+
+# 🛑 the alias must dial the registry's seat before any keystroke leaves:
+#   `grove_ssh_seat_ready` lays it where ssh reads first, or refuses (see its header)
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.ssh.operations.sh"
+[[ -n "$GROVE" ]] && { grove_ssh_seat_ready "$GROVE" || exit $?; }
 
 ######################################################################
 # the trigger guard on --bare
@@ -427,6 +453,10 @@ if [[ -n "$PLAY" ]]; then
   # a TRAP, so a Ctrl-C mid-upload leaves no file behind. cleared right after,
   # because this block CONTINUES rather than exits (same shape as `--detach`)
   trap 'rm -f "$PLAY_ERR"' EXIT
+  # the ONE ssh here without `-n`: it reads the play on stdin. every other ssh
+  #   in this skill takes `-n`. 📜 2026-11-18: a bare ssh set O_NONBLOCK on the
+  #   stdin it shared with the caller's stdout, so a large reply's sink failed
+  #   with `sed: couldn't write … Resource temporarily unavailable`
   ssh -o BatchMode=yes "$GROVE" \
         'mkdir -p "$HOME/.local/state/grove.play"'" && cat > \"\$HOME/$PLAY_REMOTE_REL\" && chmod +x \"\$HOME/$PLAY_REMOTE_REL\"" \
         < "$PLAY_FILE" 2>"$PLAY_ERR" | __duct_strip_escapes
@@ -490,7 +520,7 @@ if [[ -n "$PLAY" ]]; then
   #    shebang and runs as a child process, so it inherits the interactive zsh's
   #    exported PATH, and this file holds no opinion about which interpreter the
   #    play itself declares.
-  if ssh -o BatchMode=yes "$GROVE" 'test -f "$HOME/.zshrc"' 2>/dev/null; then
+  if ssh -n -o BatchMode=yes "$GROVE" 'test -f "$HOME/.zshrc"' 2>/dev/null; then
     WHAT="zsh -ic $PLAY_REMOTE"
     PLAY_SHELL="zsh -ic (this seat's PATH is served by ~/.zshrc)"
   else
@@ -563,7 +593,7 @@ if [[ "$BARE" == "true" ]]; then
     # trap table is ours, and that one is a function in a human's interactive
     # shell, where an EXIT trap would clobber theirs
     trap 'rm -f "$DETACH_ERR"' EXIT
-    REMOTE_PID=$(ssh -o BatchMode=yes "$GROVE" "$REMOTE_DRIVE" 2>"$DETACH_ERR" | __duct_strip_escapes)
+    REMOTE_PID=$(ssh -n -o BatchMode=yes "$GROVE" "$REMOTE_DRIVE" 2>"$DETACH_ERR" | __duct_strip_escapes)
     [[ -s "$DETACH_ERR" ]] && __duct_strip_escapes < "$DETACH_ERR" >&2
     rm -f "$DETACH_ERR"
     trap - EXIT
@@ -622,7 +652,7 @@ if [[ "$BARE" == "true" ]]; then
   # a TRAP, so a Ctrl-C mid-ssh leaves no file behind. safe here and NOT in
   # `__duct_ssh_tmux`: this is its own process, where the trap table is ours
   trap 'rm -f "$SEND_ERR"' EXIT
-  ssh -o BatchMode=yes "$GROVE" "$WHAT" 2>"$SEND_ERR" | __duct_strip_escapes
+  ssh -n -o BatchMode=yes "$GROVE" "$WHAT" 2>"$SEND_ERR" | __duct_strip_escapes
   SEND_RC=$?
   [[ -s "$SEND_ERR" ]] && __duct_strip_escapes < "$SEND_ERR" >&2
   rm -f "$SEND_ERR"
@@ -723,12 +753,12 @@ if [[ "$DETACH" == "true" ]]; then
   #    would put a command in the very pane whose busyness is the question
   DETACH_WAITED=0
   while [[ "$DETACH_WAITED" -lt "$DETACH_WITHIN" ]]; do
-    ssh -o BatchMode=yes -o ConnectTimeout=10 "$GROVE" "test -f \"$DETACH_PID\"" 2>/dev/null && break
+    ssh -n -o BatchMode=yes -o ConnectTimeout=10 "$GROVE" "test -f \"$DETACH_PID\"" 2>/dev/null && break
     sleep "$DETACH_EVERY"
     DETACH_WAITED=$(( DETACH_WAITED + DETACH_EVERY ))
   done
 
-  if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "$GROVE" "test -f \"$DETACH_PID\"" 2>/dev/null; then
+  if ! ssh -n -o BatchMode=yes -o ConnectTimeout=10 "$GROVE" "test -f \"$DETACH_PID\"" 2>/dev/null; then
     echo "✋ the text landed, and no job started within ${DETACH_WITHIN}s" >&2
     echo "" >&2
     echo "   why: the pane was busy, so the line was eaten as a live job's stdin —" >&2
@@ -742,8 +772,8 @@ if [[ "$DETACH" == "true" ]]; then
     exit "$GROVE_SEND_NO_VERDICT"
   fi
 
-  DETACH_REMOTE_PID="$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$GROVE" "cat \"$DETACH_PID\"" 2>/dev/null | tr -d '[:space:]')"
-  ssh -o BatchMode=yes -o ConnectTimeout=10 "$GROVE" "rm -f \"$DETACH_PID\"" 2>/dev/null
+  DETACH_REMOTE_PID="$(ssh -n -o BatchMode=yes -o ConnectTimeout=10 "$GROVE" "cat \"$DETACH_PID\"" 2>/dev/null | tr -d '[:space:]')"
+  ssh -n -o BatchMode=yes -o ConnectTimeout=10 "$GROVE" "rm -f \"$DETACH_PID\"" 2>/dev/null
 
   # ⚠️ an unreadable pid is NOT a pass. the file was there a moment ago, so an
   #    empty read means it went away under us (`rule.forbid.failhide`)
@@ -1017,7 +1047,7 @@ if [[ "$REPLY_WANTED" == "true" ]]; then
     #    still mid-run does. so reachability is asked SEPARATELY — to conflate
     #    them would report a wait that observed no state at all
     #    (`rule.forbid.failhide`)
-    if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "$GROVE" true 2>/dev/null; then
+    if ! ssh -n -o BatchMode=yes -o ConnectTimeout=10 "$GROVE" true 2>/dev/null; then
       echo "✋ the grove went silent, so the command's verdict is unknown" >&2
       echo "   ⇒ an unreachable box and a finished command both read as quiet," >&2
       echo "     so this refuses to guess between them" >&2
@@ -1025,7 +1055,7 @@ if [[ "$REPLY_WANTED" == "true" ]]; then
       exit "$GROVE_SEND_NO_VERDICT"
     fi
 
-    if ssh -o BatchMode=yes "$GROVE" "test -f \"$REPLY_RC\"" 2>/dev/null; then
+    if ssh -n -o BatchMode=yes "$GROVE" "test -f \"$REPLY_RC\"" 2>/dev/null; then
       break
     fi
 
@@ -1039,11 +1069,11 @@ if [[ "$REPLY_WANTED" == "true" ]]; then
     REPLY_WAITED=$(( REPLY_WAITED + REPLY_EVERY ))
   done
 
-  if ! ssh -o BatchMode=yes "$GROVE" "test -f \"$REPLY_RC\"" 2>/dev/null; then
+  if ! ssh -n -o BatchMode=yes "$GROVE" "test -f \"$REPLY_RC\"" 2>/dev/null; then
     echo "🌙 still busy after ${REPLY_WITHIN}s — this is a BOUND, not a verdict" >&2
     echo "   ├─ the command may simply need longer: --within <secs>" >&2
     echo "   └─ its output so far, and the pane, both survive the give-up" >&2
-    ssh -o BatchMode=yes "$GROVE" "cat \"$REPLY_OUT\"" 2>/dev/null | __duct_strip_escapes
+    ssh -n -o BatchMode=yes "$GROVE" "cat \"$REPLY_OUT\"" 2>/dev/null | __duct_strip_escapes
     exit "$GROVE_SEND_NO_VERDICT"
   fi
 
@@ -1056,9 +1086,9 @@ if [[ "$REPLY_WANTED" == "true" ]]; then
   #    clipboard, so the next paste is text the grove chose. the sink and its
   #    full reason live in `src/grove.provision/2.shell/2.7.aliases/ductwork.sh`, sourced above via ~/.bash_aliases
   ####################################################################
-  ssh -o BatchMode=yes "$GROVE" "cat \"$REPLY_OUT\"" 2>/dev/null | __duct_strip_escapes
-  REPLY_CODE="$(ssh -o BatchMode=yes "$GROVE" "cat \"$REPLY_RC\"" 2>/dev/null | tr -d '[:space:]')"
-  ssh -o BatchMode=yes "$GROVE" "rm -f \"$REPLY_OUT\" \"$REPLY_RC\"" 2>/dev/null
+  ssh -n -o BatchMode=yes "$GROVE" "cat \"$REPLY_OUT\"" 2>/dev/null | __duct_strip_escapes
+  REPLY_CODE="$(ssh -n -o BatchMode=yes "$GROVE" "cat \"$REPLY_RC\"" 2>/dev/null | tr -d '[:space:]')"
+  ssh -n -o BatchMode=yes "$GROVE" "rm -f \"$REPLY_OUT\" \"$REPLY_RC\"" 2>/dev/null
 
   # ⚠️ an unreadable rc is NOT a pass. the rc file existed a moment ago, so an
   #    empty read here means the file went away under us — report the break

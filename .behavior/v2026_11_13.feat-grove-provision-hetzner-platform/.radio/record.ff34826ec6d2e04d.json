@@ -1,0 +1,19 @@
+{
+  "key": "ff34826ec6d2e04d",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet"
+  },
+  "exid": null,
+  "title": "fix(run.jit): node 26 refuses --experimental-transform-types, so rhx dies on lts",
+  "description": "## .what\n\n`rhachet/bin/run.jit` (rhachet@1.51.0) launches node with `--experimental-transform-types`. node 26 removed that flag, so every `rhx` call on a node-26 box dies before it starts:\n\n```\nnode: bad option: --experimental-transform-types\n```\n\n## .measured\n\n- 2026-11-14, a fresh grove whose default node followed `lts-latest` to v26.13.1\n- same install, node v22.21.0: `rhx keyrack --help` answers\n- node v26.13.1: the line above, exit 9\n\n## .why it matters\n\nlts-latest is v26 now, so any box provisioned from today with a default lts node has no `rhx` that runs: no keyrack, no rack, no skills.\n\n## .the shape of the fix\n\nchoose the flag per node major in `run.jit`: type strip is stable on node 26, so the flag can drop there and stay for older majors.\n\n## .stopgap downstream\n\ndev-env-setup pins the box default node to its `.nvmrc` (22.21.0) until a release lands.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": null,
+  "heldSeq": 9,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "749"
+}

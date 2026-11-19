@@ -341,6 +341,10 @@ source "$HERE/grove.web.sh"
 source "$HERE/grove.env.sh"
 source "$HERE/grove.for.sh"
 
+# the box's own aws identity, read per platform — shared by `5.6.aws` and the
+# `aws.reach.*` skills, so one rule decides which endpoint every body names
+source "$HERE/grove.aws.sh"
+
 grove_env_derive --for "$FOR" || exit 2
 FOR="${FOR:-$(grove_for_detect)}"
 

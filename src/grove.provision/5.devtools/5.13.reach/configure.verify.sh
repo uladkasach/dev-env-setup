@@ -13,13 +13,55 @@
 #   - it declines where the reach cannot apply, and FAILS where it should hold
 ######################################################################
 
+# .what = the ✋ for a named profile that does NOT answer, sorted by aws's own words
+# .why  = three causes wear near-identical text and want different repairs:
+#   - the role trusts this box and refuses what its roles-anywhere session CARRIES
+#     (a source identity, session tags) ⇒ name every action owed AT ONCE, the same
+#     set `aws.reach.set` names (`grove_aws_trust_refused`, `grove_aws_trust_actions_owed`).
+#     its text holds "AccessDenied" and "AssumeRole" too, so it is sorted FIRST
+#   - a bare AssumeRole denial ⇒ the ORG question first, then the infra ask
+#     (`rule.require.a-grove-reaches-its-own-org-only`, m10). no id is printed
+#   - any other ⇒ a named profile with no live body
+# .note = prints to stderr; the caller tallies the failure
+grove_provision_5_13_reach_refusal_say() {
+  local org="$1" env="$2" named="$3" said="$4" role="$5" refused
+  if refused="$(grove_aws_trust_refused "$said")"; then
+    echo "   ✋ ${org}.${env} — the role TRUSTS this box, and refuses what its session carries ($refused)" >&2
+    echo "      ⇒ an IAM Roles Anywhere session carries a source identity and session tags," >&2
+    echo "        and a chained AssumeRole passes both on" >&2
+    echo "      ⇒ an ask of ${org}/infrastructure: the trust statement on '${role}'" >&2
+    echo "        for this box's principal must allow all three at once:" >&2
+    echo "        $(grove_aws_trust_actions_owed)" >&2
+    echo "      ⇒ read the refusal in full, on the box (it names the ids):" >&2
+    echo "        aws sts get-caller-identity --profile ${named}" >&2
+    return 0
+  fi
+
+  if [[ "$said" == *AccessDenied* && "$said" == *AssumeRole* ]]; then
+    echo "   ✋ ${org}.${env} — the hop is declared, and this box is REFUSED it" >&2
+    echo "      ⇒ a re-apply of this bundle refuses identically" >&2
+    grove_provision_5_13_reach_denied_causes_say "$org" "$role"
+    echo "      ⇒ read the refusal in full, on the box (it names the ids):" >&2
+    echo "        aws sts get-caller-identity --profile ${named}" >&2
+    return 0
+  fi
+
+  echo "   ✋ the rack names '${named}' for ${org}.${env}, and it does not answer" >&2
+  echo "      ⇒ a named profile with no live body is a profile aws cannot find" >&2
+  echo "        — the half-applied pair aws.reach.set exists to prevent" >&2
+  echo "      ⇒ read the refusal in full:" >&2
+  echo "        aws sts get-caller-identity --profile ${named}" >&2
+  echo "      fix: rhx grove.provision --what 5.13.reach --mode apply" >&2
+}
+
 grove_provision_5_13_reach_configure_verify() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "account reach"; return 0; }
   local owner
   owner="$(grove_provision_5_13_reach_owner)"
 
   if ! aws configure export-credentials --profile ambient >/dev/null 2>&1; then
-    echo "   • declined — no ambient identity here, so no reach to prove"
-    return 0
+    grove_env_ambient_absent_says "account reach"
+    return
   fi
 
   if ! command -v rhx >/dev/null 2>&1; then
@@ -39,19 +81,12 @@ grove_provision_5_13_reach_configure_verify() {
   gitroot="$(grove_provision_5_12_rack_gitroot)"
   srcname="$(grove_provision_5_13_reach_srcorg)/$(grove_provision_5_13_reach_srcname)"
 
-  # ⚠️ parse the row the SAME way the upsert does — one table, two readers, free
-  #    to drift. a `${pair##*:}` here reads the ROLE key as the account key, so
-  #    every env falls to the weaker 🌙 "no clone declares the account"
-  local failed=0 pair rest org env reader akey rkey account named seen declsrc
+  # ⚠️ the row is parsed by the ONE reader the upsert asks too. a hand parse here
+  #    once read the ROLE key as the account key, so every env fell to the weaker
+  #    🌙 "no clone declares the account"
+  local failed=0 pair org env reader akey rkey account named seen declsrc
   for pair in $(grove_provision_5_13_reach_envs); do
-    org="${pair%%:*}"
-    rest="${pair#*:}"
-    env="${rest%%:*}"
-    rest="${rest#*:}"
-    reader="${rest%%:*}"
-    rest="${rest#*:}"
-    akey="${rest%%:*}"
-    rkey="${rest##*:}"
+    IFS='|' read -r org env reader akey rkey <<< "$(grove_provision_5_13_reach_row_fields "$pair")"
     declsrc="$(grove_provision_5_13_reach_declsrc "$reader")" || declsrc="(unknown reader '${reader}')"
 
     # 🛑 declare THIS ROW's org before its reads — `5.12.rack` runs first and its
@@ -102,37 +137,8 @@ grove_provision_5_13_reach_configure_verify() {
     seen="$(printf '%s\n' "$said" | grep -oE '^[0-9]{12}$' | head -1)"
 
     if [[ -z "$seen" ]]; then
-      # 🛑 THREE causes read identically here, and want OPPOSITE fixes. the two
-      #    AssumeRole denials are sorted only by the ORG, which this code cannot
-      #    ask — so the fix-text puts "should this org reach here AT ALL?" FIRST,
-      #    before any infra ask. no id is printed for either cause
-      #    (`rule.require.a-grove-reaches-its-own-org-only`, m10)
-      if [[ "$said" == *AccessDenied* && "$said" == *AssumeRole* ]]; then
-        echo "   ✋ ${org}.${env} — the hop is declared, and this box is REFUSED it" >&2
-        echo "      ⇒ a re-apply of this bundle refuses identically. TWO causes wear" >&2
-        echo "        this one message, and they want OPPOSITE repairs:" >&2
-        echo "      1. does a '${org}' row belong on a grove of THIS org at all?" >&2
-        echo "         no  ⇒ 🔴 OURS. delete the row; no grant is owed, and none may" >&2
-        echo "               be sought (rule.require.a-grove-reaches-its-own-org-only)" >&2
-        echo "      2. only if yes — the role EXISTS and this box sits outside its" >&2
-        echo "         trust policy ⇒ an infra ask. the grant owed: trust this box's" >&2
-        echo "         CAMP role as a principal on" >&2
-        echo "         '$(grove_provision_5_13_reach_role "$reader" "$rkey")', beside the camp role already there" >&2
-        echo "      ⇒ ask 1 FIRST. its answer is the ORG's, and the refusal says no" >&2
-        echo "        word about it — an ask filed on a no buys a standing hop into" >&2
-        echo "        another org's accounts, to silence a check that was right" >&2
-        echo "      ⇒ read the refusal in full, on the box (it names the ids):" >&2
-        echo "        aws sts get-caller-identity --profile ${named}" >&2
-        failed=1
-        continue
-      fi
-
-      echo "   ✋ the rack names '${named}' for ${org}.${env}, and it does not answer" >&2
-      echo "      ⇒ a named profile with no live body is a profile aws cannot find" >&2
-      echo "        — the half-applied pair aws.reach.set exists to prevent" >&2
-      echo "      ⇒ read the refusal in full:" >&2
-      echo "        aws sts get-caller-identity --profile ${named}" >&2
-      echo "      fix: rhx grove.provision --what 5.13.reach --mode apply" >&2
+      grove_provision_5_13_reach_refusal_say "$org" "$env" "$named" "$said" \
+        "$(grove_provision_5_13_reach_role "$reader" "$rkey")"
       failed=1
       continue
     fi

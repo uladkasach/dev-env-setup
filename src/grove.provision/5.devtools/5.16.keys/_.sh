@@ -37,30 +37,13 @@ grove_provision_5_16_keys_required() {
 
   case "$org" in
     ahbode)
-      printf 'ahbode:prep:FIREWORKS_API_KEY ahbode:test:FIREWORKS_API_KEY'
-      printf ' ahbode:prep:OPENROUTER_API_KEY ahbode:test:OPENROUTER_API_KEY'
-
-      # ⚠️ the ehmpathy rows ride AHBODE's opt-in, exactly as `5.13.reach`'s
-      #   do — ehmpathy is generic infra, and ahbode opted into it. no other
-      #   org inherits them
-      printf ' ehmpathy:prep:FIREWORKS_API_KEY ehmpathy:test:FIREWORKS_API_KEY'
-      printf ' ehmpathy:prep:OPENROUTER_API_KEY ehmpathy:test:OPENROUTER_API_KEY'
-
-      # the bhrain root manifest's vendor set, at env.test — asked for 2026-09-07
-      printf ' ehmpathy:test:OPENAI_API_KEY ehmpathy:test:ANTHROPIC_API_KEY'
-      printf ' ehmpathy:test:TAVILY_API_KEY ehmpathy:test:XAI_API_KEY'
-
-      # the radio's robot identity — `radio.task.pull` pins env=prep and this key,
-      # and takes the ORG from the checkout (`getGithubTokenByAuthArg.js:40-49`)
-      #
-      # 🛑 these two cannot ride `git.grove.auth.keys.set`: `keyrack get` DELIVERS the
-      #   minted token and never the stored blob, so a get→set pipe seals a corpse
-      #   that reads green forever (`ehmpathy/rhachet#522`)
-      # 🛑 the remedy is a VAULT, never a terminal on the box — `aws.params` holds
-      #   this mech, so it is written ONCE on a laptop and every grove mints its own
-      #   token with no prompt (`rule.require.one-command-provision`)
-      printf ' ahbode:prep:EHMPATH_BEAVER_GITHUB_TOKEN'
-      printf ' ehmpathy:prep:EHMPATH_BEAVER_GITHUB_TOKEN'
+      # the route review's brain: every `.guard` peer review reads it at env.prep,
+      #   scoped to the checkout's org — an operation, never a test
+      printf 'ahbode:prep:OPENROUTER_API_KEY'
+      # the ehmpathy row rides ahbode's opt-in, as `5.13.reach`'s rows do
+      printf ' ehmpathy:prep:OPENROUTER_API_KEY'
+      # 🛑 NOT rows: live-brain TEST keys (BRAIN_LIVE=true only) and the radio's
+      #   robot token (the fleet writes `--auth as-human`) — a human sets those per run
       ;;
     aether)
       # asked for 2026-10-04 — OPENROUTER alone; aether's other vendor keys are not rows

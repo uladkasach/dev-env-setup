@@ -35,4 +35,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# 🛑 the alias must dial the registry's seat before the duct is read
+#   (`grove_ssh_seat_ready`, in git.grove.ssh.operations.sh)
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.ssh.operations.sh"
+[[ -n "${ARGS[0]:-}" && "${ARGS[0]}" != -* ]] && { grove_ssh_seat_ready "${ARGS[0]}" || exit $?; }
+
 git_alias_grove read "${ARGS[@]}"

@@ -21,7 +21,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=/dev/null
 source "$HERE/src/grove.env.sh"
 
-fixture="$(mktemp -d)"
+fixture="$(mktemp -d)" || { echo "💥 MalfunctionError: could not make a temp dir" >&2; exit 1; }
 trap 'rm -rf "$fixture"' EXIT
 grove_env_platform_file() { printf '%s' "$fixture/platform"; }
 

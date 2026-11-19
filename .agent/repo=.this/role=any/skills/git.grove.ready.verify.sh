@@ -167,8 +167,10 @@ halt() {
   echo ""
   echo "  why: $why"
   echo "  fix:"
+  # every line of every arg sits at the fix indent, and an empty separator stays
+  #   truly empty, with no spaces after the line's end
   local line
-  for line in "$@"; do echo "    $line"; done
+  for line in "$@"; do printf '%s\n' "$line" | sed -E 's/^/    /; s/^[[:space:]]+$//'; done
   echo ""
   echo "  then climb again from here —"
   echo "    rhx git.grove.ready.verify $GROVE --from $rung"
@@ -199,6 +201,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/git.grove.operations.sh"
 #    (`term=keyrack.gitroot`)
 # shellcheck source=/dev/null
 source "$(dirname "${BASH_SOURCE[0]}")/git.grove.rack.operations.sh"
+# the reach readers: is the registry's host a tailnet name or a tunnel end
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.ssh.operations.sh"
 
 ######################################################################
 # rung 1 — registry
@@ -259,11 +264,18 @@ if [[ -f "$ENTRY" ]]; then
   ACCOUNT=$(jq -r '.account // ""' "$ENTRY")
   ENV=$(jq -r '.env // "camp"' "$ENTRY")
   GROVE_ORG_DECLARED=$(jq -r '.org // ""' "$ENTRY")
-  for V in EXID ACCOUNT ENV GROVE_ORG_DECLARED; do
+  REG_HOST=$(jq -r '.host // ""' "$ENTRY")
+  for V in EXID ACCOUNT ENV GROVE_ORG_DECLARED REG_HOST; do
     [[ "${!V}" == "null" ]] && declare "$V="
   done
   [[ -n "$ENV" ]] || ENV="camp"
 fi
+
+# a TAILNET grove (a hetzner box) is dialed at its own name, with no ssm tunnel.
+#   it sits in no aws account, so no account is owed to the entry and no aws
+#   profile to this machine — its wake is one ssh round trip (`git.grove.wake`)
+TAILNET=0
+grove_ssh_host_is_tailnet "${REG_HOST:-}" && TAILNET=1
 
 if _in_range 1; then
   echo "      ├─ 1. registry"
@@ -292,7 +304,9 @@ if _in_range 1; then
   #    ⇒ the halt below is worded for what it measures: an entry that names no
   #      account cannot be checked against one, so the ladder stops before rung
   #      2 would fail on a cause rung 1 could already see.
-  if [[ -z "$ACCOUNT" ]]; then
+  if [[ "$TAILNET" -eq 1 ]]; then
+    echo "      │     ⇒ a tailnet grove ($REG_HOST): no aws account is owed"
+  elif [[ -z "$ACCOUNT" ]]; then
     halt 1 registry \
       "the entry names no account, so a wake cannot assert it reached the right one" \
       "rhx git.grove.set $GROVE --exid $EXID --env $ENV --account <id>"
@@ -348,7 +362,7 @@ if _in_range 2; then
   echo "      ├─ 2. reach"
 
   # the LOCAL subject — does this machine hold a profile for that box's org?
-  if ! _rack_profile "$ENV" "$GROVE_ORG_DECLARED" >/dev/null; then
+  if [[ "$TAILNET" -eq 0 ]] && ! _rack_profile "$ENV" "$GROVE_ORG_DECLARED" >/dev/null; then
     halt 2 reach \
       "THIS MACHINE holds no aws profile for env=$ENV${GROVE_ORG_DECLARED:+ org=$GROVE_ORG_DECLARED} — the box is unjudged, never unwell" \
       "rhx git.grove.rack.unlock${GROVE_ORG_DECLARED:+ --org $GROVE_ORG_DECLARED} --env $ENV --key AWS_PROFILE" \
@@ -359,7 +373,32 @@ if _in_range 2; then
   fi
 
   # the REMOTE subject — now a failure here really is about the box
-  if ! rhx git.grove.wake "$GROVE" >"$LOGDIR"/wake.log 2>&1; then
+  # ⚠️ a tailnet climb asks no rack and has no hibernate, so its halt names
+  #    neither: its one road is an ssh round trip over the tailnet
+  # rc 2 = the box ANSWERED and the wake refused (a key absent from the seat): no
+  #   silence, so the halt names the refusal and never the tailnet
+  _wake_rc=0
+  [[ "$TAILNET" -eq 1 ]] && { rhx git.grove.wake "$GROVE" >"$LOGDIR"/wake.log 2>&1 || _wake_rc=$?; }
+  if [[ "$_wake_rc" -eq 2 ]]; then
+    halt 2 reach \
+      "the grove answered over the tailnet and the wake refused — its own words name the fix" \
+      "tail -30 $LOGDIR/wake.log" \
+      "" \
+      "  a refused key is placed from a laptop that already reaches the ground seat —" \
+      "rhx git.grove.auth.ssh.set ${GROVE%.ground} --identity <this laptop's key>.pub --mode plan"
+  fi
+  if [[ "$_wake_rc" -ne 0 ]]; then
+    halt 2 reach \
+      "the grove did not answer over ssh on the tailnet ($REG_HOST) — so this is the box, or the tailnet between" \
+      "rhx git.grove.wake $GROVE" \
+      "" \
+      "  a hetzner box is always on, so a miss is no hibernate: either this" \
+      "  laptop is off the tailnet, or the box's sshd or tailscale is down." \
+      "" \
+      "  read what it said —" \
+      "tail -30 $LOGDIR/wake.log"
+  fi
+  if [[ "$TAILNET" -eq 0 ]] && ! rhx git.grove.wake "$GROVE" >"$LOGDIR"/wake.log 2>&1; then
     halt 2 reach \
       "the grove did not wake, and the rack DID hand over a profile — so this is the box" \
       "rhx git.grove.wake $GROVE" \
@@ -371,7 +410,10 @@ if _in_range 2; then
       "  read what it said —" \
       "tail -30 $LOGDIR/wake.log"
   fi
-  echo "      │  └─ ✔ awake, and the account assertion passed"
+  # the wake proves a different fact per reach: an ec2 wake asserts the account
+  AWAKE_PROOF="awake, and the account assertion passed"
+  [[ "$TAILNET" -eq 1 ]] && AWAKE_PROOF="awake — answers over ssh on the tailnet"
+  echo "      │  └─ ✔ $AWAKE_PROOF"
 fi
 
 ######################################################################
@@ -560,16 +602,28 @@ if _in_range 3; then
   echo "      ├─ 3. duct"
   if ! _ask_bare 'command -v tmux' >"$LOGDIR/duct.log" 2>&1; then
     if _ask_bare 'true' >/dev/null 2>&1; then
+      # ⚠️ the DRIVER by path, and a carve-out under
+      #    `rule.forbid.the-driver-by-path`: a `--bare` send is a
+      #    non-interactive ssh, which reads no `.zshrc`, so `rhx` is not on
+      #    PATH on the far side. every OTHER fix-text in this file names
+      #    `rhx grove.provision`, because those ride the duct's interactive zsh
+      # 🛑 the comment sits ABOVE the call: a comment between `\` lines ends the
+      #    command there, and the fix lines below it would run as commands
       halt 3 duct \
         "the box answers a bare ssh but carries no tmux — so it can hold no duct, which is the state of a box before 2.8.tmux lands" \
-        # ⚠️ the DRIVER by path, and a carve-out under
-        #    `rule.forbid.the-driver-by-path`: a `--bare` send is a
-        #    non-interactive ssh, which reads no `.zshrc`, so `rhx` is not on
-        #    PATH on the far side. every OTHER fix-text in this file names
-        #    `rhx grove.provision`, because those ride the duct's interactive zsh
         "rhx git.grove.send $GROVE --bare --why 'no tmux yet' \\" \
         "  --what 'bash ~/git/more/dev-env-setup/src/grove.provision._.sh --what 2.8.tmux --mode apply'"
     fi
+    # a tailnet box has no tunnel to bind and no prior-key attestation for replace:
+    #   its silence is a key not yet trusted, or a key this laptop does not hold
+    [[ "${TAILNET:-0}" == 1 ]] && halt 3 duct \
+      "the box is awake per rung 2 and answers no ssh session — on the tailnet that is a host key not yet trusted (a first contact, or a REBUILT box), or a seat that refuses this laptop's key" \
+      "rhx git.grove.trust.gen --grove $GROVE --mode plan" \
+      "  a FIRST contact: rhx git.grove.provision boot $GROVE --mode apply --trust tofu" \
+      "  a REBUILT box: ask infra for its host fingerprints; no flag settles a changed key here" \
+      "" \
+      "  read what the ride said — it names which it was —" \
+      "tail -20 $LOGDIR/duct.log"
     halt 3 duct \
       "the box is awake per rung 2 and answers no ssh at all — either the endpoint presents an identity we do not trust (a REBUILT box does), or the tunnel bound its port and relays no session" \
       "rhx git.grove.trust.gen --grove $GROVE --mode apply --on-changed replace" \

@@ -174,6 +174,25 @@ if [[ -n "$GROVE" ]]; then
     ORG=$(jq -r '.org // ""' "$REGISTRY")
     [[ "$ORG" == "null" ]] && ORG=""
   fi
+
+  # 🛑 a tailnet grove has naught this skill stops: no instance to hibernate, and no
+  #    ssm tunnel to close. every step below assumes both — its port read 22, and the
+  #    duct close would `pkill` a plugin pattern any ec2 duct's argv can match. so the
+  #    reach is read by the ONE reader wake, ready.verify, and trust.gen share
+  #    (`grove_ssh_host_is_tailnet`), and the skill refuses before any of it runs
+  # shellcheck source=/dev/null
+  source "$(dirname "${BASH_SOURCE[0]}")/git.grove.ssh.operations.sh"
+  STOP_HOST=$(jq -r '.host // "localhost"' "$REGISTRY"); [[ "$STOP_HOST" == "null" ]] && STOP_HOST="localhost"
+  if grove_ssh_host_is_tailnet "$STOP_HOST"; then
+    echo "✋ ConstraintError: grove '$GROVE' is reached over the tailnet ($STOP_HOST) — there is naught here to stop" >&2
+    echo "   ⇒ no instance to hibernate: the box is always on, and its power is ${ORG:+$ORG/}infrastructure's" >&2
+    echo "   ⇒ no ssm tunnel to close: every duct dials the box's own name over ssh" >&2
+    echo "   fix: none owed. a duct pane closes with its tmux session; the box stays up by design" >&2
+    exit 2
+  fi
+
+  # 🛑 the alias must dial the registry's seat before any step reaches the box
+  grove_ssh_seat_ready "$GROVE" || exit $?
 fi
 [[ -z "$ENV" ]] && ENV="camp"
 

@@ -69,9 +69,17 @@ DECLINED=0
 # ⚠️ a decline here, rather than a guess. a play that cannot learn which
 #    contract applies cannot grade a seat against one
 ######################################################################
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-if [[ ! -r "$HERE/src/grove.env.sh" ]]; then
-  echo "   ✋ no src/grove.env.sh at $HERE — the tier cannot be read" >&2
+# 🛑 find the checkout by a FILE IT HOLDS, never by how the play arrived
+#   - `git.grove.send --reply --play` lands this file ALONE, under
+#     `~/.local/state/grove.play/`, so its own `../..` holds no `src/`
+#   - ⇒ the boot's checkout (`git.grove.provision.boot`, `INTO`) is the fallback
+HERE=""
+for cand in "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)" "$HOME/git/more/dev-env-setup"; do
+  [[ -r "$cand/src/grove.env.sh" ]] && { HERE="$cand"; break; }
+done
+if [[ -z "$HERE" ]]; then
+  echo "   ✋ no src/grove.env.sh beside this play nor at ~/git/more/dev-env-setup" >&2
+  echo "      ⇒ the tier cannot be read, so no contract can be graded" >&2
   exit 2
 fi
 # shellcheck source=/dev/null

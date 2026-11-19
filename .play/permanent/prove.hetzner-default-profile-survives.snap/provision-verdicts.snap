@@ -1,0 +1,104 @@
+## provision.verify · cli absent · plugin present
+   ✋ ConstraintError: the aws cli is absent from PATH
+      ⇒ no aws identity can answer on this box, and from a laptop no ec2
+        grove can be woken — git.grove.wake opens its tunnel through
+        'aws ssm start-session' (a tailnet grove's wake needs no aws)
+      fix: rhx grove.provision --what 5.6.aws --mode apply
+   • the ssm session-manager plugin is present ✔
+rc=1
+
+## provision.verify · cli adrift · plugin present
+   ✋ ConstraintError: aws is v2, and NOT at the version this repo declares
+      ⇒ two boxes then run different cli code from one unchanged
+        line — the deterministic clause of one-command provision
+      ⇒ a command -v guard cannot see a version at all, so a
+        presence check reports this state nowhere
+      read why: aws --version
+      fix: rhx grove.provision --what 5.6.aws --mode apply
+           its upsert re-runs the installer with --update
+   • the ssm session-manager plugin is present ✔
+rc=1
+
+## provision.verify · cli v1 · plugin present
+   ✋ ConstraintError: the aws on PATH is NOT v2
+      ⇒ debian's awscli package is v1, which answers command -v
+        and then fails every v2-only call with an opaque arg error
+      ⇒ a presence-check guard counts it done and skips, so this
+        line would name a re-apply that could never clear it
+      read why: aws --version ; type -a aws
+      fix: rhx grove.provision --what 5.6.aws --mode apply
+           its upsert installs v2 over it, and says so when a v1
+           earlier on PATH still shadows the result
+   • the ssm session-manager plugin is present ✔
+rc=1
+
+## provision.verify · cli whole · plugin absent
+   • aws cli is v2 at the declared version ✔
+   ✋ ConstraintError: the ssm session-manager plugin is absent
+      ⇒ 'aws ssm start-session' fails with 'SessionManagerPlugin is
+        not found' — the cli alone cannot open a session
+      fix: rhx grove.provision --what 5.6.aws --mode apply
+rc=1
+
+## provision.verify · cli whole · plugin present
+   • aws cli is v2 at the declared version ✔
+   • the ssm session-manager plugin is present ✔
+rc=0
+
+## provision.upsert · the fetch of *.zip fails
+   💥 MalfunctionError: could not fetch the aws cli installer
+      ⇒ with no aws cli, no ec2 grove can be woken — git.grove.wake
+        opens its tunnel through 'aws ssm start-session' (a tailnet grove's needs no aws)
+rc=1
+
+## provision.upsert · the fetch of *.zip.sig fails
+   💥 MalfunctionError: could not fetch the aws cli installer's signature
+      ⇒ the zip is discarded UNOPENED. an unverifiable installer
+        would run as root, having proven not one fact about its bytes
+rc=1
+
+## provision.upsert · the fetch of *session-manager-plugin.deb fails
+   • aws cli already at the declared version; skipped (whole)
+   💥 MalfunctionError: could not install the ssm plugin from https://s3.amazonaws.com/session-manager-downloads/plugin/1.2.835.0/ubuntu_64bit/session-manager-plugin.deb
+      ⇒ 'aws ssm start-session' then fails with 'SessionManagerPlugin
+        is not found', so no grove tunnel can open
+rc=1
+
+## provision.upsert · the fetch of *session-manager-plugin.deb.sig fails
+   • aws cli already at the declared version; skipped (whole)
+   💥 MalfunctionError: could not fetch the ssm plugin's signature
+      ⇒ the .deb is discarded UNINSTALLED. a .deb's maintainer
+        procedures run as ROOT, so an unverified package is not a
+        lesser install — it is arbitrary root code
+rc=1
+
+## provision.upsert · the extract fails
+   • aws cli 2.36.23 verified against aws's signer key ✔
+   💥 MalfunctionError: could not extract the aws cli installer
+      ⇒ it said: unzip: cannot find or open the zip
+      ⇒ unzip may be absent; a fresh ubuntu image ships none
+      fix: sudo apt install unzip, then re-apply — rhx grove.provision --what 5.6.aws --mode apply
+rc=1
+
+## provision.upsert · the installer fails
+   • aws cli 2.36.23 verified against aws's signer key ✔
+   💥 MalfunctionError: the aws cli installer failed, so no aws cli landed
+      ⇒ it said: install: permission denied
+      read why: ls -ld /usr/local/aws-cli /usr/local/bin ; df -h /usr/local
+rc=1
+
+## provision.upsert · the install lands, a v1 shadows it
+   • aws cli 2.36.23 verified against aws's signer key ✔
+   💥 MalfunctionError: the installer ran, and the aws on PATH is still 'v1'
+      ⇒ v2 landed at /usr/local/bin/aws. another aws earlier on PATH
+        shadows it — debian's 'awscli' package (v1) is the usual one
+      read why: type -a aws ; echo "$PATH"
+rc=1
+
+## provision.upsert · apt refuses the plugin package
+   • aws cli already at the declared version; skipped (whole)
+   • ssm plugin 1.2.835.0 verified against aws's release key ✔
+   💥 MalfunctionError: the ssm plugin package would not install
+      ⇒ it said: E: the package is broken
+      read why: sudo apt-get install -f   # apt names a held or broken dependency
+rc=1

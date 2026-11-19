@@ -22,7 +22,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SKILL="$HERE/.agent/repo=.this/role=any/skills/play.run.sh"
 [[ -r "$SKILL" ]] || { echo "✋ ConstraintError: the subject play.run.sh is absent from $HERE" >&2; exit 2; }
 
-fixture="$(mktemp -d)"
+fixture="$(mktemp -d)" || { echo "💥 MalfunctionError: could not make a temp dir" >&2; exit 1; }
 trap 'rm -rf "$fixture"' EXIT
 mkdir -p "$fixture/tmp"
 

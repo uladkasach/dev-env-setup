@@ -14,8 +14,8 @@ always:
       - briefs/evidence/rule.require.solve-at-cause.md
       # a static check is not proof; an apply on a grove is
       - briefs/grove/provision/rule.require.prove-changes-on-a-grove.md
-      # a write to aws.params off ec2 breaks the box — the gate is the platform tag
-      - briefs/creds/rule.forbid.aws-params-off-ec2.md
+      # every camp grove carries the camp identity; aws.params off camp breaks the box — the gate is the tier
+      - briefs/creds/rule.require.aws-params-on-camp-groves-only.md
       # a public repo: one leaked identifier is permanent
       - briefs/creds/rule.forbid.dox-in-public-repo.md
       # a claim i wrote down is not evidence for itself
