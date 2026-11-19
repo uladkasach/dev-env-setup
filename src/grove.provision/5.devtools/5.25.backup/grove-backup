@@ -3,16 +3,16 @@
 # .what = back up every unit on this grove to its bucket, then write the status
 #
 # .who runs it
-#   - `grove-backup.service`, as root, each hour (`grove-backup.timer`)
-#   - a human, by hand, as root: `sudo systemctl start grove-backup.service`
+#   - `grove-backup.service`, as camper, each hour (`grove-backup.timer`)
+#   - a human, by hand, from ground: `sudo systemctl start grove-backup.service`
 #   - a play, which SOURCES it and calls `grove_backup_run` against fixtures
 #
 # .the run
 #   1. one lock per box: a second run while one is active exits, never a double put
 #   2. the reach, in its written order (grove name → bucket name → credential);
 #      the first that fails is the cause, and the whole run fails on it
-#   3. the walk: every clone, worktree, and home dir of every seat
-#   4. per unit: tar to a root-only temp file, hash, compare against that unit's
+#   3. the walk: every clone, worktree, and home dir of camper's home
+#   4. per unit: tar to an owner-only temp file, hash, compare against that unit's
 #      LATEST object of any date, put only on change (F8)
 #   5. a unit that fails at run time is retried once, then named; the rest land
 #   6. the status, which every surface renders: ✓ only when every unit landed
@@ -24,7 +24,7 @@
 # guarantee:
 #   - writes only to the bucket, under this grove's own `grove=<slug>/` prefix,
 #     and to its state dir
-#   - reads every home; changes no file in any of them
+#   - reads camper's home; changes no file in it
 #   - exit 0 = every unit landed or was unchanged · 1 = the run failed (status says why)
 ######################################################################
 set -uo pipefail
@@ -40,7 +40,7 @@ grove_backup_unit_once() {
   local kind="$1" user="$2" path="$3" unit="$4" tmp="$5" index="$6"
   local out="$tmp/unit.tar.gz" sha latest facts sha_latest rc key
 
-  sha="$(grove_backup_pack "$kind" "$(grove_backup_home_root)/$user" "$path" "$out")" || return 2
+  sha="$(grove_backup_pack "$kind" "$(grove_backup_seat_home)" "$path" "$out")" || return 2
 
   # the latest object of this unit, of ANY date — `date=` sorts as text
   latest="$(awk -F'\t' -v p="grove=$GROVE_BACKUP_GROVE/$unit/date=" 'index($1, p) == 1 { print $1 }' "$index" \
@@ -105,7 +105,7 @@ grove_backup_run() {
   mapfile -t units < <(grove_backup_units_walk)
   total="${#units[@]}"
   if [[ "$total" -eq 0 ]]; then
-    GROVE_BACKUP_CAUSE="no units found under $(grove_backup_home_root)/*"
+    GROVE_BACKUP_CAUSE="no units found under $(grove_backup_seat_home)"
     GROVE_BACKUP_FIX="a run of zero units is never a ✓; read the walk: journalctl -u grove-backup -n 50"
     echo "✗ grove backup · FAILED · $GROVE_BACKUP_CAUSE" >&2
     grove_backup_status_write "$began" failed "$GROVE_BACKUP_CAUSE" "$GROVE_BACKUP_FIX" 0 0 0 "$failures"

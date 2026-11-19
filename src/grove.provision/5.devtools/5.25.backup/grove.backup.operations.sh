@@ -3,7 +3,7 @@
 # .what = the grove backup's shared operations — one library, four callers
 #
 # .who reads it
-#   - the agent, `grove-backup`, run as root by `grove-backup.service`
+#   - the agent, `grove-backup`, run as camper by `grove-backup.service`
 #   - `rhx grove.backup.get` and `rhx grove.backup.restore`, run by a seat
 #   - the plays that prove the reach order and the round trip
 #
@@ -61,7 +61,7 @@ GROVE_BACKUP_AWS_TIMEOUT_SECS=900
 ######################################################################
 grove_backup_name_file()   { printf '/etc/grove/name'; }
 grove_backup_bucket_file() { printf '/etc/grove/backup.bucket'; }
-grove_backup_home_root()   { printf '/home'; }
+grove_backup_seat_home()   { printf '%s' "$HOME"; }
 grove_backup_state_dir()   { printf '/var/lib/grove-backup'; }
 grove_backup_status_file() { printf '%s/status.json' "$(grove_backup_state_dir)"; }
 grove_backup_now()         { date -u +%s; }
@@ -276,6 +276,21 @@ grove_backup_cause_denied() {
 ######################################################################
 grove_backup_key() { printf 'grove=%s/%s/date=%s.tar.gz' "$1" "$2" "$3"; }
 
+# .what = "1 commit", "3 commits" — a count with its noun, singular at one
+plural() { [[ "$1" -eq 1 ]] && printf '1 %s' "$2" || printf '%s %ss' "$1" "$2"; }
+
+# .what = top-level bucket prefixes on stdin → one grove slug per line
+# .why the bucket holds prefixes that are no grove's (infra keeps a `probe/` one);
+#   read as a grove, each would render a row with no backup and a made-up date
+grove_backup_groves_of_prefixes() {
+  local p
+  while IFS= read -r p; do
+    [[ "$p" == grove=?*/ ]] || continue
+    p="${p#grove=}"
+    printf '%s\n' "${p%/}"
+  done
+}
+
 # the unit id of a key: drop `grove=<slug>/` and `/date=….tar.gz`
 grove_backup_key_unit() {
   local key="${1#grove=*/}"
@@ -322,55 +337,51 @@ grove_backup_worktree_repo() {
 # .what = every unit on this box → "kind<TAB>user<TAB>path<TAB>unit" lines
 #
 # .the walk
-#   /home/<seat>/git/<org>/<repo>             a clone      (its `.git` is a dir)
-#   /home/<seat>/git/<org>/_worktrees/<dir>   a worktree   (its `.git` is a link)
-#   /home/<seat>/<dir>                        a home unit, one per scope dir
-#                                             beside `~/git`
+#   ~/git/<org>/<repo>             a clone      (its `.git` is a dir)
+#   ~/git/<org>/_worktrees/<dir>   a worktree   (its `.git` is a link)
+#   ~/<dir>                        a home unit, one per scope dir beside `~/git`
 #
-# .why every seat under the home root: `ground` and `camper` both hold work,
-#   and a seat with no `~/git` simply adds no unit (inventory b14)
+# .why ONE home, the agent's own: only the camper seat holds work, the scope
+#   `git backup` carries. the key keeps `user=<seat>`, so a restore names it
 ######################################################################
 grove_backup_units_walk() {
-  local root home user org org_name entry name wt dir hd
-  root="$(grove_backup_home_root)"
-  for home in "$root"/*/; do
-    [[ -d "$home" ]] || continue
-    home="${home%/}"
-    user="${home##*/}"
+  local home user org org_name entry name wt dir hd
+  home="$(grove_backup_seat_home)"
+  [[ -d "$home" ]] || return 0
+  user="${home##*/}"
 
-    for dir in "${GROVE_BACKUP_SCOPE_DIRS[@]}"; do
-      hd="${dir#\~/}"
+  for dir in "${GROVE_BACKUP_SCOPE_DIRS[@]}"; do
+    hd="${dir#\~/}"
 
-      # the home dirs beside ~/git: one unit each
-      if [[ "$hd" != git ]]; then
-        [[ -d "$home/$hd" ]] && printf 'home\t%s\t%s\tuser=%s/home=%s\n' "$user" "$home/$hd" "$user" "$hd"
-        continue
-      fi
+    # the home dirs beside ~/git: one unit each
+    if [[ "$hd" != git ]]; then
+      [[ -d "$home/$hd" ]] && printf 'home\t%s\t%s\tuser=%s/home=%s\n' "$user" "$home/$hd" "$user" "$hd"
+      continue
+    fi
 
-      # ~/git: one unit per clone, one per worktree
-      [[ -d "$home/git" ]] || continue
-      for org in "$home/git"/*/; do
-        [[ -d "$org" ]] || continue
-        org="${org%/}"
-        org_name="${org##*/}"
-        for entry in "$org"/*/; do
-          [[ -d "$entry" ]] || continue
-          entry="${entry%/}"
-          name="${entry##*/}"
-          if [[ "$name" == _worktrees ]]; then
-            for wt in "$entry"/*/; do
-              [[ -d "$wt" ]] || continue
-              wt="${wt%/}"
-              [[ -e "$wt/.git" ]] || continue
-              printf 'worktree\t%s\t%s\tuser=%s/org=%s/repo=%s/tree=%s\n' \
-                "$user" "$wt" "$user" "$org_name" "$(grove_backup_worktree_repo "$wt")" "${wt##*/}"
-            done
-            continue
-          fi
-          [[ -d "$entry/.git" ]] || continue
-          printf 'clone\t%s\t%s\tuser=%s/org=%s/repo=%s/tree=%s\n' \
-            "$user" "$entry" "$user" "$org_name" "$name" "$name"
-        done
+    # ~/git: one unit per clone, one per worktree
+    [[ -d "$home/git" ]] || continue
+    for org in "$home/git"/*/; do
+      [[ -d "$org" ]] || continue
+      org="${org%/}"
+      org_name="${org##*/}"
+      for entry in "$org"/*/; do
+        [[ -d "$entry" ]] || continue
+        entry="${entry%/}"
+        name="${entry##*/}"
+        if [[ "$name" == _worktrees ]]; then
+          for wt in "$entry"/*/; do
+            [[ -d "$wt" ]] || continue
+            wt="${wt%/}"
+            [[ -e "$wt/.git" ]] || continue
+            printf 'worktree\t%s\t%s\tuser=%s/org=%s/repo=%s/tree=%s\n' \
+              "$user" "$wt" "$user" "$org_name" "$(grove_backup_worktree_repo "$wt")" "${wt##*/}"
+          done
+          continue
+        fi
+        [[ -d "$entry/.git" ]] || continue
+        printf 'clone\t%s\t%s\tuser=%s/org=%s/repo=%s/tree=%s\n' \
+          "$user" "$entry" "$user" "$org_name" "$name" "$name"
       done
     done
   done
@@ -386,8 +397,8 @@ grove_backup_units_walk() {
 #     deeper down
 #   - `dist` `build` `coverage` `.next`, only where git ignores them
 #
-# .why `git -c safe.directory=*`: the agent is root and the repo is a seat's, so
-#   git refuses the repo as "dubious ownership" without it
+# .why `git -c safe.directory=*`: a clone restored from another box or seat may
+#   carry another owner, and git refuses it as "dubious ownership" without it
 ######################################################################
 grove_backup_pack_excludes() {
   local kind="$1" home="$2" path="$3" ex abs rel base want

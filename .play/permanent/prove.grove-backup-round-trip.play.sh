@@ -54,7 +54,7 @@ BUCKET="$fixture/bucket"
 mkdir -p "$BUCKET" "$fixture/etc" "$fixture/state"
 grove_backup_name_file()   { printf '%s' "$fixture/etc/name"; }
 grove_backup_bucket_file() { printf '%s' "$fixture/etc/bucket"; }
-grove_backup_home_root()   { printf '%s' "$HOME_ROOT"; }
+grove_backup_seat_home()   { printf '%s/%s' "$HOME_ROOT" "$ME"; }
 grove_backup_state_dir()   { printf '%s' "$fixture/state"; }
 
 STUB_CRED=0 STUB_PUT=0
@@ -145,6 +145,8 @@ claim "run 1 · the status line reads ✓" test "$(grove_backup_status_line)" ==
 key_of() { find "$BUCKET" -name '*.tar.gz' -path "*$1/date=*" | head -n 1; }
 claim "key · a clone's tree is its repo" test -n "$(key_of 'user='"$ME"'/org=acme/repo=widget/tree=widget')"
 claim "key · a worktree names its repo from its link" test -n "$(key_of 'repo=widget/tree=widget.feat-x')"
+claim "list · a prefix not shaped grove=<slug>/ is no grove" \
+  test "$(printf 'grove=alpha/\nprobe/\ngrove=/\ngrove=beta/\n' | grove_backup_groves_of_prefixes | paste -sd,)" == "alpha,beta"
 
 # 🛑 each cut claim first proves its object EXISTS: over an absent key, "the
 #   member is not in the tar" is true of an empty list, and the claim passes
@@ -200,8 +202,8 @@ STUB_PUT=3
 claim "reach · a refused put → the verb named" test "$(reach_cause)" == "access denied: s3:PutObject"
 claim "reach · last_ok survives a failed run" test "$(status '.last_ok != null')" == true
 STUB_PUT=0
-HOME_ROOT="$fixture/empty"; mkdir -p "$HOME_ROOT"
-claim "reach · zero units is never ✓" test "$(reach_cause)" == "no units found under $fixture/empty/*"
+HOME_ROOT="$fixture/empty"; mkdir -p "$HOME_ROOT/$ME"
+claim "reach · zero units is never ✓" test "$(reach_cause)" == "no units found under $fixture/empty/$ME"
 HOME_ROOT="$fixture/dead"
 ( grove_backup_run >/dev/null 2>&1 )
 

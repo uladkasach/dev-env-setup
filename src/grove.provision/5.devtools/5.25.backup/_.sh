@@ -9,7 +9,7 @@
 #   - it runs after `5.6.aws`, which installs the cli the agent calls
 #
 # .what infra owes before a run is ✓ (each run names the one it lacks)
-#   - /etc/grove/name, /etc/grove/backup.bucket, and on hetzner /etc/grove/aws.env
+#   - /etc/grove/name and /etc/grove/backup.bucket
 #
 # usage:
 #   rhx grove.provision --what 5.25.backup --mode apply

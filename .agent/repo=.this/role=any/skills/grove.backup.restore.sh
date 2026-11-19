@@ -96,8 +96,6 @@ rows_flush() {
   ROWS=()
 }
 
-# .what = "1 commit", "3 commits" — a count with its noun, singular at one
-plural() { [[ "$1" -eq 1 ]] && printf '1 %s' "$2" || printf '%s %ss' "$1" "$2"; }
 
 constraint() {
   echo "✋ ConstraintError: $1" >&2
