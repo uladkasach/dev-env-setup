@@ -8,18 +8,18 @@ write it under `Host <box>.ground` (or any name other than the bare box name), n
 
 ## .what infra writes today
 
-on the create of `grove-ahbode-hetzner-v20261119`, a block appeared in the laptop's
+on the create of `the rebuilt hetzner grove`, a block appeared in the laptop's
 `~/.ssh/config`:
 
 ```
-Host grove-ahbode-hetzner-v20261119
+Host the rebuilt hetzner grove
   HostName <tailnet-ip>
   Port 22
   User ground
   IdentityFile ~/.ssh/id_ed25519
 ```
 
-the same shape stood for the prior box, `grove-ahbode-hetzner-v20261022`.
+the same shape stood for the prior box, `the first hetzner grove`.
 
 ## .why it is a defect, not a preference
 

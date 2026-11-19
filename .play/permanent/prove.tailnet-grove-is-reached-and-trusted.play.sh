@@ -265,7 +265,7 @@ echo ""
 ######################################################################
 echo "   arm 1 — git.grove.wake, tailnet reach"
 # ANOTHER writer (infra) already laid a block for the camper's name, which
-#   points at GROUND — 📜 2026-11-15, grove-ahbode-hetzner-v20261022
+#   points at GROUND — 📜 2026-11-15, the first hetzner grove
 OWNED="$HOME/.ssh/config.d/grove.conf"
 printf 'Host %s\n  HostName 192.0.2.9\n  User ground\n' "$GROVE" > "$HOME/.ssh/config"
 seat_of() { ssh -G "$1" 2>/dev/null | awk '$1 == "user" { u = $2 } $1 == "hostname" { h = $2 } END { print u "@" h }'; }

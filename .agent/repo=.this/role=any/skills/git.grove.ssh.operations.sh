@@ -8,7 +8,7 @@
 #         (infra lays its own), and ssh obeys the first value it reads. so the
 #         registry declared one seat while the wire reached another, and no
 #         command errored
-#         📜 2026-11-15, grove-ahbode-hetzner-v20261022: infra's bare-name block
+#         📜 2026-11-15, the first hetzner grove: infra's bare-name block
 #            named `ground`, the registry named `camper`, and every camper send
 #            for a week landed on ground
 #
@@ -85,7 +85,7 @@ grove_ssh_platform_findsert() {
 # .what = make a grove seat's alias dial the registry's seat, then prove it —
 #         the ONE call every skill makes before it dials a grove
 #
-# .why  = 📜 2026-11-18, grove-ahbode-hetzner-v20261022: only the wake and the
+# .why  = 📜 2026-11-18, the first hetzner grove: only the wake and the
 #         boot laid aliases, so a seat never woken on this laptop kept whatever
 #         Host block another writer had laid. infra's named `ground`, the registry
 #         named `camper`, and every camper send ran as ground. a check at some

@@ -167,7 +167,7 @@ done
 #         sink then writes a burst, the reader lags, write(2) answers EAGAIN,
 #         and the sink drops the rest:
 #           sed: couldn't write 56 items to stdout: Resource temporarily unavailable
-#         📜 2026-11-18, grove-ahbode-hetzner-v20261022: a whole-tree plan relayed
+#         📜 2026-11-18, the first hetzner grove: a whole-tree plan relayed
 #         ~8KB and stopped mid-word, three times, with the command green on the box
 # .how  = clear the flag on fd 1 (perl-base is essential on debian; no other
 #         tool can call fcntl). a box with no perl keeps the old behavior

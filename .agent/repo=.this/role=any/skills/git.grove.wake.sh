@@ -323,7 +323,7 @@ if grove_ssh_host_is_tailnet "$HOST_NAME"; then
   # 🛑 the alias: the REGISTRY's seat, written where ssh reads it FIRST
   #   - infra lays its own block for a name this repo also dials, and once that
   #     block named another seat, so every send to the camper landed on ground
-  #     (📜 2026-11-15, grove-ahbode-hetzner-v20261022)
+  #     (📜 2026-11-15, the first hetzner grove)
   #   - ⇒ `grove_ssh_alias_set` writes the block into a file this repo owns, read
   #     ahead of every other block; infra's bytes are left as they stand
   # the writer's fault prints nested under this tree's own `└─` line

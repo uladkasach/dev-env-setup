@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
       echo "  rhx git.grove.seat.get <grove>"
       echo ""
       echo "example:"
-      echo "  rhx git.grove.seat.get grove-ahbode-hetzner-v20261119"
+      echo "  rhx git.grove.seat.get <grove>"
       exit 0 ;;
     --repo|--role|--skill) shift 2 ;;
     -*) echo "✋ ConstraintError: unknown arg: $1" >&2; echo "   fix: rhx git.grove.seat.get --help" >&2; exit 2 ;;

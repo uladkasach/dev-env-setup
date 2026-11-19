@@ -3,7 +3,7 @@
 # .what = drive `grove_ssh_seat_ready`, the gate every grove-dial skill passes
 #         first, against each seat shape it must heal or refuse
 #
-# .why  = 📜 2026-11-18, grove-ahbode-hetzner-v20261022: no camper alias was laid
+# .why  = 📜 2026-11-18, the first hetzner grove: no camper alias was laid
 #         where ssh reads first, so infra's Host block (User ground) answered every
 #         "camper" dial. a refusal alone would leave the grove unusable until a
 #         human ran the wake; so a tailnet seat is LAID to the registry on the spot,

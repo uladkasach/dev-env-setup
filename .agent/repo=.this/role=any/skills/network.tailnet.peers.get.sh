@@ -8,7 +8,7 @@
 #         so the name a registry dials answers for the DEAD node and a scan of it
 #         times out. this read names that state in one call, so a reach failure is
 #         sorted into "box down" vs "name moved" before any guess
-#         📜 2026-11-18, grove-ahbode-hetzner-v20261022: a rebuild left the key
+#         📜 2026-11-18, the first hetzner grove: a rebuild left the key
 #         scan at the registry's name silent for 30s
 #
 # usage:

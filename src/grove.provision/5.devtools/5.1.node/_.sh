@@ -53,7 +53,7 @@ grove_node_versions_wanted() {
 # first baseline. never `lts-latest`, which moves: rhachet's `run.jit` passes
 # `--experimental-transform-types`, which node 26 removed, so a box whose
 # default followed lts to v26 had no `rhx` that ran — no keyrack, no rack, no gh
-# token (measured 2026-11-14, grove-ahbode-hetzner-v20261022). the declared
+# token (measured 2026-11-14, the first hetzner grove). the declared
 # version is the one this repo's own toolchain is proven on
 grove_node_version_default() {
   local pinned; pinned="$(grove_node_nvmrc_pin)"

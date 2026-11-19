@@ -162,7 +162,7 @@ grove_provision_5_1_node_provision_upsert() {
     #    multishell dir, so a `corepack` hashed while a node that bundles it was
     #    in use still answers `command -v` after a swap to one that bundles none
     #    — and every call then dies "No such file" (measured 2026-11-14, v22 →
-    #    v26, grove-ahbode-hetzner-v20261022)
+    #    v26, the first hetzner grove)
     hash -r
 
     # `web_corepack`/`web_npm`, BOUNDED — a stall multiplies per node. `corepack

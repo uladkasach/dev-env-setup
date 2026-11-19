@@ -3,7 +3,7 @@
 # .what = drive the grove alias resolver, and `git grove send` through it, against
 #         an ssh that dials another seat than the registry declares
 #
-# .why  = 📜 2026-11-18, grove-ahbode-hetzner-v20261022: the registry named
+# .why  = 📜 2026-11-18, the first hetzner grove: the registry named
 #         `camper`, infra's Host block for the same name named `ground`, and no
 #         camper alias was ever laid where ssh reads first. every "camper" send ran
 #         as ground for days and no command errored. the resolver now reads

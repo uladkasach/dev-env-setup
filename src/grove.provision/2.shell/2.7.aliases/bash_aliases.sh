@@ -3124,7 +3124,7 @@ _git_grove_list() {
 # 🛑 .why the read-back lives HERE, in the resolver every send and read dials through
 #   - a block for the same name in ~/.ssh/config, laid by another writer (infra's),
 #     answers for the alias whenever the owned config.d block is absent
-#   - 📜 2026-11-18, grove-ahbode-hetzner-v20261022: the registry named `camper`,
+#   - 📜 2026-11-18, the first hetzner grove: the registry named `camper`,
 #     infra's block named `ground`, and no camper alias was ever laid, so every
 #     "camper" send ran as ground and no command errored
 #   - the alias writer reads ssh back only when IT writes; a send never writes, so

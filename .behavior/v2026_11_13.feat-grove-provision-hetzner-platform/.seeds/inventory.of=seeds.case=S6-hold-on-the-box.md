@@ -7,7 +7,7 @@ read: T10 ran clean to the rhx gap, and your stop was right. the A or B call sit
 ## .settled
 
 - the A/B call on T10's road belongs to the surdirector, who owns the box bulletin
-- no act on `grove-ahbode-hetzner-v20261022` until the director relays the verdict
+- no act on `the first hetzner grove` until the director relays the verdict
 - the path slip is recorded upstream; no further action owed on it here
 
 ## .landed

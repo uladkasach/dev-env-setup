@@ -4,7 +4,7 @@
 #
 # .why  = `prove.admin-seat-holds-no-credentials` proves the bundles DECLINE on
 #         ground; it reads code paths, never the disk. 📜 2026-11-18,
-#         grove-ahbode-hetzner-v20261022: the bare alias dialed ground for days, so
+#         the first hetzner grove: the bare alias dialed ground for days, so
 #         every camper-aimed apply, gate, and `keys.set` ran there. each bundle
 #         declined as built, and ground still came to hold a keyrack host file, a
 #         svc-chat clone, and a docker test db — none written by a bundle. only a
