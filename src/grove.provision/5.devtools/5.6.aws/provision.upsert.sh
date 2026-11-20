@@ -47,15 +47,15 @@ grove_provision_5_6_aws_provision_upsert() {
     # `--within` is raised — this is the tree's LARGEST fetch at ~60MB
     if ! web_fetch "$awscli_url" \
       --into "$tmp_dir/awscliv2.zip" --within 1800; then
-      echo "   ✋ could not fetch the aws cli installer" >&2
-      echo "      ⇒ with no aws cli, no grove can be woken — git.grove.wake" >&2
-      echo "        opens its tunnel through 'aws ssm start-session'" >&2
+      echo "   💥 MalfunctionError: could not fetch the aws cli installer" >&2
+      echo "      ⇒ with no aws cli, no ec2 grove can be woken — git.grove.wake" >&2
+      echo "        opens its tunnel through 'aws ssm start-session' (a tailnet grove's needs no aws)" >&2
       rm -rf "$tmp_dir"
       return 1
     fi
 
     if ! web_fetch "${awscli_url}.sig" --into "$tmp_dir/awscliv2.sig"; then
-      echo "   ✋ could not fetch the aws cli installer's signature" >&2
+      echo "   💥 MalfunctionError: could not fetch the aws cli installer's signature" >&2
       echo "      ⇒ the zip is discarded UNOPENED. an unverifiable installer" >&2
       echo "        would run as root, having proven not one fact about its bytes" >&2
       rm -rf "$tmp_dir"
@@ -79,9 +79,11 @@ grove_provision_5_6_aws_provision_upsert() {
 
     # extract only AFTER the signature holds — an unverified zip would
     # decide what root runs next (rule.require.verify-binary-downloads)
-    if ! unzip -q "$tmp_dir/awscliv2.zip" -d "$tmp_dir"; then
-      echo "   ✋ could not extract the aws cli installer" >&2
+    if ! bundle.run unzip -q "$tmp_dir/awscliv2.zip" -d "$tmp_dir"; then
+      echo "   💥 MalfunctionError: could not extract the aws cli installer" >&2
+      bundle.said "      " "$BUNDLE_SAID" >&2
       echo "      ⇒ unzip may be absent; a fresh ubuntu image ships none" >&2
+      echo "      fix: sudo apt install unzip, then re-apply — rhx grove.provision --what 5.6.aws --mode apply" >&2
       rm -rf "$tmp_dir"
       return 1
     fi
@@ -91,8 +93,10 @@ grove_provision_5_6_aws_provision_upsert() {
     local install_args=()
     [[ "$cli_state" == absent ]] || install_args+=(--update)
 
-    if ! sudo "$tmp_dir/aws/install" "${install_args[@]}"; then
-      echo "   ✋ the aws cli installer failed" >&2
+    if ! bundle.run sudo "$tmp_dir/aws/install" "${install_args[@]}"; then
+      echo "   💥 MalfunctionError: the aws cli installer failed, so no aws cli landed" >&2
+      bundle.said "      " "$BUNDLE_SAID" >&2
+      echo "      read why: ls -ld /usr/local/aws-cli /usr/local/bin ; df -h /usr/local" >&2
       rm -rf "$tmp_dir"
       return 1
     fi
@@ -105,7 +109,7 @@ grove_provision_5_6_aws_provision_upsert() {
     if [[ "$cli_state" == whole || "$cli_state" == unknown ]]; then
       echo "   • aws cli ${awscli_version} installed ($cli_state)"
     else
-      echo "   ✋ the installer ran, and the aws on PATH is still '$cli_state'" >&2
+      echo "   💥 MalfunctionError: the installer ran, and the aws on PATH is still '$cli_state'" >&2
       echo "      ⇒ v2 landed at /usr/local/bin/aws. another aws earlier on PATH" >&2
       echo "        shadows it — debian's 'awscli' package (v1) is the usual one" >&2
       echo "      read why: type -a aws ; echo \"\$PATH\"" >&2
@@ -133,7 +137,7 @@ grove_provision_5_6_aws_provision_upsert() {
   local tmp_pkg="$tmp_dir/session-manager-plugin.deb"
 
   if ! web_fetch "$url" --into "$tmp_pkg"; then
-    echo "   ✋ could not install the ssm plugin from $url" >&2
+    echo "   💥 MalfunctionError: could not install the ssm plugin from $url" >&2
     echo "      ⇒ 'aws ssm start-session' then fails with 'SessionManagerPlugin" >&2
     echo "        is not found', so no grove tunnel can open" >&2
     rm -rf "$tmp_dir"
@@ -143,7 +147,7 @@ grove_provision_5_6_aws_provision_upsert() {
   # the signature is TIER 2, a DIFFERENT key from the cli's
   # (.refs = gotcha.5-6-aws-pins.demo=tier-evidence)
   if ! web_fetch "${url}.sig" --into "$tmp_dir/plugin.sig"; then
-    echo "   ✋ could not fetch the ssm plugin's signature" >&2
+    echo "   💥 MalfunctionError: could not fetch the ssm plugin's signature" >&2
     echo "      ⇒ the .deb is discarded UNINSTALLED. a .deb's maintainer" >&2
     echo "        procedures run as ROOT, so an unverified package is not a" >&2
     echo "        lesser install — it is arbitrary root code" >&2
@@ -167,11 +171,13 @@ grove_provision_5_6_aws_provision_upsert() {
   # apt may print "Download is performed unsandboxed as root" here —
   # EXPECTED, the cost of the 0700 dir above. do NOT widen it to silence it
   local rc=0
-  pkg_apt apt-get install -y "$tmp_pkg" || rc=$?
+  bundle.run pkg_apt apt-get install -y "$tmp_pkg" || rc=$?
   rm -rf "$tmp_dir"
 
   if (( rc != 0 )); then
-    echo "   ✋ the ssm plugin package would not install (see the error above)" >&2
+    echo "   💥 MalfunctionError: the ssm plugin package would not install" >&2
+    bundle.said "      " "$BUNDLE_SAID" >&2
+    echo "      read why: sudo apt-get install -f   # apt names a held or broken dependency" >&2
     return 1
   fi
 

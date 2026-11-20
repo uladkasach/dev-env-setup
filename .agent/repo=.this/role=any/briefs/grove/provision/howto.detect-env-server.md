@@ -25,15 +25,23 @@ so `$server` decides whether a box gets offered a prompt. get it wrong on a head
 
 ## .the ladder
 
-two platforms, three probes, no fallback. climb it cheapest-first, and stop at the first answer —
+three platforms, four probes, no fallback. climb it cheapest-first, and stop at the first answer —
 the **stop** is load-bear, and it is why a laptop never pays imds's second.
 
 | # | probe | asks | cost | fires on |
 |---|---|---|---|---|
-| 1 | `grove_env_probe_aws_ec2` | dmi vendor ×4 · `systemd-detect-virt` · cloud-init `cloud-id` · xen uuid | free | a grove |
-| 2 | `grove_env_probe_desktop` | `WAYLAND_DISPLAY` · `DISPLAY` · `XDG_SESSION_TYPE` **by value** | free | a laptop at its keyboard |
-| 3 | `grove_env_probe_aws_ec2_imds` | `169.254.169.254`, capped at 1s | **~1s when absent** | an ec2 box whose dmi did not answer |
+| 1 | `grove_env_probe_aws_ec2` | dmi vendor ×4 · `systemd-detect-virt` · cloud-init `cloud-id` · xen uuid | free | an ec2 grove |
+| 2 | `grove_env_probe_hetzner_hetzbot` | `/etc/grove/platform` reads `hetzner.hetzbot` | free (one file) | a hetzner grove |
+| 3 | `grove_env_probe_desktop` | `WAYLAND_DISPLAY` · `DISPLAY` · `XDG_SESSION_TYPE` **by value** | free | a laptop at its keyboard |
+| 4 | `grove_env_probe_aws_ec2_imds` | `169.254.169.254`, capped at 1s | **~1s when absent** | an ec2 box whose dmi did not answer |
 | — | *no probe answered* | — | — | **✋ refuse, exit 2** |
+
+⚠️ a **hetzner** box has no metadata to probe, so rung 2 answers by DECLARATION: the one-line
+file that `git.grove.provision boot` lays from the registry's `--platform`. it yields
+`cloud@hetzner.hetzbot`; the closed set and its reason live in `src/grove.env.sh`.
+- the dmi rung still answers first: it reads hardware, so no file on disk can contradict it
+- a declaration present but UNREADABLE halts the derivation (exit 2) before rung 3 — read as
+  absent, it would let the desktop rung call a hetzner box with a display `local@unix`
 
 ahead of all of it sit the two overrides the contract's parser order already blesses:
 `GROVE_ENV_SERVER` (a full `$tier@$platform`), then `--for local|cloud` (a **tier only** — the
@@ -186,6 +194,8 @@ rhx duct.stop --on 'duct:///envprobe/mechanic'
 | 6 | `GROVE_ENV_SERVER` set | that value; no probe runs | per value | ✔ by inspection |
 | 7 | `--for cloud` on a grove | `cloud@aws.ec2` — tier stated, platform still inferred | CLOSED | ✔ |
 | 8 | `--for local` on an undetectable box | **refuses** — a tier is not a `$server` | — | ✗ reasoned |
+| 9 | a hetzner grove, declaration laid | `cloud@hetzner.hetzbot` via rung 2 | CLOSED | ✔ measured on the hetzner grove (both seats) |
+| 10 | a declaration present but unreadable | **refuses**, exit 2 — no later rung answers | — | ✔ `prove.hetzner-probe-reads-its-declaration` (even beside a display) |
 
 > rows 3–5 and 8 are **reasoned, not measured**, and that is precisely the status this file paid a
 > day to learn to distrust. treat them as claims. if you can produce the box, measure it and
@@ -241,10 +251,11 @@ question at a time.
 
 ## .how to add a platform
 
-the set is closed at two. `aws.lambda` and `cicd` probes were **removed** 2026-07-30 — both
-correct, neither with a machine to run on. an unrun probe is an unproven probe.
+the set is closed at three: `aws.ec2`, `hetzner.hetzbot`, `unix`. `aws.lambda` and `cicd` probes
+were **removed** 2026-07-30 — both correct, neither with a machine to run on. an unrun probe is an
+unproven probe. `hetzner.hetzbot` earned its rung the other way: a real box arrived first.
 
-when a third box arrives:
+when a fourth box arrives:
 
 1. write its probe as a named function in `src/grove.env.sh` — never inline at a call site
 2. **measure it on that box and on one it must stay silent on**

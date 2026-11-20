@@ -52,16 +52,36 @@ grove_provision_5_10_repos_https_is_racked() {
   [[ -n "$helper" && "$helper" == *git-credential-keyrack && -x "$helper" ]]
 }
 
-# .what = which of THREE states is this repo dir in? whole|half|absent
+# .what = which of FOUR states is this repo dir in? whole|half|carried|absent
 # .why a state, never a boolean, so upsert and verify share one fact; reads
 #   `.git/HEAD` never `git rev-parse`, which forks git across hundreds of
 #   repos on every plan (.refs = gotcha.5-10-repos-two-readers.demo=clone-cut-partway)
 #
-# stdout: whole = readable HEAD; half = clone cut partway; absent = never cloned
+# 🛑 `carried` = files and no `.git` — a tree `git.grove.push` laid, which a box
+#   with no github read credential reads its declarations from (`5.13.reach`).
+#   it is not a checkout, and `gh repo clone` refuses a non-empty dir, so the
+#   upsert moves it aside before the clone, exactly as it does a half-clone
+#
+# stdout: whole = readable HEAD; half = clone cut partway; carried = a tree with
+#         no .git; absent = never cloned (or an empty dir)
 grove_provision_5_10_repos_state() {
-  [[ -d "$1/.git" ]]   || { echo absent; return 0; }
+  # ⚠️ a `.git` FILE is a checkout too (a worktree, or `--separate-git-dir`) — never
+  #   a carried tree to move aside. `-e`, as `5.13.reach` reads it, so the two agree
+  [[ -f "$1/.git" ]] && { echo whole; return 0; }
+  if [[ ! -d "$1/.git" ]]; then
+    [[ -d "$1" && -n "$(ls -A "$1" 2>/dev/null)" ]] && { echo carried; return 0; }
+    echo absent; return 0
+  fi
   [[ -r "$1/.git/HEAD" ]] || { echo half; return 0; }
   echo whole
+}
+
+# .what = the dir a half-clone or carried tree is moved aside to, beside its repo
+# .why  = `<repo>.<state>.<stamp>` sorts by time and names why it was set aside;
+#   the fix-text and the verify read that shape, so it is declared once
+grove_provision_5_10_repos_aside_of() {
+  local into="$1" state="$2"
+  printf '%s.%s.%s' "$into" "$state" "$(date +%Y%m%dT%H%M%S)"
 }
 
 grove_provision_5_10_repos() {

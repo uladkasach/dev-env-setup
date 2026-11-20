@@ -27,14 +27,17 @@ grove_provision_5_12_rack_slug_org()   { printf '@all'; }
 grove_provision_5_12_rack_slug_env()   { printf 'camp'; }
 grove_provision_5_12_rack_slug_vault() { printf 'aws.params'; }
 
-# .what = is this box on the ec2 PLATFORM — the only place `aws.params` may be written
-# 🛑 `rule.forbid.aws-params-off-ec2`. a local, house, or hetzner grove has no ec2
-#   identity, so an `aws.params` write there reads ssm as whatever credential the
-#   human's shell holds, rewires the entry, and puts the value back into that account
-# .why the PLATFORM half of the tag, never the tier — `cloud` names who reaches the
-#   box, `aws.ec2` names the fact this depends on, and any tag this repo does not
-#   know yet (a house grove) fails CLOSED
-grove_provision_5_12_rack_platform_is_ec2() { [[ "${GROVE_ENV_SERVER:-}" == *@aws.ec2 ]]; }
+# .what = is this box a CAMP grove — the only place `aws.params` may be read or written
+# 🛑 `rule.require.aws-params-on-camp-groves-only`. a camp grove carries the camp
+#   account's aws identity BY MANDATE, on every platform: ec2 through its instance
+#   role, hetzner through infra's IAM Roles Anywhere signer. `5.6.aws` ASSERTS that
+#   identity first and fails loud where it is absent, so a reader here may rely on it
+#   - a local or house grove has no such identity, so an `aws.params` write there
+#     reads ssm as whatever credential the human's shell holds
+# .why the TIER, never the platform — `cloud` is what a camp grove is; a platform
+#   names only HOW the identity reaches the box. 📜 2026-11-15: an `*@aws.ec2` gate
+#   here declined the fleet github token on a hetzner box whose role read it fine
+grove_provision_5_12_rack_is_camp_grove() { [[ "${GROVE_ENV_SERVER:-}" == cloud@* ]]; }
 
 # .what = the vault this seat's rack names for the github slug — empty if no entry
 # .why a box provisioned before 2026-09-27 (#149) holds an `aws.params` entry off
@@ -70,11 +73,82 @@ grove_provision_5_12_rack_without_aws() {
       "$@"
 }
 
+# .what = retire a STALE `aws.params` github entry from a box that is not a camp grove
+# .why
+#   - until 2026-09-27 (#149) this bundle wrote the entry on EVERY box; the gate
+#     that day stopped new writes and left the old ones in place
+#   - off camp no unlock can read it, and rhachet fails the whole unlock on it
+#   - 🛑 a bare `keyrack del` reaches into the vault, and that vault holds the
+#     fleet's SHARED github token — so it either fails, or deletes it for every
+#     grove (ehmpathy/rhachet#697 asks for a host-only del)
+# .how
+#   1. repoint the entry at `os.secure` with a placeholder — a LOCAL vault
+#   2. del it, which now touches local storage only
+#   - both run with every aws route cut, and the cut is PROVEN before either
+# .when #697 ships a host-only del, step 1 goes and step 2 names `--scope host`
+# .note = the upsert's one caller; it sits here beside `without_aws`, which it needs
+grove_provision_5_12_rack_upsert_heal_stale() {
+  local gitroot="$1" held owner key org env log
+  owner="$(grove_provision_5_12_rack_slug_owner)"
+  key="$(grove_provision_5_12_rack_slug_key)"
+  org="$(grove_provision_5_12_rack_slug_org)"
+  env="$(grove_provision_5_12_rack_slug_env)"
+
+  # reject an unreadable rack — "could not read" is not "no entry"
+  if ! held="$(grove_provision_5_12_rack_slug_vault_held "$gitroot")"; then
+    echo "   ✋ could not read this seat's rack, so a stale ${org}.${env}.${key} is unread" >&2
+    echo "      read why: rhx keyrack list --owner $owner --org $org --env $env" >&2
+    return 1
+  fi
+
+  # no stale entry, no work
+  if [[ "$held" != "aws.params" ]]; then
+    echo "   • no stale aws.params entry for ${org}.${env}.${key} — no work"
+    return 0
+  fi
+
+  # prove the cut BEFORE any write: an identity reachable here could reach the shared token
+  if command -v aws >/dev/null 2>&1 \
+     && grove_provision_5_12_rack_without_aws timeout -k 5 20 \
+          aws sts get-caller-identity >/dev/null 2>&1; then
+    echo "   ✋ an aws identity is reachable with every known route cut, so the heal is REFUSED" >&2
+    echo "      ⇒ the stale ${org}.${env}.${key} entry points at the fleet's shared token," >&2
+    echo "        and a del that reaches it would delete that token for every grove" >&2
+    echo "      read why: rhx aws.whoami" >&2
+    return 1
+  fi
+
+  # repoint at a local vault — the placeholder is piped, never in argv
+  if ! log="$(printf 'placeholder-to-retire-a-stale-entry' \
+        | grove_provision_5_12_rack_without_aws env -C "$gitroot" rhx keyrack set \
+            --owner "$owner" --key "$key" --org "$org" --env "$env" \
+            --vault os.secure --mech PERMANENT_VIA_REPLICA 2>&1)"; then
+    echo "   ✋ could not repoint the stale ${org}.${env}.${key} at os.secure" >&2
+    printf '%s\n' "$log" | sed 's/^/        /' >&2
+    return 1
+  fi
+
+  # del — the entry now names a local vault, so this touches this box only
+  if ! log="$(grove_provision_5_12_rack_without_aws env -C "$gitroot" rhx keyrack del \
+        --owner "$owner" --key "$key" --org "$org" --env "$env" 2>&1)"; then
+    echo "   ✋ repointed, but could not del ${org}.${env}.${key}" >&2
+    echo "      ⇒ it now names os.secure, a LOCAL vault, so a del touches this box only" >&2
+    echo "      ⇒ a rerun will NOT retry it: an os.secure entry may be a human's own" >&2
+    echo "      fix: rhx keyrack del --owner $owner --org $org --env $env --key $key" >&2
+    printf '%s\n' "$log" | sed 's/^/        /' >&2
+    return 1
+  fi
+  echo "   • retired a stale aws.params entry for ${org}.${env}.${key} (the shared token untouched)"
+}
+
 # .what = the aws-profile slug, and the ONE value it ever holds
 # .why
-#   - an ec2 grove answers `5.6.aws`'s `ambient` role over imds. a local, house,
-#     or hetzner grove has no ec2 identity, so this slug declines on it
-#     (`rule.forbid.aws-params-off-ec2`)
+#   - it is gated on whether `ambient` ANSWERS (`aws configure export-credentials
+#     --profile ambient`), never on the platform: an ec2 grove answers over imds,
+#     a hetzner grove over infra's signer on loopback (`src/grove.aws.sh`), and a
+#     laptop declines because it holds no `ambient` at all
+#   - the vault is `os.direct`, which holds a name and is legal on every box;
+#     `rule.require.aws-params-on-camp-groves-only` bounds only the `aws.params` vault
 #   - no secret is stored: `ambient` names an identity, and an instance
 #     role's keys rotate on aws's clock, so a stored copy would go stale
 #   - ONLY `camp`. every other env is a REACH — a hop out of camp into another

@@ -19,6 +19,28 @@ _nvim_verify_say() {
   done
 }
 
+# .what = claim 4, currency: does the file imagemagick READS carry this checkout's fence?
+# .note = never sets a failure — imagemagick is non-fatal here (see claims 4-6 below);
+#   each arm prints one verdict, and the stale arm names the box-wide fix
+grove_provision_4_5_nvim_policy_currency_verify() {
+  local pol_src="$1" pol_dst
+  if ! pol_dst="$(grove_provision_4_5_nvim_policy_path_readable)"; then
+    echo "   🌙 imagemagick names no readable policy file — read why: identify -list policy | grep '^Path:'"
+    return 0
+  fi
+  if [[ ! -r "$pol_src" ]]; then
+    echo "   🌙 this checkout has no imagemagick.policy.xml to compare $pol_dst against ($pol_src)"
+    return 0
+  fi
+  if grove_provision_4_5_nvim_policy_render "$pol_dst" "$pol_src" 2>/dev/null | cmp -s - "$pol_dst"; then
+    echo "   • $pol_dst carries this checkout's imagemagick rules ✔"
+    return 0
+  fi
+  echo "   🌙 $pol_dst lacks this checkout's imagemagick rules (absent or stale fence)"
+  echo "      fix: a box-wide write — on a grove, ground's apply; on a laptop:"
+  echo "        sudo -v && rhx grove.provision --what 4.5.nvim --mode apply"
+}
+
 grove_provision_4_5_nvim_configure_verify() {
   local bundle_dir="$GROVE_SRC/grove.provision/4.terminal/4.5.nvim"
   local src="$bundle_dir/init.lua"
@@ -170,19 +192,8 @@ fix: pin all three off near the top of $src — vim.o.modeline = false / modelin
   #   so a hard-fail verify here would contradict its own upsert; they still PRINT
   # .refs = gotcha.4-5-nvim.demo=configure-verify-measurements, m3-m5
   local pol_src="$bundle_dir/imagemagick.policy.xml"
-  local pol_dst="${XDG_CONFIG_HOME:-$HOME/.config}/ImageMagick/policy.xml"
-  # ── 4. currency
-  if [[ ! -r "$pol_dst" ]]; then
-    echo "   🌙 no imagemagick policy at $pol_dst — the box runs debian's default, which declares no coder rule at all"
-    echo "      fix: rhx grove.provision --what 4.5.nvim --mode apply"
-  elif [[ ! -r "$pol_src" ]]; then
-    echo "   🌙 a policy is installed, but this checkout has no imagemagick.policy.xml to compare it against ($pol_src)"
-  elif cmp -s "$pol_src" "$pol_dst"; then
-    echo "   • the installed imagemagick policy matches this checkout ✔"
-  else
-    echo "   🌙 the installed imagemagick policy DIFFERS from this checkout"
-    echo "      read what differs: diff $pol_src $pol_dst — fix: rhx grove.provision --what 4.5.nvim --mode apply"
-  fi
+  # ── 4. currency — the fence inside the file imagemagick READS matches this checkout
+  grove_provision_4_5_nvim_policy_currency_verify "$pol_src"
   # ── 5-6. effect and cost, asked of the LIVE tool — a grep of policy.xml would green on a path imagemagick never consults
   local im=""
   for c in identify magick convert; do
@@ -212,12 +223,7 @@ fix: pin all three off near the top of $src — vim.o.modeline = false / modelin
   elif printf '%s' "$eps_out" | grep -qi 'no .*delegate\|unable to open'; then
     echo "   🌙 this build cannot reach the PS coder at all — the policy has no subject here; correct to keep, unprovable on this box"
   else
-    local extra
-    if [[ -r "$pol_dst" ]]; then
-      extra="⇒ a policy IS installed at $pol_dst; imagemagick does not consult it — read where it does: $im -list policy | grep '^Path:'"
-    else
-      extra="fix: rhx grove.provision --what 4.5.nvim --mode apply"
-    fi
+    local extra="fix: a box-wide write — on a grove, ground's apply; on a laptop: sudo -v && rhx grove.provision --what 4.5.nvim --mode apply"
     _nvim_verify_say "imagemagick hands a postscript file to ghostscript" \
       "it said: $(printf '%s' "$eps_out" | sed "s|$imwork/||")" \
       "⇒ PS/EPS/PDF/XPS exec \`gs\`; git.grove.pull writes a tree a GROVE named, and image.nvim converts what nvim opens" \

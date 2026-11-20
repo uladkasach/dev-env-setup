@@ -27,6 +27,7 @@
 ######################################################################
 
 grove_provision_5_15_identity_configure_upsert() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "the git identity"; return 0; }
   local email="${GIT_USER_EMAIL:-}"
   local name="${GIT_USER_NAME:-}"
 

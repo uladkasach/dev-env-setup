@@ -26,7 +26,7 @@ set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUNDLE="$HERE/src/grove.provision/5.devtools/5.23.tailscale"
 
-fixture="$(mktemp -d)"
+fixture="$(mktemp -d)" || { echo "💥 MalfunctionError: could not make a temp dir" >&2; exit 1; }
 trap 'rm -rf "$fixture"' EXIT
 
 failed=0

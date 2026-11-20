@@ -67,7 +67,8 @@ rc=1
    💥 MalfunctionError: could not fetch tailscale's package repository key for '<codename>'
       ⇒ apt would report the source unsigned, and the error reads
         'NO_PUBKEY' rather than 'the key was never fetched'
-      read why: curl -sSI https://pkgs.tailscale.com/stable/ubuntu/<codename>.noarmor.gpg
+      read why: the web_fetch line above names the status; the url should answer 200:
+        https://pkgs.tailscale.com/stable/ubuntu/<codename>.noarmor.gpg
       fix: once the url answers, rerun — no write was made, so a rerun is safe:
         sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
 writes: bundle.root.owns tailscale · web_tempdir · web_fetch https://pkgs.tailscale.com/stable/ubuntu/<codename>.noarmor.gpg --into <fixture>/tmp/tailscale.gpg

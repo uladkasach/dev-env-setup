@@ -3,30 +3,12 @@
 # .what = declare firefox's prefs via `user.js`, and open a tab for each extension
 #         that is genuinely absent
 #
-# .why `user.js` and not `prefs.js`
-#   - firefox REWRITES `prefs.js` on every clean exit
-#   - ⇒ a value written there survives until the next quit and then reverts
-#   - that is the worst failure shape: it works when tested and is gone the next day
-#   - `user.js` is read at every start and re-applied over `prefs.js`
-#
-# .why the profile dir is READ and not assumed
-#   - the flatpak profile lives at a generated path like `abc123.default-release`
-#   - `profiles.ini` is the only file at a fixed path, so the dir is read out of it
-#   - an absent `profiles.ini` means firefox has never been STARTED
-#   - ⇒ that case reports what is owed, never a failure
-#
-# .why an extension tab is opened only when the extension is ABSENT
-#   - mozilla requires a human to accept an extension's permission prompt
-#   - ⇒ these three cannot be installed by any command
-#   - three tabs every run is non-idempotent and obnoxious
-#   - `extensions.json` names every accepted addon, so absence is CHECKABLE
-#   - ⇒ a converged box opens no tab and a fresh one opens exactly what it owes
-#
-# .why the ctrl+N rebind runs BEFORE the profile is read
-#   - the rebind lives in the flatpak `systemconfig` extension dir, not the profile
-#   - that dir exists whether or not firefox has ever been started
-#   - the profile lookup below returns early on a never-started firefox
-#   - ⇒ a step placed after it is skipped on exactly the fresh box that needs it most
+# .why
+#   - `user.js`, never `prefs.js`: firefox rewrites `prefs.js` on every clean exit
+#   - the profile dir is READ from `profiles.ini`, since its name is generated
+#   - an extension needs a human to accept its prompt, so a tab opens only for
+#     one `extensions.json` does not name
+#   - the ctrl+N rebind runs FIRST: the profile read returns early on a fresh box
 #
 # guarantee:
 #   - idempotent: `user.js` is overwritten from this file's text

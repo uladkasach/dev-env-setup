@@ -174,6 +174,11 @@ if [[ ! -f "$REGISTRY" ]]; then
   exit 2
 fi
 SSH_ALIAS=$(jq -r '.sshAlias // .name' "$REGISTRY")
+# 🛑 a key set on the wrong seat lands in another rack: the alias must dial the
+#   registry's seat first (`grove_ssh_seat_ready`, git.grove.ssh.operations.sh)
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.ssh.operations.sh"
+grove_ssh_seat_ready "$GROVE" || exit $?
 
 ######################################################################
 # 🛑 the ORG — an INPUT, and the one `5.16.keys` gates its rows on
@@ -283,17 +288,19 @@ fi
 # .why = a terminal OBEYS what it is sent, and `src/grove.provision/2.shell/2.8.tmux/tmux.conf` sets
 #        `set-clipboard on` — so one OSC 52 in a grove's output rewrites this
 #        human's clipboard. every relay below goes through the sink
+#
+# 🛑 the CHECKOUT's copy, sourced unconditionally: `rhx` loads the installed
+#    copy via `BASH_ENV`, so a `command -v` guard would keep that older sink
+#    (the measurement sits in `git.grove.operations.sh`)
 ######################################################################
-if ! command -v __duct_strip_escapes >/dev/null 2>&1; then
-  _keys_ductwork="$REPO_ROOT/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
-  if [[ -r "$_keys_ductwork" ]]; then
-    # shellcheck disable=SC1090
-    source "$_keys_ductwork"
-  else
-    echo "✋ ductwork is absent from this checkout, so grove bytes cannot be stripped" >&2
-    echo "   looked at: $_keys_ductwork" >&2
-    exit 1
-  fi
+_keys_ductwork="$REPO_ROOT/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
+if [[ -r "$_keys_ductwork" ]]; then
+  # shellcheck disable=SC1090
+  source "$_keys_ductwork"
+else
+  echo "✋ ductwork is absent from this checkout, so grove bytes cannot be stripped" >&2
+  echo "   looked at: $_keys_ductwork" >&2
+  exit 1
 fi
 
 # .what = run one command on the grove, non-interactive, verdict by exit code

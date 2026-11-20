@@ -3,12 +3,13 @@
 ## .what
 
 drive a fresh grove (a remote box) from bare to tree parity — zsh, starship, tmux,
-nvim, node, robot brains — over the ssm tunnel, with no desktop concerns.
+nvim, node, robot brains — over its duct, with no desktop concerns.
 
 ## .why
 
-a grove is reached ONLY through an ssm port-forward tunnel, and a *fresh* grove has
-neither tmux (so no duct) nor git (so no clone). that order trap is what makes the
+a cloud grove is reached through ONE road: an ec2 grove through an ssm port-forward
+tunnel, a hetzner grove over the tailnet. a *fresh* grove of either kind has neither tmux
+(so no duct) nor git (so no clone). that order trap is what makes the
 first provision run differ from every later one, and it is where the time goes if
 you do not know it up front.
 
@@ -42,11 +43,16 @@ it drives four steps, in the one order that works:
 | 4 | gate | `git.grove.provision test`, with no command in between |
 
 a **REBUILT** box presents a new host key, so tofu refuses it — correctly. that is an input
-about the BOX, never a resume:
+about the BOX, never a resume. on ec2 the box's boot record attests the new key:
 
 ```sh
 rhx git.grove.provision boot <grove> --mode apply --trust replace
 ```
+
+on the tailnet there is no boot record. a key still on record attests the new one
+(`git.grove.trust.gen --on-changed replace`); a FIRST contact is tofu by the human's word
+(`--trust tofu`); and a full rebuild with no key left is compared to infra's fingerprints
+first. the boot's trust halt names each road.
 
 ### 🛑 do NOT re-expand those four steps into commands here
 

@@ -19,6 +19,7 @@
 ######################################################################
 
 grove_provision_5_10_repos_provision_upsert() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "the org repos"; return 0; }
   ####################################################################
   # ⚠️ the SHARED reader, from this bundle's `_.sh`
   #   - the set is PER-ORG, and it was a scalar declared here AND inline in
@@ -119,18 +120,24 @@ grove_provision_5_10_repos_provision_upsert() {
       #   - `<repo>.half.<stamp>` is not one of them, so it is never revisited
       #   - ⇒ silent disk use is its own defect (`rule.forbid.failhide`)
       ################################################################
-      if [[ "$state" == half ]]; then
-        local aside="$into.half.$(date +%Y%m%dT%H%M%S)"
+      # ⚠️ a `carried` tree (files, no `.git`) takes the same road ON A CLOUD SEAT: a
+      #   push carried it there, a clone supersedes it, and it is kept for the same
+      #   reasons. on a laptop such a tree is the human's own, so it stays in place
+      if [[ "$state" == carried && "${GROVE_ENV_SERVER:-}" != cloud@* ]]; then
+        echo "   │  🌙 $repo — holds files and no .git; a laptop's tree is left in place, no clone"
+        continue
+      fi
+      if [[ "$state" == half || "$state" == carried ]]; then
+        local aside; aside="$(grove_provision_5_10_repos_aside_of "$into" "$state")"
         if ! mv "$into" "$aside"; then
           failed=$(( failed + 1 ))
-          echo "   │  ✋ $repo — half-cloned, and the dir could not be moved aside" >&2
-          echo "   │     ⇒ $into holds a .git with no readable HEAD, so no git" >&2
-          echo "   │       command opens it and a re-clone cannot use the path" >&2
+          echo "   │  💥 MalfunctionError: $repo — $state, and the dir could not be moved aside" >&2
+          echo "   │     ⇒ $into is no checkout, so a clone cannot use the path" >&2
           echo "   │     read why: ls -ld $into ; touch $into/.probe" >&2
           continue
         fi
         quarantined=$(( quarantined + 1 ))
-        echo "   │  • $repo — half-cloned; moved aside, re-clone follows"
+        echo "   │  • $repo — $state; moved aside, clone follows"
         echo "   │    kept at: $aside"
       fi
 
@@ -179,9 +186,10 @@ grove_provision_5_10_repos_provision_upsert() {
   #   - a quarantine is bytes a human may reclaim, invisible to every later run
   #   - ⇒ the run that made it is the only one that can report it
   if [[ "$quarantined" -gt 0 ]]; then
-    echo "      ⇒ $quarantined half-cloned dir(s) were moved aside and re-cloned."
-    echo "        each is kept at '<repo>.half.<stamp>' beside its repo — they hold"
-    echo "        no commit, so they are safe to remove once you have looked"
+    echo "      ⇒ $quarantined half-cloned or carried dir(s) were moved aside and cloned."
+    echo "        each is kept at '<repo>.<half|carried>.<stamp>' beside its repo. a half"
+    echo "        holds no commit; a carried one holds files — diff it against the clone"
+    echo "        before you remove it"
   fi
 
   ####################################################################

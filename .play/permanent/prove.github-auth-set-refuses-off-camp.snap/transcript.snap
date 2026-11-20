@@ -1,0 +1,165 @@
+
+## --help
+rc=0
+git.grove.auth.github.set — put a github token on a grove's rack, securely
+
+usage:
+  rhx git.grove.auth.github.set <grove> [--mode plan|apply] [--refresh]
+
+options:
+  --mode     plan (default) or apply
+  --refresh  re-set a slug that already answers (rotated or expired pat)
+  --env      keyrack env; default camp
+  --owner    keyrack owner; default ehmpath
+  --org      org sigil for the slug; default @all (every org reads it)
+
+a camp grove only: on a local or house grove the token lives in os.secure, set on the box.
+
+the value is TYPED on the box over an interactive ssh tty — never passed
+as an argument, never sent down a duct. see the header for why.
+
+## a local or house grove → refused at rung 0b
+rc=2
+🐢 heres the wave...
+
+🔑 git.grove.auth.github.set grove-x --mode plan
+   ├─ slug:  owner=ehmpath  @all.camp.GITHUB_TOKEN
+   ├─ vault: aws.params  (central; a camp grove's identity answers it)
+   └─ drive
+      ├─ box  reachable at 'grove-x'
+      └─ ✋ ConstraintError: grove 'grove-x' is not a camp grove (its GROVE_ENV_SERVER is local@unix)
+
+  why: this skill stores the token in aws.params, and only a camp grove holds
+       the camp identity that reads it back. a local or house grove would get
+       a value written into whatever account its shell holds
+  fix: keep the token in os.secure instead — run this ON that grove, at a tty:
+    cd ~/git/more/dev-env-setup && rhx keyrack set \
+      --owner ehmpath --key GITHUB_TOKEN --org @all --env camp --vault os.secure
+    (or, on a box with a human: gh auth login)
+
+## a camp grove with no live identity → refused at rung 0b
+rc=2
+🐢 heres the wave...
+
+🔑 git.grove.auth.github.set grove-x --mode plan
+   ├─ slug:  owner=ehmpath  @all.camp.GITHUB_TOKEN
+   ├─ vault: aws.params  (central; a camp grove's identity answers it)
+   └─ drive
+      ├─ box  reachable at 'grove-x'
+      └─ ✋ ConstraintError: grove 'grove-x' is a camp grove, and its camp identity does not answer
+
+  why: a camp grove carries the camp aws identity by MANDATE, on every seat;
+       this seat's [default] chain answered no identity, so aws.params is
+       unreadable here and a set would be read back by naught
+  fix: on hetzner, infra wires [default] to its IAM Roles Anywhere signer —
+       run ahbode/infrastructure's grove identity skill for this seat; on ec2,
+       the instance role is detached. then prove it on the box:
+    rhx git.grove.send grove-x --what 'rhx grove.provision --what 5.6.aws --mode apply'
+
+## a box with no checkout → rc 1, never read as not-camp
+rc=1
+🐢 heres the wave...
+
+🔑 git.grove.auth.github.set grove-x --mode plan
+   ├─ slug:  owner=ehmpath  @all.camp.GITHUB_TOKEN
+   ├─ vault: aws.params  (central; a camp grove's identity answers it)
+   └─ drive
+      ├─ box  reachable at 'grove-x'
+      └─ 💥 MalfunctionError: grove 'grove-x' could not name its own tier
+
+  why: its derive did not answer — no checkout at ~/git/more/dev-env-setup/src, or a derive
+       that fails closed (a hetzner box with no /etc/grove/platform yet)
+  it said:
+    bash: line 1: /home/<seat>/git/more/dev-env-setup/src/grove.env.sh: No such file or directory
+  fix: provision it first — the boot lays the checkout and the platform:
+    rhx git.grove.provision boot grove-x --mode apply
+
+## the control · a camp grove → passes rung 0b, plan only
+rc=0
+🐢 heres the wave...
+
+🔑 git.grove.auth.github.set grove-x --mode plan
+   ├─ slug:  owner=ehmpath  @all.camp.GITHUB_TOKEN
+   ├─ vault: aws.params  (central; a camp grove's identity answers it)
+   └─ drive
+      ├─ box  reachable at 'grove-x'
+      ├─ camp the box is a camp grove and its identity answers, so aws.params is readable
+      ├─ rhx  present
+      ├─ rhx  runs (keyrack answered)
+      └─ ✔ the rack already answers for GITHUB_TOKEN — no work
+
+🔑 already set!
+   ├─ to replace a rotated or expired pat: --refresh
+   └─ to prove gh accepts it:
+      rhx git.grove.send grove-x --what 'gh auth status'
+
+## a camp grove, the slug absent → the plan, rc 0
+rc=0
+🐢 heres the wave...
+
+🔑 git.grove.auth.github.set grove-x --mode plan
+   ├─ slug:  owner=ehmpath  @all.camp.GITHUB_TOKEN
+   ├─ vault: aws.params  (central; a camp grove's identity answers it)
+   └─ drive
+      ├─ box  reachable at 'grove-x'
+      ├─ camp the box is a camp grove and its identity answers, so aws.params is readable
+      ├─ rhx  present
+      ├─ rhx  runs (keyrack answered)
+      ├─ rack does NOT answer for GITHUB_TOKEN — a human is owed
+      └─ plan — this is what apply would run ON THE BOX:
+
+         cd ~/git/more/dev-env-setup
+         rhx keyrack set  --owner ehmpath --key GITHUB_TOKEN \
+                          --org @all --env camp --vault aws.params
+
+      the set PROMPTS twice on the box's own tty — mechanism (answer 1),
+      then the token. mint it at https://github.com/settings/tokens with
+      scopes: repo, read:org
+
+      ⚠️ one set, and no 'keyrack fill' after it. set stores the value
+         itself; fill re-drives those same two prompts, so a chained fill
+         takes the pat as its MECHANISM answer and keyrack rejects it with
+         expected: "1-2"
+
+      re-run with --mode apply to be handed that prompt.
+
+## a probe that hangs → ended by the bound, rc 1 (a malfunction)
+rc=1
+🐢 heres the wave...
+
+🔑 git.grove.auth.github.set grove-x --mode plan
+   ├─ slug:  owner=ehmpath  @all.camp.GITHUB_TOKEN
+   ├─ vault: aws.params  (central; a camp grove's identity answers it)
+   └─ drive
+      ├─ box  reachable at 'grove-x'
+      └─ 💥 MalfunctionError: grove 'grove-x' did not answer the tier probe within 2s
+
+  why: a login shell on the box held the session past the bound — an rc line
+       that waits, or a derive with no answer. the tier is unknown, not denied
+  fix: read the box's own derive, then re-run —
+    rhx git.grove.send grove-x --what 'rhx grove.provision --mode plan'
+
+## a grove that does not answer → rc 1, names the wake
+rc=1
+🐢 heres the wave...
+
+🔑 git.grove.auth.github.set grove-x --mode plan
+   ├─ slug:  owner=ehmpath  @all.camp.GITHUB_TOKEN
+   ├─ vault: aws.params  (central; a camp grove's identity answers it)
+   └─ drive
+      └─ 💥 MalfunctionError: grove 'grove-x' does not answer at ssh alias 'grove-x'
+
+  why: the box is asleep, or its tunnel is not bound
+  fix: wake it — a wake is idempotent
+    rhx git.grove.wake grove-x
+
+## a grove never registered → refused
+rc=2
+✋ ConstraintError: grove 'grove-none' is not registered
+   list them: rhx git.grove.list
+
+## no grove named → the usage
+rc=2
+✋ ConstraintError: usage: rhx git.grove.auth.github.set <grove> [--mode apply]
+   list them: rhx git.grove.list
+

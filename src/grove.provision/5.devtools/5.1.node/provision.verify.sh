@@ -10,6 +10,40 @@
 # guarantee:
 #   - READ-ONLY. it observes; it mutates no state
 
+# .what = does fnm alias a DEFAULT node, and is it the one this checkout declares?
+# .why  = fnm can hold three versions and put none on PATH, and the default alias
+#   is what a new shell lands on. reads `fnm list`, never `fnm current` — the
+#   latter answers the CALLING SHELL, and a bar built on it would cry ✋ on every
+#   non-interactive provision
+# .note = rc 1 on either ✋, so the caller tallies it
+# .refs = gotcha.5-1-node.demo=verify-read-shape, m1
+grove_provision_5_1_node_default_verify() {
+  local fnm="$1" default_node default_want
+  default_node="$("$fnm" list 2>/dev/null \
+    | awk '/(^|[ ,])default([ ,]|$)/ { print $2; exit }')"
+  default_want="v$(grove_node_version_default)"
+  # a partial pin (`22`, `22.21`) names a family: `fnm default 22` aliases the newest
+  #   22.x the box holds, so `v22.21.0` satisfies `v22`. matched on a `.` boundary, so
+  #   `v2` never accepts `v22.21.0`
+  if [[ "$default_node" == "$default_want" || "$default_node" == "$default_want".* ]]; then
+    echo "   • fnm's default node is $default_node ✔ (declared by .nvmrc)"
+    return 0
+  fi
+  if [[ -n "$default_node" && "$default_node" != "system" ]]; then
+    echo "   ✋ ConstraintError: fnm's default node is $default_node, and this checkout declares $default_want" >&2
+    echo "      ⇒ a default that follows lts past the toolchain leaves no rhx that runs" >&2
+    echo "        (node 26 refuses the flag rhachet's run.jit passes)" >&2
+    echo "      fix: rhx grove.provision --what 5.1.node --mode apply" >&2
+    return 1
+  fi
+  echo "   ✋ ConstraintError: fnm has no default node (it aliases '${default_node:-none}')" >&2
+  echo "      ⇒ fnm may hold several versions and still alias NONE as default," >&2
+  echo "        so an 'installed' node is unreachable from any new shell" >&2
+  echo "      read it yourself: $fnm list   # the 'default' marker is the claim" >&2
+  echo "      fix: rhx grove.provision --what 5.1.node --mode apply" >&2
+  return 1
+}
+
 grove_provision_5_1_node_provision_verify() {
   local failed=0
 
@@ -32,24 +66,8 @@ grove_provision_5_1_node_provision_verify() {
   fi
   echo "   • fnm is present ✔"
 
-  # 2. fnm has a DEFAULT node — fnm can hold three versions and put none on
-  # PATH, and the default alias is what a new shell lands on. reads `fnm
-  # list`, never `fnm current` — the latter answers the CALLING SHELL, and a
-  # bar built on it would cry ✋ on every non-interactive provision
-  # .refs = gotcha.5-1-node.demo=verify-read-shape, m1
-  local default_node
-  default_node="$("$fnm" list 2>/dev/null \
-    | awk '/(^|[ ,])default([ ,]|$)/ { print $2; exit }')"
-  if [[ -n "$default_node" && "$default_node" != "system" ]]; then
-    echo "   • fnm's default node is $default_node ✔"
-  else
-    echo "   ✋ fnm has no default node (it aliases '${default_node:-none}')" >&2
-    echo "      ⇒ fnm may hold several versions and still alias NONE as default," >&2
-    echo "        so an 'installed' node is unreachable from any new shell" >&2
-    echo "      read it yourself: $fnm list   # the 'default' marker is the claim" >&2
-    echo "      fix: rhx grove.provision --what 5.1.node --mode apply" >&2
-    failed=1
-  fi
+  # 2. fnm has a DEFAULT node, and it is the declared one
+  grove_provision_5_1_node_default_verify "$fnm" || failed=1
 
   # 2b. every WANTED version is on the box, never merely the default — the
   # use-on-cd hook does not fall back on an absent pin, it ASKS on stdin, and

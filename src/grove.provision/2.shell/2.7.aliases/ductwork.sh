@@ -98,10 +98,13 @@ __duct_as_registry_file() {
 #     grove write this human's clipboard — the next paste is the grove's command
 #   - it strips by CLASS: every C0 but TAB and LF, plus ESC and C1
 #   - it is a filter, never a check — a hash compare reads the RAW bytes
-#   - 🛑 THREE stages, in order: `tr` (C0+DEL by byte), `iconv -c` (invalid
-#     utf-8, so a raw C1), `sed` (U+0080..U+009F as characters). one `tr` over
-#     `\177-\237` ate every box glyph and emoji, since that range is utf-8's
-#     continuation bytes
+#   - 🛑 FOUR stages, in order: `sed` (a whole 7-bit OSC or CSI sequence, so its
+#     payload never reaches a human as `]52;c;…` debris), `tr` (C0+DEL by byte),
+#     `iconv -c` (invalid utf-8, so a raw C1), `sed` (U+0080..U+009F as
+#     characters). one `tr` over `\177-\237` ate every box glyph and emoji, since
+#     that range is utf-8's continuation bytes
+#   - the first stage is legibility only; the class stages are the guard, so an
+#     unterminated or 8-bit sequence it misses still loses every control byte
 #   - 🛑 it owns its own `pipefail`, in a subshell — a caller's options cannot
 #     be known, and `local -` is a bash-ism
 #   - ⚠️ `iconv` is glibc, so its absence is a broken box
@@ -113,7 +116,8 @@ __duct_as_registry_file() {
 __duct_strip_escapes() {
   (
     set -o pipefail
-    LC_ALL=C tr -d '\000-\010\013\014\016-\037\177' \
+    LC_ALL=C sed -E $'s/\e\\][^\a\e]*(\a|\e\\\\)//g; s/\e\\[[0-?]*[ -/]*[@-~]//g' \
+      | LC_ALL=C tr -d '\000-\010\013\014\016-\037\177' \
       | iconv -c -f UTF-8 -t UTF-8 \
       | LC_ALL=C sed 's/\xC2[\x80-\x9F]//g'
   )

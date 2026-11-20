@@ -1,0 +1,19 @@
+{
+  "key": "ec16de37aba46bf4",
+  "kind": "create",
+  "repo": {
+    "owner": "ahbode",
+    "name": "infrastructure"
+  },
+  "exid": null,
+  "title": "chore(hetzner-bootstrap): drop unattended-upgrades once dev-env-setup 1.14.updates lands",
+  "description": "## .what\n\ndrop `unattended-upgrades` from the hetzner grove bootstrap: dev-env-setup's `1.14.updates` bundle now owns it on every cloud grove.\n\n## .why\n\ntwo writers on one artifact drift. the bundle installs the package, writes `/etc/apt/apt.conf.d/52grove-unattended-upgrades`, and enables `apt-daily-upgrade.timer`, then verifies all three on each provision. its drop-in also keeps a changed dpkg conffile (`--force-confdef`, `--force-confold`), so an unattended upgrade never reverts a policy a bundle fenced into `/etc` — measured 2026-11-15 on hetzner for `/etc/ImageMagick-6/policy.xml`. a bootstrap copy of the same config would not carry that, and whichever ran last would win.\n\n## .the shape of the fix\n\nremove the `unattended-upgrades` install and config from the bootstrap. the box gets it on the ground seat's first `grove.provision` apply (`rhx git.grove.provision boot <grove>`, step 2).\n\n## .when\n\nonce dev-env-setup's hetzner platform PR (`beav/feat-grove-provision-hetzner-platform`) lands on main. until then, keep it — the bundle is a no-op over an equal config.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": "as-human",
+  "idem": null,
+  "heldSeq": 11,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "122"
+}

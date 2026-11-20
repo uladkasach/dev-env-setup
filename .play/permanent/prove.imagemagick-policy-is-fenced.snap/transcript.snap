@@ -1,0 +1,50 @@
+## no root, an inert seat copy present
+   • removed the inert seat copy at <fix>/home/.config/ImageMagick/policy.xml (imagemagick never read it)
+   🌙 the imagemagick coder policy is a BOX-WIDE fact, and this seat has no root
+
+## root, first apply
+   • imagemagick rules fenced into <fix>/etc.xml
+     ⇒ box-wide: EPS, PS, PDF, XPS, MVG, MSL, TEXT and the shell delegates now read
+       'not authorized' for every user; the fence sits between this bundle's markers
+
+## root, second apply
+   • imagemagick rules already fenced into <fix>/etc.xml ✔
+
+## root, imagemagick names no readable policy file
+   🌙 imagemagick names no readable policy file, so there is no place for its rules
+      read why: identify -list policy | grep '^Path:'
+
+## root, a policy file with no <policymap>
+   🌙 <fix>/bare.xml holds no '<policymap>' line to anchor the rules on; left as found
+
+## root, a policy file with a lone fence marker
+   ✋ ConstraintError: <fix>/lone.xml holds a broken grove fence (a lone marker, or two fences); left as found
+      a render would drop '</policymap>', so this bundle writes no byte of it
+      fix: delete every line from '<!-- grove: 4.5.nvim imagemagick rules — owned by dev-env-setup, never edit on the box -->'
+           to '<!-- grove: end 4.5.nvim -->' (or the lone one), then:
+           sudo -v && rhx grove.provision --what 4.5.nvim --mode apply
+
+## root, the checkout holds no policy
+   🌙 this checkout has no imagemagick.policy.xml, so the coder policy
+      is left as the box found it (looked in: <fix>/no-such-policy.xml)
+
+## root, the write refused
+   💥 MalfunctionError: could not write <fix>/ro.xml with root held — the policy stays as found
+      ⇒ it said: install: cannot create regular file: Read-only file system
+      read why: ls -l <fix>/ro.xml ; df -h <fix>
+
+## verify, the file imagemagick reads carries the fence
+   • <fix>/etc.xml carries this checkout's imagemagick rules ✔
+
+## verify, the file imagemagick reads holds no fence
+   🌙 <fix>/etc.xml lacks this checkout's imagemagick rules (absent or stale fence)
+      fix: a box-wide write — on a grove, ground's apply; on a laptop:
+        sudo -v && rhx grove.provision --what 4.5.nvim --mode apply
+
+## verify, the checkout holds no policy
+   🌙 this checkout has no imagemagick.policy.xml to compare <fix>/etc.xml against (<fix>/no-such-policy.xml)
+
+## verify, imagemagick names no readable policy file
+   🌙 imagemagick names no readable policy file — read why: identify -list policy | grep '^Path:'
+
+

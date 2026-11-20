@@ -93,7 +93,8 @@ grove_provision_5_23_tailscale_provision_upsert() {
       echo "   💥 MalfunctionError: could not fetch tailscale's package repository key for '${codename}'" >&2
       echo "      ⇒ apt would report the source unsigned, and the error reads" >&2
       echo "        'NO_PUBKEY' rather than 'the key was never fetched'" >&2
-      echo "      read why: curl -sSI https://pkgs.tailscale.com/stable/ubuntu/${codename}.noarmor.gpg" >&2
+      echo "      read why: the web_fetch line above names the status; the url should answer 200:" >&2
+      echo "        https://pkgs.tailscale.com/stable/ubuntu/${codename}.noarmor.gpg" >&2
       echo "      fix: once the url answers, rerun — no write was made, so a rerun is safe:" >&2
       echo "        sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply" >&2
       rm -rf "$keytmp"

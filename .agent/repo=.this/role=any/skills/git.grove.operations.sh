@@ -46,19 +46,25 @@
 # ⚠️ the CHECKOUT's copy, never `~/.bash_aliases.ductwork.sh`. a skill in this
 #    tree is judged against this tree — an installed copy may be an older
 #    revision, and then the sink a reader audits is not the sink that ran.
+#
+# 🛑 sourced UNCONDITIONALLY — never behind `command -v __duct_strip_escapes`
+#    - `rhx` runs a skill under `BASH_ENV=~/.bash_aliases`, so the INSTALLED
+#      copy is already defined when this file loads; a `command -v` guard keeps
+#      it, and the checkout's sink never runs
+#    - 📜 measured 2026-11-17: the boot's halt relayed `]52;c;ZXZpbA==` debris
+#      after the checkout's sink had learned to take whole sequences — the play
+#      read `declare -f` and found the installed three-stage sink live
 ######################################################################
-if ! command -v __duct_strip_escapes >/dev/null 2>&1; then
-  _grove_ops_ductwork="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
-  if [[ -r "$_grove_ops_ductwork" ]]; then
-    # shellcheck disable=SC1090
-    source "$_grove_ops_ductwork"
-  else
-    echo "✋ ductwork is absent from this checkout, so grove bytes cannot be stripped" >&2
-    echo "   looked at: $_grove_ops_ductwork" >&2
-    echo "   ⇒ it owns __duct_strip_escapes, the one sink between a grove's" >&2
-    echo "     stdout and a terminal that OBEYS what it is sent" >&2
-    exit 1
-  fi
+_grove_ops_ductwork="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)/src/grove.provision/2.shell/2.7.aliases/ductwork.sh"
+if [[ -r "$_grove_ops_ductwork" ]]; then
+  # shellcheck disable=SC1090
+  source "$_grove_ops_ductwork"
+else
+  echo "✋ ductwork is absent from this checkout, so grove bytes cannot be stripped" >&2
+  echo "   looked at: $_grove_ops_ductwork" >&2
+  echo "   ⇒ it owns __duct_strip_escapes, the one sink between a grove's" >&2
+  echo "     stdout and a terminal that OBEYS what it is sent" >&2
+  exit 1
 fi
 
 ######################################################################
@@ -900,6 +906,24 @@ _say_claims() {
     | grep -v 'grove.provision finished' \
     | sed -E 's/^[[:space:]]+//' \
     || true
+}
+
+######################################################################
+# _say_ladder_claims — the seat tallies and claims a halted ladder printed
+#
+# .what = from a `git.grove.ready.verify` log, every tree row above its `why:`
+#         that carries a ✋ — each seat's `✔ N · ✋ M`, and each claim under it
+#
+# .why  = the ladder's halt says "each claim is named above". a caller that
+#         prints the log from `why:` onward shows the pointer and drops what it
+#         points at. 📜 measured 2026-11-16 on hetzner: rung 4 named 2 reach
+#         rows, and `git.grove.provision test` printed 0
+#
+# .note = `|| true` absorbs grep's no-match exit only; an absent log still
+#         says so on stderr, so a halt never reads as "no claims" in silence
+######################################################################
+_say_ladder_claims() {
+  sed -n '1,/^  why:/p' "$1" | grep -E '^ +│.*✋' || true
 }
 
 ######################################################################

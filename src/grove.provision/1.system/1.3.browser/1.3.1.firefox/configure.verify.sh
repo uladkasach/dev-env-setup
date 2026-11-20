@@ -4,23 +4,11 @@
 #         prefs that matter, and report which of the three human-click extensions
 #         are still owed
 #
-# .why it asserts three prefs and not all fifteen
-#   - a check per pref is a second copy of the upsert's text, and a second copy drifts
-#   - so it asserts the three whose absence a human would misdiagnose as another defect:
-#
-#     signon.rememberSignons          → a credential lands outside 1password
-#     widget.gtk.native-emoji-dialog  → ctrl+. opens gtk's picker, 1password never fires
-#     ...showSponsored                → the new tab page fills with ads
-#
-#   - the rest are cosmetic siblings of the third
-#   - ⇒ if `user.js` holds those three, it landed from this bundle
-#
-# .why an absent extension is a 🌙 and NOT a failure
-#   - mozilla requires a human hand on the permission prompt
-#   - ⇒ an absent extension is work OWED to a human, not work this bundle got wrong
-#   - a failure here would fire on every fresh box until the human clicks
-#   - that teaches a reader to ignore this roll
-#   - (rule.forbid.failhide cuts both ways: a false alarm is its own dishonesty)
+# .why
+#   - it asserts only the prefs whose absence a human would misdiagnose as another
+#     defect; a check per pref would be a second copy of the upsert, free to drift
+#   - an absent extension is a 🌙: it is owed a human click, never a defect, and a
+#     ✋ would fire on every fresh box until ignored (rule.forbid.failhide)
 #
 # guarantee:
 #   - READ-ONLY. it reads the systemconfig extension dir, profiles.ini, user.js,
@@ -39,22 +27,10 @@ grove_provision_1_3_1_firefox_configure_verify() {
 
   ####################################################################
   # 0. the ctrl+N tab rebind — checked FIRST, since it does not live in the profile
-  #
-  # ⚠️ it is asserted from the HOST files, not from the sandbox
-  #   - `firefox.systemconfig.sh status` answers by a `flatpak run --command=cat`
-  #   - ⇒ that is a real sandbox launch on every plan
-  #   - it probes live state the host files already decide
-  #   - (`rule.require.judge-declared-state-not-live-state`)
-  #   - and it is unbounded where a verify must be bounded
-  #   - (`rule.require.bounded-probes-in-verifies`)
-  #   - the two host files ARE the declaration, so if they hold, the mount holds
+  # ⚠️ judged from the HOST files, never a sandbox launch: they ARE the declaration
+  #   (rule.require.judge-declared-state-not-live-state, bounded-probes-in-verifies)
+  # ⚠️ `cmp`, never grep: the files are COPIED, so a stale copy passes a grep
   ####################################################################
-  # ⚠️ this DIFFS rather than greps
-  #   - a `grep 'key_selectTab'` proves the token landed once
-  #   - it does not prove the live file matches this checkout
-  #   - these two files are COPIED, so a stale copy passes a grep
-  #   - ⇒ last month's rebind runs silently
-  #   - `cmp` is the only check that separates "arrived" from "current"
   local ext_dir="$HOME/.local/share/flatpak/extension/org.mozilla.firefox.systemconfig/x86_64/stable"
   local ff_assets="$GROVE_SRC/grove.provision/1.system/1.3.browser/1.3.1.firefox/firefox"
   local pair
@@ -107,19 +83,9 @@ grove_provision_1_3_1_firefox_configure_verify() {
   local profile_dir
   profile_dir="$(grep -oP 'Path=\K.*default-release' "$ff_root/profiles.ini" 2>/dev/null)"
   if [[ -z "$profile_dir" ]]; then
-    ##################################################################
-    # 🛑 "yet" is a claim about the FUTURE, and it is true on one box only
-    #   - a profile is born of a GUI launch
-    #   - ⇒ a box with no display and no human has no such future
-    #   - "no profile yet … open firefox once" names a step no one can take
-    #   - it names it on EVERY apply forever
-    #   - and it reports owed work on a box that holds all this bundle can give it
-    #   - its upsert twin carries the same repair and the full argument
-    #
-    # ⚠️ a repair applied to one phase of a bundle is not applied to the bundle
-    #   - 📜 `5.8.docker` learned that twice, two days apart, over this exact shape
-    #   - (`rule.require.one-command-provision`)
-    ##################################################################
+    # 🛑 "yet" is true on one box only: off `local@unix` no hand can launch the
+    #   GUI that births a profile, so "open firefox once" would be owed forever
+    #   (rule.require.one-command-provision; the upsert twin carries the same gate)
     if [[ "$GROVE_ENV_SERVER" != "local@unix" ]]; then
       echo "   🌙 no profile here, and none is owed — so its prefs and extensions"
       echo "      are not observable and are not absent. a profile is born of a GUI"

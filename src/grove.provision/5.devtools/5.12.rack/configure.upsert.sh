@@ -15,6 +15,7 @@
 ######################################################################
 
 grove_provision_5_12_rack_configure_upsert() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "the rack's camp entries"; return 0; }
   local key org env vault param
   key="$(grove_provision_5_12_rack_slug_key)"
   org="$(grove_provision_5_12_rack_slug_org)"
@@ -27,9 +28,9 @@ grove_provision_5_12_rack_configure_upsert() {
     echo "   • declined — rhx is absent, and keyrack ships inside it (5.3.brains)"
     return 0
   fi
-  # .why ec2 only — off ec2 there is no ssm read, and the stale-entry heal (2c)
-  #   needs no aws cli, so an absent cli there must not skip it
-  if grove_provision_5_12_rack_platform_is_ec2 && ! command -v aws >/dev/null 2>&1; then
+  # .why a camp grove only — elsewhere there is no ssm read, and the stale-entry
+  #   heal (2c) needs no aws cli, so an absent cli there must not skip it
+  if grove_provision_5_12_rack_is_camp_grove && ! command -v aws >/dev/null 2>&1; then
     echo "   • declined — the aws cli is absent, so the ssm read cannot run (5.6.aws)"
     return 0
   fi
@@ -79,13 +80,14 @@ grove_provision_5_12_rack_configure_upsert() {
     printf '%s\n' "$initlog" | sed 's/^/        /' >&2
     return 1
   fi
-  # .what = 2c. an `aws.params` entry is written on the ec2 PLATFORM only
-  # 🛑 `rule.forbid.aws-params-off-ec2` — off ec2, steps 3-4 would read and PUT as
-  #   the human's own credential. the absent fact is the identity, never the binary
-  if ! grove_provision_5_12_rack_platform_is_ec2; then
-    echo "   🌙 declined — ${org}.${env}.${key} lives in aws.params, which only an ec2 box may reach"
-    echo "      ⇒ this box is '${GROVE_ENV_SERVER:-unset}': no instance role, so no aws.params read or write"
-    echo "      ⇒ a local grove reaches github through 'gh auth login', by its human (5.4.gh)"
+  # .what = 2c. an `aws.params` entry is written on a CAMP grove only
+  # 🛑 `rule.require.aws-params-on-camp-groves-only` — elsewhere, steps 3-4 would
+  #   read and PUT as the human's own credential. a camp grove's identity is a
+  #   mandated prereq, asserted by `5.6.aws` before this bundle runs
+  if ! grove_provision_5_12_rack_is_camp_grove; then
+    echo "   🌙 declined — ${org}.${env}.${key} lives in aws.params, which only a camp grove may reach"
+    echo "      ⇒ this box is '${GROVE_ENV_SERVER:-unset}': not a camp grove, so it holds no camp identity"
+    echo "      ⇒ off camp, github is reached through 'gh auth login' or an os.secure token (5.4.gh)"
     grove_provision_5_12_rack_upsert_heal_stale "$gitroot" || return 1
     grove_provision_5_12_rack_upsert_awsprofile "$gitroot"
     return $?
@@ -146,75 +148,6 @@ grove_provision_5_12_rack_configure_upsert() {
 }
 
 ######################################################################
-# .what = retire a STALE `aws.params` github entry from a box off ec2
-# .why
-#   - until 2026-09-27 (#149) this bundle wrote the entry on EVERY box; the gate
-#     that day stopped new writes and left the old ones in place
-#   - off ec2 no unlock can read it, and rhachet fails the whole unlock on it
-#   - 🛑 a bare `keyrack del` reaches into the vault, and that vault holds the
-#     fleet's SHARED github token — so it either fails, or deletes it for every
-#     grove (ehmpathy/rhachet#697 asks for a host-only del)
-# .how
-#   1. repoint the entry at `os.secure` with a placeholder — a LOCAL vault
-#   2. del it, which now touches local storage only
-#   - both run with every aws route cut, and the cut is PROVEN before either
-# .when #697 ships a host-only del, step 1 goes and step 2 names `--scope host`
-######################################################################
-grove_provision_5_12_rack_upsert_heal_stale() {
-  local gitroot="$1" held owner key org env log
-  owner="$(grove_provision_5_12_rack_slug_owner)"
-  key="$(grove_provision_5_12_rack_slug_key)"
-  org="$(grove_provision_5_12_rack_slug_org)"
-  env="$(grove_provision_5_12_rack_slug_env)"
-
-  # reject an unreadable rack — "could not read" is not "no entry"
-  if ! held="$(grove_provision_5_12_rack_slug_vault_held "$gitroot")"; then
-    echo "   ✋ could not read this seat's rack, so a stale ${org}.${env}.${key} is unread" >&2
-    echo "      read why: rhx keyrack list --owner $owner --org $org --env $env" >&2
-    return 1
-  fi
-
-  # no stale entry, no work
-  if [[ "$held" != "aws.params" ]]; then
-    echo "   • no stale aws.params entry for ${org}.${env}.${key} — no work"
-    return 0
-  fi
-
-  # prove the cut BEFORE any write: an identity reachable here could reach the shared token
-  if command -v aws >/dev/null 2>&1 \
-     && grove_provision_5_12_rack_without_aws timeout -k 5 20 \
-          aws sts get-caller-identity >/dev/null 2>&1; then
-    echo "   ✋ an aws identity is reachable with every known route cut, so the heal is REFUSED" >&2
-    echo "      ⇒ the stale ${org}.${env}.${key} entry points at the fleet's shared token," >&2
-    echo "        and a del that reaches it would delete that token for every grove" >&2
-    echo "      read why: rhx aws.whoami" >&2
-    return 1
-  fi
-
-  # repoint at a local vault — the placeholder is piped, never in argv
-  if ! log="$(printf 'placeholder-to-retire-a-stale-entry' \
-        | grove_provision_5_12_rack_without_aws env -C "$gitroot" rhx keyrack set \
-            --owner "$owner" --key "$key" --org "$org" --env "$env" \
-            --vault os.secure --mech PERMANENT_VIA_REPLICA 2>&1)"; then
-    echo "   ✋ could not repoint the stale ${org}.${env}.${key} at os.secure" >&2
-    printf '%s\n' "$log" | sed 's/^/        /' >&2
-    return 1
-  fi
-
-  # del — the entry now names a local vault, so this touches this box only
-  if ! log="$(grove_provision_5_12_rack_without_aws env -C "$gitroot" rhx keyrack del \
-        --owner "$owner" --key "$key" --org "$org" --env "$env" 2>&1)"; then
-    echo "   ✋ repointed, but could not del ${org}.${env}.${key}" >&2
-    echo "      ⇒ it now names os.secure, a LOCAL vault, so a del touches this box only" >&2
-    echo "      ⇒ a rerun will NOT retry it: an os.secure entry may be a human's own" >&2
-    echo "      fix: rhx keyrack del --owner $owner --org $org --env $env --key $key" >&2
-    printf '%s\n' "$log" | sed 's/^/        /' >&2
-    return 1
-  fi
-  echo "   • retired a stale aws.params entry for ${org}.${env}.${key} (the shared token untouched)"
-}
-
-######################################################################
 # .what = wire `<org>.camp.AWS_PROFILE` to the literal `ambient`, and DECLARE
 #         every env `5.13.reach` will later set
 # .why
@@ -233,19 +166,12 @@ grove_provision_5_12_rack_upsert_awsprofile() {
   owner="$(grove_provision_5_12_rack_slug_owner)"
   # .ask the aws cli, never a raw IMDS curl — the claim is that a CONSUMER of this
   #   profile gets live credentials, and a raw metadata call proves only a role
+  # .why the fix names 5.6.aws, never "has not run yet" — `5.devtools/_.sh` dispatches
+  #   5.6 before 5.12, so order is no cause; an absent artifact from an EARLIER bundle
+  #   means it did not CONVERGE (define.provision-defect-shapes)
   if ! aws configure export-credentials --profile "$value" >/dev/null 2>&1; then
-    echo "   🌙 declined — the '${value}' profile yields no credentials here"
-    echo "      ⇒ so the rack would name a profile that cannot answer, and every"
-    echo "        consumer aimed there would fail later and less clearly"
-    echo "      ⇒ on a laptop this is correct: aws profiles are its human's to place"
-    # .why this never says "5.6.aws has not run yet" — `5.devtools/_.sh` dispatches
-    #   5.6 before 5.12, so order is no cause; an absent artifact from an EARLIER
-    #   bundle means it did not CONVERGE (define.provision-defect-shapes)
-    echo "      ⇒ on a grove it means 5.6.aws ran and did not converge — it is"
-    echo "        dispatched BEFORE this bundle, so a re-apply of this one would"
-    echo "        find the same absent profile"
-    echo "        rhx grove.provision --what 5.6.aws --mode apply"
-    return 0
+    grove_env_ambient_absent_says "the rack's '${value}' AWS_PROFILE row"
+    return
   fi
   # .why a NAMED org needs a keyrack.yml — written into the throwaway root, never an
   #   org repo, whose own would then hold two writers (rule.forbid.two-writers-on-one-artifact)

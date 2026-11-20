@@ -93,7 +93,7 @@ scan_line() {
     HITS+=("$where|account|$m")
   done < <(grep -oE '(^|[^0-9A-Za-z])[0-9]{12}($|[^0-9A-Za-z])' <<< "$text" | grep -oE '[0-9]{12}')
   while read -r m; do [[ -n "$m" ]] && HITS+=("$where|ssm|$m"); done < <(grep -oE 'arn:aws:ssm:[a-z0-9-]+:[0-9]*:parameter/[A-Za-z0-9/_.-]+|parameter/[A-Za-z0-9_.-]+/[A-Za-z0-9/_.-]+|/aws/reference/[A-Za-z0-9/_.-]+' <<< "$text")
-  while read -r m; do [[ -n "$m" ]] && HITS+=("$where|machine|$m"); done < <(grep -oE '\bgrove-[a-z0-9]+-v[0-9]{8}\b|\bi-[0-9a-f]{8,17}\b' <<< "$text" | grep -v 'i-0123456789abcdef0')
+  while read -r m; do [[ -n "$m" ]] && HITS+=("$where|machine|$m"); done < <(grep -oE '\bgrove-[a-z0-9]+(-[a-z0-9]+)*-v[0-9]{8}\b|\bi-[0-9a-f]{8,17}\b' <<< "$text" | grep -v 'i-0123456789abcdef0')
 }
 
 # every line to judge, as two aligned files: where it sits, and what it says
@@ -125,7 +125,7 @@ LINES_READ="$(wc -l < "$WORK/text")"
 
 # .why a prefilter = a classify forks ~20 times per line; one grep picks the few
 #      lines any class could match, and only those are classified
-UNION='\.ts\.net|tskey-|([0-9]{1,3}\.){3}[0-9]{1,3}|@[A-Za-z0-9-]+\.|[0-9]{12}|arn:aws:ssm|parameter/|/aws/reference/|grove-[a-z0-9]+-v[0-9]{8}|\bi-[0-9a-f]{8,17}\b'
+UNION='\.ts\.net|tskey-|([0-9]{1,3}\.){3}[0-9]{1,3}|@[A-Za-z0-9-]+\.|[0-9]{12}|arn:aws:ssm|parameter/|/aws/reference/|grove-[a-z0-9]+(-[a-z0-9]+)*-v[0-9]{8}|\bi-[0-9a-f]{8,17}\b'
 {
   grep -nE -- "$UNION" "$WORK/text" | cut -d: -f1
   [[ -n "$HOST" ]] && grep -nwF -- "$HOST" "$WORK/text" | cut -d: -f1

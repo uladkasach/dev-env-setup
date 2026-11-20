@@ -32,6 +32,7 @@
 ######################################################################
 
 grove_provision_5_4_gh_configure_upsert() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "github auth"; return 0; }
   # .what = the one rack SLUG this repo's github token lives at (`term=slug`)
   #   - the halt below must print the SAME slug the get reads
   #   - these are locals, never `readonly`, since a file may be sourced twice
@@ -60,9 +61,9 @@ grove_provision_5_4_gh_configure_upsert() {
   local GH_KEYRACK_KEY="GITHUB_TOKEN"
   local GH_KEYRACK_ORG="@all"
   local GH_KEYRACK_ENV="camp"
-  # .the vault follows the PLATFORM — `grove_provision_5_4_gh_keyrack_vault` (`_.sh`)
+  # .the vault follows the TIER — `grove_provision_5_4_gh_keyrack_vault` (`_.sh`)
   #   - the read below names no vault: `keyrack get` reads the entry this box
-  #     holds, and off ec2 `5.12.rack` never wires an aws.params one. only the
+  #     holds, and off a camp grove `5.12.rack` never wires an aws.params one. only the
   #     fix-texts name a vault, so only they follow this choice
   local GH_KEYRACK_VAULT
   GH_KEYRACK_VAULT="$(grove_provision_5_4_gh_keyrack_vault)"

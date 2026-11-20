@@ -153,31 +153,8 @@ print(o.repaint_delay, o.input_delay)
   # 2c + 2d. the DECLARED window size wins, and that override is STATED (m11) — in _.sh
   _kitty_verify_window_size "$conf"
 
-  # 2f. a BEL requests no focus, per the loader — the default does, and on wayland cosmic
-  #     grants it, so two windows that beep steal focus from each other without end
-  local wab=""
-  if command -v kitty >/dev/null 2>&1; then
-    wab="$(timeout -k 5 20 kitty +runpy "
-from kitty.config import load_config
-print(load_config('$conf').window_alert_on_bell)
-" 2>/dev/null | tail -1 | tr -d '[:space:]')"
-  fi
-  if [[ -z "$wab" ]]; then
-    echo "   🌙 kitty's loader did not answer, so whether a bell steals focus is UNREAD"
-  else
-    case "$wab" in
-      no|false|n|False)
-        echo "   • a bell marks the tab and steals no focus ✔ ($wab, per kitty's own loader)"
-        ;;
-      *)
-        _kitty_verify_fail "kitty RESOLVES window_alert_on_bell to '$wab'" \
-          "⇒ every BEL becomes an xdg-activation request, and cosmic grants it as focus" \
-          "⇒ two windows that each beep thrash focus back and forth and burn cpu" \
-          "fix: rhx grove.provision --what 4.3.2.emulator --mode apply" \
-          "⚠️ an open kitty keeps the value it started with; a new one reads this"
-        ;;
-    esac
-  fi
+  # 2f. a BEL requests no focus, per the loader — in _.sh
+  _kitty_verify_bell "$conf"
 
   # 2g. a program may WRITE the clipboard, per the loader — the last hop of every tmux copy
   #     - tmux copy-mode (and nvim in a duct) copies by an OSC 52 write to kitty

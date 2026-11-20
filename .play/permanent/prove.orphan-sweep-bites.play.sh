@@ -60,6 +60,7 @@ set -uo pipefail
 DIR="$HOME/.git.forest/groves"
 FIX_ORPHAN="zz-probe-orphan-doesnotexist"
 FIX_NOASK="zz-probe-noask-doesnotexist"
+FIX_HETZ="zz-probe-hetzner-doesnotexist"
 
 echo "🔎 prove.orphan-sweep-bites"
 echo "   └─ subject: git grove del --orphaned"
@@ -68,13 +69,21 @@ echo ""
 ######################################################################
 # 0. decline unless every precondition holds
 ######################################################################
-if ! command -v git_alias_grove &>/dev/null; then
-  # shellcheck source=/dev/null
-  source "$HOME/.bash_aliases" 2>/dev/null || true
+# 🛑 the CHECKOUT's sweep is the subject, sourced unconditionally — never the installed one
+#   - under rhx, BASH_ENV preloads ~/.bash_aliases, so a `command -v` guard finds the
+#     INSTALLED git_alias_grove and the play grades whatever the box last applied
+#   - 📜 measured 2026-11-17: arm 3b read ✋ against a stale installed sweep that
+#     predated the tailnet-host skip, while the checkout's sweep held it
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "")"
+ALIASES="$ROOT/src/grove.provision/2.shell/2.7.aliases/bash_aliases.sh"
+if [[ -z "$ROOT" || ! -f "$ALIASES" ]]; then
+  echo "   ✋ ConstraintError: the subject is absent: $ALIASES" >&2
+  exit 2
 fi
-if ! command -v git_alias_grove &>/dev/null; then
-  echo "   ✋ git_alias_grove is absent — the installed aliases are stale" >&2
-  echo "      fix: rhx grove.provision --what 2.7.aliases --mode apply" >&2
+# shellcheck source=/dev/null
+source "$ALIASES"
+if ! declare -F git_alias_grove &>/dev/null; then
+  echo "   ✋ ConstraintError: $ALIASES defines no git_alias_grove" >&2
   exit 2
 fi
 
@@ -87,7 +96,7 @@ fi
 # 🛑 .why this refuses a name already taken
 #   - an overwrite-then-restore of a real entry destroys a record this play
 #     never read
-for n in "$FIX_ORPHAN" "$FIX_NOASK"; do
+for n in "$FIX_ORPHAN" "$FIX_NOASK" "$FIX_HETZ"; do
   if [[ -e "$DIR/$n.json" ]]; then
     echo "   ✋ $n.json already exists — refused, rather than overwrite it" >&2
     exit 2
@@ -98,7 +107,7 @@ done
 # the fixtures, and their unconditional restore
 ######################################################################
 _restore() {
-  rm -f "$DIR/$FIX_ORPHAN.json" "$DIR/$FIX_NOASK.json"
+  rm -f "$DIR/$FIX_ORPHAN.json" "$DIR/$FIX_NOASK.json" "$DIR/$FIX_HETZ.json"
 }
 trap _restore EXIT
 
@@ -117,7 +126,14 @@ cat > "$DIR/$FIX_NOASK.json" <<JSON
 {"name":"$FIX_NOASK","sshAlias":"$FIX_NOASK","exid":"$FIX_NOASK","env":"zz-no-such-env","type":"ec2","status":"active"}
 JSON
 
-if [[ ! -f "$DIR/$FIX_ORPHAN.json" || ! -f "$DIR/$FIX_NOASK.json" ]]; then
+# a hetzner entry registered BEFORE --platform existed: `git grove set` stamped type ec2
+# and an exid on it, and ec2 holds no such instance — so a sweep that read type+exid
+# alone would call a live box an orphan. its tailnet host is what marks it
+cat > "$DIR/$FIX_HETZ.json" <<JSON
+{"name":"$FIX_HETZ","sshAlias":"$FIX_HETZ","exid":"$FIX_HETZ","env":"camp","host":"203.0.113.9","type":"ec2","status":"active"}
+JSON
+
+if [[ ! -f "$DIR/$FIX_ORPHAN.json" || ! -f "$DIR/$FIX_NOASK.json" || ! -f "$DIR/$FIX_HETZ.json" ]]; then
   echo "   🌙 the fixtures did not land, so no arm has a subject" >&2
   exit 2
 fi
@@ -260,8 +276,34 @@ else
 fi
 
 ######################################################################
+# arm 3b — a declared non-ec2 platform is SKIPPED, never named an orphan
+#
+# 🛑 judged in a SCRATCH registry that holds this fixture alone
+#   - a tailnet entry is skipped before any aws ask, so this arm needs no
+#     credential — and in the real registry a foreign halt starved it of a row
+#   - ⇒ `HOME` points the sweep at a dir this play owns; the real one is untouched
+######################################################################
+scratch_home="$(mktemp -d -t orphan-sweep-home.XXXXXX)"
+mkdir -p "$scratch_home/.git.forest/groves"
+cp "$DIR/$FIX_HETZ.json" "$scratch_home/.git.forest/groves/"
+out3b="$(HOME="$scratch_home" git_alias_grove del --orphaned 2>&1)"; rc3b=$?
+rm -rf "$scratch_home"
+
+# read line by line: a whole-output glob would join this row to another orphan's verdict
+if [[ "$out3b" == *"$FIX_HETZ — not a cloud grove"* && "$rc3b" -eq 0 ]] \
+   && ! printf '%s\n' "$out3b" | grep -F "$FIX_HETZ" | grep -qF 'no instance carries'; then
+  echo "   │  ├─ 3b. a hetzner entry is skipped        ✔ never named an orphan"
+else
+  echo "   │  ├─ 3b. a hetzner entry is skipped        ✋ rc=$rc3b, the sweep judged it as ec2" >&2
+  echo "   │  │     ⇒ a live hetzner box would be unregistered by --mode apply" >&2
+  printf '%s\n' "$out3b" | sed 's/^/   │  │     said: /' >&2
+  fails=$(( fails + 1 ))
+fi
+
+######################################################################
 # arm 4 — PLAN dropped no entry. the default mode may never write
 ######################################################################
+
 if [[ -f "$DIR/$FIX_ORPHAN.json" ]]; then
   echo "   │  └─ 4. plan mode dropped no entry        ✔ plan is read-only"
 else
@@ -276,7 +318,7 @@ fi
 ######################################################################
 _restore
 left=""
-for n in "$FIX_ORPHAN" "$FIX_NOASK"; do
+for n in "$FIX_ORPHAN" "$FIX_NOASK" "$FIX_HETZ"; do
   [[ -e "$DIR/$n.json" ]] && left="$left $n"
 done
 

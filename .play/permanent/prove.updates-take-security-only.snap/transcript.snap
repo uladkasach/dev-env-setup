@@ -1,0 +1,205 @@
+## provision.verify, the package absent
+   ✋ ConstraintError: unattended-upgrades is NOT installed
+      ⇒ this box takes no security patch until a human applies one
+      fix: from a seat with sudo (ground on a grove; a laptop's own terminal):
+        sudo -v && rhx grove.provision --what 1.14.updates --mode apply
+
+## provision.upsert, absent, a laptop seat with no root
+   🌙 the unattended-upgrades package is a BOX-WIDE fact, and this seat has no root
+      ⇒ unattended-upgrades is not installed
+      ⇒ on a laptop the seat with root is its human. run this ONCE, from a
+        terminal — the sudo -v is what lets the rhx run below reach root:
+        sudo -v && rhx grove.provision --what 1.14.updates --mode apply
+
+## provision.upsert, absent, root here, apt refuses
+   💥 MalfunctionError: unattended-upgrades did not install
+      ⇒ it said: E: stub apt refused the install
+
+## provision.upsert, absent, root here
+   • unattended-upgrades installed
+
+## provision.upsert, present
+   • unattended-upgrades ✔ (already installed)
+
+## provision.verify, present
+   • unattended-upgrades is installed ✔
+
+## configure.upsert, no drop-in, a grove seat with no root
+   🌙 the unattended-upgrades policy is a BOX-WIDE fact, and this seat has no root
+      ⇒ 3 policy file(s) out of date, apt timers not enabled
+      ⇒ a seat converges its own $HOME; this lives outside it, and the
+        seat with sudo runs this same bundle and sets it there
+      ⇒ no step is owed by this seat, and none by a human
+
+## configure.upsert, root here, the timer masked
+   • <fix>/live/52grove-unattended-upgrades written
+   • <fix>/live/grove-unattended-keep-conffiles.conf written
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf written
+   ✋ ConstraintError: a masked apt timer, so the policy on disk never runs (apt-daily.timer apt-daily-upgrade.timer)
+      ⇒ a mask is an admin's own refusal, and this apply does not lift it
+      fix: if the box should take security updates, lift it, then re-apply —
+        sudo systemctl unmask apt-daily.timer apt-daily-upgrade.timer
+        rhx grove.provision --what 1.14.updates --mode apply
+
+## configure.upsert, root here, the enable refused
+   • <fix>/live/52grove-unattended-upgrades written
+   • <fix>/live/grove-unattended-keep-conffiles.conf written
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf written
+   💥 MalfunctionError: could not enable apt-daily.timer apt-daily-upgrade.timer
+      ⇒ the policy is on disk and never runs
+      ⇒ it said: Failed to enable unit: Access denied
+      read why: systemctl status apt-daily.timer apt-daily-upgrade.timer
+
+## configure.upsert, root here, the apt dir unwritable
+   💥 MalfunctionError: could not write <fix>/live/52grove-unattended-upgrades
+      ⇒ it said: install: cannot create regular file '<fix>/live/52grove-unattended-upgrades': Permission denied
+      read why: ls -ld <fix>/live
+
+## configure.upsert, a declared file absent from the checkout
+   💥 MalfunctionError: the declared file is absent at <fix>/checkout/52grove-unattended-upgrades
+      ⇒ the checkout is partial; re-pull it, then re-run
+
+## configure.upsert, root here, the daemon-reload refused
+   • <fix>/live/52grove-unattended-upgrades written
+   • <fix>/live/grove-unattended-keep-conffiles.conf written
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf written
+   💥 MalfunctionError: <fix>/live/unit.d/52grove-keep-conffiles.conf is on disk and systemd did not reload it
+      ⇒ it said: Failed to reload daemon: Access denied
+      read why: systemctl status apt-daily-upgrade.service
+
+## configure.upsert, root here, first apply
+   • <fix>/live/52grove-unattended-upgrades written
+   • <fix>/live/grove-unattended-keep-conffiles.conf written
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf written
+   • apt-daily.timer apt-daily-upgrade.timer enabled
+
+## configure.upsert, current, no root
+   • policy, unattended conffile choice, and both apt timers current ✔ (daily, security only, no reboot)
+
+## configure.verify, all in force
+   • <fix>/live/52grove-unattended-upgrades matches the declared policy ✔
+   • <fix>/live/grove-unattended-keep-conffiles.conf matches the declared policy ✔
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf matches the declared policy ✔
+   • apt runs unattended-upgrade daily ✔
+   • unattended-upgrade never reboots this box ✔
+   • only security origins are allowed ✔
+   • this box's apt sources serve the allowed security archive ✔ (o=Ubuntu,a=noble-security)
+   • only the unattended run keeps a local conffile ✔ (a human's apt still asks)
+   • apt-daily.timer apt-daily-upgrade.timer are enabled ✔
+
+## configure.verify, a later drop-in turns off the daily run
+   • <fix>/live/52grove-unattended-upgrades matches the declared policy ✔
+   • <fix>/live/grove-unattended-keep-conffiles.conf matches the declared policy ✔
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf matches the declared policy ✔
+   ✋ ConstraintError: apt's merged config does not run unattended-upgrade daily
+      ⇒ a drop-in later than <fix>/live/52grove-unattended-upgrades, or an absent one, overrides the policy
+      read it: apt-config dump APT::Periodic
+   • unattended-upgrade never reboots this box ✔
+   • only security origins are allowed ✔
+   • this box's apt sources serve the allowed security archive ✔ (o=Ubuntu,a=noble-security)
+   • only the unattended run keeps a local conffile ✔ (a human's apt still asks)
+   • apt-daily.timer apt-daily-upgrade.timer are enabled ✔
+
+## configure.verify, a later drop-in allows a reboot
+   • <fix>/live/52grove-unattended-upgrades matches the declared policy ✔
+   • <fix>/live/grove-unattended-keep-conffiles.conf matches the declared policy ✔
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf matches the declared policy ✔
+   • apt runs unattended-upgrade daily ✔
+   ✋ ConstraintError: apt's merged config lets unattended-upgrade reboot this box
+      ⇒ a reboot kills every duct pane and every run mid-flight
+      read it: apt-config dump Unattended-Upgrade::Automatic-Reboot
+   • only security origins are allowed ✔
+   • this box's apt sources serve the allowed security archive ✔ (o=Ubuntu,a=noble-security)
+   • only the unattended run keeps a local conffile ✔ (a human's apt still asks)
+   • apt-daily.timer apt-daily-upgrade.timer are enabled ✔
+
+## configure.verify, a non-security origin allowed
+   • <fix>/live/52grove-unattended-upgrades matches the declared policy ✔
+   • <fix>/live/grove-unattended-keep-conffiles.conf matches the declared policy ✔
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf matches the declared policy ✔
+   • apt runs unattended-upgrade daily ✔
+   • unattended-upgrade never reboots this box ✔
+   ✋ ConstraintError: unattended-upgrade allows a non-security origin (or none at all)
+        Unattended-Upgrade::Origins-Pattern:: "origin=Ubuntu,archive=${distro_codename}-security";
+        Unattended-Upgrade::Origins-Pattern:: "origin=UbuntuESMApps,archive=${distro_codename}-apps-security";
+        Unattended-Upgrade::Allowed-Origins:: "${distro_id}:${distro_codename}-updates";
+      ⇒ a feature update could move a pinned tool on this box and not its peer
+      read it: grep -rn 'Origins' /etc/apt/apt.conf.d/  — a drop-in later than <fix>/live/52grove-unattended-upgrades names it
+   • this box's apt sources serve the allowed security archive ✔ (o=Ubuntu,a=noble-security)
+   • only the unattended run keeps a local conffile ✔ (a human's apt still asks)
+   • apt-daily.timer apt-daily-upgrade.timer are enabled ✔
+
+## configure.verify, the timer disabled
+   • <fix>/live/52grove-unattended-upgrades matches the declared policy ✔
+   • <fix>/live/grove-unattended-keep-conffiles.conf matches the declared policy ✔
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf matches the declared policy ✔
+   • apt runs unattended-upgrade daily ✔
+   • unattended-upgrade never reboots this box ✔
+   • only security origins are allowed ✔
+   • this box's apt sources serve the allowed security archive ✔ (o=Ubuntu,a=noble-security)
+   • only the unattended run keeps a local conffile ✔ (a human's apt still asks)
+   ✋ ConstraintError: not every apt timer is enabled (apt-daily.timer apt-daily-upgrade.timer)
+      ⇒ the policy is declared and never runs
+      fix: from a seat with sudo: sudo -v && rhx grove.provision --what 1.14.updates --mode apply
+
+## configure.verify, the unit hands the run no APT_CONFIG
+   • <fix>/live/52grove-unattended-upgrades matches the declared policy ✔
+   • <fix>/live/grove-unattended-keep-conffiles.conf matches the declared policy ✔
+   ✋ ConstraintError: <fix>/live/unit.d/52grove-keep-conffiles.conf differs from the declared policy (or is absent)
+      fix: from a seat with sudo: sudo -v && rhx grove.provision --what 1.14.updates --mode apply
+   • apt runs unattended-upgrade daily ✔
+   • unattended-upgrade never reboots this box ✔
+   • only security origins are allowed ✔
+   • this box's apt sources serve the allowed security archive ✔ (o=Ubuntu,a=noble-security)
+   ✋ ConstraintError: apt-daily-upgrade.service hands no APT_CONFIG=<fix>/live/grove-unattended-keep-conffiles.conf to the unattended run
+      ⇒ it skips any upgrade that would prompt over an edited conffile (imagemagick's policy.xml)
+      read it: systemctl show -p Environment apt-daily-upgrade.service
+   • apt-daily.timer apt-daily-upgrade.timer are enabled ✔
+
+## configure.verify, a global drop-in keeps every conffile
+   • <fix>/live/52grove-unattended-upgrades matches the declared policy ✔
+   • <fix>/live/grove-unattended-keep-conffiles.conf matches the declared policy ✔
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf matches the declared policy ✔
+   • apt runs unattended-upgrade daily ✔
+   • unattended-upgrade never reboots this box ✔
+   • only security origins are allowed ✔
+   • this box's apt sources serve the allowed security archive ✔ (o=Ubuntu,a=noble-security)
+   ✋ ConstraintError: EVERY apt run keeps a local conffile silently, a human's included
+      ⇒ a drop-in in /etc/apt/apt.conf.d/ sets Dpkg::Options; that choice belongs to the unattended run alone
+      read it: grep -rn 'force-confold' /etc/apt/apt.conf.d/
+   • apt-daily.timer apt-daily-upgrade.timer are enabled ✔
+
+## configure.verify, apt-config itself fails
+   • <fix>/live/52grove-unattended-upgrades matches the declared policy ✔
+   • <fix>/live/grove-unattended-keep-conffiles.conf matches the declared policy ✔
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf matches the declared policy ✔
+   💥 MalfunctionError: apt-config could not dump apt's merged config
+      ⇒ it said: E: stub apt-config could not parse its config
+
+## configure.verify, no apt source serves the security archive
+   • <fix>/live/52grove-unattended-upgrades matches the declared policy ✔
+   • <fix>/live/grove-unattended-keep-conffiles.conf matches the declared policy ✔
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf matches the declared policy ✔
+   • apt runs unattended-upgrade daily ✔
+   • unattended-upgrade never reboots this box ✔
+   • only security origins are allowed ✔
+   ✋ ConstraintError: no apt source here serves o=Ubuntu,a=noble-security
+      ⇒ the policy allows only that archive, so the daily run would upgrade naught
+      read it: apt-cache policy | grep -- '-security'
+      fix: if the lists are stale, sudo apt update; if this box is not ubuntu-based,
+        its security archive needs its own Origins-Pattern row in 52grove-unattended-upgrades
+   • only the unattended run keeps a local conffile ✔ (a human's apt still asks)
+   • apt-daily.timer apt-daily-upgrade.timer are enabled ✔
+
+## configure.verify, a pop!_os laptop that serves ubuntu's security archive
+   • <fix>/live/52grove-unattended-upgrades matches the declared policy ✔
+   • <fix>/live/grove-unattended-keep-conffiles.conf matches the declared policy ✔
+   • <fix>/live/unit.d/52grove-keep-conffiles.conf matches the declared policy ✔
+   • apt runs unattended-upgrade daily ✔
+   • unattended-upgrade never reboots this box ✔
+   • only security origins are allowed ✔
+   • this box's apt sources serve the allowed security archive ✔ (o=Ubuntu,a=noble-security)
+   • only the unattended run keeps a local conffile ✔ (a human's apt still asks)
+   • apt-daily.timer apt-daily-upgrade.timer are enabled ✔
+
+

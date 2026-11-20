@@ -30,7 +30,7 @@ declare -F grove_provision_5_12_rack_declare_org >/dev/null || {
   exit 1
 }
 
-fixture="$(mktemp -d)" || { echo "💥 MalfunctionError: mktemp -d failed" >&2; exit 1; }
+fixture="$(mktemp -d)" || { echo "💥 MalfunctionError: could not make a temp dir" >&2; exit 1; }
 trap 'rm -rf "$fixture"' EXIT
 
 failed=0

@@ -605,6 +605,9 @@ if _in_range 0; then
   if ! rhx git.grove.ready.verify "$GROVE" >"$LOGDIR/box.log" 2>&1; then
     echo "      │  └─ ✋ the ladder halted — its own reason is below"
     echo ""
+    # the claims sit ABOVE the ladder's `why:`, which points up at them
+    _say_ladder_claims "$LOGDIR/box.log" | sed 's/^/  /'
+    echo ""
     sed -n '/^  why:/,$p' "$LOGDIR/box.log"
     echo ""
     # 🛑 .why this does NOT say "that is a fact about the box" — measured 2026-08-13

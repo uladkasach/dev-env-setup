@@ -16,17 +16,22 @@
 #   - it DECLINES wherever an input cannot be read, and guesses none
 ######################################################################
 
+# .what = replay a skill's own words under this bundle's `what it said:` line
+# .why  = a verbatim replay strands its tree glyphs, so each line sits at one depth
+grove_provision_5_13_reach_said() {
+  printf '%s\n' "$1" | sed -E 's/^[[:space:]]*((│|├─|└─)[[:space:]]*)*//; /^$/d; s/^/        /'
+}
+
 grove_provision_5_13_reach_configure_upsert() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "account reach"; return 0; }
   local owner
   owner="$(grove_provision_5_13_reach_owner)"
 
   # 0. an ambient identity to chain OFF — every profile assumes from the box's
-  #    badge, and a laptop has none. `5.12.rack` and `5.6.aws` agree on this
+  #    badge, and a laptop has none. on a camp seat the same silence is a fault
   if ! aws configure export-credentials --profile ambient >/dev/null 2>&1; then
-    echo "   • declined — no ambient identity here, so no badge to assume from"
-    echo "     ⇒ on a laptop this is correct: its route to the same profile name"
-    echo "       is an sso login, which is a human's to perform"
-    return 0
+    grove_env_ambient_absent_says "account reach"
+    return
   fi
 
   if ! command -v rhx >/dev/null 2>&1; then
@@ -62,6 +67,10 @@ grove_provision_5_13_reach_configure_upsert() {
     ahead)   echo "   🌙 $srcname has diverged from its upstream — left alone"
              echo "      ⇒ a fast-forward would drop work, so the rows read what it holds" ;;
     detached) echo "   🌙 $srcname is on no branch with an upstream — left alone" ;;
+    carried) echo "   🌙 $srcname is a carried tree (no .git) — the rows read what it holds"
+             echo "      ⇒ it has no upstream, so a declaration merged since the carry"
+             echo "        is invisible here. re-carry it to refresh:"
+             echo "        rhx git.grove.push <grove> --from <its checkout> --into git/$(grove_org_clonedir "$srcorg")/$(grove_provision_5_13_reach_srcname) --mode apply" ;;
     *)       echo "   🌙 $srcname could not be fetched — the rows read what it holds"
              echo "      ⇒ a declaration merged since the last fetch is invisible here" ;;
   esac
@@ -71,26 +80,17 @@ grove_provision_5_13_reach_configure_upsert() {
   local gitroot
   gitroot="$(grove_provision_5_12_rack_gitroot)"
 
-  # every `rhx` below runs from the CHECKOUT ROOT, where rhachet links this
-  # repo's role. 🛑 hoisted ABOVE the loop — `set -u` killed the reap when every
-  # row declined before a loop-local line could set it
+  # every `rhx` below runs from the CHECKOUT ROOT, where rhachet links this repo's
+  # role. 🛑 hoisted ABOVE the loop — `set -u` killed the reap when every row declined
   local checkout; checkout="$(dirname "$GROVE_SRC")"
 
   # 1. one row at a time. ⚠️ the role AND the org are read INSIDE the loop — the
   #    rows share neither, so a hoisted read writes one value into every profile
-  local failed=0 pair rest org env reader akey rkey role account
+  local failed=0 pair org env reader akey rkey role account
   for pair in $(grove_provision_5_13_reach_envs); do
-    org="${pair%%:*}"
-    rest="${pair#*:}"
-    env="${rest%%:*}"
-    rest="${rest#*:}"
-    reader="${rest%%:*}"
-    rest="${rest#*:}"
-    akey="${rest%%:*}"
-    rkey="${rest##*:}"
+    IFS='|' read -r org env reader akey rkey <<< "$(grove_provision_5_13_reach_row_fields "$pair")"
 
-    # ⚠️ halt a short row here: `${rest##*:}` would hand back some EARLIER
-    #    field, whose empty role read looks like "infrastructure is not cloned"
+    # ⚠️ halt a short row here: its empty role read looks like an absent clone
     if [[ "$pair" != *:*:*:*:* ]]; then
       echo "   ✋ the row '${pair}' is malformed" >&2
       echo "      ⇒ a row is '<org>:<env>:<reader>:<accountKey>:<roleKey>' — see 5.13.reach/_.sh" >&2
@@ -125,7 +125,9 @@ grove_provision_5_13_reach_configure_upsert() {
       echo "        guess turns a readable gap into a false 'no access' report"
       continue
     fi
-    echo "   • ${env} role (read from ${srcname}'s declaration): $role"
+    # the DECLARATION source and the role's OWNER can differ (a cross-org opt-in), so
+    #   the line names both — the trust ask below goes to the owner, never the source
+    echo "   • ${org}.${env} role: $role (declared in ${srcname}$([[ "$org" != "${srcorg%%-*}" ]] && printf '; a role %s owns' "$org"))"
 
     # ⚠️ the account is read and PASSED, never printed (`rule.forbid.dox-in-public-repo`)
     account="$(grove_provision_5_13_reach_account "$reader" "$akey")"
@@ -140,15 +142,14 @@ grove_provision_5_13_reach_configure_upsert() {
     # ⚠️ CAPTURED and replayed on failure — the skill's output IS the diagnosis
     # 🛑 `--assume`, NEVER `--role` — rhachet injects `--role` itself, so the
     #    skill drops a caller's in silence. only a FROM-SCRATCH box shows it
-    local reachlog rc
+    local reachlog rc refused
     reachlog="$(env -C "$checkout" rhx aws.reach.set \
                   --org "$org" --env "$env" --owner "$owner" \
                   --assume "$role" --account "$account" --mode apply 2>&1)"
     rc=$?
 
     if [[ $rc -ne 0 ]]; then
-      # ⚠️ the CAUSE is read from the log, never assumed. no `-q` on either read:
-      #    a matched `grep -q` under pipefail takes the ELSE branch
+      # ⚠️ the CAUSE is read from the log. no `-q`: under pipefail it takes the ELSE branch
       echo "   ✋ could not give this seat reach into ${org}.${env}" >&2
       echo "      ⇒ every suite that targets ${env} resources acts as the CAMP" >&2
       echo "        role instead, and is refused on each call it makes" >&2
@@ -161,17 +162,28 @@ grove_provision_5_13_reach_configure_upsert() {
         echo "      read which: rhx git.grove.send <grove> --bare \\" >&2
         echo "        --why 'a verify needs the remote verdict' \\" >&2
         echo "        --play diagnose.grove-reaches-this-repos-skills" >&2
+      elif printf '%s\n' "$reachlog" | grep "OUTSIDE this skill's fence" >/dev/null; then
+        # a hand-laid twin of the hop's profile: the sdk reads the LAST of two blocks
+        #   of one name, so the skill refuses to write beside it (catalog c11)
+        echo "      ⇒ ~/.aws/config already holds this hop's profile OUTSIDE the fence —" >&2
+        echo "        laid by hand or by another writer, so it is not this bundle's to delete." >&2
+        echo "        remove that block (the skill names its lines below), then re-apply" >&2
+      elif refused="$(grove_aws_trust_refused "$reachlog")"; then
+        # 🛑 read FIRST: a session-tag refusal's text holds "AssumeRole" too, and its
+        #   repair is the opposite one — the role trusts this box already
+        #   (the same shared reader the verify sorts by, `src/grove.aws.sh`)
+        echo "      ⇒ the role TRUSTS this box, and refuses what its session carries ($refused)" >&2
+        echo "        an infra ask: the role's trust policy must allow all three of" >&2
+        echo "        $(grove_aws_trust_actions_owed), in ${org}/infrastructure" >&2
       elif printf '%s\n' "$reachlog" | grep -i 'AccessDenied' >/dev/null; then
-        echo "      ⇒ an AccessDenied on sts:AssumeRole means the role exists and" >&2
-        echo "        this box is outside its trust policy — an infra ask, not a" >&2
-        echo "        box defect (handoff.infra.grove-account-reach.md)" >&2
+        grove_provision_5_13_reach_denied_causes_say "$org" "$role"
       else
         echo "      ⇒ the skill ran and refused for a reason that is neither an" >&2
         echo "        absent linkage nor an AccessDenied — read its own words" >&2
       fi
 
       echo "      ⇒ what it said:" >&2
-      printf '%s\n' "$reachlog" | sed 's/^/        /' >&2
+      grove_provision_5_13_reach_said "$reachlog" >&2
       failed=1
       continue
     fi
@@ -179,8 +191,7 @@ grove_provision_5_13_reach_configure_upsert() {
     echo "   • ${org}.${env} reaches its account, proven with a live sts call ✔"
   done
 
-  # 2. reap every reach this table no longer declares — by DECLARATION, never a
-  #    hand list of dead names, and bounded to this family's `# grove: reach` fences
+  # 2. reap every reach no row declares — bounded to this family's `# grove: reach` fences
   local declared carried seen
 
   # 🛑 an UNKNOWN org may NEVER drive a reap — it read no table, so every fence
@@ -193,8 +204,7 @@ grove_provision_5_13_reach_configure_upsert() {
 
   declared="$(grove_provision_5_13_reach_declared_profiles)"
 
-  # ⚠️ a checkout with no `.agent/` cannot list its fences — a SKIPPED reap,
-  #    never a converged box (`rule.forbid.failhide`)
+  # ⚠️ no `.agent/` → no fence list → a SKIPPED reap, never a converged box
   if ! carried="$(grove_provision_5_13_reach_carried)"; then
     echo "   🌙 the reach fences could not be listed, so none were reaped"
     echo "      ⇒ this checkout carries no .agent/, so the fence grammar has"
@@ -230,7 +240,7 @@ grove_provision_5_13_reach_configure_upsert() {
       echo "      ⇒ it stays live on this box: a profile that names a real role" >&2
       echo "        in a real account, under a name this repo no longer declares" >&2
       echo "      ⇒ what it said:" >&2
-      printf '%s\n' "$deadlog" | sed 's/^/        /' >&2
+      grove_provision_5_13_reach_said "$deadlog" >&2
       failed=1
     fi
   done < <(printf '%s\n' "$carried")

@@ -44,6 +44,21 @@ before you read a credential's state, ask: **who WRITES this?**
 a corollary that catches the same class: a probe that answers identically for "absent" and
 for "present but stored elsewhere" is not a probe. it is a constant.
 
+### .the one carve-out the tell implies — a box's OWN identity
+
+a cloud grove's platform identity is written by the platform: ec2's instance role (IMDS),
+or infra's IAM Roles Anywhere signer behind `[default]`'s endpoint on hetzner. keyrack
+writes no part of it and holds no slot for it, so by the tell above **`aws sts` is the
+reader that owns it**:
+
+```sh
+env -u AWS_PROFILE aws sts get-caller-identity   # ✅ the box's own identity, on the box
+```
+
+keyrack's `aws.params` vault decrypts THROUGH that identity, so a keyrack read cannot vouch
+for it — the derived fact would vouch for its source. every credential keyrack declares
+still goes through keyrack.
+
 ## .and the reverse mistake
 
 do not conclude from this that keyrack is fragile. it is not. the two apparent failures

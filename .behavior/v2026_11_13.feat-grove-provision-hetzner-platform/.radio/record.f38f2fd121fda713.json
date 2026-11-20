@@ -1,0 +1,19 @@
+{
+  "key": "f38f2fd121fda713",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-ehmpathy"
+  },
+  "exid": null,
+  "title": "git.repo.test: cap jest workers at 4 by default, so groves fit more crews",
+  "description": "## .what\n\ngit.repo.test caps jest workers at 4 by default (`--maxWorkers=4`), with a flag to override (e.g. `--workers <n|N%>`).\n\n## .why\n\na grove is a shared box: its cores buy room for MORE crews, never a faster crew. jest defaults to cores-1, so on a 36-core grove one suite claims 35 workers and the box fits one crew instead of ~9. a cap of 4 is free on ci runners and laptops (mostly <=4 cores), and is what lets crews sit side by side on a grove.\n\nmeasured 2026-11-18 on a 36-core hetzner grove: the svc-chat integration suite ran at 35 workers, and all 29 files started inside one second.\n\n## .done when\n\n- the default run passes `--maxWorkers=4` to jest for unit and integration\n- an override flag exists, documented in --help\n- a test pins the default",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 13,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "1409"
+}

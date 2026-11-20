@@ -21,20 +21,16 @@
 #     1.8.tmpfiles   the daily /tmp prune, so boot stays fast
 #     1.9.audio      the mic capture chain (pw-record, pactl, notify-send)
 #     1.10.hosts     the ssm-proxy db tunnel aliases (/etc/hosts)
-#     1.11.wifi      wifi power-save off (NetworkManager conf.d + live radio)
-#                    + a stall watchdog that records, then reconnects (system unit)
+#     1.11.wifi      wifi power-save off, plus a stall watchdog (NM conf.d + unit)
 #     1.12.firewall  no inbound connection, on a local grove (nftables + its unit)
-#     1.13.exitnode  the vpn switch: mullvad on/off with no password, paused
-#                    for a captive portal (a root switch + sudoers + NM hook)
+#     1.13.exitnode  the vpn switch: mullvad on/off, paused for a captive portal
+#     1.14.updates   unattended security updates, never a reboot, on every box
 #
-# .why nearly all apply to EVERY box
-#   - a screen-gate reads "no EFFECT here" as "cannot be HELD here"; a
-#     keyboard remap with no keyboard is a harmless declaration, so `1.1`
+# .why most apply to EVERY box
+#   - a screen-gate reads "no EFFECT here" as "cannot be HELD here", so `1.1`
 #     through `1.5` apply everywhere
-#   - ⚠️ `1.6.procs` is the one that SPLITS: `1.6.2.monitor` speaks through
-#     `notify-send`, which needs a desktop bus a grove has not got — so the
-#     decline is "no bus here", never "no effect here", and it lives in the
-#     leaf that owns the fact (`rule.require.identical-bundle-composition`)
+#   - a leaf that splits declines inline, beside the physical fact it reads
+#     (`rule.require.identical-bundle-composition`)
 #
 # usage:
 #   rhx grove.provision --what 1.system --mode apply
@@ -54,4 +50,5 @@ grove_provision_1_system() {
   bundle.upgrade 1.11.wifi
   bundle.upgrade 1.12.firewall
   bundle.upgrade 1.13.exitnode
+  bundle.upgrade 1.14.updates
 }

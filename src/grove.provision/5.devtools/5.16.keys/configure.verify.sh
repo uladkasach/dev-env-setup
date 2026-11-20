@@ -21,6 +21,7 @@
 ####################################################################
 
 grove_provision_5_16_keys_configure_verify() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "the work keys"; return 0; }
   local owner gitroot ambient row org rest env key profile acct verdict got failed
   owner="$(grove_provision_5_16_keys_owner)"
   gitroot="$(grove_provision_5_12_rack_gitroot)"
@@ -56,17 +57,17 @@ grove_provision_5_16_keys_configure_verify() {
     return 0
   fi
 
-  # 🛑 .off the ec2 platform, a key lives in `os.secure` and NEVER in `aws.params`
-  #   - a local or house grove has no ec2 identity to read ssm with
+  # 🛑 .off a camp grove, a key lives in `os.secure` and NEVER in `aws.params`
+  #   - a local or house grove has no camp identity to read ssm with
   #   - ⇒ the account-alignment yardstick below is void there, and a fix-text
   #     that named aws.params would send a human to write into whatever account
-  #     their shell happened to hold (`rule.forbid.aws-params-off-ec2`)
-  local onec2=0
-  grove_provision_5_12_rack_platform_is_ec2 && onec2=1
+  #     their shell happened to hold (`rule.require.aws-params-on-camp-groves-only`)
+  local oncamp=0
+  grove_provision_5_12_rack_is_camp_grove && oncamp=1
 
   # .the yardstick: this box's own badge. it is compared against, never printed
   ambient=''
-  if [[ "$onec2" -eq 1 ]]; then
+  if [[ "$oncamp" -eq 1 ]]; then
     ambient="$(aws sts get-caller-identity --profile ambient --query Account --output text 2>/dev/null)"
     [[ "$ambient" == 'None' ]] && ambient=''
   fi
@@ -81,7 +82,7 @@ grove_provision_5_16_keys_configure_verify() {
     #   ENV, so the read would ask for a key named after an env and answer
     #   empty, and the fix-text would blame a human for a table defect
     if [[ "$row" != *:*:* ]]; then
-      echo "   ✋ the required row '${row}' is not '<org>:<env>:<key>'" >&2
+      echo "   ✋ ConstraintError: the required row '${row}' is not '<org>:<env>:<key>'" >&2
       echo "      ⇒ see 5.16.keys/_.sh, \`_required\`" >&2
       return 1
     fi
@@ -112,13 +113,23 @@ grove_provision_5_16_keys_configure_verify() {
       continue
     fi
 
+    # 🛑 inside a boot, the KEYS are the boot's next step: `git.grove.auth.keys.set`
+    #   places each row from the laptop's rack right after this apply, reads each one
+    #   back, and halts on any it cannot place; the gate then re-runs this verify.
+    #   so the claim has an owner that runs next, and a ✋ here only halted the boot
+    #   one step before the step that clears it — on every first boot
+    if [[ "${GROVE_BOOT_PLACES_KEYS:-}" == 1 ]]; then
+      echo "   🌙 ${org}.${env}.${key} — not yet placed; the boot places it next and reads it back"
+      continue
+    fi
+
     failed=1
-    echo "   ✋ ${org}.${env}.${key} — the rack hands over an EMPTY value" >&2
+    echo "   ✋ ConstraintError: ${org}.${env}.${key} — the rack hands over an EMPTY value" >&2
     echo "      ⇒ this key is REQUIRED: every ${org} ${env} suite on this box dies without it" >&2
 
-    # .off ec2, three states and one vault — see the header above the loop
-    if [[ "$onec2" -eq 0 ]]; then
-      echo "      ⇒ '${GROVE_ENV_SERVER:-unset}' has no ec2 identity, so this key lives in os.secure" >&2
+    # .off a camp grove, three states and one vault — see the header above the loop
+    if [[ "$oncamp" -eq 0 ]]; then
+      echo "      ⇒ '${GROVE_ENV_SERVER:-unset}' is not a camp grove, so this key lives in os.secure" >&2
       echo "      ⇒ EMPTY here means one of three:" >&2
       echo "         · the session lapsed" >&2
       echo "         · this seat's \$HOME holds no entry for the slug" >&2
@@ -128,7 +139,7 @@ grove_provision_5_16_keys_configure_verify() {
       echo "         rhx keyrack unlock --owner ${owner} --env ${env}" >&2
       echo "      ⇒ absent, or wired to aws.params? place it here, at a terminal, in os.secure:" >&2
       echo "         rhx keyrack set --owner ${owner} --key ${key} --org ${org} --env ${env} --vault os.secure" >&2
-      echo "      🛑 never --vault aws.params on this box (rule.forbid.aws-params-off-ec2)" >&2
+      echo "      🛑 never --vault aws.params on this box (rule.require.aws-params-on-camp-groves-only)" >&2
       continue
     fi
 

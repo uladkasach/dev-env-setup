@@ -1,0 +1,48 @@
+## held, on camp
+   ✔ ahbode.prep.VENDOR_KEY — the rack hands over a value
+
+## empty, inside a boot that places keys next
+   🌙 ahbode.prep.VENDOR_KEY — not yet placed; the boot places it next and reads it back
+
+## empty, on camp, outside a boot
+   ✋ ConstraintError: ahbode.prep.VENDOR_KEY — the rack hands over an EMPTY value
+      ⇒ this key is REQUIRED: every ahbode prep suite on this box dies without it
+      ⇒ profile 'ambient' = this box's ambient account
+      ⇒ EMPTY collapses five states, and each wants a different repair:
+         · this seat's $HOME holds no manifest entry for the slug
+         · the session lapsed
+         · this box cannot read that vault
+         · an aws.params value was written into a DIFFERENT account
+         · the key is an EPHEMERAL mech, so `get` hands back a minted
+           token rather than the stored blob — and a replica placed
+           from that is a corpse. ⚠️ do NOT 'set it here': this box is
+           a grove, and a tty on the provision path is a blocker.
+           the repair is CENTRAL, run once on a human's own laptop —
+             rhx keyrack set --owner ehmpath --key VENDOR_KEY \
+               --org ahbode --env prep --vault aws.params
+           thereafter every grove reads the blob and mints its own
+           token, with no prompt on any box
+      ⇒ read the rack before you write to it — a set OVERWRITES:
+         rhx keyrack list --owner ehmpath
+         rhx keyrack unlock --owner ehmpath --env prep
+
+## empty, off camp (a laptop)
+   ✋ ConstraintError: ahbode.prep.VENDOR_KEY — the rack hands over an EMPTY value
+      ⇒ this key is REQUIRED: every ahbode prep suite on this box dies without it
+      ⇒ 'local@unix' is not a camp grove, so this key lives in os.secure
+      ⇒ EMPTY here means one of three:
+         · the session lapsed
+         · this seat's $HOME holds no entry for the slug
+         · an entry points at aws.params, which this box cannot read
+      ⇒ read the rack before you write to it — a set OVERWRITES:
+         rhx keyrack list --owner ehmpath
+         rhx keyrack unlock --owner ehmpath --env prep
+      ⇒ absent, or wired to aws.params? place it here, at a terminal, in os.secure:
+         rhx keyrack set --owner ehmpath --key VENDOR_KEY --org ahbode --env prep --vault os.secure
+      🛑 never --vault aws.params on this box (rule.require.aws-params-on-camp-groves-only)
+
+## a malformed required row
+   ✋ ConstraintError: the required row 'ahbode:VENDOR_KEY' is not '<org>:<env>:<key>'
+      ⇒ see 5.16.keys/_.sh, `_required`
+
+

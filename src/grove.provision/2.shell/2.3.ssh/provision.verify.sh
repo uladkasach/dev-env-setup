@@ -31,19 +31,10 @@
 #      box converged before that repair still carries one and apt removes none
 #      of it on a re-apply.
 #
-#    ⚠️ this rung REPORTS and repairs no state — a verify never writes
-#      (`rule.forbid.repair-plays`). the repair is a stop + disable + mask, and
-#      it lives in this bundle's own `provision.upsert`, step 2.
-#
-#    ⇒ so the fix text names a RE-APPLY, never a hand command. a fix text that
-#      hands a human three `systemctl` lines is the fourth step
-#      `rule.require.one-command-provision` forbids.
-#
-#    ⚠️ and the re-apply is legal to name here because the upsert carries NO
-#      skip-guard on that state — it re-reads `is-enabled`/`is-active` every
-#      run. a fix text that names a re-apply for state the upsert's own guard
-#      counts as done prints the same line forever, and that rule grades it a
-#      blocker.
+#    ⚠️ this rung REPORTS only (`rule.forbid.repair-plays`); the stop + disable +
+#      mask lives in `provision.upsert` step 2, which re-reads the unit state
+#      every run — so the fix names a RE-APPLY, never a hand `systemctl`
+#      (`rule.require.one-command-provision`)
 #
 # guarantee:
 #   - READ-ONLY

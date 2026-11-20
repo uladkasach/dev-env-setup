@@ -1,0 +1,14 @@
+[profile human.sso]
+sso_session = acme
+region = us-west-2
+
+[default]
+region = us-east-1
+ec2_metadata_service_endpoint = http://127.0.0.1:9911
+
+# grove: the ambient ec2 instance role, as a profile
+[profile ambient]
+credential_source = Ec2InstanceMetadata
+ec2_metadata_service_endpoint = http://127.0.0.1:9911
+region = us-east-1
+# grove: end

@@ -1,0 +1,25 @@
+// grove: owned by dev-env-setup, bundle 1.14.updates — never edit on the box.
+// read after 20auto-upgrades and 50unattended-upgrades, so these values win.
+
+// run the update and the upgrade once a day (apt-daily{,-upgrade}.timer)
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+
+// the security origin ONLY — a feature update can move a pinned tool mid-week
+// keyed on the ARCHIVE's own Origin, never ${distro_id}: on Pop!_OS distro_id is
+// `Pop`, and `Pop:noble-security` matches no archive — the run would upgrade naught
+// while the policy read green. ubuntu's security archive says `Origin: Ubuntu` on
+// ubuntu and on pop alike
+#clear Unattended-Upgrade::Allowed-Origins;
+#clear Unattended-Upgrade::Origins-Pattern;
+Unattended-Upgrade::Origins-Pattern {
+	"origin=Ubuntu,archive=${distro_codename}-security";
+	"origin=UbuntuESMApps,archive=${distro_codename}-apps-security";
+	"origin=UbuntuESM,archive=${distro_codename}-infra-security";
+};
+
+// never reboot: a grove's duct is tmux, and a reboot kills every pane mid-run
+Unattended-Upgrade::Automatic-Reboot "false";
+
+// NO Dpkg::Options here: every apt client reads this dir, a human's included.
+// the unattended run's conffile choice lives in grove-unattended-keep-conffiles.conf

@@ -50,6 +50,7 @@
 ######################################################################
 
 grove_provision_5_10_repos_configure_verify() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "the org repos"; return 0; }
   ####################################################################
   # 0. an absent key means neither claim below could ever have converged
   ####################################################################

@@ -23,6 +23,35 @@ _kitty_verify_fail() {
   failed=$(( failed + 1 ))
 }
 
+# .what = claim 2f of configure.verify: a BEL requests no focus, per kitty's loader
+# .why the default does, and on wayland cosmic grants it, so two windows that beep
+#   steal focus from each other without end
+_kitty_verify_bell() {
+  local conf="$1" wab=""
+  if command -v kitty >/dev/null 2>&1; then
+    wab="$(timeout -k 5 20 kitty +runpy "
+from kitty.config import load_config
+print(load_config('$conf').window_alert_on_bell)
+" 2>/dev/null | tail -1 | tr -d '[:space:]')"
+  fi
+  if [[ -z "$wab" ]]; then
+    echo "   🌙 kitty's loader did not answer, so whether a bell steals focus is UNREAD"
+    return 0
+  fi
+  case "$wab" in
+    no|false|n|False)
+      echo "   • a bell marks the tab and steals no focus ✔ ($wab, per kitty's own loader)"
+      ;;
+    *)
+      _kitty_verify_fail "kitty RESOLVES window_alert_on_bell to '$wab'" \
+        "⇒ every BEL becomes an xdg-activation request, and cosmic grants it as focus" \
+        "⇒ two windows that each beep thrash focus back and forth and burn cpu" \
+        "fix: rhx grove.provision --what 4.3.2.emulator --mode apply" \
+        "⚠️ an open kitty keeps the value it started with; a new one reads this"
+      ;;
+  esac
+}
+
 # .what = claims 2c + 2d of configure.verify: the DECLARED window size wins over
 #   `remember_window_size`, per kitty's loader, and that override is STATED (m11)
 _kitty_verify_window_size() {

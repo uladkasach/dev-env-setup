@@ -49,8 +49,15 @@ aws_reach_fence_shut() { printf '# grove: reach %s — end' "$1"; }
 # .what = every profile name this box holds a reach fence for, one per line
 # .why it answers "what reach does this box actually carry", which no verb
 #   could ask before — and a set that cannot be read cannot be converged
+#
+# 🛑 it reads the END line too, never the begin line alone
+#   - infra's [default] writer on a hetzner grove drops every line from
+#     [default] to the next `[` header, so a reach fence right after [default]
+#     loses its begin line (`src/grove.aws.sh` header)
+#   - the end line survives, so a list keyed on both still names that fence,
+#     and `5.13.reach` can still reap it
 aws_reach_fence_list() {
-  local cfg tpl pre suf line
+  local cfg tpl opre osuf spre ssuf line name seen=$'\n'
   cfg="$(aws_reach_config)"
   [[ -f "$cfg" ]] || return 0
 
@@ -58,16 +65,23 @@ aws_reach_fence_list() {
   #   - \x01 cannot appear in a profile name: every value composed into this
   #     file is grammar-clamped to [A-Za-z0-9._-] by `aws.reach.set`
   tpl="$(aws_reach_fence_open $'\x01')"
-  pre="${tpl%%$'\x01'*}"
-  suf="${tpl##*$'\x01'}"
+  opre="${tpl%%$'\x01'*}"; osuf="${tpl##*$'\x01'}"
+  tpl="$(aws_reach_fence_shut $'\x01')"
+  spre="${tpl%%$'\x01'*}"; ssuf="${tpl##*$'\x01'}"
 
-  # ⚠️ `|| [[ -n "$line" ]]`, because a file with no trailing newline hands the
+  # ⚠️ `|| [[ -n "$line" ]]`, because a file with no final newline hands the
   #   last line to `read` with a non-zero status and the loop would drop it
   #   (`gotcha.while-read-drops-the-last-line`)
   while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ "$line" == "$pre"*"$suf" ]] || continue
-    line="${line#"$pre"}"
-    printf '%s\n' "${line%"$suf"}"
+    name=""
+    if [[ "$line" == "$opre"*"$osuf" ]]; then
+      name="${line#"$opre"}"; name="${name%"$osuf"}"
+    elif [[ "$line" == "$spre"*"$ssuf" ]]; then
+      name="${line#"$spre"}"; name="${name%"$ssuf"}"
+    fi
+    [[ -n "$name" && "$seen" != *$'\n'"$name"$'\n'* ]] || continue
+    seen+="$name"$'\n'
+    printf '%s\n' "$name"
   done < "$cfg"
 }
 
@@ -75,16 +89,96 @@ aws_reach_fence_list() {
 # .why every line outside that fence is copied byte for byte, so a reap is the
 #   removal of one block and never a rewrite of the file — the same guarantee
 #   `aws.reach.set`'s upsert makes, read from the same two writers
+# 🛑 the drop is `src/grove.aws.sh`'s, which also drops a fence whose BEGIN line
+#   infra's [default] writer ate (that file's header says how). a local copy
+#   keyed on the begin line alone would miss that block, and the next upsert
+#   would append a twin `[profile …]`
 # .note it prints to stdout; the caller owns the write and the compare
 aws_reach_fence_drop() {
+  local profile="$1"
+  grove_aws_config_fence_drop cfg="$(aws_reach_config)" \
+    open="$(aws_reach_fence_open "$profile")" shut="$(aws_reach_fence_shut "$profile")" \
+    header="[profile $profile]"
+}
+
+# .what = the line range of each `[profile <name>]` block that sits OUTSIDE its fence
+# .why  = a refusal of a hand-laid twin must point at the block a human deletes;
+#   "lines 12-15" is a fix, "somewhere in the file" is a hunt
+# .note one `<first>-<last>` per block; a block ends before the next `[` header,
+#   a fence marker, or EOF. a fence whose BEGIN line infra's writer ate reads as
+#   unfenced here — the refusal's GATE is `aws_reach_fence_drop`, never this list
+aws_reach_unfenced_ranges() {
   local profile="$1" cfg open shut
   cfg="$(aws_reach_config)"
   [[ -f "$cfg" ]] || return 0
-  open="$(aws_reach_fence_open "$profile")"
-  shut="$(aws_reach_fence_shut "$profile")"
-  awk -v open="$open" -v shut="$shut" '
-    $0 == open { skip = 1; next }
-    $0 == shut { skip = 0; next }
-    !skip { print }
+  open="$(aws_reach_fence_open "$profile")"; shut="$(aws_reach_fence_shut "$profile")"
+  awk -v hdr="[profile $profile]" -v open="$open" -v shut="$shut" '
+    function close_block() { if (start) { print start "-" last; start = 0 } }
+    $0 == open { close_block(); fenced = 1; next }
+    $0 == shut { fenced = 0; next }
+    /^\[/ || /^# grove: / { close_block() }
+    $0 == hdr && !fenced { start = NR }
+    start && NF { last = NR }
+    END { close_block() }
   ' "$cfg"
+}
+
+# .what = the unfenced ranges as one comma list, for a human-read refusal
+aws_reach_unfenced_ranges_csv() { aws_reach_unfenced_ranges "$1" | paste -sd, -; }
+
+# .what = how many `[profile <name>]` headers survive this skill's fence drop?
+# .why  = a count above zero is a hand-laid twin outside the fence, which an
+#   append would double; the refusal gates on it
+aws_reach_twin_count() {
+  local profile="$1"
+  aws_reach_fence_drop "$profile" | grep -cFx "[profile $profile]" || true
+}
+
+# .what = copy the config through, with ONE profile's fence set IN PLACE
+# .why  = the upsert's half of the same guarantee: the block lands where it stood,
+#   so a re-run with an equal body writes no byte, and `5.6.aws`'s block never moves
+# .note it prints to stdout; the caller owns the write and the compare
+aws_reach_fence_set() {
+  local profile="$1" body="$2"
+  grove_aws_config_fence_set cfg="$(aws_reach_config)" \
+    open="$(aws_reach_fence_open "$profile")" shut="$(aws_reach_fence_shut "$profile")" \
+    header="[profile $profile]" body="$body"
+}
+
+######################################################################
+# .what = load the repo's shared runtime — the platform and the aws identity
+#
+# .why  = the box KIND decides the body this family writes, and
+#         `src/grove.env.sh` is the one place that kind is derived. a probe of
+#         169.254.169.254 here would be a second derivation, and it already
+#         drifted: it read a hetzner grove as a laptop
+#
+# .why the root is checked by LANDMARK after the hop
+#   - `../../../..` is this dir's idiom for the repo root, and a symlinked or
+#     relocated skill would hop to the wrong dir with no error
+#   - ⇒ `src/grove.env.sh` must sit at the end of the hop, or this refuses
+#
+# .why it LOADS and never derives
+#   - `aws.reach.del` reaps a fence on any box and needs no box kind; a derive
+#     here would refuse it on an undeclared seat for no gain
+#   - `aws.reach.set` calls `grove_env_derive` itself, which keeps a
+#     GROVE_ENV_SERVER already set (`5.13.reach` runs inside a provision) and
+#     refuses an undeclared box as `grove.provision` does (on a laptop over
+#     ssh: GROVE_ENV_SERVER=local@unix)
+#
+# rc: 0 = loaded · 2 = no runtime beside this skill
+######################################################################
+aws_reach_runtime_load() {
+  local root
+  root="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)" || return 2
+  if [[ ! -r "$root/src/grove.env.sh" || ! -r "$root/src/grove.aws.sh" ]]; then
+    echo "✋ ConstraintError: this skill found no src/grove.env.sh beside it (looked under $root)" >&2
+    echo "   ⇒ it reads the box kind from the repo's runtime, and runs from a dev-env-setup checkout" >&2
+    echo "   fix: run it from the checkout, e.g. rhx aws.reach.set … from ~/git/more/dev-env-setup" >&2
+    return 2
+  fi
+  # shellcheck source=../../../../src/grove.env.sh
+  source "$root/src/grove.env.sh"
+  # shellcheck source=../../../../src/grove.aws.sh
+  source "$root/src/grove.aws.sh"
 }

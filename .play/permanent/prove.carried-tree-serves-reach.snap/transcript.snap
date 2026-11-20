@@ -1,0 +1,328 @@
+## 5.13.reach configure.upsert over a carried tree (rc 0)
+   🌙 ahbode/infrastructure is a carried tree (no .git) — the rows read what it holds
+      ⇒ it has no upstream, so a declaration merged since the carry
+        is invisible here. re-carry it to refresh:
+        rhx git.grove.push <grove> --from <its checkout> --into git/ahbode/infrastructure --mode apply
+   • ahbode.test role: fixture-prep-power (declared in ahbode/infrastructure)
+   • ahbode.test reaches its account, proven with a live sts call ✔
+   • ahbode.prep role: fixture-prep-power (declared in ahbode/infrastructure)
+   • ahbode.prep reaches its account, proven with a live sts call ✔
+   • ahbode.prod role: fixture-prod-reader (declared in ahbode/infrastructure)
+   • ahbode.prod reaches its account, proven with a live sts call ✔
+   • ehmpathy.test role: fixture-demo-power (declared in ahbode/infrastructure; a role ehmpathy owns)
+   • ehmpathy.test reaches its account, proven with a live sts call ✔
+   • ehmpathy.prep role: fixture-demo-power (declared in ahbode/infrastructure; a role ehmpathy owns)
+   • ehmpathy.prep reaches its account, proven with a live sts call ✔
+
+## 5.13.reach configure.upsert, a session-tag refusal (rc 1)
+   🌙 ahbode/infrastructure is a carried tree (no .git) — the rows read what it holds
+      ⇒ it has no upstream, so a declaration merged since the carry
+        is invisible here. re-carry it to refresh:
+        rhx git.grove.push <grove> --from <its checkout> --into git/ahbode/infrastructure --mode apply
+   • ahbode.test role: fixture-prep-power (declared in ahbode/infrastructure)
+   ✋ could not give this seat reach into ahbode.test
+      ⇒ every suite that targets test resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ the role TRUSTS this box, and refuses what its session carries (sts:TagSession)
+        an infra ask: the role's trust policy must allow all three of
+        "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession", in ahbode/infrastructure
+      ⇒ what it said:
+        An error occurred (AccessDenied) when calling the AssumeRole operation: User: <principal> is not authorized to perform: sts:TagSession on resource: <role>
+   • ahbode.prep role: fixture-prep-power (declared in ahbode/infrastructure)
+   ✋ could not give this seat reach into ahbode.prep
+      ⇒ every suite that targets prep resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ the role TRUSTS this box, and refuses what its session carries (sts:TagSession)
+        an infra ask: the role's trust policy must allow all three of
+        "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession", in ahbode/infrastructure
+      ⇒ what it said:
+        An error occurred (AccessDenied) when calling the AssumeRole operation: User: <principal> is not authorized to perform: sts:TagSession on resource: <role>
+   • ahbode.prod role: fixture-prod-reader (declared in ahbode/infrastructure)
+   ✋ could not give this seat reach into ahbode.prod
+      ⇒ every suite that targets prod resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ the role TRUSTS this box, and refuses what its session carries (sts:TagSession)
+        an infra ask: the role's trust policy must allow all three of
+        "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession", in ahbode/infrastructure
+      ⇒ what it said:
+        An error occurred (AccessDenied) when calling the AssumeRole operation: User: <principal> is not authorized to perform: sts:TagSession on resource: <role>
+   • ehmpathy.test role: fixture-demo-power (declared in ahbode/infrastructure; a role ehmpathy owns)
+   ✋ could not give this seat reach into ehmpathy.test
+      ⇒ every suite that targets test resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ the role TRUSTS this box, and refuses what its session carries (sts:TagSession)
+        an infra ask: the role's trust policy must allow all three of
+        "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession", in ehmpathy/infrastructure
+      ⇒ what it said:
+        An error occurred (AccessDenied) when calling the AssumeRole operation: User: <principal> is not authorized to perform: sts:TagSession on resource: <role>
+   • ehmpathy.prep role: fixture-demo-power (declared in ahbode/infrastructure; a role ehmpathy owns)
+   ✋ could not give this seat reach into ehmpathy.prep
+      ⇒ every suite that targets prep resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ the role TRUSTS this box, and refuses what its session carries (sts:TagSession)
+        an infra ask: the role's trust policy must allow all three of
+        "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession", in ehmpathy/infrastructure
+      ⇒ what it said:
+        An error occurred (AccessDenied) when calling the AssumeRole operation: User: <principal> is not authorized to perform: sts:TagSession on resource: <role>
+
+## 5.13.reach configure.upsert, a bare AssumeRole refusal (rc 1)
+   🌙 ahbode/infrastructure is a carried tree (no .git) — the rows read what it holds
+      ⇒ it has no upstream, so a declaration merged since the carry
+        is invisible here. re-carry it to refresh:
+        rhx git.grove.push <grove> --from <its checkout> --into git/ahbode/infrastructure --mode apply
+   • ahbode.test role: fixture-prep-power (declared in ahbode/infrastructure)
+   ✋ could not give this seat reach into ahbode.test
+      ⇒ every suite that targets test resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ TWO causes wear this one message, and they want OPPOSITE repairs:
+      1. does a 'ahbode' row belong on a grove of THIS org at all?
+         no  ⇒ 🔴 OURS. delete the row; no grant is owed, and none may
+               be sought (rule.require.a-grove-reaches-its-own-org-only)
+      2. only if yes — the role EXISTS and this box sits outside its
+         trust policy ⇒ an ask of ahbode/infrastructure: trust this box's
+         principal on 'fixture-prep-power', with all three actions at once:
+         "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession"
+      ⇒ ask 1 FIRST. its answer is the ORG's, and the refusal says no
+        word about it — an ask filed on a no buys a durable hop into
+        another org's accounts, to silence a check that was right
+      ⇒ what it said:
+        An error occurred (AccessDenied) when calling the AssumeRole operation: User: <principal> is not authorized to perform: sts:AssumeRole on resource: <role>
+   • ahbode.prep role: fixture-prep-power (declared in ahbode/infrastructure)
+   ✋ could not give this seat reach into ahbode.prep
+      ⇒ every suite that targets prep resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ TWO causes wear this one message, and they want OPPOSITE repairs:
+      1. does a 'ahbode' row belong on a grove of THIS org at all?
+         no  ⇒ 🔴 OURS. delete the row; no grant is owed, and none may
+               be sought (rule.require.a-grove-reaches-its-own-org-only)
+      2. only if yes — the role EXISTS and this box sits outside its
+         trust policy ⇒ an ask of ahbode/infrastructure: trust this box's
+         principal on 'fixture-prep-power', with all three actions at once:
+         "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession"
+      ⇒ ask 1 FIRST. its answer is the ORG's, and the refusal says no
+        word about it — an ask filed on a no buys a durable hop into
+        another org's accounts, to silence a check that was right
+      ⇒ what it said:
+        An error occurred (AccessDenied) when calling the AssumeRole operation: User: <principal> is not authorized to perform: sts:AssumeRole on resource: <role>
+   • ahbode.prod role: fixture-prod-reader (declared in ahbode/infrastructure)
+   ✋ could not give this seat reach into ahbode.prod
+      ⇒ every suite that targets prod resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ TWO causes wear this one message, and they want OPPOSITE repairs:
+      1. does a 'ahbode' row belong on a grove of THIS org at all?
+         no  ⇒ 🔴 OURS. delete the row; no grant is owed, and none may
+               be sought (rule.require.a-grove-reaches-its-own-org-only)
+      2. only if yes — the role EXISTS and this box sits outside its
+         trust policy ⇒ an ask of ahbode/infrastructure: trust this box's
+         principal on 'fixture-prod-reader', with all three actions at once:
+         "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession"
+      ⇒ ask 1 FIRST. its answer is the ORG's, and the refusal says no
+        word about it — an ask filed on a no buys a durable hop into
+        another org's accounts, to silence a check that was right
+      ⇒ what it said:
+        An error occurred (AccessDenied) when calling the AssumeRole operation: User: <principal> is not authorized to perform: sts:AssumeRole on resource: <role>
+   • ehmpathy.test role: fixture-demo-power (declared in ahbode/infrastructure; a role ehmpathy owns)
+   ✋ could not give this seat reach into ehmpathy.test
+      ⇒ every suite that targets test resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ TWO causes wear this one message, and they want OPPOSITE repairs:
+      1. does a 'ehmpathy' row belong on a grove of THIS org at all?
+         no  ⇒ 🔴 OURS. delete the row; no grant is owed, and none may
+               be sought (rule.require.a-grove-reaches-its-own-org-only)
+      2. only if yes — the role EXISTS and this box sits outside its
+         trust policy ⇒ an ask of ehmpathy/infrastructure: trust this box's
+         principal on 'fixture-demo-power', with all three actions at once:
+         "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession"
+      ⇒ ask 1 FIRST. its answer is the ORG's, and the refusal says no
+        word about it — an ask filed on a no buys a durable hop into
+        another org's accounts, to silence a check that was right
+      ⇒ what it said:
+        An error occurred (AccessDenied) when calling the AssumeRole operation: User: <principal> is not authorized to perform: sts:AssumeRole on resource: <role>
+   • ehmpathy.prep role: fixture-demo-power (declared in ahbode/infrastructure; a role ehmpathy owns)
+   ✋ could not give this seat reach into ehmpathy.prep
+      ⇒ every suite that targets prep resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ TWO causes wear this one message, and they want OPPOSITE repairs:
+      1. does a 'ehmpathy' row belong on a grove of THIS org at all?
+         no  ⇒ 🔴 OURS. delete the row; no grant is owed, and none may
+               be sought (rule.require.a-grove-reaches-its-own-org-only)
+      2. only if yes — the role EXISTS and this box sits outside its
+         trust policy ⇒ an ask of ehmpathy/infrastructure: trust this box's
+         principal on 'fixture-demo-power', with all three actions at once:
+         "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession"
+      ⇒ ask 1 FIRST. its answer is the ORG's, and the refusal says no
+        word about it — an ask filed on a no buys a durable hop into
+        another org's accounts, to silence a check that was right
+      ⇒ what it said:
+        An error occurred (AccessDenied) when calling the AssumeRole operation: User: <principal> is not authorized to perform: sts:AssumeRole on resource: <role>
+
+## 5.13.reach configure.upsert, an unfenced twin (rc 1)
+   🌙 ahbode/infrastructure is a carried tree (no .git) — the rows read what it holds
+      ⇒ it has no upstream, so a declaration merged since the carry
+        is invisible here. re-carry it to refresh:
+        rhx git.grove.push <grove> --from <its checkout> --into git/ahbode/infrastructure --mode apply
+   • ahbode.test role: fixture-prep-power (declared in ahbode/infrastructure)
+   ✋ could not give this seat reach into ahbode.test
+      ⇒ every suite that targets test resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ ~/.aws/config already holds this hop's profile OUTSIDE the fence —
+        laid by hand or by another writer, so it is not this bundle's to delete.
+        remove that block (the skill names its lines below), then re-apply
+      ⇒ what it said:
+        ✋ ConstraintError: <cfg> already declares [profile ahbode.test] OUTSIDE this skill's fence
+        where: <cfg>, lines 4-7
+   • ahbode.prep role: fixture-prep-power (declared in ahbode/infrastructure)
+   ✋ could not give this seat reach into ahbode.prep
+      ⇒ every suite that targets prep resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ ~/.aws/config already holds this hop's profile OUTSIDE the fence —
+        laid by hand or by another writer, so it is not this bundle's to delete.
+        remove that block (the skill names its lines below), then re-apply
+      ⇒ what it said:
+        ✋ ConstraintError: <cfg> already declares [profile ahbode.prep] OUTSIDE this skill's fence
+        where: <cfg>, lines 4-7
+   • ahbode.prod role: fixture-prod-reader (declared in ahbode/infrastructure)
+   ✋ could not give this seat reach into ahbode.prod
+      ⇒ every suite that targets prod resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ ~/.aws/config already holds this hop's profile OUTSIDE the fence —
+        laid by hand or by another writer, so it is not this bundle's to delete.
+        remove that block (the skill names its lines below), then re-apply
+      ⇒ what it said:
+        ✋ ConstraintError: <cfg> already declares [profile ahbode.prod] OUTSIDE this skill's fence
+        where: <cfg>, lines 4-7
+   • ehmpathy.test role: fixture-demo-power (declared in ahbode/infrastructure; a role ehmpathy owns)
+   ✋ could not give this seat reach into ehmpathy.test
+      ⇒ every suite that targets test resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ ~/.aws/config already holds this hop's profile OUTSIDE the fence —
+        laid by hand or by another writer, so it is not this bundle's to delete.
+        remove that block (the skill names its lines below), then re-apply
+      ⇒ what it said:
+        ✋ ConstraintError: <cfg> already declares [profile ehmpathy.test] OUTSIDE this skill's fence
+        where: <cfg>, lines 4-7
+   • ehmpathy.prep role: fixture-demo-power (declared in ahbode/infrastructure; a role ehmpathy owns)
+   ✋ could not give this seat reach into ehmpathy.prep
+      ⇒ every suite that targets prep resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ ~/.aws/config already holds this hop's profile OUTSIDE the fence —
+        laid by hand or by another writer, so it is not this bundle's to delete.
+        remove that block (the skill names its lines below), then re-apply
+      ⇒ what it said:
+        ✋ ConstraintError: <cfg> already declares [profile ehmpathy.prep] OUTSIDE this skill's fence
+        where: <cfg>, lines 4-7
+
+## 5.13.reach configure.upsert, one row refuses (rc 1)
+   🌙 ahbode/infrastructure is a carried tree (no .git) — the rows read what it holds
+      ⇒ it has no upstream, so a declaration merged since the carry
+        is invisible here. re-carry it to refresh:
+        rhx git.grove.push <grove> --from <its checkout> --into git/ahbode/infrastructure --mode apply
+   • ahbode.test role: fixture-prep-power (declared in ahbode/infrastructure)
+   • ahbode.test reaches its account, proven with a live sts call ✔
+   • ahbode.prep role: fixture-prep-power (declared in ahbode/infrastructure)
+   • ahbode.prep reaches its account, proven with a live sts call ✔
+   • ahbode.prod role: fixture-prod-reader (declared in ahbode/infrastructure)
+   • ahbode.prod reaches its account, proven with a live sts call ✔
+   • ehmpathy.test role: fixture-demo-power (declared in ahbode/infrastructure; a role ehmpathy owns)
+   ✋ could not give this seat reach into ehmpathy.test
+      ⇒ every suite that targets test resources acts as the CAMP
+        role instead, and is refused on each call it makes
+      ⇒ TWO causes wear this one message, and they want OPPOSITE repairs:
+      1. does a 'ehmpathy' row belong on a grove of THIS org at all?
+         no  ⇒ 🔴 OURS. delete the row; no grant is owed, and none may
+               be sought (rule.require.a-grove-reaches-its-own-org-only)
+      2. only if yes — the role EXISTS and this box sits outside its
+         trust policy ⇒ an ask of ehmpathy/infrastructure: trust this box's
+         principal on 'fixture-demo-power', with all three actions at once:
+         "sts:AssumeRole", "sts:SetSourceIdentity", "sts:TagSession"
+      ⇒ ask 1 FIRST. its answer is the ORG's, and the refusal says no
+        word about it — an ask filed on a no buys a durable hop into
+        another org's accounts, to silence a check that was right
+      ⇒ what it said:
+        An error occurred (AccessDenied) when calling the AssumeRole operation: User: <principal> is not authorized to perform: sts:AssumeRole on resource: <role>
+   • ehmpathy.prep role: fixture-demo-power (declared in ahbode/infrastructure; a role ehmpathy owns)
+   • ehmpathy.prep reaches its account, proven with a live sts call ✔
+
+## 5.13.reach configure.upsert, no ambient identity, local@unix (rc 0)
+   🌙 declined — no ambient identity here, so no badge for account reach
+      ⇒ off camp this is correct: 'local@unix' carries no mandated identity;
+        a laptop's route to the same profile is an sso login, a human's to perform
+
+## 5.13.reach configure.upsert, no ambient identity, cloud@hetzner.hetzbot (rc 1)
+   ✋ no ambient identity answers on this camp seat, so account reach cannot hold
+      ⇒ a grove's [default] must answer: the identity bundle names why it does not
+      ⇒ on hetzner the [default] reads infra's signer — a stopped signer unit or
+        a lapsed roles-anywhere session reads exactly like this
+      fix: rhx grove.provision --what 5.6.aws --mode plan
+
+## 5.13.reach configure.upsert, no ambient identity, cloud@aws.ec2 (rc 1)
+   ✋ no ambient identity answers on this camp seat, so account reach cannot hold
+      ⇒ a grove's [default] must answer: the identity bundle names why it does not
+      fix: rhx grove.provision --what 5.6.aws --mode plan
+
+## grove_provision_5_13_reach_configure_verify, no ambient identity, cloud@hetzner.hetzbot (rc 1)
+   ✋ no ambient identity answers on this camp seat, so account reach cannot hold
+      ⇒ a grove's [default] must answer: the identity bundle names why it does not
+      ⇒ on hetzner the [default] reads infra's signer — a stopped signer unit or
+        a lapsed roles-anywhere session reads exactly like this
+      fix: rhx grove.provision --what 5.6.aws --mode plan
+
+## grove_provision_5_13_reach_configure_verify, no ambient identity, local@unix (rc 0)
+   🌙 declined — no ambient identity here, so no badge for account reach
+      ⇒ off camp this is correct: 'local@unix' carries no mandated identity;
+        a laptop's route to the same profile is an sso login, a human's to perform
+
+## grove_provision_5_12_rack_upsert_awsprofile, no ambient identity, cloud@hetzner.hetzbot (rc 1)
+   ✋ no ambient identity answers on this camp seat, so the rack's 'ambient' AWS_PROFILE row cannot hold
+      ⇒ a grove's [default] must answer: the identity bundle names why it does not
+      ⇒ on hetzner the [default] reads infra's signer — a stopped signer unit or
+        a lapsed roles-anywhere session reads exactly like this
+      fix: rhx grove.provision --what 5.6.aws --mode plan
+
+## grove_provision_5_12_rack_upsert_awsprofile, no ambient identity, local@unix (rc 0)
+   🌙 declined — no ambient identity here, so no badge for the rack's 'ambient' AWS_PROFILE row
+      ⇒ off camp this is correct: 'local@unix' carries no mandated identity;
+        a laptop's route to the same profile is an sso login, a human's to perform
+
+## grove_provision_5_12_rack_verify_awsprofile, no ambient identity, cloud@hetzner.hetzbot (rc 1)
+   ✋ no ambient identity answers on this camp seat, so the rack's 'ambient' AWS_PROFILE row cannot hold
+      ⇒ a grove's [default] must answer: the identity bundle names why it does not
+      ⇒ on hetzner the [default] reads infra's signer — a stopped signer unit or
+        a lapsed roles-anywhere session reads exactly like this
+      fix: rhx grove.provision --what 5.6.aws --mode plan
+
+## grove_provision_5_12_rack_verify_awsprofile, no ambient identity, local@unix (rc 0)
+   🌙 declined — no ambient identity here, so no badge for the rack's 'ambient' AWS_PROFILE row
+      ⇒ off camp this is correct: 'local@unix' carries no mandated identity;
+        a laptop's route to the same profile is an sso login, a human's to perform
+
+## 5.10.repos provision.verify over a carried tree, laptop plan (rc 0)
+   🌙 ahbode — 0 on disk, 1 a carried tree (named below)
+   🌙 1 repo dir(s) hold files and no .git (a carried tree):
+      • <fix>/home/git/ahbode/infrastructure
+      ⇒ on a laptop each is the human's own tree: an apply leaves it in place
+   • no repo dir is half-cloned ✔ (each carried tree above is no checkout)
+
+## 5.10.repos provision.upsert over a carried tree, laptop (rc 0)
+   ├─ ahbode
+   │  🌙 ahbode/infrastructure — holds files and no .git; a laptop's tree is left in place, no clone
+   └─ cloned: 0, already present: 0, failed: 0
+
+## 5.10.repos provision.verify over a carried tree, plan (rc 0)
+   🌙 ahbode — 0 on disk, 1 a carried tree (named below)
+   🌙 1 repo dir(s) hold files and no .git (a carried tree):
+      • <fix>/home/git/ahbode/infrastructure
+      ⇒ an apply moves each aside to '<repo>.carried.<stamp>', keeps it, and clones
+   • no repo dir is half-cloned ✔ (each carried tree above is no checkout)
+
+## 5.10.repos provision.upsert over a carried tree (rc 0)
+   ├─ ahbode
+   │  • ahbode/infrastructure — carried; moved aside, clone follows
+   │    kept at: <fix>/home/git/ahbode/infrastructure.carried.<stamp>
+   └─ cloned: 1, already present: 0, failed: 0
+      ⇒ 1 half-cloned or carried dir(s) were moved aside and cloned.
+        each is kept at '<repo>.<half|carried>.<stamp>' beside its repo. a half
+        holds no commit; a carried one holds files — diff it against the clone
+        before you remove it
+
+

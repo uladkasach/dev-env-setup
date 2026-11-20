@@ -120,7 +120,13 @@ fi
 echo "   ├─ tracked shell files: ${#TRACKED_SH[@]}"
 echo "   ├─ tracked files, both arms: ${#TRACKED_ALL[@]}"
 
-_is_tracked() { git ls-files --error-unmatch -- "$1" >/dev/null 2>&1; }
+# the index is read ONCE into a set, and each lookup is a hash read
+#   📜 2026-11-18: one `git ls-files --error-unmatch` per slug (over a thousand
+#   forks) let arm 2 outrun the 900s bound inside `play.run --all`, so the play
+#   proved no claim. every path below is in the form `git ls-files` prints
+declare -A TRACKED_SET=()
+while IFS= read -r p; do TRACKED_SET[$p]=1; done < <(git ls-files)
+_is_tracked() { [[ -n "${TRACKED_SET[$1]:-}" ]]; }
 
 echo ""
 

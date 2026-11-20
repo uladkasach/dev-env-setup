@@ -211,5 +211,5 @@ if [[ "$FAILED" -eq 0 ]]; then
   echo "🌲 the rack reaches a foreign org, and only through the gitroot ✔"
   exit 0
 fi
-echo "✋ prove.rack-reads-a-foreign-org found a defect" >&2
+echo "💥 MalfunctionError: prove.rack-reads-a-foreign-org found a defect" >&2
 exit 1

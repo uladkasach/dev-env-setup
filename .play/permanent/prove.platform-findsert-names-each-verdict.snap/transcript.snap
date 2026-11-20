@@ -1,0 +1,21 @@
+## absent → the boot lays it
+SET
+   (rc 0)
+
+## same → the boot keeps it
+KEEP
+   (rc 0)
+
+## another platform declared → the boot refuses
+DIFFERS aws.ec2
+   (rc 3)
+
+## absent, the seat's sudo wants a password
+sudo: a password is required
+   (rc 1)
+
+## the seat is unreachable
+ssh: connect to host <host> port 22: Connection refused
+   (rc 255)
+
+

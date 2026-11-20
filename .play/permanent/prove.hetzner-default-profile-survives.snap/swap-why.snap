@@ -1,0 +1,8 @@
+## rc 3
+[default] changed while this run read the file — another writer (infra's identity skill) ran at the same moment. re-run to rebuild from the new bytes
+
+## rc 4
+the rebuilt file would change [default], which this writer does not own — a defect here, not on the box
+
+## rc 1
+the write failed (io) — check that <fixture>/swapwhy/.aws/config is writable

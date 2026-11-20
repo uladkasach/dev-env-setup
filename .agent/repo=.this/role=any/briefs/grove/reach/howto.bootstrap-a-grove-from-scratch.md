@@ -2,8 +2,9 @@
 
 ## .what
 
-take a **brand new** grove — an image with a shell and no devenv — to parity, over the ssm
-tunnel. this is the path for a box that has just been built, or rebuilt.
+take a **brand new** grove — an image with a shell and no devenv — to parity, over its one
+road (an ec2 grove's ssm tunnel, a hetzner grove's tailnet). this is the path for a box that
+has just been built, or rebuilt.
 
 ## 🛑 .the bar this whole brief serves — ZERO intervention
 

@@ -151,9 +151,12 @@ done
 #    and grades the key on a weaker basis than the caller asked for. ⇒ the
 #    degradation is silent, which is why the 🌙 below must stay loud
 ####################################################################
-if [[ -z "$ORG" ]]; then
+# an absent manifest is the no-org case the 🌙 below names; the read is guarded so
+#   the shell's own redirect error never prints ahead of it
+KEYRACK_MANIFEST="$HOME/git/more/dev-env-setup/.agent/keyrack.yml"
+if [[ -z "$ORG" && -r "$KEYRACK_MANIFEST" ]]; then
   ORG=$(jq -Rr 'select(startswith("org:")) | sub("^org:[[:space:]]*";"")' \
-        < "$HOME/git/more/dev-env-setup/.agent/keyrack.yml" 2>/dev/null | head -1)
+        < "$KEYRACK_MANIFEST" | head -1)
   ORG="${ORG//[[:space:]]/}"
 fi
 
@@ -223,6 +226,12 @@ source ~/.bash_aliases 2>/dev/null || true
 #    where it lives (`term=keyrack.gitroot`)
 # shellcheck source=/dev/null
 source "$(dirname "${BASH_SOURCE[0]}")/git.grove.rack.operations.sh"
+# the reach readers: is the registry's host a tunnel end or a tailnet name
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.ssh.operations.sh"
+# the escape sink, for what the box says over the pinned ssh (`_grove_relay_sunk`)
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.operations.sh"
 ####################################################################
 # 🛑 the gate reads EVERY function this skill borrows, never one of them
 #
@@ -283,14 +292,25 @@ for _fn in "${GROVE_TRUST_BORROWS[@]}"; do
   #    reason `git.grove.send:124-129` gives, measured on the same day
   exit 2
 done
-ALIAS="$(_git_grove_ssh_alias "$GROVE")" || {
+# a tailnet seat is LAID to the registry before it is read; an --alias seat that
+#   dials another user is refused (`grove_ssh_seat_ready`)
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.ssh.operations.sh"
+grove_ssh_seat_ready "$GROVE" || exit $?
+ALIAS_RC=0
+ALIAS="$(_git_grove_ssh_alias "$GROVE")" || ALIAS_RC=$?
+# rc 2 = the alias dials another seat than the registry declares, named above by
+#   the resolver: no key may be trusted for a seat the wire does not reach
+(( ALIAS_RC == 2 )) && exit 2
+if (( ALIAS_RC != 0 )); then
   echo "✋ grove '$GROVE' not in the registry — run: rhx git.grove.list" >&2
   exit 2
-}
+fi
 
 # read the endpoint the alias actually dials, so the known_hosts entry matches
 # what ssh will look up (ssh keys known_hosts on HostName + Port, not the alias)
-SSH_CONFIG_EFFECTIVE=$(ssh -G "$ALIAS" 2>/dev/null)
+# bounded, stdin closed: `ssh -G` runs any `Match exec` in the human's config
+SSH_CONFIG_EFFECTIVE=$(timeout -k 5 10 ssh -G "$ALIAS" </dev/null 2>/dev/null)
 HOSTNAME_SSH=$(echo "$SSH_CONFIG_EFFECTIVE" | awk '/^hostname /{print $2}')
 PORT_SSH=$(echo "$SSH_CONFIG_EFFECTIVE" | awk '/^port /{print $2}')
 if [[ -z "$HOSTNAME_SSH" || -z "$PORT_SSH" ]]; then
@@ -379,13 +399,71 @@ if [[ -n "$REG_HOST" && -n "$REG_PORT" ]] \
   exit 2
 fi
 
+####################################################################
+# .what = the transformers the steps below read by name
+####################################################################
+# .what = the host-key fingerprints a box reports of its own /etc/ssh, read over
+#         ssh pinned to key types already trusted (a communicator)
+# .why  = HostKeyAlgorithms narrowed to `algos` means ssh cannot negotiate a key
+#         under question, so the channel is authenticated
+# .note = ssh's stderr goes to the file `$3`, and the exit is ssh's own: a channel
+#         that failed is never read as a box that reported no key
+_fingerprints_by_pinned_ssh() {
+  local alias="$1" algos="$2" err="$3" said rc
+  said="$(timeout -k 5 30 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
+      -o HostKeyAlgorithms="$algos" "$alias" \
+      'for k in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf "$k"; done' </dev/null 2>"$err")"; rc=$?
+  printf '%s\n' "$said" | grep -oE 'SHA256:[A-Za-z0-9+/=]+' | sort -u
+  return "$rc"
+}
+
+# .what = which channel attests a verified trust: none | pinned-ssh | no-trusted-key | ssm
+#   - none           = the trust is not `verified`, so no attestation is asked
+#   - ssm            = an ssm grove (a local tunnel end): its ec2 boot record
+#   - pinned-ssh     = a tailnet grove with a key already trusted: the box itself
+#   - no-trusted-key = a tailnet grove whose builder has laid no key yet
+_attest_route() {
+  local trust="$1" tunnel_local="$2" trusted="$3"
+  [[ "$trust" == "verified" ]] || { echo none; return 0; }
+  [[ "$tunnel_local" -eq 1 ]] && { echo ssm; return 0; }
+  [[ -n "$trusted" ]] && { echo pinned-ssh; return 0; }
+  echo no-trusted-key
+}
+
+# .what = a space-separated list as one comma-joined value (ssh's list syntax)
+_as_comma_list() { local -a items; read -ra items <<< "$1"; local IFS=,; printf '%s' "${items[*]}"; }
+
+# .what = the name ssh files a host's keys under: a bare host on port 22,
+#         `[host]:port` on any other
+_as_known_hosts_name() {
+  local host="$1" port="$2"
+  [[ "$port" == "22" ]] && { printf '%s' "$host"; return 0; }
+  printf '[%s]:%s' "$host" "$port"
+}
+
+# .what = the scanned lines whose key type is in a space-separated set
+_scan_lines_of_types() {
+  local scanned="$1" types="$2"
+  printf '%s\n' "$scanned" | awk -v want=" $types " 'NF && index(want, " " $2 " ")'
+}
+
 # is the local tunnel port even bound? read /proc/net/tcp rather than guess, so a
 # closed tunnel is told apart from a bound-but-mute one — two causes, two fixes
+#
+# ⚠️ a TAILNET grove (a hetzner box) is dialed at its own name, with no local
+#    tunnel, so no local port is owed to listen. a /proc read there asks this
+#    laptop about a port it never binds and answers "closed" on a healthy box.
+#    the host is scanned direct; its key is a real host's key, keyed on its name
 PORT_HEX=$(printf '%04X' "$PORT_SSH")
-LISTENS_V4=$(awk -v p=":$PORT_HEX" '$2 ~ p && $4 == "0A"' /proc/net/tcp 2>/dev/null)
-LISTENS_V6=$(awk -v p=":$PORT_HEX" '$2 ~ p && $4 == "0A"' /proc/net/tcp6 2>/dev/null)
+TUNNEL_LOCAL=0
+grove_ssh_host_is_loopback "$HOSTNAME_SSH" && TUNNEL_LOCAL=1
+LISTENS_V4=""; LISTENS_V6=""
+if [[ "$TUNNEL_LOCAL" -eq 1 ]]; then
+  LISTENS_V4=$(awk -v p=":$PORT_HEX" '$2 ~ p && $4 == "0A"' /proc/net/tcp 2>/dev/null)
+  LISTENS_V6=$(awk -v p=":$PORT_HEX" '$2 ~ p && $4 == "0A"' /proc/net/tcp6 2>/dev/null)
+fi
 LISTENS="$LISTENS_V4$LISTENS_V6"
-if [[ -z "$LISTENS" ]]; then
+if [[ "$TUNNEL_LOCAL" -eq 1 && -z "$LISTENS" ]]; then
   echo "   └─ 💥 no process listens on $HOSTNAME_SSH:$PORT_SSH" >&2
   echo "" >&2
   echo "  why: the ssm tunnel is closed — it does not survive a reboot, and it" >&2
@@ -407,7 +485,10 @@ fi
 # ssh will look up (see the rewrite below), because ssh keys known_hosts on the
 # HostName string, never on whatever address answered.
 HOST_SCAN="$HOSTNAME_SSH"
-if [[ -n "$LISTENS_V4" && -z "$LISTENS_V6" ]]; then
+KH_NAME="$(_as_known_hosts_name "$HOSTNAME_SSH" "$PORT_SSH")"
+if [[ "$TUNNEL_LOCAL" -eq 0 ]]; then
+  echo "   ├─ tailnet:  no local tunnel — scan $HOSTNAME_SSH direct"
+elif [[ -n "$LISTENS_V4" && -z "$LISTENS_V6" ]]; then
   HOST_SCAN="127.0.0.1"
   echo "   ├─ tunnel:   bound on ipv4 only (scan via $HOST_SCAN)"
 elif [[ -z "$LISTENS_V4" && -n "$LISTENS_V6" ]]; then
@@ -422,6 +503,22 @@ fi
 # connection must still reach ssm, so a scan needs far longer than ssh-keyscan's
 # 5s default. hence --timeout, defaulted generously.
 SCANNED=$(ssh-keyscan -T "$TIMEOUT" -p "$PORT_SSH" "$HOST_SCAN" 2>/dev/null | grep -v '^#')
+# ⚠️ a TAILNET grove has no tunnel to be stale and no ssm session to expire, so the
+#    tunnel text below would send its reader to fix a part the box does not have.
+#    📜 2026-11-18: a rebuilt hetzner box came back under a NEW tailnet name; the scan
+#    of the old name timed out and the text said "the ssm session has expired"
+if [[ -z "$SCANNED" && "$TUNNEL_LOCAL" -eq 0 ]]; then
+  echo "   └─ 💥 $HOSTNAME_SSH:$PORT_SSH offered no host keys in ${TIMEOUT}s" >&2
+  echo "" >&2
+  echo "  why: the box did not answer at its tailnet name. either it is offline, this" >&2
+  echo "       laptop is off the tailnet, or the box was replaced — a replacement" >&2
+  echo "       joins under a NEW tailnet name, and the registry still names the old one" >&2
+  echo "  fix: ask the tailnet which name is online —" >&2
+  echo "    rhx network.tailnet.peers.get --match ${GROVE%-v*}" >&2
+  echo "  a new name → adopt it (howto.adopt-a-replacement-grove); an offline one → wake it —" >&2
+  echo "    rhx git.grove.wake $GROVE" >&2
+  exit 1
+fi
 if [[ -z "$SCANNED" ]]; then
   echo "   └─ 💥 the tunnel is bound, but offered no host keys in ${TIMEOUT}s" >&2
   echo "" >&2
@@ -441,8 +538,8 @@ echo "   ├─ scanned:  $(echo "$SCANNED" | wc -l) key(s) offered"
 # ssh says `localhost`), an unrewritten entry would be trusted for an address ssh
 # never asks about — silently useless. so relabel to the name ssh will use.
 if [[ "$HOST_SCAN" != "$HOSTNAME_SSH" ]]; then
-  SCANNED=$(echo "$SCANNED" | awk -v want="[$HOSTNAME_SSH]:$PORT_SSH" '{$1=want; print}')
-  echo "   ├─ labeled:  [$HOSTNAME_SSH]:$PORT_SSH (the name ssh looks up)"
+  SCANNED=$(echo "$SCANNED" | awk -v want="$KH_NAME" '{$1=want; print}')
+  echo "   ├─ labeled:  $KH_NAME (the name ssh looks up)"
 fi
 
 # compare against what is already trusted — a CHANGED key is a security event,
@@ -456,7 +553,7 @@ while read -r LINE; do
   [[ -z "$LINE" ]] && continue
   KEYTYPE=$(echo "$LINE" | awk '{print $2}')
   KEYDATA=$(echo "$LINE" | awk '{print $3}')
-  EXTANT=$(ssh-keygen -F "[$HOSTNAME_SSH]:$PORT_SSH" -f "$KNOWN_HOSTS" 2>/dev/null | grep " $KEYTYPE " || true)
+  EXTANT=$(ssh-keygen -F "$KH_NAME" -f "$KNOWN_HOSTS" 2>/dev/null | grep " $KEYTYPE " || true)
   if [[ -z "$EXTANT" ]]; then
     ABSENT+="$KEYTYPE "
   # ⚠️ `grep -F … >/dev/null`, never `grep -qF`. a MATCH here means the key is
@@ -471,6 +568,8 @@ while read -r LINE; do
     CHANGED+="$KEYTYPE "
   fi
 done <<< "$SCANNED"
+# the lists are built space-joined; their last space would print inside "( … )"
+TRUSTED_ALREADY="${TRUSTED_ALREADY% }"; ABSENT="${ABSENT% }"; CHANGED="${CHANGED% }"
 
 ####################################################################
 # ⚠️ a CHANGED key is NOT decided here — it is decided by the boot record
@@ -504,8 +603,24 @@ done <<< "$SCANNED"
 #      VERIFIED replace, not trust-on-faith — the boot record is the whole
 #      reason this skill reads console output at all.
 ####################################################################
+# a TAILNET name has no local port to share and no boot record: a changed key there is a
+#   rebuilt box or another host, and only infra's fingerprints tell them apart
+if [[ -n "$CHANGED" && "$ON_CHANGED" == "refuse" && "$TUNNEL_LOCAL" -eq 0 ]]; then
+  echo "   └─ ✋ ConstraintError: host key CHANGED for $KH_NAME ($CHANGED)" >&2
+  echo "" >&2
+  echo "  why: the tailnet name answered with a key other than the one on record —" >&2
+  echo "       a REBUILT box, or a host that is not the box. a tailnet box has no" >&2
+  echo "       console; the one attestation is the box's own report, over ssh" >&2
+  echo "       pinned to a key still on record" >&2
+  echo "  fix: confirm the tailnet names the box, then let a key still on record decide —" >&2
+  echo "    tailscale status | grep '$HOSTNAME_SSH'" >&2
+  echo "    rhx git.grove.trust.gen --grove $GROVE --mode apply --on-changed replace" >&2
+  echo "  if NO key on record still matches (a full rebuild), no channel here attests it:" >&2
+  echo "  compare the fingerprints to infra's (its bootstrap prints them) before any write" >&2
+  exit 2
+fi
 if [[ -n "$CHANGED" && "$ON_CHANGED" == "refuse" ]]; then
-  echo "   └─ ✋ host key CHANGED for [$HOSTNAME_SSH]:$PORT_SSH ($CHANGED)" >&2
+  echo "   └─ ✋ ConstraintError: host key CHANGED for $KH_NAME ($CHANGED)" >&2
   echo "" >&2
   echo "  why: this port previously answered with a different key. either the" >&2
   echo "       grove was rebuilt (or the port was reused by a NEW box), or" >&2
@@ -533,7 +648,43 @@ fi
 # this is what binds the local-port entry back to the real machine
 FINGERPRINTS_BOOT=""
 ATTEST=""
-if [[ "$TRUST" == "verified" ]]; then
+# a TAILNET grove has no ec2 boot record, and none is owed: when one of its keys
+#   is already trusted (its builder laid it), ssh pinned to THAT key is an
+#   authenticated channel to the box, and the box reports its own /etc/ssh keys
+#   over it — the same attestation the ssm arm below makes for an ec2 grove.
+#   HostKeyAlgorithms is narrowed to the trusted types, so ssh cannot negotiate
+#   one of the keys under question
+ATTEST_ROUTE="$(_attest_route "$TRUST" "$TUNNEL_LOCAL" "$TRUSTED_ALREADY")"
+if [[ "$ATTEST_ROUTE" == "pinned-ssh" ]]; then
+  PIN_ALGOS="$(_as_comma_list "$TRUSTED_ALREADY")"
+  PIN_ERR="$(mktemp "${TMPDIR:-/tmp}/grove.pin.XXXXXX")" || { echo "💥 MalfunctionError: could not open a scratch file for ssh's stderr" >&2; exit 1; }
+  FINGERPRINTS_BOOT="$(_fingerprints_by_pinned_ssh "$ALIAS" "$PIN_ALGOS" "$PIN_ERR")"; PIN_RC=$?
+  # 🛑 a failed channel attests naught, and it is no stale boot record either:
+  #    halt on it by name, with ssh's own words, rather than fall to the ec2 text
+  if (( PIN_RC != 0 )); then
+    echo "   └─ 💥 MalfunctionError: the ssh pinned to the trusted key ($PIN_ALGOS) did not answer (rc $PIN_RC)" >&2
+    echo "" >&2
+    echo "  why: that channel is what attests every other key, so no key was attested" >&2
+    echo "  it said:" >&2
+    { _grove_relay_sunk "$PIN_ERR" || :; } 2>&1 | head -6 | sed 's/^/    /' >&2
+    rm -f "$PIN_ERR"
+    echo "  fix: if it names a CHANGED host key or a failed verification, the trusted" >&2
+    echo "       key itself no longer matches — a security event; confirm the box first:" >&2
+    echo "    tailscale status | grep '$HOSTNAME_SSH'" >&2
+    echo "  else wake the seat, then re-run —" >&2
+    echo "    rhx git.grove.wake $GROVE" >&2
+    exit 1
+  fi
+  rm -f "$PIN_ERR"
+  [[ -n "$FINGERPRINTS_BOOT" ]] && ATTEST="the box itself, over ssh pinned to its trusted key ($PIN_ALGOS)"
+fi
+if [[ "$ATTEST_ROUTE" == "no-trusted-key" && -n "$CHANGED" ]]; then
+  echo "   ├─ 🌙 a REBUILT tailnet box — no key on record still matches, so no channel attests the change" >&2
+fi
+if [[ "$ATTEST_ROUTE" == "no-trusted-key" && -z "$CHANGED" ]]; then
+  echo "   ├─ 🌙 a tailnet grove with no trusted key yet — no channel attests a first contact" >&2
+fi
+if [[ "$ATTEST_ROUTE" == "ssm" ]]; then
   if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
     # ⚠️ the rack's stderr is NOT redirected — see git.grove.wake.sh for the
     #    measurement. this branch is TOLERANT by design (an absent profile
@@ -716,7 +867,7 @@ if [[ -n "$UNREAD" ]]; then
   echo "      ⇒ it is about to write keys into ~/.ssh/known_hosts, and it has" >&2
   echo "        NOT fingerprinted all of them. a partial read is not a pass." >&2
   echo "      read it yourself:" >&2
-  echo "        ssh-keyscan -p <port> localhost | ssh-keygen -lf -" >&2
+  echo "        ssh-keyscan -p $PORT_SSH $HOST_SCAN | ssh-keygen -lf -" >&2
 fi
 
 [[ -n "$ATTEST" ]] && echo "   ├─ attest:   $ATTEST"
@@ -739,10 +890,48 @@ if [[ "$VERIFIED" != "true" && "$TRUST" != "tofu" ]]; then
     echo "" >&2
     echo "       a host's public keys are public, so a real key beside a forged one" >&2
     echo "       is the cheap attack — every offered key is checked, never just one." >&2
-    echo "       ⇒ treat this as a security event, NOT as a stale record. another" >&2
-    echo "         process may hold the local port" >&2
-    echo "  fix: find what holds the port before you trust any key here —" >&2
-    echo "    ss -tlnp | grep ':$PORT_SSH'" >&2
+    echo "       ⇒ treat this as a security event, NOT as a stale record." >&2
+    if [[ "$TUNNEL_LOCAL" -eq 1 ]]; then
+      echo "         another process may hold the local port" >&2
+      echo "  fix: find what holds the port before you trust any key here —" >&2
+      echo "    ss -tlnp | grep ':$PORT_SSH'" >&2
+      exit 2
+    fi
+    echo "         the name '$HOSTNAME_SSH' may answer from a host that is not the box" >&2
+    echo "  fix: confirm the tailnet names that box before you trust any key here —" >&2
+    echo "    tailscale status | grep '$HOSTNAME_SSH'" >&2
+    exit 2
+  fi
+
+  # a TAILNET first contact: no console, no boot record, so tofu is the one road. a plan
+  #   is a survey, so it reports that and exits 0; only the apply refuses
+  # 🛑 a CHANGED key here is a rebuild, never a first contact: tofu is refused beside a
+  #   replace (above), so offer it not. the one attestation left is infra's fingerprints
+  if [[ "$TUNNEL_LOCAL" -eq 0 && -n "$CHANGED" ]]; then
+    echo "   └─ ✋ ConstraintError: a rebuilt tailnet box, and no key on record still matches ($CHANGED)" >&2
+    echo "" >&2
+    echo "  why: no console, no boot record, and no trusted key left to pin ssh to —" >&2
+    echo "       so no channel here attests the new keys, and none may be accepted on faith" >&2
+    echo "  fix: compare the fingerprints above to infra's (its bootstrap prints them)" >&2
+    echo "       before any write; a key that does not match is not the box" >&2
+    exit 2
+  fi
+  if [[ "$TUNNEL_LOCAL" -eq 0 ]]; then
+    if [[ "$MODE" == "plan" ]]; then
+      echo "   └─ plan: would need --trust tofu — a tailnet box has no boot record to attest"
+      echo "      ├─ a NEW box: confirm the tailnet names it, then accept its keys —"
+      echo "      │  rhx git.grove.trust.gen --grove $GROVE --mode apply --trust tofu"
+      echo "      └─ a REBUILT box: compare the rows above to infra's fingerprints first"
+      exit 0
+    fi
+    echo "   └─ ✋ a tailnet box has no boot record, so these keys are unattested" >&2
+    echo "" >&2
+    echo "  why: a tailnet grove has no console channel; the first contact is trust on" >&2
+    echo "       first use, and only you may grant it" >&2
+    echo "  fix: confirm the tailnet names the box, then accept its keys —" >&2
+    echo "    tailscale status | grep '$HOSTNAME_SSH'" >&2
+    echo "    rhx git.grove.trust.gen --grove $GROVE --mode apply --trust tofu" >&2
+    echo "  a REBUILT box: compare the fingerprints above to infra's before you accept" >&2
     exit 2
   fi
   echo "   └─ ✋ cannot verify the fingerprint against the box's boot record" >&2
@@ -758,7 +947,7 @@ fi
 
 if [[ "$MODE" == "plan" ]]; then
   if [[ -n "$CHANGED" ]]; then
-    echo "   └─ plan: would REPLACE the stale entry, then trust ($CHANGED$ABSENT)"
+    echo "   └─ plan: would REPLACE the stale entry, then trust ($CHANGED${ABSENT:+ $ABSENT})"
   else
     echo "   └─ plan: run with --mode apply to trust these key(s)"
   fi
@@ -789,8 +978,11 @@ fi
 #      artifact that says a change occurred at all.
 ####################################################################
 if [[ -n "$CHANGED" ]]; then
-  if ! ssh-keygen -R "[$HOSTNAME_SSH]:$PORT_SSH" >/dev/null 2>&1; then
-    echo "   └─ 💥 could not drop the stale entry for [$HOSTNAME_SSH]:$PORT_SSH" >&2
+  # 🛑 `-f` is load-bear: with none, ssh-keygen finds home by the passwd entry and
+  #   never by $HOME, so its drop and this skill's append (to $KNOWN_HOSTS) could
+  #   touch two files, and the stale key would stay beside the new one
+  if ! ssh-keygen -R "$KH_NAME" -f "$KNOWN_HOSTS" >/dev/null 2>&1; then
+    echo "   └─ 💥 MalfunctionError: could not drop the stale entry for $KH_NAME" >&2
     echo "" >&2
     echo "  why: the scanned key was verified, so the write SHOULD proceed — but" >&2
     echo "       known_hosts could not be rewritten. a read-only file or a bad" >&2
@@ -799,12 +991,17 @@ if [[ -n "$CHANGED" ]]; then
     echo "    ls -l ~/.ssh/known_hosts" >&2
     exit 1
   fi
-  echo "   ├─ replaced: stale entry for [$HOSTNAME_SSH]:$PORT_SSH dropped"
+  echo "   ├─ replaced: stale entry for $KH_NAME dropped"
 fi
 
-echo "$SCANNED" >> "$KNOWN_HOSTS"
-if [[ -n "$CHANGED" ]]; then
-  echo "   └─ 🌴 trusted — [$HOSTNAME_SSH]:$PORT_SSH re-trusted for the new box"
-else
-  echo "   └─ 🌴 trusted — [$HOSTNAME_SSH]:$PORT_SSH added to known_hosts"
-fi
+# a replace dropped EVERY entry for the host above, so the whole scan is owed
+#   back. a findsert owes only the ABSENT types: a re-append of a key already
+#   trusted writes a duplicate line for each partial trust (a tailnet box, whose
+#   builder laid one key, is the common case)
+TYPES_OWED="$ABSENT"
+[[ -n "$CHANGED" ]] && TYPES_OWED="$CHANGED${ABSENT:+ $ABSENT}${TRUSTED_ALREADY:+ $TRUSTED_ALREADY}"
+_scan_lines_of_types "$SCANNED" "$TYPES_OWED" >> "$KNOWN_HOSTS"
+
+TRUST_SAID="added to known_hosts"
+[[ -n "$CHANGED" ]] && TRUST_SAID="re-trusted for the new box"
+echo "   └─ 🌴 trusted — $KH_NAME $TRUST_SAID"

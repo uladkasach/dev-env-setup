@@ -42,6 +42,7 @@ GROVE_REPOS_GH_PROBE_SECONDS=15
 GROVE_REPOS_GH_LIST_SECONDS=60
 
 grove_provision_5_10_repos_provision_verify() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "the org repos"; return 0; }
   # .the SHARED reader, so this half and the upsert cut ONE set
   #   - it held an inline copy of the upsert's scalar until 2026-09-24
   local orgs; orgs="$(grove_provision_5_10_repos_orgs)"
@@ -79,11 +80,12 @@ grove_provision_5_10_repos_provision_verify() {
     return 1
   fi
 
-  local organization present absent broken repo clonedir into
-  local halves=()
+  local organization present absent moved broken repo clonedir into
+  local halves=() carried=()
   for organization in $orgs; do
     present=0
     absent=0
+    moved=0
     broken=0
     ##################################################################
     # 🛑 the SHARED alias, so this half reads the dir the upsert WROTE
@@ -104,13 +106,19 @@ grove_provision_5_10_repos_provision_verify() {
       case "$(grove_provision_5_10_repos_state "$into")" in
         whole)  present=$(( present + 1 )) ;;
         absent) absent=$(( absent + 1 )) ;;
+        # a carried tree is no checkout, and it is NOT empty: counted apart, so the
+        #   plan names it as carried, never as "not on disk"
+        carried) moved=$(( moved + 1 )); carried+=("$into") ;;
         half)   broken=$(( broken + 1 )); halves+=("$into") ;;
       esac
     done < <(timeout -k 5 "$GROVE_REPOS_GH_LIST_SECONDS" gh repo list "$organization" --limit 1000 2>/dev/null)
 
-    if (( absent == 0 && broken == 0 && present > 0 )); then
+    if (( absent == 0 && moved == 0 && broken == 0 && present > 0 )); then
       echo "   • $organization — all $present repos on disk ✔"
-    elif (( present == 0 && absent == 0 && broken == 0 )); then
+    elif (( absent == 0 && broken == 0 && moved > 0 )); then
+      # every gap is a carried tree, named in full below; no clone is absent
+      echo "   🌙 $organization — $present on disk, $moved a carried tree (named below)"
+    elif (( present == 0 && absent == 0 && moved == 0 && broken == 0 )); then
       ################################################################
       # 🛑 an empty list is a CREDENTIAL fact, and it names its owner
       #
@@ -143,7 +151,11 @@ grove_provision_5_10_repos_provision_verify() {
       #   - the race is real, so the FACT earns a 🌙 and the INSTRUCTION does not
       #   - (`term=decline`, `rule.require.one-command-provision`)
       ################################################################
-      echo "   🌙 $organization — $present on disk, $absent not on disk"
+      if (( moved > 0 )); then
+        echo "   🌙 $organization — $present on disk, $absent not on disk, $moved a carried tree"
+      else
+        echo "   🌙 $organization — $present on disk, $absent not on disk"
+      fi
       if [[ "${GROVE_MODE:-apply}" == "apply" ]]; then
         echo "      the upsert ran in this run and every clone it tried succeeded,"
         echo "      so these appeared on github after it listed. no step is owed —"
@@ -155,12 +167,29 @@ grove_provision_5_10_repos_provision_verify() {
     fi
   done
 
+  # a carried tree holds files a human or a push laid: the apply keeps them aside,
+  #   and says so here first, since a plan is where a human reads what will move
+  if [[ ${#carried[@]} -gt 0 ]]; then
+    echo "   🌙 ${#carried[@]} repo dir(s) hold files and no .git (a carried tree):"
+    local c
+    for c in "${carried[@]}"; do echo "      • $c"; done
+    if [[ "${GROVE_ENV_SERVER:-}" == cloud@* ]]; then
+      echo "      ⇒ an apply moves each aside to '<repo>.carried.<stamp>', keeps it, and clones"
+    else
+      echo "      ⇒ on a laptop each is the human's own tree: an apply leaves it in place"
+    fi
+  fi
+
   ####################################################################
   # THE claim — no repo dir is half-cloned
   #   - see the header for why this is fatal rather than owed
   ####################################################################
   if [[ ${#halves[@]} -eq 0 ]]; then
-    echo "   • every repo dir on disk opens as a git checkout ✔"
+    if [[ ${#carried[@]} -gt 0 ]]; then
+      echo "   • no repo dir is half-cloned ✔ (each carried tree above is no checkout)"
+    else
+      echo "   • every repo dir on disk opens as a git checkout ✔"
+    fi
     return 0
   fi
 

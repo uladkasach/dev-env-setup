@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <!--
-  .what = a SEAT-SCOPED imagemagick policy. it closes the coder classes that
-          hand a file to another program or interpret it as a program, and it
-          leaves every raster format this repo actually renders untouched.
+  .what = this bundle's imagemagick RULES. they close the coder classes that
+          hand a file to another program or interpret it as a program, and they
+          leave every raster format this repo actually renders untouched.
 
   .why  = `4.5.nvim` installs imagemagick, because image.nvim converts an image
           in the tree nvim has open. that tree is written by `git.grove.pull`,
@@ -19,35 +19,24 @@
             a benign .eps read as coder PS — the ghostscript reach is live
             12 of the 16 coders below carried by the build, all open
 
-  .where = `${XDG_CONFIG_HOME:-$HOME/.config}/ImageMagick/policy.xml`
+  .where = the `<policy>` lines below are FENCED into the policy file the tool
+           reports it reads (`identify -list policy`, first `Path:`) — on debian,
+           `/etc/ImageMagick-6/policy.xml` — right after its `<policymap>` line.
+           every byte outside the fence stays debian's.
 
-  ⚠️ .why the SEAT path and not /etc
-       measured 2026-08-31: a policy at the seat path BITES with no env var
-       that names it, on both the `$XDG_CONFIG_HOME` route and the
-       `$HOME/.config` fallback. `identify -list policy` reports it as a second
-       `Path:` beside `/etc/ImageMagick-6/policy.xml`.
+  🛑 .why /etc and never a seat path — measured on hetzner 2026-11-15, im6 6.9.12
+       with these rules at a seat path, under MAGICK_CONFIGURE_PATH, or behind an
+       `<include>` in /etc, the tool lists only /etc + [built-in] and still reads
+       an eps. INLINED in /etc: an eps is refused, a png still writes, debian's
+       own rules hold. so the holder is a BOX-WIDE write: ground's apply on a
+       grove, `sudo -v && rhx …` on a laptop (`bundle.root.declines`). the camper
+       runs the editor with no sudo and inherits the fact
+       (rule.require.seam-claims-have-an-owner).
 
-  🛑 ⚠️ THAT CLAIM DOES NOT HOLD ON THE LAPTOP — re-measured 2026-09-20
-       the file is installed at `/home/vlad/.config/ImageMagick/policy.xml` and
-       `identify -list policy` names only `/etc/ImageMagick-6/policy.xml` and
-       `[built-in]` — with `XDG_CONFIG_HOME` unset AND with it set explicitly.
-       so every rule below is INERT here: the ghostscript reach rule 1 exists to
-       close is open, which `4.5.nvim`'s own configure.verify reports as a ✋.
-
-       ⇒ read this file as a DECLARATION, never as a measured posture. ask the
-         box which paths it consults before you claim a coder or delegate is
-         shut (`gotcha.a-check-that-cries-wolf-gets-silenced`, q13 — one claim,
-         two stores). the repair is owed and is not this file's to make; it is
-         caught as a dream against `4.5.nvim`.
-
-       so the holder needs NO root — which matters because the CAMPER seat is
-       the seat that runs the editor and holds no sudo. a box-wide write would
-       have to be owned by `ground`, and every camper would then depend on a
-       fact only the other seat could set (rule.require.seam-claims-have-an-owner).
-
-  ⚠️ .this file is COPIED, never symlinked
-       so `configure.verify` can `cmp` the installed copy against this checkout
-       and catch a stale one (rule.require.repo-as-source-of-truth).
+  ⚠️ .why the /etc file can be edited at all
+       it is a dpkg conffile. `1.14.updates` sets confold, so an upgrade keeps
+       the edited copy rather than hold the package on a prompt; the next apply
+       re-fences whatever the package shipped.
 -->
 <policymap>
 
@@ -93,19 +82,12 @@
           line — the verify asks BOTH halves, so a too-wide policy is caught
           rather than discovered later as a broken image render.
 
-       🛑 .on the laptop this line costs zero because NO READER CONSULTS IT
-          see the ⚠️ under `.why the SEAT path` above. where the seat policy is
-          unread, rule 4 closes no delegate, and the "cost zero" claim above is
-          true for a reason it never intended.
-
-          ⚠️ so do NOT cite rule 4 as the holder of a delegate refusal. measured
-             2026-09-20: `nvim readme.md` raised
-             `not allowed by the security policy 'inkscape'` on a shields.io
-             badge, and rule 4 was not why — `inkscape` and `rsvg-convert` are
-             both ABSENT from that box, and im6 reports the dead reach in the
-             vocabulary of a policy error. `4.5.nvim` was repaired at its own
-             cause instead (`download_remote_images = false`), which holds
-             wherever this file is read and wherever it is not.
+       ⚠️ an svg is refused under this line (measured 2026-11-15: the svg
+          coder routes through the `inkscape` delegate). svg is not in the
+          render set, so that costs naught. a delegate refusal seen on a box
+          with NO fence is not this line either: im6 reports an ABSENT inkscape
+          in the same words. `download_remote_images = false` in init.lua is
+          what keeps a remote badge off the wire at all.
   -->
   <policy domain="delegate" rights="none" pattern="*" />
 

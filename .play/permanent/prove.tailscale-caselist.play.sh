@@ -22,7 +22,7 @@ set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUNDLE="$HERE/src/grove.provision/5.devtools/5.23.tailscale"
 
-fixture="$(mktemp -d)"
+fixture="$(mktemp -d)" || { echo "💥 MalfunctionError: could not make a temp dir" >&2; exit 1; }
 trap 'rm -rf "$fixture"' EXIT
 
 failed=0
@@ -354,7 +354,7 @@ play_snap_verify dir="$HERE/.play/permanent/prove.tailscale-caselist.snap" name=
 
 echo ""
 if [[ $failed -ne 0 ]]; then
-  echo "✋ prove.tailscale-caselist: a claim did not hold" >&2
+  echo "💥 MalfunctionError: prove.tailscale-caselist: a claim did not hold" >&2
   exit 1
 fi
 echo "🌲 all claims held ✔"

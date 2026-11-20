@@ -29,6 +29,7 @@
 GROVE_GH_AUTH_PROBE_SECONDS=15
 
 grove_provision_5_4_gh_configure_verify() {
+  grove_env_seat_is_admin && { grove_env_seat_admin_declines "github auth"; return 0; }
   if ! command -v gh >/dev/null 2>&1; then
     echo "   ✋ ConstraintError: gh is absent, so it can hold no credential" >&2
     echo "      ⇒ the provision phase above owns that claim; repair it first" >&2

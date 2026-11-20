@@ -1,0 +1,19 @@
+{
+  "key": "e0df503a6a0c10b8",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "sdk-environment"
+  },
+  "exid": null,
+  "title": "fix(getEnvironment): share the account-name lookup across processes; back off on TooManyRequests",
+  "description": "## .what\n\n`getEnvironment()` throttles under parallel jest: `getEnvAccessFromAwsAccountName` calls `GetAccountInformation` once per cold module registry, and the aws Account API refuses the burst with `TooManyRequestsException`.\n\n## .measured — 2026-11-16, ahbode/svc-chat integration suite on a 36-core grove\n\n- run 1: 176 passed, 9 failed. run 2: 178 passed, 7 failed — a DIFFERENT set each run\n- every failure: `TooManyRequestsException: Too Many Requests` at `getEnvAccessFromAwsAccountName.ts:56`, via `getEnvironment.ts:131` and `:183`\n- the same suite is green on a 4-core grove. jest runs ~cores-1 workers, so 36 cores ⇒ ~35 cold lookups at once\n- the identity is fine: 176+ tests reach aws through it\n\n## .why the extant cache does not help\n\n`getEnvironment.ts:106` caches in a module-level `simple-in-memory-cache`. jest gives each test FILE its own module registry, in its own worker process, so the cache is shared within one file only — ~29 files ⇒ ~29 cold `GetAccountInformation` calls, most of them concurrent.\n\n## .the shape of the fix\n\n1. a cross-process cache for the account-name read: a file on disk keyed by the caller identity (account + role arn from sts), short ttl, atomic write. one process asks aws; the rest read the file. it serves any multi-process caller, not jest alone\n2. retry with backoff + jitter on `TooManyRequestsException` (or `retryMode: 'adaptive'` on the `AccountClient`) — a safety net, since the first cold burst still happens\n\nclamp: a test that fires N concurrent cold `getEnvironment()` calls across processes and asserts ONE `GetAccountInformation` reaches the client.\n\n## .who waits on it\n\nthe hetzner camp grove smoketest (dev-env-setup, `git.grove.provision test`) stays red on this alone; every other rung holds.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": null,
+  "heldSeq": 10,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "17"
+}

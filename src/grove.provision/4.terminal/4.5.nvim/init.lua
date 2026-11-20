@@ -2707,11 +2707,33 @@ local PLUGIN_SPEC = {
               return
             end
             -- dir mode scans in-process with no git to share; it keeps the shipped path
-            if not explorer.git_root or _G.codediff_skip_noop_refresh == false then
+            if not explorer.git_root then
               full_refresh(explorer)
               return vim.schedule(function() settled(explorer) end)
             end
             local git = require('codediff.core.git')
+            -- the full rebuild (the clamp's old-* arm): settle once git has ANSWERED
+            --   ⚠️ the shipped refresh asks git async, so a settle queued at return beat
+            --     the build: on a loaded box the clamp read 0 builds, then 1 in the next
+            --     count. 📜 measured 2026-11-18 inside `play.run --all`. the shipped
+            --     callback queues its build in a vim.schedule; ours queues behind it
+            if _G.codediff_skip_noop_refresh == false then
+              local name = git_call_of(explorer)
+              local live = git[name]
+              git[name] = function(...)
+                local args, n = { ... }, select('#', ...)
+                local cb = args[n]
+                args[n] = function(...)
+                  cb(...)
+                  vim.schedule(function() vim.schedule(function() settled(explorer) end) end)
+                end
+                return live(unpack(args, 1, n))
+              end
+              local ok, e = pcall(full_refresh, explorer)
+              git[name] = live
+              if not ok then error(e, 0) end
+              return
+            end
             local name, args, n = git_call_of(explorer)
             -- read at call time, so a wrapper installed after ours still sees the call
             local ask = git[name]
@@ -3647,12 +3669,10 @@ local PLUGIN_SPEC = {
             --    the `rsvg-convert` of the plain `svg` delegate, and im6 reports
             --    the dead reach as `not allowed by the security policy 'inkscape'`.
             --
-            -- ⚠️ do NOT read that sentence as this repo's policy at work. measured
-            --    the same day, `identify -list policy` names only
-            --    `/etc/ImageMagick-6/policy.xml` and `[built-in]`, with and without
-            --    `XDG_CONFIG_HOME` set — so `imagemagick.policy.xml` is UNREAD here
-            --    and its rule 4 holds no delegate at all. the /etc file closes
-            --    three (URL, HTTPS, HTTP) and declares no `inkscape` rule.
+            -- ⚠️ do NOT read that sentence as proof this repo's policy bites: an
+            --    absent inkscape and a refused one print the same words. the
+            --    policy is fenced into /etc by configure.upsert, and
+            --    configure.verify asks the live tool whether it bites.
             --
             -- ⇒ so the bound belongs HERE either way: do not fetch what we never
             --   declared renderable. IMAGE_DIFF_EXTS is the declaration, and it

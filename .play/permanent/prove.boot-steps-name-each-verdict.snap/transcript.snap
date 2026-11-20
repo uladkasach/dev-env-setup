@@ -1,0 +1,379 @@
+## platform, none in the registry (rc 0)
+      │  └─ platform · none declared in the registry (an ec2 box answers it alone)
+
+## platform, none in the registry, a tailnet grove (rc 3)
+      └─ ✋ step 1 (reach) does not hold
+
+  why: the registry reaches grove-demo over the tailnet and declares no platform for it
+  fix:
+    a box with no metadata cannot derive its own platform, so the first apply would
+    halt at the derive. declare it in the registry, then re-run —
+    rhx git.grove.set grove-demo --platform hetzner.hetzbot
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 1 --trust verified
+
+## platform, hetzner, plan (rc 0)
+      │  · would findsert /etc/grove/platform = hetzner.hetzbot, over grove-demo.ground
+
+## platform, hetzner, apply, laid (rc 0)
+      │  └─ platform ✔ /etc/grove/platform = hetzner.hetzbot (SET)
+
+## platform, hetzner, apply, the box declares another (rc 3)
+      └─ ✋ step 1 (reach) does not hold
+
+  why: the platform declaration could not be laid over grove-demo.ground: DIFFERS: the box declares aws.ec2
+  fix:
+    a DIFFERS answer means the box already declares another platform —
+    read it before any apply: ssh grove-demo.ground cat /etc/grove/platform
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 1 --trust keep
+
+## platform, hetzner, apply, the ground seat's road refuses (rc 3)
+      └─ ✋ step 1 (reach) does not hold
+
+  why: the ground seat grove-demo.ground refused this laptop's key: ground@host: Permission denied (publickey).
+  fix:
+    a laptop that already reaches grove-demo.ground places this one's PUBLIC key on every seat —
+    rhx git.grove.auth.ssh.set grove-demo --identity <this laptop's key>.pub --mode plan
+    rhx git.grove.auth.ssh.set grove-demo --identity <this laptop's key>.pub --mode apply
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 1 --trust keep
+
+## platform, hetzner, apply, the ground seat's sudo refuses (rc 3)
+      └─ ✋ step 1 (reach) does not hold
+
+  why: the platform declaration could not be laid over grove-demo.ground: sudo: a password is required
+  fix:
+    the ground seat did not run the write — its road (ssh, then sudo) refused
+    read the seat's own answer: ssh grove-demo.ground sudo -n true
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 1 --trust keep
+
+## platform, a registry value no box declares (rc 3)
+      └─ ✋ step 1 (reach) does not hold
+
+  why: the registry's platform 'aws.ec2' is not one a box declares
+  fix:
+    rhx git.grove.set grove-demo --platform hetzner.hetzbot
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 1 --trust verified
+
+## keys, plan (rc 0)
+      │  ├─ keys · would run: <fix>/bin/rhx git.grove.auth.keys.set grove-demo --mode apply --org ahbode
+
+## keys, apply, placed (rc 0)
+   (stub) rhx git.grove.auth.keys.set grove-demo --mode apply --org ahbode
+      │  ├─ keys ✔ grove-demo reads every row 5.16.keys declares
+
+## keys, apply, a row this laptop cannot place (rc 3)
+   (stub) rhx git.grove.auth.keys.set grove-demo --mode apply --org ahbode
+   ✋ ConstraintError: ahbode.prep.VENDOR_KEY — this laptop's rack reads it empty
+      └─ ✋ step 3 (keys) does not hold
+
+  why: the required keys could not be placed on grove-demo — the skill's own lines above name the row and why
+  fix:
+    <fix>/bin/rhx git.grove.auth.keys.set grove-demo --mode plan --org ahbode
+    once each row reads on this laptop, place them:
+    <fix>/bin/rhx git.grove.auth.keys.set grove-demo --mode apply --org ahbode
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 4 --trust keep
+
+## seat halt, an unproven send (97) (rc 3)
+      └─ ✋ step 3 (camper) does not hold
+
+  why: the text landed and NO JOB STARTED — an unproven delivery, not a failure
+  fix:
+    look before you re-send; a blind re-send starts a second copy —
+    <fix>/bin/rhx git.grove.send grove-demo --reply --what '<slice>'
+    only the marker there → no copy runs, so the resume below is safe;
+    an apply's lines there → it runs: wait for its '🌲 grove.provision done' first
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 3 --trust keep
+
+## seat halt, ground, ten empty probes (rc 3)
+      └─ ✋ step 2 (ground) does not hold
+
+  why: the probe gave no verdict 10 times over — the apply may still be at work
+  fix:
+    ⚠️ an EMPTY reply is a fault, not a 'not yet'. read the box directly,
+       and do NOT re-send; a blind re-send starts a second copy —
+    <fix>/bin/rhx git.grove.send grove-demo.ground --what 'tail -20 <log>'
+    ⚠️ that read is UNBOUNDED on purpose: a marker that never landed is one
+       cause of this halt, so a slice from it would render empty too
+
+  then, once THIS run's log ends '🌲 grove.provision done' (and not before) —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 3 --trust keep
+
+## seat halt, camper, ten empty probes (rc 3)
+      └─ ✋ step 3 (camper) does not hold
+
+  why: the probe gave no verdict 10 times over — the apply may still be at work
+  fix:
+    ⚠️ an EMPTY reply is a fault, not a 'not yet'. read the box directly,
+       and do NOT re-send; a blind re-send starts a second copy —
+    <fix>/bin/rhx git.grove.send grove-demo --what 'tail -20 <log>'
+    ⚠️ that read is UNBOUNDED on purpose: a marker that never landed is one
+       cause of this halt, so a slice from it would render empty too
+
+  then, once THIS run's log ends '🌲 grove.provision done' (and not before) —
+    <fix>/bin/rhx git.grove.auth.keys.set grove-demo --mode apply --org ahbode
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 4 --trust keep
+
+## seat halt, camper, the apply outran its bound (rc 3)
+      └─ ✋ step 3 (camper) does not hold
+
+  why: the apply outran 2700s — that is a BOUND, not a verdict. it may still be at work
+  fix:
+    do NOT re-send; read whether the log still grows, and wait while it does —
+    <fix>/bin/rhx git.grove.send grove-demo --reply --what 'stat -c %y <log>'
+    <fix>/bin/rhx git.grove.send grove-demo --reply --what '<slice> | tail -4'
+
+  then, once THIS run's log ends '🌲 grove.provision done' (and not before) —
+    <fix>/bin/rhx git.grove.auth.keys.set grove-demo --mode apply --org ahbode
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 4 --trust keep
+
+## seat converged, camper, the duct is reborn (rc 0)
+      │  └─ ✔ duct reborn (duct://grove-demo/main/mechanic) — its shell reads this apply's PATH
+
+## seat converged, ground, the duct is reborn (rc 0)
+      │  └─ ✔ duct reborn (duct://grove-demo.ground/main/mechanic) — its shell reads this apply's PATH
+
+## seat converged, camper, the duct refuses its reboot (rc 3)
+      └─ ✋ step 3 (camper) does not hold
+
+  why: the apply converged, and its duct refused a fresh shell — it still holds one born before this apply
+  fix:
+    it said:
+         (stub) rhx duct.reboot --on duct://grove-demo/main/mechanic
+      ✋ duct.reboot: 'duct://grove-demo/main/mechanic' is absent — there is no pane to reboot
+    a command sent there runs on the old PATH, so `rhx` and the toolchain read absent —
+    <fix>/bin/rhx duct.reboot --on 'duct://grove-demo/main/mechanic'
+    <fix>/bin/rhx git.grove.auth.keys.set grove-demo --mode apply --org ahbode
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 4 --trust keep
+
+## wake halt, ec2, asked --trust tofu (rc 3)
+      └─ ✋ step 1 (reach) does not hold
+
+  why: the grove did not wake — the tunnel is the only road in
+  fix:
+    camp credentials lapse in ~55m, and a lapsed read reports as an absent key —
+    <fix>/bin/rhx keyrack unlock --owner ehmpath --env camp
+    <fix>/bin/rhx git.grove.wake grove-demo --mode apply
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 1 --trust tofu
+
+## trust halt, ec2, asked --trust verified (rc 3)
+      └─ ✋ step 1 (reach) does not hold
+
+  why: the host key was not trusted, so this refuses to reach the box
+  fix:
+    the key offered on the tunnel was NOT attested by the box's own boot
+    record — read trust.gen's own rows above; they name each fingerprint
+    a REBUILT box presents a NEW key, and that is the benign cause —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --trust replace
+    🛑 if the boot record cannot be read AT ALL, there is no flag for it.
+    --trust tofu is refused on a CHANGED key: a prior key is on record
+    and disagrees, so there is no 'first use' for tofu to be about, and
+    a scan alone settles no question. read what holds the port instead —
+    ss -tlnp | grep ':<the port from git.grove.list>'
+    ⚠️ tofu remains right for FIRST contact, where no prior key exists.
+    even then the endpoint is a shared localhost port, so 'first use'
+    there is not first use of a HOST (howto.adopt-a-replacement-grove)
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 1 --trust verified
+
+## wake halt, tailnet, asked --trust tofu (rc 3)
+      └─ ✋ step 1 (reach) does not hold
+
+  why: the grove did not answer over ssh on the tailnet — wake's own lines above quote ssh
+  fix:
+    a tailnet grove is always on, so a silence is reach: is this laptop on the tailnet,
+    and is the box up? read both, then re-run —
+    tailscale status
+    <fix>/bin/rhx git.grove.wake grove-demo --mode apply
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 1 --trust tofu
+
+## trust halt, tailnet, asked --trust verified (rc 3)
+      └─ ✋ step 1 (reach) does not hold
+
+  why: the host key was not trusted, so this refuses to reach the box
+  fix:
+    trust.gen's own rows above name each fingerprint and the road it asks for.
+    a tailnet box has no console, so its first key is yours to accept — read it first:
+    <fix>/bin/rhx git.grove.trust.gen --grove grove-demo --mode plan
+    FIRST contact (no key on record): confirm the tailnet names the box, then —
+    <fix>/bin/rhx git.grove.trust.gen --grove grove-demo --mode apply --trust tofu
+    a REBUILT box (a key on record that CHANGED): a key still on record attests the new —
+    <fix>/bin/rhx git.grove.trust.gen --grove grove-demo --mode apply --on-changed replace
+    if none still matches, no channel here attests it: compare to infra's fingerprints
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 1 --trust verified
+
+## wake halt, tailnet, the wake refused (rc 2) (rc 3)
+      └─ ✋ step 1 (reach) does not hold
+
+  why: the grove answered and the wake refused (rc 2) — wake's own lines above name why and the fix
+  fix:
+    a refused key is placed from a laptop that already reaches the ground seat:
+    <fix>/bin/rhx git.grove.auth.ssh.set grove-demo --identity <this laptop's key>.pub --mode plan
+    else follow the fix wake printed, then re-run —
+    <fix>/bin/rhx git.grove.wake grove-demo --mode apply
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 1 --trust tofu
+
+## ground alias, plan (rc 0)
+      │  · would set alias 'grove-demo.ground' → ground@grove-demo-1:22 (the ground seat, read first)
+
+## ground alias, apply, a fresh laptop (rc 0)
+      │  ├─ ground alias [SET] 'grove-demo.ground' → ground@grove-demo-1:22
+
+## ground alias, apply, a re-run (rc 0)
+      │  ├─ ground alias [KEEP] 'grove-demo.ground' → ground@grove-demo-1:22
+
+## ground alias, an --alias seat (no host) (rc 0)
+      │  ├─ ground alias [KEEP] 'infra-ground' (no host recorded: an --alias seat, whose Host block is not ours, or one its wake addresses)
+
+## platform, an --alias ground seat, plan (rc 0)
+      │  · would findsert /etc/grove/platform = hetzner.hetzbot, over infra-ground
+
+## ground alias, no ground seat registered (rc 3)
+      └─ ✋ step 1 (reach) does not hold
+
+  why: no 'grove-demo.ground' seat is registered, and every box-wide step runs from it
+  fix:
+    register the admin seat beside the work seat (howto.add-a-new-grove, the two seats):
+    rhx git.grove.set grove-demo.ground --at ground@<host>:<port>
+
+  then run again from here —
+    <fix>/bin/rhx git.grove.provision boot grove-demo --mode apply --from 1 --trust verified
+
+## cli · --help (rc 0)
+git.grove.provision boot — bare box to acceptance-grade, in ONE command
+
+usage:
+  rhx git.grove.provision boot <name> [--mode plan|apply] [--from N] [--trust verified|replace|tofu|keep] [--within S]
+
+inputs:
+  <name>    the grove, as rhx git.grove.list names it      (required)
+  --mode    plan names the steps and runs none; apply runs them  (default plan)
+  --from    the first step to run, 0-4                      (default 0)
+  --trust   how the host key is trusted at step 1           (default verified)
+            verified — checked against the box's own report; an unattested key halts
+            replace  — verified, and a CHANGED key is re-trusted (a rebuilt box)
+            tofu     — the check is skipped: a tailnet first contact, by your word
+            keep     — the trust step is not run
+  --within  seconds to allow one seat's apply               (default 2700)
+
+examples:
+  rhx git.grove.provision boot <name>                                    # plan
+  rhx git.grove.provision boot <name> --mode apply                       # the whole boot
+  rhx git.grove.provision boot <name> --mode apply --trust tofu          # a tailnet first contact
+  rhx git.grove.provision boot <name> --mode apply --from 3 --trust keep # resume at the camper
+
+the steps:
+  0. grants  — ask the HUMAN-ONLY credentials first, before any reach
+  1. reach   — wake the road (an ec2 tunnel, or the tailnet), trust the host key
+               (a tailnet first contact: --trust tofu, by your word)
+  2. ground  — push, then ONE apply (the seat WITH sudo goes first)
+  3. camper  — push, then ONE apply (the seat that does the work)
+  4. gate    — git.grove.provision test, with no command in between
+
+the ORDER is the point: ground converges every box-wide fact, so the
+camper's apply asks for no root at all — and step 0 runs first so a
+grant only a human can make is asked BEFORE a 45-minute unattended run,
+never discovered as a claim at the end of one.
+exit 0 = provisioned + gated | 3 = a step failed | 2 = bad input
+
+## cli · refused: '--wat' (rc 2)
+✋ ConstraintError: unknown flag '--wat'
+   ├─ valid: --mode plan|apply  --from 0-4  --trust verified|replace|tofu|keep  --within <secs>  --help
+   ├─ fix: rhx git.grove.provision boot <name> --mode apply
+   └─ every input: rhx git.grove.provision boot --help
+
+## cli · refused: '<no args>' (rc 2)
+✋ ConstraintError: no grove named
+   ├─ list them: rhx git.grove.list
+   ├─ fix: rhx git.grove.provision boot <name> --mode apply
+   └─ every input: rhx git.grove.provision boot --help
+
+## cli · refused: 'grove-demo --mode' (rc 2)
+✋ ConstraintError: --mode needs a value
+   ├─ fix: rhx git.grove.provision boot <name> --mode apply
+   └─ every input: rhx git.grove.provision boot --help
+
+## cli · refused: 'grove-demo --mode yes' (rc 2)
+✋ ConstraintError: --mode 'yes' is not plan or apply
+   ├─ fix: rhx git.grove.provision boot <name> --mode apply
+   └─ every input: rhx git.grove.provision boot --help
+
+## cli · refused: 'grove-demo --from 7' (rc 2)
+✋ ConstraintError: --from '7' is not a step 0-4
+   ├─ fix: rhx git.grove.provision boot <name> --mode apply
+   └─ every input: rhx git.grove.provision boot --help
+
+## cli · refused: 'grove-demo --trust maybe' (rc 2)
+✋ ConstraintError: --trust 'maybe' is not verified, replace, tofu, or keep
+   ├─ fix: rhx git.grove.provision boot <name> --mode apply
+   └─ every input: rhx git.grove.provision boot --help
+
+## cli · refused: 'grove-demo --within soon' (rc 2)
+✋ ConstraintError: --within 'soon' is not a whole number of seconds
+   ├─ fix: rhx git.grove.provision boot <name> --mode apply
+   └─ every input: rhx git.grove.provision boot --help
+
+## sink · osc 52, bel-terminated (rc 0)
+in:   D I F F E R S : a w s . e c 2 033 ] 5 2 ; c ; Z X Z p b A = = \a e n d 
+out:  D I F F E R S : a w s . e c 2 e n d 
+
+## sink · osc 52, st-terminated (rc 0)
+in:   a 033 ] 5 2 ; c ; Z X Z p b A = = 033 \ b 
+out:  a b 
+
+## sink · osc 0 title (rc 0)
+in:   033 ] 0 ; o w n e d \a o k 
+out:  o k 
+
+## sink · csi color (rc 0)
+in:   033 [ 3 1 m r e d 033 [ 0 m p l a i n 
+out:  r e d p l a i n 
+
+## sink · csi cursor moves (rc 0)
+in:   x 033 [ 2 K y 033 [ 1 0 ; 2 0 H z 
+out:  x y z 
+
+## sink · csi private mode (rc 0)
+in:   033 [ ? 1 0 4 9 h s c r e e n 
+out:  s c r e e n 
+
+## sink · unterminated osc (rc 0)
+in:   a 033 ] 5 2 ; c ; Z X Z p b A = = t a i l 
+out:  a ] 5 2 ; c ; Z X Z p b A = = t a i l 
+
+## sink · 8-bit csi (U+009B) (rc 0)
+in:   a 302 233 3 1 m b 
+out:  a 3 1 m b 
+
+## sink · lone esc and bel (rc 0)
+in:   a 033 b \a c 
+out:  a b c 
+
+## sink · tab, tree glyph, turtle kept (rc 0)
+in:   a \t b 342 224 234 360 237 220 242 z 
+out:  a \t b 342 224 234 360 237 220 242 z 
+
+
