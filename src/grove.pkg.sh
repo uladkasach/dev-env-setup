@@ -466,6 +466,10 @@ pkg_install() {
   [[ ${#wanted[@]} -eq 0 ]] && return 0
 
   # a real install remains, so NOW the machinery to change the box must be there
+  #   - name what is absent FIRST: a seat with no root refuses next, and without
+  #     this line its ✋ names no package. 📜 2026-11-19: a camper seat refused on
+  #     a playwright list whose every printed row read ✔
+  echo "   • absent, to install: ${wanted[*]}"
   pkg_assert_sudo || return 1
 
   local absent=() broken=() unmet=() cand deps
