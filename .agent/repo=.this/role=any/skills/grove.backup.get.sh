@@ -41,8 +41,8 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
 fi
 
 REPO="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
-# shellcheck source=../../../src/grove.provision/5.devtools/5.25.backup/grove.backup.operations.sh
-source "$REPO/src/grove.provision/5.devtools/5.25.backup/grove.backup.operations.sh"
+# shellcheck source=../../../src/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh
+source "$REPO/src/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh"
 
 LIST=0
 FROM=""
@@ -80,7 +80,7 @@ if [[ "$LIST" -eq 0 ]]; then
   line="$(grove_backup_status_line "$enrolled")"
   if [[ ! -f "$status" ]]; then
     echo "   └─ backup: $line"
-    [[ -z "$enrolled" ]] && echo "      └─ fix: rhx grove.provision --what 5.25.backup --mode apply"
+    [[ -z "$enrolled" ]] && echo "      └─ fix: rhx grove.provision --what 5.26.backup --mode apply"
     exit 0
   fi
 

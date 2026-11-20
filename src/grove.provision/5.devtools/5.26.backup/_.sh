@@ -12,19 +12,19 @@
 #   - /etc/grove/name and /etc/grove/backup.bucket
 #
 # usage:
-#   rhx grove.provision --what 5.25.backup --mode apply
+#   rhx grove.provision --what 5.26.backup --mode apply
 #   rhx grove.backup.get
 ######################################################################
 
-grove_provision_5_25_backup() {
-  bundle.upgrade 5.25.backup.provision.upsert
-  bundle.upgrade 5.25.backup.provision.verify
+grove_provision_5_26_backup() {
+  bundle.upgrade 5.26.backup.provision.upsert
+  bundle.upgrade 5.26.backup.provision.verify
 }
 
 # .what = the four files this bundle installs → "src<TAB>dst<TAB>mode" lines
 # .why one list: the upsert copies exactly what the verify diffs
-grove_provision_5_25_backup_files() {
-  local src="$GROVE_SRC/grove.provision/5.devtools/5.25.backup"
+grove_provision_5_26_backup_files() {
+  local src="$GROVE_SRC/grove.provision/5.devtools/5.26.backup"
   printf '%s\t%s\t%s\n' \
     "$src/grove-backup"                 /usr/local/lib/grove-backup/grove-backup                 755 \
     "$src/grove.backup.operations.sh"   /usr/local/lib/grove-backup/grove.backup.operations.sh   644 \
@@ -33,4 +33,4 @@ grove_provision_5_25_backup_files() {
 }
 
 # .what = does this tier hold a grove role? — the one gate both phases ask
-grove_provision_5_25_backup_applies() { [[ "${GROVE_ENV_SERVER:-}" == cloud@* ]]; }
+grove_provision_5_26_backup_applies() { [[ "${GROVE_ENV_SERVER:-}" == cloud@* ]]; }
