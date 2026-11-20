@@ -64,4 +64,8 @@ grove_provision_5_devtools() {
   #   reach the two skills says so — instead of a timer that ticks forever
   #   over a gate that never closes
   bundle.upgrade 5.18.openhours
+
+  # LAST: the crew boot gate reads this marker, so a box declares itself a work
+  #   grove only once every bundle above has converged it
+  bundle.upgrade 5.25.purpose
 }
