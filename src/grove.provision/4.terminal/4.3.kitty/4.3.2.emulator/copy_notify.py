@@ -3,6 +3,7 @@ import subprocess
 
 from kitty.boss import Boss
 from kitty.clipboard import set_clipboard_string
+from kitty.fast_data_types import add_timer
 from kittens.tui.handler import result_handler
 
 # 🛑 ctrl+c / ctrl+shift+c must NEVER interrupt any receiver
@@ -26,7 +27,31 @@ def _comm(pid: int) -> str:
         return ''
 
 
+def _children_of(pid: int) -> list:
+    # the direct children of one pid, read from the kernel's own list
+    #   - `/proc/<pid>/task/<tid>/children` names the kids each thread forked
+    #   - None when the kernel lacks CONFIG_PROC_CHILDREN, so the caller can
+    #     fall back to a full map rather than read an empty tree as truth
+    try:
+        tids = os.listdir('/proc/%d/task' % pid)
+    except Exception:
+        return []
+    kids = []
+    for tid in tids:
+        try:
+            with open('/proc/%d/task/%s/children' % (pid, tid)) as fh:
+                kids.extend(int(k) for k in fh.read().split())
+        except FileNotFoundError:
+            return None
+        except Exception:
+            continue
+    return kids
+
+
 def _child_map() -> dict:
+    # every pid on the box, keyed by its parent — the fallback walk only
+    #   - ⚠️ it reads /proc/<pid>/stat for EVERY process, so its cost grows with
+    #     the box, never with the window. see `_subtree` for why that matters
     kids = {}
     for name in os.listdir('/proc'):
         if not name.isdigit():
@@ -42,13 +67,29 @@ def _child_map() -> dict:
     return kids
 
 
-def _subtree(root: int, kids: dict) -> list:
+def _subtree(root: int) -> list:
+    # every pid under `root`, walked from root DOWN, never from the whole box UP
+    #
+    # 🛑 the cost must scale with the window, never with the machine
+    #   - a box mid-work holds dozens of duct sessions, so a full /proc read is
+    #     thousands of opens, paid on every ctrl+c
+    #   - the kernel's `children` list reads only this window's own tree
+    #   - a kernel with no such list falls back to the full map, so the answer
+    #     stays correct and merely costs more there
     out = []
-    stack = list(kids.get(root, []))
+    stack = _children_of(root)
+    if stack is None:
+        kids = _child_map()
+        stack = list(kids.get(root, []))
+        while stack:
+            pid = stack.pop()
+            out.append(pid)
+            stack.extend(kids.get(pid, []))
+        return out
     while stack:
         pid = stack.pop()
         out.append(pid)
-        stack.extend(kids.get(pid, []))
+        stack.extend(_children_of(pid) or [])
     return out
 
 
@@ -163,7 +204,7 @@ def _window_pids(window) -> list:
     root = getattr(window.child, 'pid', None)
     if not root:
         return []
-    return [root] + _subtree(root, _child_map())
+    return [root] + _subtree(root)
 
 
 def _local_tmux_in_copy_mode(pane: tuple) -> bool:
@@ -251,10 +292,27 @@ def handle_result(args, answer, target_window_id, boss: Boss) -> None:
             ['notify-send', '-t', '1200', '-a', 'kitty', 'copied to clipboard']
         )
 
-    # forward branch — hand the copy key to a copy-receiver, and to none other
+    # forward branch — run on the NEXT loop tick, never inside this handler
+    #
+    # 🛑 the clipboard write above is only QUEUED: kitty sends it to the
+    #   compositor when its event loop next turns, and this handler blocks that
+    #   turn. the forward costs a /proc walk and a tmux call (timeout 1s)
+    #   - a human who copies and switches windows at once moves focus first
+    #   - wayland then drops the late offer from an unfocused kitty, so the
+    #     copy toasts and never lands
+    #   - ⇒ return now, so the offer flushes; the forward follows one tick later
+    add_timer(lambda timer_id: _forward(target_window_id, boss), 0, False)
+
+
+def _forward(target_window_id, boss: Boss) -> None:
+    # hand the copy key to a copy-receiver, and to none other
     #   - so it can never land on claude-cli or a shell or an unknown TUI
     #   - ONE walk of /proc feeds the verdict, so its three reasons cannot read
     #     two different snapshots of one window
+    #   - the window is looked up again: it may have closed in the one tick
+    window = boss.window_id_map.get(target_window_id)
+    if window is None:
+        return
     pids = _window_pids(window)
     if _is_copy_receiver(window, pids):
         window.write_to_child(b'\x1b[99;6u')

@@ -29,11 +29,17 @@ import types
 
 kitten, client_pid, arm = sys.argv[1], int(sys.argv[2]), sys.argv[3]
 
+# the import below would write a __pycache__/ beside the SHIPPED kitten, in the
+# checkout; a probe leaves the tree it reads exactly as it found it
+sys.dont_write_bytecode = True
+
 # kitty's own modules exist only inside kitty; the lookup under test uses none
-for name in ('kitty', 'kitty.boss', 'kitty.clipboard', 'kittens', 'kittens.tui', 'kittens.tui.handler'):
+for name in ('kitty', 'kitty.boss', 'kitty.clipboard', 'kitty.fast_data_types',
+             'kittens', 'kittens.tui', 'kittens.tui.handler'):
     sys.modules.setdefault(name, types.ModuleType(name))
 sys.modules['kitty.boss'].Boss = object
 sys.modules['kitty.clipboard'].set_clipboard_string = lambda s: None
+sys.modules['kitty.fast_data_types'].add_timer = lambda cb, interval, repeats: 1
 sys.modules['kittens.tui.handler'].result_handler = lambda **kw: (lambda f: f)
 
 spec = importlib.util.spec_from_file_location('copy_notify', kitten)

@@ -112,6 +112,21 @@ BOTH concerns and they are independent:
 `send-keys C-S-c` re-emit is what hands it back to nvim — drop that half and
 copy dies everywhere, local included.
 
+## 🛑 .the clipboard write leaves the handler BEFORE the forward
+
+`set_clipboard_string` only QUEUES the offer. kitty sends it to the compositor when its event
+loop next turns, and the kitten's handler blocks that turn. so the forward runs on the next
+tick (`add_timer(…, 0, False)`), never inline.
+
+- a human who copies and switches windows at once moves focus first
+- wayland drops a late offer from an unfocused client: the toast fires, the clipboard never changes
+- measured 2026-11-21: the old full `/proc` walk read 1802 `stat` files per press, for a window
+  with one child. the walk now reads the kernel's own `children` list, so it scales with the
+  window, never with the box
+
+⇒ clamp: `prove.copy-kitten-flushes-before-forward`. its old arms (inline forward, full walk) must
+go red.
+
 ## .both keys are equal
 
 `ctrl+c` and `ctrl+shift+c` both map to `kitten copy_notify.py`, so they behave identically everywhere: copy kitty's selection + toast, plus the allowlist forward. the builtin `copy_to_clipboard` action would skip both the toast and the forward, so the kitten backs both keys.
