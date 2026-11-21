@@ -187,10 +187,11 @@ check "the timer is a calendar spec, so Persistent= binds it"         "$(grep '^
 # the aws.params gate — row 29
 ######################################################################
 echo "   ├─ aws.params gate"
-gate() { GROVE_ENV_SERVER="$1" grove_provision_5_12_rack_platform_is_ec2 && echo open || echo closed; }
+gate() { GROVE_ENV_SERVER="$1" grove_provision_5_12_rack_is_camp_grove && echo open || echo closed; }
 check "row 29: house@unix: closed"                                    "$(is "$(gate house@unix)" closed)"
 check "local@unix: closed"                                            "$(is "$(gate local@unix)" closed)"
 check "cloud@aws.ec2: open"                                           "$(is "$(gate cloud@aws.ec2)" open)"
+check "cloud@hetzner.hetzbot: open"                                   "$(is "$(gate cloud@hetzner.hetzbot)" open)"
 
 ######################################################################
 # the probe's trust half — a seat may never elect itself
