@@ -1,0 +1,15 @@
+# rule.require.solve-at-cause
+
+solve at the root cause, never by workaround of a symptom. ask first: what causes this? is there an intended api to control it? can it be configured at the source?
+
+⇒ the full rule and its worked example: `rule.require.solve-at-cause` (ehmpathy/architect). this repo adds one cue:
+
+## ⚠️ .a bulk failure is ONE cause repeated, not N causes
+
+measured 2026-08-10: a fresh grove's first `grove.provision --mode apply` closed 6 of 78 claims. 72 claims on a box that new do not have 72 causes. sorted by SHAPE, 68 read `<binary> is absent from PATH` — one cause (`gotcha.a-tool-found-by-path-answers-only-a-human`). a repair of the first claim on the list fixes one row and leaves 67.
+
+⚠️ a plan reports the STATE; a bulk cause is a fact about the RUN. so sort the claims yourself, and let the largest group name the cause.
+
+⇒ **when a failure count is large, find what the failures have in common before you read any one of them.**
+
+enforcement: a workaround where a source-level fix exists = blocker · a bulk failure worked one claim at a time, with no sort by shape first = nitpick
