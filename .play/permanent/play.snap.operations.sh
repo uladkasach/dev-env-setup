@@ -12,10 +12,10 @@
 #   - absent → it is written, and the run says so. review the new file in the diff
 #     (under CI an absent snap is a 💥, never a write)
 #   - equal  → silent pass
-#   - drifted → 💥, with the diff. to accept a drift, delete the file and rerun:
-#       rhx rmsafe --path .play/permanent/<play>.snap/<name>.snap
-#   - `play.run` passes no flags to a play, so there is no `--resnap`; the
-#     delete is the deliberate step
+#   - drifted → 💥, with the diff. to accept a drift, rerun with
+#       rhx play.run --play <play> --resnap
+#     (it exports GROVE_RESNAP=1, which rewrites the file; review it in the diff)
+#   - under CI, GROVE_RESNAP is refused: a ci run never rewrites a baseline
 #
 # .mask  = a caller strips every value that differs per run or per box (a
 #          mktemp dir, a codename) BEFORE the call; this helper compares bytes
@@ -54,6 +54,20 @@ play_snap_verify() {
     return 1
   fi
 
+  # a resnap under ci would pass the very drift the snap exists to catch
+  if [[ "${GROVE_RESNAP:-}" == 1 && -n "${CI:-}" ]]; then
+    echo "   💥 MalfunctionError: GROVE_RESNAP=1 under CI — a ci run never rewrites a snapshot" >&2
+    return 1
+  fi
+
+  # resnap — rewrite it, and say so; the diff of the pr is where it is reviewed
+  if [[ "${GROVE_RESNAP:-}" == 1 ]]; then
+    mkdir -p "$dir"
+    printf '%s\n' "$actual" > "$file"
+    echo "   • snapshot rewritten: $name (GROVE_RESNAP=1) — review it in the diff ✔"
+    return 0
+  fi
+
   # first run — write it, and say so; the diff of the pr is where it is reviewed
   if [[ ! -f "$file" ]]; then
     mkdir -p "$dir"
@@ -71,6 +85,6 @@ play_snap_verify() {
   # drift — show it, and name the deliberate step that accepts it
   echo "   💥 MalfunctionError: '$name' drifted from its snapshot ($file)" >&2
   diff <(printf '%s\n' "$actual") "$file" | head -40 >&2
-  echo "      ⇒ if the new output is right: rhx rmsafe --path ${file#"$(git rev-parse --show-toplevel 2>/dev/null)/"}, then rerun" >&2
+  echo "      ⇒ if the new output is right: rhx play.run --play <this play> --resnap, then review the diff" >&2
   return 1
 }
