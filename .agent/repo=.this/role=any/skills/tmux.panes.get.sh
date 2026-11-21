@@ -15,6 +15,12 @@
 #             "up", not as a scroll
 #         which apps hold which state is a live fact; this reads it
 #
+#         and one fact a level up: the SESSION's own `mouse` option. with it
+#         off, the tmux client never asks kitty for the mouse, so kitty turns
+#         every wheel tick over that window into arrow keys. a row with
+#         `tmux-mouse=off` is that cause, named; `rhx grove.provision --what
+#         2.8.tmux --mode apply` sources the conf that turns it on
+#
 # usage:
 #   tmux.panes.get.sh                  # every attached pane, all servers
 #   tmux.panes.get.sh --command claude # only panes whose command matches
@@ -38,7 +44,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 DIR="${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)"
-FMT='#{session_attached}	#{session_name}	#{pane_current_command}	#{alternate_on}	#{mouse_any_flag}	#{mouse_sgr_flag}	#{pane_in_mode}'
+# `#{mouse}` reads the option itself, session override included
+FMT='#{session_attached}	#{session_name}	#{pane_current_command}	#{alternate_on}	#{mouse_any_flag}	#{mouse_sgr_flag}	#{pane_in_mode}	#{mouse}'
 
 echo "🐢 heres what each pane holds"
 echo ""
@@ -48,13 +55,15 @@ echo "   ├─ columns: server · session · command · screen · mouse · mode
 ROWS=()
 for sock in "$DIR"/*; do
   [[ -S "$sock" ]] || continue
-  while IFS=$'\t' read -r attached session cmd alt mouse sgr mode; do
+  while IFS=$'\t' read -r attached session cmd alt mouse sgr mode tmuxmouse; do
     [[ "$attached" == 0 || -z "$attached" ]] && continue
     [[ -n "$MATCH" && "$cmd" != *"$MATCH"* ]] && continue
     screen=main; [[ "$alt" == 1 ]] && screen=alt
     m=none; [[ "$mouse" == 1 ]] && m=asked; [[ "$sgr" == 1 ]] && m="$m+sgr"
     md=-; [[ "$mode" == 1 ]] && md=copy-mode
-    ROWS+=("${sock##*/} · $session · $cmd · $screen · $m · $md")
+    # a flag option renders `1` in a format, `on` in show-options — accept both
+    off=''; [[ "$tmuxmouse" != 1 && "$tmuxmouse" != on ]] && off=" · ✋ tmux-mouse=${tmuxmouse:-unset}"
+    ROWS+=("${sock##*/} · $session · $cmd · $screen · $m · $md$off")
   done < <(timeout 2 tmux -S "$sock" list-panes -a -F "$FMT" 2>/dev/null)
 done
 
