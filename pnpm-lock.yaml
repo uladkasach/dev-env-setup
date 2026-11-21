@@ -5,9 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  rhachet-roles-bhrain@0.42.4:
+  rhachet-roles-bhrain@0.43.1:
     hash: a34b5f057e5681e021bbac139a15ce2df61c25720d163c60a0c7fcffc8c09a15
-    path: patches/rhachet-roles-bhrain@0.42.4.patch
+    path: patches/rhachet-roles-bhrain@0.43.1.patch
 
 importers:
 
@@ -32,14 +32,14 @@ importers:
         specifier: ^0.3.3
         version: 0.3.3(rhachet@1.51.0(zod@4.3.4))
       rhachet-roles-bhrain:
-        specifier: ^0.43.1
-        version: 0.43.1(@types/node@25.3.0)(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3)
+        specifier: 0.43.1
+        version: 0.43.1(patch_hash=a34b5f057e5681e021bbac139a15ce2df61c25720d163c60a0c7fcffc8c09a15)(@types/node@25.3.0)(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3)
       rhachet-roles-bhrowser:
         specifier: 0.1.0
         version: 0.1.0(rhachet@1.51.0(zod@4.3.4))
       rhachet-roles-bhuild:
         specifier: ^0.24.0
-        version: 0.24.0(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet-brains-xai@0.3.3(rhachet@1.51.0(zod@4.3.4)))(rhachet-roles-bhrain@0.43.1(@types/node@25.3.0)(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3)
+        version: 0.24.0(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet-brains-xai@0.3.3(rhachet@1.51.0(zod@4.3.4)))(rhachet-roles-bhrain@0.43.1(patch_hash=a34b5f057e5681e021bbac139a15ce2df61c25720d163c60a0c7fcffc8c09a15)(@types/node@25.3.0)(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3)
       rhachet-roles-ehmpathy:
         specifier: ^1.43.0
         version: 1.43.0(@huggingface/transformers@3.8.1)(@tensorflow/tfjs@4.22.0(seedrandom@3.0.5))
@@ -4425,7 +4425,7 @@ snapshots:
     transitivePeerDependencies:
       - ws
 
-  rhachet-roles-bhrain@0.43.1(@types/node@25.3.0)(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3):
+  rhachet-roles-bhrain@0.43.1(patch_hash=a34b5f057e5681e021bbac139a15ce2df61c25720d163c60a0c7fcffc8c09a15)(@types/node@25.3.0)(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3):
     dependencies:
       '@ehmpathy/as-command': 1.0.3
       '@ehmpathy/uni-time': 1.8.1
@@ -4476,7 +4476,7 @@ snapshots:
       - rhachet
       - ws
 
-  rhachet-roles-bhuild@0.24.0(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet-brains-xai@0.3.3(rhachet@1.51.0(zod@4.3.4)))(rhachet-roles-bhrain@0.43.1(@types/node@25.3.0)(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3):
+  rhachet-roles-bhuild@0.24.0(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet-brains-xai@0.3.3(rhachet@1.51.0(zod@4.3.4)))(rhachet-roles-bhrain@0.43.1(patch_hash=a34b5f057e5681e021bbac139a15ce2df61c25720d163c60a0c7fcffc8c09a15)(@types/node@25.3.0)(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3):
     dependencies:
       domain-objects: 0.31.9
       emoji-space-shim: 0.0.0
@@ -4485,7 +4485,7 @@ snapshots:
       rhachet: 1.51.0(zod@4.3.4)
       rhachet-brains-openrouter: 0.1.4(rhachet@1.51.0(zod@4.3.4))
       rhachet-brains-xai: 0.3.3(rhachet@1.51.0(zod@4.3.4))
-      rhachet-roles-bhrain: 0.43.1(@types/node@25.3.0)(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3)
+      rhachet-roles-bhrain: 0.43.1(patch_hash=a34b5f057e5681e021bbac139a15ce2df61c25720d163c60a0c7fcffc8c09a15)(@types/node@25.3.0)(rhachet-brains-openrouter@0.1.4(rhachet@1.51.0(zod@4.3.4)))(rhachet@1.51.0(zod@4.3.4))(with-simple-cache@0.17.3)
       simple-on-disk-cache: 1.8.1(with-simple-cache@0.17.3)
       test-fns: 1.15.7
       with-simple-mutex: 0.1.1
