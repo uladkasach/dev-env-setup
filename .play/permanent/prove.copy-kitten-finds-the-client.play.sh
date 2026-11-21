@@ -41,17 +41,31 @@ SOCK="copyfind-$$"
 OUTER="copyfind-outer-$$"
 FAILED=0
 
+# the probe imports the SHIPPED kitten from the checkout; with bytecode on, python
+#   writes `__pycache__/` beside it, inside `src/` — residue in the tree under test
+export PYTHONDONTWRITEBYTECODE=1
+
+# 🛑 every server this play touches lives under a PRIVATE socket dir
+#   - the old arm asks `default` alone; with the shared dir that is the human's
+#     LIVE server, and tmux answered its own current pane (`zsh`) for a tty it
+#     holds no client of — so the arm read the human's session, never the lookup
+#   - ⇒ here `default` is a server no one runs, so the old lookup can only
+#     answer what it would for a client on any other socket: naught
+#   - the kitten reads TMUX_TMPDIR itself, so it resolves the same dir
+#   - the outer session sits on its own named socket, never `default`
+TMUX_TMPDIR="$(mktemp -d -t copyfind-tmux.XXXXXX)"
+export TMUX_TMPDIR
+
 cleanup() {
   tmux -L "$SOCK" kill-server 2>/dev/null
-  tmux kill-session -t "$OUTER" 2>/dev/null
-  # a killed server can leave its socket FILE, which `rhx tmux.sockets.get` then names STALE
-  rm -f "${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/$SOCK"
+  tmux -L "$OUTER" kill-server 2>/dev/null
   echo ""
-  if tmux -L "$SOCK" has-session 2>/dev/null || tmux has-session -t "$OUTER" 2>/dev/null; then
+  if tmux -L "$SOCK" has-session 2>/dev/null || tmux -L "$OUTER" has-session 2>/dev/null; then
     echo "   ✋ a probe tmux SURVIVED"
   else
     echo "   🧹 restored: probe server and outer session down"
   fi
+  rm -rf "$TMUX_TMPDIR"
 }
 trap cleanup EXIT
 
@@ -62,13 +76,32 @@ for bin in tmux nvim python3; do
   command -v "$bin" >/dev/null || { echo "✋ no $bin on PATH"; exit 1; }
 done
 
+# .what = stop one server, and return only once its socket is gone
+# .why  = `kill-server` returns before the server exits. the next arm's new-session
+#         then reached the DYING server and read `server exited unexpectedly`, so the
+#         arm attached no client. 📜 measured 2026-11-18 inside `play.run --all`
+server_down() {
+  local sock="$1" path
+  path="$TMUX_TMPDIR/tmux-$(id -u)/$sock"
+  tmux -L "$sock" kill-server 2>/dev/null
+  for _ in $(seq 50); do
+    [[ -e "$path" ]] || return 0
+    sleep 0.1
+  done
+  rm -f "$path"
+}
+
 arm() {
   local name="$1" cmd="$2" probe_arm="$3" want="$4" want_calls="$5" pid rows saw calls
-  tmux -L "$SOCK" kill-server 2>/dev/null
-  tmux kill-session -t "$OUTER" 2>/dev/null
+  server_down "$SOCK"
+  server_down "$OUTER"
 
-  tmux -L "$SOCK" new-session -d -s inner -x 100 -y 30 "$cmd"
-  tmux new-session -d -s "$OUTER" -x 100 -y 30 "tmux -L $SOCK attach -t inner"
+  if ! tmux -L "$SOCK" new-session -d -s inner -x 100 -y 30 "$cmd" \
+     || ! tmux -L "$OUTER" new-session -d -s outer -x 100 -y 30 "tmux -L $SOCK attach -t inner"; then
+    echo "   💥 $name — a probe server would not start; this arm asked NO question"
+    FAILED=1
+    return
+  fi
 
   # wait on the facts themselves, never a clock: the client is attached
   for _ in $(seq 50); do
@@ -90,10 +123,7 @@ arm() {
   rows="$(python3 "$PROBE" "$KITTEN" "$pid" "$probe_arm")"
   saw="$(grep -oP '^focused=\K.*' <<<"$rows")"
   calls="$(grep -oP '^tmux_calls=\K.*' <<<"$rows")"
-  # `!x` = any answer but x — the blind arm's claim is "never nvim", and the
-  #   default server answers its OWN outer session's pane (`tmux`) when it holds
-  #   no client on that tty, so EMPTY alone would over-pin the probe's own shape
-  if [[ "$saw" == "$want" || ( "$want" == '!'* && "${saw:-EMPTY}" != "${want#!}" ) ]]; then
+  if [[ "$saw" == "$want" ]]; then
     echo "   ✔ $name — focused=$saw (as declared)"
   else
     echo "   ✋ $name — focused=${saw:-<no row>}, expected $want"
@@ -117,7 +147,7 @@ echo ""
 
 arm "control           nvim in the pane   → must read nvim " "nvim --clean" control nvim 1
 arm "control-shell     a shell in the pane → must read bash" "bash --norc -i" control bash 1
-arm "old-default-only  the lookup asks 'default' alone → must NOT read nvim" "nvim --clean" old-default-only '!nvim' ""
+arm "old-default-only  the lookup asks 'default' alone → must read EMPTY" "nvim --clean" old-default-only EMPTY ""
 
 echo ""
 [[ "$FAILED" -eq 0 ]] \
