@@ -13,7 +13,7 @@ what a **grove** should hold, and converges any grove toward that declaration.
 | kind | `$GROVE_ENV_SERVER` | `--for` | reached by | camp identity |
 |---|---|---|---|---|
 | **local** | `local@unix`, `local@cicd` | `local` | no transport — the shell is already on it | ✋ never |
-| **house** | `house@<platform>` | — (never derived) | undeclared here | ✋ never |
+| **house** | `house@unix` | `house` | loopback ssh to a seat user on a box we own, read off a root-owned election | ✋ never |
 | **cloud** | `cloud@aws.ec2`, `cloud@hetzner.hetzbot` | `cloud` | a duct (`term=duct`) | ✔ mandated |
 
 ⇒ inbound: a local grove takes none; a cloud grove takes its duct
@@ -128,7 +128,7 @@ from a shell, `grove.provision` is the same command
 
 ## .$server = $tier@$platform
 
-`local@unix`, `local@cicd`, `cloud@aws.ec2`, `cloud@hetzner.hetzbot`. a bundle that cannot run everywhere
+`local@unix`, `local@cicd`, `house@unix`, `cloud@aws.ec2`, `cloud@hetzner.hetzbot`. a bundle that cannot run everywhere
 DECLINES inline, with an early return, beside the reason it declines for:
 
 ```sh
@@ -164,7 +164,7 @@ collocate into:
 | `bundle.upgrade.sh` | the runtime — the one operation, at every depth |
 | `grove.for.sh` / `grove.env.sh` / `grove.pkg.sh` | shared runtime: target, server detection, package installs |
 | `grove.aws.sh` | shared runtime: the box's aws identity endpoint; the `~/.aws/config` swap that keeps `[default]` |
-| `grove.web.sh` | shared runtime: the ONE wire boundary. `web_fetch`, `web_verify_sha256`, `web_verify_gpg_signature`, `web_verify_gpg_fingerprints`, `git_clone`, and the bounded `web_npm` / `web_pnpm` / `web_corepack` / `web_flatpak`. sourced by the entrypoint at `grove.provision._.sh:263` |
+| `grove.web.sh` | shared runtime: the ONE wire boundary. `web_fetch`, `web_verify_sha256`, `web_verify_gpg_signature`, `web_verify_gpg_fingerprints`, `git_clone`, and the bounded `web_npm` / `web_pnpm` / `web_corepack` / `web_flatpak`. the entrypoint sources it |
 | `machine/` | systemd units + scripts. copied by FIVE bundles: `1.6.1.finders`, `1.6.2.monitor`, `1.7.usage`, `1.8.tmpfiles`, `4.3.4.snapshot` — no ONE owner, so no ONE dir to collocate into |
 | `cosmic.gtk.desert.css` | **nobody** — an orphan; see below |
 | `util.yubikey.ssh.sh` | human-run: load an ssh key onto a yubikey |
@@ -234,12 +234,12 @@ reads the machine and writes OUT to 1password, the opposite direction. neither m
 | `notes/`, `ideally/`, `backups/` | a human's scratch. read by no phase |
 
 ⚠️ **`assets/kitty-icon.png` is read from OUTSIDE `src/`.**
-`4.3.2.emulator/configure.upsert.sh:644` reaches it as `$GROVE_SRC/../assets/`,
+`4.3.2.emulator/configure.upsert.sh` reaches it as `$GROVE_SRC/../assets/`,
 so it is a declared asset that a `git.grove.push --from src` does **not** carry
 (`gotcha.grove-push-into-names-the-destination`).
 
 that step carries **no `GROVE_ENV_SERVER` gate**, so it runs on every box class — a grove
-included. the `🌙` at line 654 keeps it benign: an absent asset is reported and the bundle
+included. its `🌙` keeps it benign: an absent asset is reported and the bundle
 continues, since an icon is a decoration and a `✋` would fail the whole bundle over one.
 
 > ⚠️ **a brief that cites ANOTHER BRIEF for a fact about code has verified no part of it** —

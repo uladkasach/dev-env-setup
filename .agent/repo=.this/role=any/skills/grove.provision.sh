@@ -78,8 +78,8 @@ while [[ $# -gt 0 ]]; do
       echo "  --mode apply  install — tools AND configs"
       echo ""
       echo "  every other flag goes to grove.provision._.sh, e.g."
-      echo "    --for cloud|local     force the machine kind (else auto-detected)"
-      echo "    --what <slug>         run just that bundle subtree; repeatable"
+      echo "    --for cloud|house|local  force the machine kind (else auto-detected)"
+      echo "    --what <slug>            run just that bundle subtree; repeatable"
       exit 0
       ;;
     # rhachet forwards its own --skill/--repo/--role flags; ignore them

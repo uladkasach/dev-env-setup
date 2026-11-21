@@ -1,0 +1,17 @@
+# .what = ask hourly whether the house badge cert owes a renewal
+# .why  = the renewal itself is a no-op until a day is left, so an hourly ask
+#         costs one openssl read. a missed hour (a lid close, a reboot) is made up
+#         at once: `Persistent=true` fires a calendar run the box slept through,
+#         and `OnBootSec` asks soon after a cold boot
+# ⚠️ `Persistent=` binds `OnCalendar=` alone, never a monotonic `OnUnitActiveSec=`,
+#    so the hourly cadence is a calendar spec on purpose
+[Unit]
+Description=ask hourly whether the house badge cert owes a renewal
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+OnBootSec=5min
+
+[Install]
+WantedBy=timers.target
