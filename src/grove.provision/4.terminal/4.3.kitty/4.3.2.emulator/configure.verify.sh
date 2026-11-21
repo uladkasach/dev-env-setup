@@ -76,14 +76,8 @@ except SyntaxError as e:
   fi
 
   # 2. kitty's loader RESOLVES remote control to a disabled value — an allowlist (m2-m6)
-  local rc_policy="" rc_source=""
-  if command -v kitty >/dev/null 2>&1; then
-    rc_policy="$(timeout -k 5 20 kitty +runpy "
-from kitty.config import load_config
-print(load_config('$conf').allow_remote_control)
-" 2>/dev/null | tail -1 | tr -d '[:space:]')"
-    [[ -n "$rc_policy" ]] && rc_source="kitty's own loader"
-  fi
+  local rc_policy rc_source="kitty's own loader"
+  rc_policy="$(_kitty_loader_get "$conf" 'o.allow_remote_control')"
   if [[ -z "$rc_policy" ]]; then
     echo "   🌙 kitty's config loader did not answer, so the effective"
     echo "      allow_remote_control is UNREAD on this box"
@@ -135,14 +129,8 @@ print(load_config('$conf').allow_remote_control)
 
   # 2e. the render delays kitty READS — a delay felt as no change can mean either "no
   #     felt cost" or "never read", and only the loader parts the two
-  local delays=""
-  if command -v kitty >/dev/null 2>&1; then
-    delays="$(timeout -k 5 20 kitty +runpy "
-from kitty.config import load_config
-o = load_config('$conf')
-print(o.repaint_delay, o.input_delay)
-" 2>/dev/null | tail -1)"
-  fi
+  local delays
+  delays="$(_kitty_loader_get "$conf" "'%s %s' % (o.repaint_delay, o.input_delay)")"
   if [[ -z "$delays" ]]; then
     echo "   🌙 kitty's loader did not answer, so the render delays are UNREAD on this box"
   else
@@ -162,13 +150,8 @@ print(o.repaint_delay, o.input_delay)
   #       the desktop, and no signal says so. a paste then yields the OLD clipboard
   #     - the tmux half of the same hop is the `clipboard` feature, which 2.8.tmux's
   #       verify checks on every attached client
-  local ccw=""
-  if command -v kitty >/dev/null 2>&1; then
-    ccw="$(timeout -k 5 20 kitty +runpy "
-from kitty.config import load_config
-print('write-clipboard' in load_config('$conf').clipboard_control)
-" 2>/dev/null | tail -1 | tr -d '[:space:]')"
-  fi
+  local ccw
+  ccw="$(_kitty_loader_get "$conf" "'write-clipboard' in o.clipboard_control")"
   case "$ccw" in
     True)
       echo "   • a program may write the clipboard ✔ (write-clipboard, per kitty's own loader)"

@@ -14,7 +14,6 @@ sudo -v && rhx grove.provision --what <slug> --mode apply
 
 - `sudo -v` asks for the password in the human's own terminal and caches it
 - sudo caches per terminal; the `rhx` child shares that terminal, so `sudo -n true` passes
-- a bare `rhx grove.provision …` cannot reach root on a laptop, at any keyboard
 
 ## .the measurement — 2026-10-07
 

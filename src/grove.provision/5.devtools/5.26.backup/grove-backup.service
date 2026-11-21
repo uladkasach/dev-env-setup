@@ -1,0 +1,29 @@
+# .what = one backup run of camper's home to this grove's bucket
+#
+# .why User=camper: only the camper seat holds `~/git`, `~/.claude`, and `~/.rhachet`
+#   (the scope `git backup` carries). as camper, the agent reaches aws as every brain
+#   does: its own `~/.aws/config` — the instance role on ec2, roles anywhere on hetzner
+# .why no ProtectHome (the 1.8 template sets it): the home is what this reads
+#
+# .why StateDirectory: systemd lays /var/lib/grove-backup at 0755, owned by camper,
+#   so the status file is world-readable and infra's stats read it without sudo
+#
+# .why Nice=10: a clone's own build or test outranks the hourly tar
+#
+# read a run with:
+#   journalctl -u grove-backup -n 50
+
+[Unit]
+Description=Back up camper's clones, worktrees, and home dirs to this grove's bucket
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=camper
+ExecStart=/usr/local/lib/grove-backup/grove-backup
+Environment=AWS_RETRY_MODE=standard AWS_MAX_ATTEMPTS=5
+StateDirectory=grove-backup
+StateDirectoryMode=0755
+Nice=10
+TimeoutStartSec=55min

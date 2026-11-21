@@ -1,0 +1,10 @@
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  ├─ ⇄ graft into <fixture>/fresh/<seat>/git/acme/widget (its files untouched)
+   │  ├─ feat-x                       + new branch · 3 commits this clone lacked
+   │  ├─ main                         + fast-forward · 1 commit · checked out, its tree clean
+   │  ├─ grove-1/stash                + stash entry, from refs/stash, kept aside
+   │  └─ grove-1/wt/widget.spike      + detached HEAD of worktree `widget.spike`, kept aside
+   └─ 1 unit · 1 restored · 0 await a thaw · 0 refused · 0 failed

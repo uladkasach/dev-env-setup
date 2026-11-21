@@ -262,7 +262,20 @@ for f in "${FILES[@]}"; do
     [[ -z "$hit" ]] && continue
 
     # a single line may hold several pointers
-    for raw in $(echo "$hit" | grep -oE '(\.agent/repo=[^ `"'"'"']*/)?briefs/[A-Za-z0-9._=/-]+\.md|\.dream/[A-Za-z0-9._=/-]+\.md|src/[A-Za-z0-9._/-]+\.(sh|toml|conf|lua|zsh|json|xml|ron|css|md|policy)'); do
+    for raw in $(echo "$hit" | grep -oE '(\.agent/repo=[^ `"'"'"']*/)?briefs/[A-Za-z0-9._=/-]+\.md|\.dream/[A-Za-z0-9._=/-]+\.md|[$A-Za-z0-9_{}]*src/[A-Za-z0-9._/-]+\.(sh|toml|conf|lua|zsh|json|xml|ron|css|md|policy)'); do
+
+      ######################################################################
+      # .what = a `src/` glued to a word or a `$` is NO root path
+      #
+      # .why
+      #   - 📜 2026-11-07: `"$src/grove.backup.operations.sh"` in a bundle's
+      #     `_.sh` drew a false ✋. `$src` is a local var that holds the
+      #     bundle dir, so the file it names is live, beside its `_.sh`
+      #   - the extract takes the glued prefix along, so `$src/x.sh`,
+      #     `${src}/x.sh`, and `bundle_src/x.sh` each arrive whole, and only a
+      #     token that opens with `src/` is read as a pointer
+      ######################################################################
+      [[ "$raw" == *src/* && "$raw" != src/* && "$raw" != *briefs/* && "$raw" != .dream/* ]] && continue
 
       ######################################################################
       # 🛑 .what = three line shapes are NOT pointers
