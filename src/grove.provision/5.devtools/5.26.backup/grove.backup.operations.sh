@@ -50,7 +50,7 @@ GROVE_BACKUP_REBUILT_DIRS=(dist build coverage .next)
 GROVE_BACKUP_SLUG_PATTERN='^[a-z0-9][a-z0-9-]{0,62}$'
 GROVE_BACKUP_BUCKET_PATTERN='^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
 
-# a status older than this reads ✗ STALE: two missed hourly runs
+# a status older than this reads ✗ STALE: eight missed passes of the 15-minute timer
 GROVE_BACKUP_STALE_SECS=7200
 
 # every aws call is bounded, so a hung endpoint fails one run and never holds the timer
@@ -65,6 +65,9 @@ grove_backup_seat_home()   { printf '%s' "$HOME"; }
 grove_backup_state_dir()   { printf '/var/lib/grove-backup'; }
 grove_backup_status_file() { printf '%s/status.json' "$(grove_backup_state_dir)"; }
 grove_backup_now()         { date -u +%s; }
+# .why a stamp to the nanosecond: an edit in the same second as a pack start, but
+#   before it, must never read as newer than the pack
+grove_backup_now_precise() { date -u +%s.%N; }
 grove_backup_today()       { date -u -d "@$(grove_backup_now)" +%F; }
 grove_backup_iso()         { date -u -d "@$1" +%Y-%m-%dT%H:%MZ; }
 
@@ -297,10 +300,12 @@ grove_backup_key_unit() {
   printf '%s' "${key%/date=*}"
 }
 
-# clone | worktree | home, from a unit id
+# clone | worktree | orphan | setaside | home, from a unit id
 grove_backup_unit_kind() {
   local unit="$1" repo tree
   [[ "$unit" == */home=* ]] && { printf 'home'; return; }
+  [[ "$unit" == */orphan=* ]] && { printf 'orphan'; return; }
+  [[ "$unit" == */setaside=* ]] && { printf 'setaside'; return; }
   repo="${unit#*/repo=}"; repo="${repo%%/*}"
   tree="${unit##*/tree=}"
   [[ "$repo" == "$tree" ]] && { printf 'clone'; return; }
@@ -313,6 +318,44 @@ grove_backup_unit_field() {
   [[ "/$unit/" == */"$name"=* ]] || return 1
   value="${unit#*"$name"=}"
   printf '%s' "${value%%/*}"
+}
+
+# .what = is the reach fault one a retry may cure (no answer), rather than one a human fixes?
+# .why the exit follows the cause: a transient fault is a malfunction (1), a credential,
+#   a bucket name, or a grant is a constraint (2)
+grove_backup_cause_is_transient() {
+  [[ "${GROVE_BACKUP_CAUSE:-}" == "aws unreachable" || "${GROVE_BACKUP_CAUSE:-}" == "the list failed" ]]
+}
+
+# the day a key's unit last changed: its `date=` value
+grove_backup_key_day() {
+  local day="${1##*/date=}"
+  printf '%s' "${day%.tar.gz}"
+}
+
+# a unit id with its seat (`user=<seat>/`) dropped, for display under that seat
+grove_backup_unit_without_seat() { printf '%s' "${1#user=*/}"; }
+
+# .what = the order a unit lays in: 1 clone · 2 worktree · 3 orphan or set-aside · 4 home
+# .why a worktree needs its clone laid first; plain files come last. the list reads the
+#   same order, so what a human sees is what `--all` will do
+grove_backup_unit_rank() {
+  case "$(grove_backup_unit_kind "$1")" in
+    clone) printf 1 ;; worktree) printf 2 ;; orphan|setaside) printf 3 ;; *) printf 4 ;;
+  esac
+}
+
+# .what = each unit's LATEST object, from list lines on stdin
+#   in:  "key<TAB>lastmod<TAB>class" (as grove_backup_s3_list writes)
+#   out: "unit<TAB>key<TAB>class", one per unit; an absent class reads STANDARD
+# .note `date=` sorts as text, so the last key per unit after a sort is its latest
+grove_backup_units_latest() {
+  local key class
+  while IFS=$'\t' read -r key _ class; do
+    printf '%s\t%s\t%s\n' "$(grove_backup_key_unit "$key")" "$key" "${class:-STANDARD}"
+  done | sort -t$'\t' -k1,1 -k2,2 \
+    | awk -F'\t' '{ latest[$1] = $0 } END { for (u in latest) print latest[u] }' \
+    | sort -t$'\t' -k1,1
 }
 
 ######################################################################
@@ -334,18 +377,58 @@ grove_backup_worktree_repo() {
 }
 
 ######################################################################
+# .what = a set-aside tree's unit name: its dir name, with no time in it
+#
+# .why a set-aside dir is named `<tree>.<YYYYMMDDTHHMMSSZ>`, the hour a clone set
+#   it aside. a unit name is a bucket key, and a key carries no time of work. so
+#   the stamp is cut, and in its place goes 8 hex of a hash keyed by this box's
+#   machine-id: two set-asides of one tree stay apart, and the stamp cannot be
+#   read back from the hash without the key, which never leaves the box
+# .why a name with no stamp passes as is: a set-aside a restore laid back already
+#   bears its hash, so the next box backs it up under the same unit
+# 🛑 .why no machine-id means NO hash, never an unsalted one
+#   a year holds ~31M seconds, so an unsalted hash of `<tree>.<stamp>` is read back
+#   to its stamp by brute force in seconds. with no key, the stamp is cut and naught
+#   stands in: the key leaks no time, and two set-asides of one tree share a unit,
+#   whose bucket versions keep both. the fault is named on stderr, so it is no silent
+#   degrade (a systemd box always holds a machine-id; its absence is a broken box)
+######################################################################
+grove_backup_machine_id_file() { printf '/etc/machine-id'; }
+grove_backup_setaside_name() {
+  local name="$1" base salt
+  [[ "$name" =~ ^(.+)\.[0-9]{8}T[0-9]{6}Z$ ]] || { printf '%s' "$name"; return 0; }
+  base="${BASH_REMATCH[1]}"
+  salt="$(head -n 1 "$(grove_backup_machine_id_file)" 2>/dev/null)"
+  if [[ -z "$salt" ]]; then
+    echo "💥 MalfunctionError: $(grove_backup_machine_id_file) is absent or empty, so set-aside '$base' rides with no hash" >&2
+    printf '%s' "$base"
+    return 0
+  fi
+  printf '%s.%s' "$base" "$(printf '%s\n%s' "$salt" "$name" | sha256sum | cut -c1-8)"
+}
+
+######################################################################
 # .what = every unit on this box → "kind<TAB>user<TAB>path<TAB>unit" lines
 #
 # .the walk
 #   ~/git/<org>/<repo>             a clone      (its `.git` is a dir)
 #   ~/git/<org>/_worktrees/<dir>   a worktree   (its `.git` is a link)
+#   ~/git/<org>/_worktrees/<dir>   an orphan    (no `.git` at all: git dropped the
+#                                  worktree, and its ignored files stayed — its
+#                                  transcripts among them)
+#   ~/git/<org>/<repo>/.git/tree-del-setaside/<dir>   a set-aside tree
+#   ~/git/<org>/_setaside/<repo>/<dir>                a set-aside a restore laid
 #   ~/<dir>                        a home unit, one per scope dir beside `~/git`
+#
+# .why orphans and set-asides ride as plain files: neither holds git state, and
+#   each may hold the only copy of a conversation (📜 2026-11-20, 0901: 66 trees
+#   that held transcripts sat inside no unit)
 #
 # .why ONE home, the agent's own: only the camper seat holds work, the scope
 #   `git backup` carries. the key keeps `user=<seat>`, so a restore names it
 ######################################################################
 grove_backup_units_walk() {
-  local home user org org_name entry name wt dir hd
+  local home user org org_name entry name wt sa dir hd
   home="$(grove_backup_seat_home)"
   [[ -d "$home" ]] || return 0
   user="${home##*/}"
@@ -373,53 +456,366 @@ grove_backup_units_walk() {
           for wt in "$entry"/*/; do
             [[ -d "$wt" ]] || continue
             wt="${wt%/}"
-            [[ -e "$wt/.git" ]] || continue
+            if [[ ! -e "$wt/.git" ]]; then
+              printf 'orphan\t%s\t%s\tuser=%s/org=%s/orphan=%s\n' "$user" "$wt" "$user" "$org_name" "${wt##*/}"
+              continue
+            fi
             printf 'worktree\t%s\t%s\tuser=%s/org=%s/repo=%s/tree=%s\n' \
               "$user" "$wt" "$user" "$org_name" "$(grove_backup_worktree_repo "$wt")" "${wt##*/}"
+          done
+          continue
+        fi
+        if [[ "$name" == _setaside ]]; then
+          for sa in "$entry"/*/*/; do
+            [[ -d "$sa" ]] || continue
+            sa="${sa%/}"
+            printf 'setaside\t%s\t%s\tuser=%s/org=%s/repo=%s/setaside=%s\n' "$user" "$sa" "$user" "$org_name" \
+              "$(basename "$(dirname "$sa")")" "$(grove_backup_setaside_name "${sa##*/}")"
           done
           continue
         fi
         [[ -d "$entry/.git" ]] || continue
         printf 'clone\t%s\t%s\tuser=%s/org=%s/repo=%s/tree=%s\n' \
           "$user" "$entry" "$user" "$org_name" "$name" "$name"
+        for sa in "$entry"/.git/tree-del-setaside/*/; do
+          [[ -d "$sa" ]] || continue
+          sa="${sa%/}"
+          printf 'setaside\t%s\t%s\tuser=%s/org=%s/repo=%s/setaside=%s\n' "$user" "$sa" "$user" "$org_name" \
+            "$name" "$(grove_backup_setaside_name "${sa##*/}")"
+        done
       done
     done
   done
 }
 
 ######################################################################
-# .what = the tar flags that cut what a unit must not carry, one per line
+# .what = git, as the agent runs it on a tree
 #
-# .the three cuts
+# .why `safe.directory=*`: a clone restored from another box or seat may carry
+#   another owner, and git refuses it as "dubious ownership" without it
+# .why `core.quotepath=off`: a path with a byte above 0x7f prints raw, so a list
+#   read back with `-z` names the file that is there
+######################################################################
+grove_backup_git() {
+  local path="$1"
+  shift
+  git -c safe.directory='*' -c core.quotepath=off -C "$path" "$@"
+}
+
+# .what = a url with any `user:secret@` stripped, so no credential lands in a unit
+grove_backup_url_clean() { printf '%s' "$1" | sed -E 's#^([a-z+]+://)[^/@]*@#\1#'; }
+
+######################################################################
+# .what = the tar flags that cut what a HOME unit must not carry, one per line
+#
 #   - `node_modules` at any depth: rebuilt by an install, never work
 #   - each scope exclude that falls inside this unit, ANCHORED at its root, so
 #     `~/.claude/.credentials.json` cuts that one file and no file of that name
 #     deeper down
-#   - `dist` `build` `coverage` `.next`, only where git ignores them
-#
-# .why `git -c safe.directory=*`: a clone restored from another box or seat may
-#   carry another owner, and git refuses it as "dubious ownership" without it
 ######################################################################
 grove_backup_pack_excludes() {
-  local kind="$1" home="$2" path="$3" ex abs rel base want
+  local home="$1" path="$2" ex abs
   printf '%s\n' --no-anchored --exclude=node_modules --anchored
-
   for ex in "${GROVE_BACKUP_SCOPE_EXCLUDE[@]}"; do
     abs="$home/${ex#\~/}"
     abs="${abs%/}"
     [[ "$abs" == "$path"/* ]] || continue
     printf -- '--exclude=./%s\n' "${abs#"$path"/}"
   done
+}
 
-  [[ "$kind" == home ]] && return 0
-  git -c safe.directory='*' -C "$path" ls-files --others --ignored --exclude-standard --directory -z 2>/dev/null \
-    | while IFS= read -r -d '' rel; do
-        rel="${rel%/}"
-        base="${rel##*/}"
-        for want in "${GROVE_BACKUP_REBUILT_DIRS[@]}"; do
-          [[ "$base" == "$want" ]] && printf -- '--exclude=./%s\n' "$rel"
+######################################################################
+# the change check — a quiet unit costs a metadata read, never a pack
+######################################################################
+
+# .what = one line that moves whenever a tree's git state moves: its local refs,
+#         its HEAD, its index, its reflog, a rebase or merge mid-flight
+# .why remote refs are left out: a fetch moves them and changes no work here
+grove_backup_tree_fingerprint() {
+  local path="$1" gd
+  gd="$(grove_backup_git "$path" rev-parse --absolute-git-dir 2>/dev/null)" || { printf 'no-git'; return 0; }
+  {
+    grove_backup_git "$path" for-each-ref --format='%(objectname) %(refname)' refs/heads refs/stash refs/tags
+    cat "$gd/HEAD" 2>/dev/null
+    stat -c '%n %s %.9Y' "$gd/index" "$gd/logs/HEAD" "$gd/ORIG_HEAD" "$gd/MERGE_HEAD" "$gd/CHERRY_PICK_HEAD" 2>/dev/null
+    ls -d "$gd/rebase-merge" "$gd/rebase-apply" 2>/dev/null
+  } | sha256sum | cut -d' ' -f1
+}
+
+# .what = did any file or dir under <path> change since <stamp> was written?
+# rc 0 = it moved · 1 = it is quiet
+# .why ctime, never mtime: ctime moves on every content change, rename, and
+#   delete (a delete moves its dir), and no tool can set it back
+# .why `.git` is pruned: the fingerprint above reads the git state
+grove_backup_unit_moved_since() {
+  local path="$1" stamp="$2"
+  [[ -f "$stamp" ]] || return 0
+  [[ -n "$(find "$path" \( -name node_modules -o -name .git \) -prune -o -cnewer "$stamp" -print -quit 2>/dev/null)" ]]
+}
+
+# .what = did a pack read a still unit? rc 0 = settled · 1 = a file moved under it
+# .why a `.jsonl` is skipped: a live conversation appends as a matter of course,
+#   and it lands as a whole prefix of itself
+grove_backup_pack_settled() {
+  local path="$1" stamp="$2"
+  [[ -z "$(find "$path" \( -name node_modules -o -name .git \) -prune -o \
+             \( -type f -o -type l \) ! -name '*.jsonl' -cnewer "$stamp" -print -quit 2>/dev/null)" ]]
+}
+
+######################################################################
+# the marks — each unit records its own last pass, the moment it lands
+#
+#   <state>/marks/<id>.json   { unit, at, sha, fingerprint, origin_checked }
+#   <state>/marks/<id>.stamp  mtime = the pack start, to the nanosecond, for the ctime check
+#
+# .why `at` is the pack START: a file that changes while the unit packs is newer
+#   than the stamp, so the next pass sees it
+######################################################################
+grove_backup_mark_id()   { printf '%s' "$1" | sha256sum | cut -c1-32; }
+grove_backup_mark_file() { printf '%s/marks/%s.json' "$(grove_backup_state_dir)" "$(grove_backup_mark_id "$1")"; }
+grove_backup_mark_get()  { jq -r --arg f "$2" '.[$f] // empty' "$(grove_backup_mark_file "$1")" 2>/dev/null; }
+
+grove_backup_mark_set() {
+  local unit="$1" at="$2" sha="$3" fp="$4" checked="$5" file tmp
+  file="$(grove_backup_mark_file "$unit")"
+  mkdir -p "$(dirname "$file")" || return 1
+  tmp="$file.tmp.$$"
+  jq -n --arg unit "$unit" --argjson at "$at" --arg sha "$sha" --arg fp "$fp" --argjson checked "$checked" \
+    '{ unit: $unit, at: ($at | floor), sha: $sha, fingerprint: $fp, origin_checked: $checked }' >"$tmp" \
+    && mv -f "$tmp" "$file" \
+    && touch -d "@$at" "${file%.json}.stamp"
+}
+
+######################################################################
+# the tree pack — a tree carries exactly what origin and its own HEAD cannot
+#   rebuild, and needs no other unit to restore
+#
+#   .grove-backup/objects.pack      every commit, tree, and blob the kept refs
+#                                   reach that origin lacks — a plain git pack
+#   .grove-backup/refs.txt          "<sha> <ref>" for HEAD, its branches, the stash, tags
+#   .grove-backup/checkout/         HEAD, the index, HEAD's reflog, a rebase or merge mid-flight
+#   .grove-backup/repo/             branch + remote config (urls cleaned), info/exclude, edited hooks
+#   .grove-backup/staged/<path>     the index's copy of each staged file
+#   .grove-backup/meta.json         { version, kind, head_sha, head_ref, origin, origin_checked,
+#                                     deletes, staged, point_in_time }
+#   <path>                          each file that differs from HEAD, untracked, or ignored and kept
+#
+# .why a plain pack and never a `git bundle`: a bundle refuses to exist when
+#   every ref tip is already on origin, yet a reflog-only commit still owes a ride
+# .why "on origin" is asked of origin NOW (`ls-remote`), never of this box's
+#   remote refs: a branch deleted or force-pushed since the last fetch would
+#   leave commits that origin no longer holds out of the pack
+######################################################################
+
+# .what = the shas origin holds now, that this repo also holds → one per line in $2
+# rc 0 = origin answered · 1 = no origin · 2 = origin did not answer (this box's own
+#   view of origin is written instead, so the pack stays small, and the unit packs again)
+grove_backup_origin_shas() {
+  local path="$1" out="$2" raw
+  raw="$out.raw"
+  grove_backup_git "$path" remote get-url origin >/dev/null 2>&1 || { : >"$out"; return 1; }
+  if timeout 60 env GIT_TERMINAL_PROMPT=0 git -c safe.directory='*' -C "$path" ls-remote origin >"$raw" 2>/dev/null; then
+    cut -f1 "$raw" | sort -u \
+      | grove_backup_git "$path" cat-file --batch-check='%(objectname) %(objecttype)' 2>/dev/null \
+      | awk '$2 == "commit" || $2 == "tag" { print $1 }' >"$out"
+    rm -f "$raw"
+    return 0
+  fi
+  rm -f "$raw"
+  grove_backup_git "$path" for-each-ref --format='%(objectname)' refs/remotes/origin | sort -u >"$out"
+  return 2
+}
+
+# .what = the refs a unit keeps → "<sha> <ref>" lines
+# .why a clone keeps every branch; a worktree keeps its own HEAD and branch —
+#   and each keeps the stash, shared by every tree of the clone
+grove_backup_tree_refs() {
+  local path="$1" kind="$2" head branch
+  head="$(grove_backup_git "$path" rev-parse -q --verify HEAD 2>/dev/null)"
+  branch="$(grove_backup_git "$path" symbolic-ref -q HEAD 2>/dev/null)"
+  [[ -n "$head" ]] && printf '%s HEAD\n' "$head"
+  if [[ "$kind" == clone ]]; then
+    grove_backup_git "$path" for-each-ref --format='%(objectname) %(refname)' refs/heads refs/tags refs/stash
+    return 0
+  fi
+  [[ -n "$branch" && -n "$head" ]] && printf '%s %s\n' "$head" "$branch"
+  grove_backup_git "$path" for-each-ref --format='%(objectname) %(refname)' refs/stash
+}
+
+# .what = every sha a reflog of this tree holds — an undo the restore keeps
+grove_backup_tree_reflog_shas() {
+  local path="$1" kind="$2" branch
+  grove_backup_git "$path" reflog show --format=%H HEAD 2>/dev/null
+  grove_backup_git "$path" reflog show --format=%H refs/stash 2>/dev/null
+  if [[ "$kind" == clone ]]; then
+    grove_backup_git "$path" for-each-ref --format='%(refname)' refs/heads \
+      | while read -r branch; do grove_backup_git "$path" reflog show --format=%H "$branch" 2>/dev/null; done
+    return 0
+  fi
+  branch="$(grove_backup_git "$path" symbolic-ref -q HEAD 2>/dev/null)"
+  [[ -n "$branch" ]] && grove_backup_git "$path" reflog show --format=%H "$branch" 2>/dev/null
+  return 0
+}
+
+# .what = the tree-relative paths a unit carries, NUL-separated, into $2
+grove_backup_tree_files() {
+  local path="$1" out="$2" has_head="$3" rel base want flag
+  {
+    # what differs from HEAD, staged or not (a delete is listed, then dropped below)
+    if [[ "$has_head" == yes ]]; then
+      grove_backup_git "$path" diff -z --name-only --no-renames HEAD
+    else
+      grove_backup_git "$path" ls-files -z --cached
+    fi
+    # what git does not track, and does not ignore
+    grove_backup_git "$path" ls-files -z --others --exclude-standard --directory --no-empty-directory
+    # what git ignores — kept, but for the dirs a build or an install rebuilds
+    grove_backup_git "$path" ls-files -z --others --ignored --exclude-standard --directory \
+      | while IFS= read -r -d '' rel; do
+          base="${rel%/}"; base="${base##*/}"
+          for want in node_modules "${GROVE_BACKUP_REBUILT_DIRS[@]}"; do [[ "$base" == "$want" ]] && continue 2; done
+          printf '%s\0' "$rel"
         done
+    # a file git is told to trust blind: packed whole, since git would vouch for it falsely
+    grove_backup_git "$path" ls-files -z -v \
+      | while IFS= read -r -d '' rel; do
+          flag="${rel:0:1}"
+          [[ "$flag" == S || "$flag" =~ [a-z] ]] && printf '%s\0' "${rel:2}"
+        done
+  } | sort -zu | while IFS= read -r -d '' rel; do
+        rel="${rel%/}"
+        [[ -e "$path/$rel" || -L "$path/$rel" ]] && printf '%s\0' "$rel"
+      done >"$out"
+}
+
+######################################################################
+# .what = pack one tree into a gz temp file; writes the sha256 of its tar to <out.gz>.sha
+#
+# .why the hash is of the uncompressed tar: a gzip upgrade changes every
+#   compressed byte and none of the content
+# .why deterministic (`--sort=name`, numeric owner, sorted lists): an unchanged
+#   tree must hash the same on every pass, or the skip never fires
+#
+# usage: grove_backup_pack_tree <kind> <path> <out.gz> <work dir> <point in time: true|false>
+# rc 0 ok · 2 fault (GROVE_BACKUP_PACK_WHY) · sets GROVE_BACKUP_ORIGIN_CHECKED
+######################################################################
+grove_backup_pack_tree() {
+  local kind="$1" path="$2" out="$3" work="$4" pit="$5"
+  local stage="$work/stage" gb gd cd head_sha head_ref origin origin_rc checked rc sha rel hook
+  local -a excludes=(--no-anchored --exclude=node_modules --anchored)
+  rm -rf "$stage" "$work/unit.tar"
+  gb="$stage/.grove-backup"
+  mkdir -p "$gb/checkout" "$gb/repo" "$gb/staged" || { GROVE_BACKUP_PACK_WHY="the stage could not be made"; return 2; }
+
+  gd="$(grove_backup_git "$path" rev-parse --absolute-git-dir 2>/dev/null)" \
+    || { GROVE_BACKUP_PACK_WHY="git does not read this tree"; return 2; }
+  cd="$(grove_backup_git "$path" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+  head_sha="$(grove_backup_git "$path" rev-parse -q --verify HEAD 2>/dev/null)"
+  head_ref="$(grove_backup_git "$path" symbolic-ref -q HEAD 2>/dev/null)"
+  origin="$(grove_backup_url_clean "$(grove_backup_git "$path" remote get-url origin 2>/dev/null)")"
+
+  # 1. the objects origin lacks
+  grove_backup_origin_shas "$path" "$work/origin.shas"
+  origin_rc=$?
+  checked=true
+  [[ "$origin_rc" -eq 2 ]] && checked=false
+  GROVE_BACKUP_ORIGIN_CHECKED="$checked"
+  grove_backup_tree_refs "$path" "$kind" | sort -u -k2 >"$gb/refs.txt"
+  # ⚠️ an `if`, never `[[ … ]] && …`: the group's status is its last command's, and
+  #   under pipefail a false test with no origin fails the whole pack
+  {
+    cut -d' ' -f1 "$gb/refs.txt"
+    grove_backup_tree_reflog_shas "$path" "$kind"
+    if [[ -s "$work/origin.shas" ]]; then echo --not; cat "$work/origin.shas"; fi
+  } | grove_backup_git "$path" pack-objects --revs --stdout -q >"$gb/objects.pack" 2>"$work/pack.err"
+  rc=$?
+  if [[ "$rc" -ne 0 ]]; then
+    GROVE_BACKUP_PACK_WHY="git pack-objects failed: $(head -n 1 "$work/pack.err")"
+    return 2
+  fi
+  if ! git index-pack -o "$work/check.idx" "$gb/objects.pack" >/dev/null 2>"$work/pack.err"; then
+    GROVE_BACKUP_PACK_WHY="the objects pack does not verify: $(head -n 1 "$work/pack.err")"
+    return 2
+  fi
+  rm -f "$work/check.idx"
+
+  # 2. the checkout state — this tree's own git dir files
+  for rel in HEAD index ORIG_HEAD MERGE_HEAD MERGE_MSG CHERRY_PICK_HEAD rebase-merge rebase-apply; do
+    [[ -e "$gd/$rel" ]] && cp -a "$gd/$rel" "$gb/checkout/$rel"
+  done
+  [[ -f "$gd/logs/HEAD" ]] && mkdir -p "$gb/checkout/logs" && cp -a "$gd/logs/HEAD" "$gb/checkout/logs/HEAD"
+  if [[ -d "$cd/logs/refs" ]]; then
+    mkdir -p "$gb/checkout/logs"
+    if [[ "$kind" == clone ]]; then
+      cp -a "$cd/logs/refs" "$gb/checkout/logs/refs"
+    else
+      for rel in "${head_ref#refs/}" stash; do
+        [[ -n "$rel" && -f "$cd/logs/refs/$rel" ]] || continue
+        mkdir -p "$gb/checkout/logs/refs/$(dirname "$rel")" && cp -a "$cd/logs/refs/$rel" "$gb/checkout/logs/refs/$rel"
       done
+    fi
+  fi
+
+  # 3. the repo config — branch upstreams and remotes, with every url cleaned
+  grove_backup_git "$path" config --get-regexp '^(branch|remote)\.' 2>/dev/null \
+    | while read -r key value; do
+        [[ "$key" == *.url || "$key" == *.pushurl ]] && value="$(grove_backup_url_clean "$value")"
+        printf '%s %s\n' "$key" "$value"
+      done >"$gb/repo/config.list"
+  [[ -f "$cd/info/exclude" ]] && cp -a "$cd/info/exclude" "$gb/repo/exclude"
+  for hook in "$cd"/hooks/*; do
+    [[ -f "$hook" && "$hook" != *.sample ]] || continue
+    mkdir -p "$gb/repo/hooks" && cp -a "$hook" "$gb/repo/hooks/"
+  done
+
+  # 4. the staged copies — the index's blob of each staged file, since no ref reaches it
+  grove_backup_git "$path" diff -z --cached --name-only --no-renames ${head_sha:+HEAD} 2>/dev/null \
+    | while IFS= read -r -d '' rel; do
+        grove_backup_git "$path" cat-file -e ":$rel" 2>/dev/null || continue
+        mkdir -p "$gb/staged/$(dirname "$rel")" && grove_backup_git "$path" cat-file blob ":$rel" >"$gb/staged/$rel"
+      done
+
+  # 5. the files, and the manifest
+  grove_backup_tree_files "$path" "$work/files" "$([[ -n "$head_sha" ]] && echo yes || echo no)"
+  grove_backup_git "$path" ls-files -z --others --ignored --exclude-standard --directory \
+    | while IFS= read -r -d '' rel; do
+        base="${rel%/}"; base="${base##*/}"
+        for want in "${GROVE_BACKUP_REBUILT_DIRS[@]}"; do [[ "$base" == "$want" ]] && printf -- '--exclude=%s\n' "${rel%/}"; done
+      done >"$work/excl"
+  mapfile -t -O "${#excludes[@]}" excludes <"$work/excl"
+  jq -n \
+    --arg kind "$kind" --arg head_sha "$head_sha" --arg head_ref "$head_ref" --arg origin "$origin" \
+    --argjson checked "$checked" --argjson pit "$pit" \
+    --rawfile deletes <(if [[ -n "$head_sha" ]]; then grove_backup_git "$path" diff -z --name-only --no-renames --diff-filter=D HEAD; fi) \
+    --rawfile staged <(cd "$gb/staged" && find . -type f -printf '%P\0' | sort -z) \
+    '{ version: 2, kind: $kind,
+       head_sha: (if $head_sha == "" then null else $head_sha end),
+       head_ref: (if $head_ref == "" then null else $head_ref end),
+       origin: (if $origin == "" then null else $origin end),
+       origin_checked: $checked,
+       deletes: ($deletes | split("\u0000") | map(select(. != ""))),
+       staged: ($staged | split("\u0000") | map(select(. != ""))),
+       point_in_time: $pit }' >"$gb/meta.json" \
+    || { GROVE_BACKUP_PACK_WHY="the manifest could not be written"; return 2; }
+
+  tar --no-wildcards -C "$stage" --sort=name --numeric-owner -cf "$work/unit.tar" .grove-backup 2>"$work/tar.err" \
+    || { GROVE_BACKUP_PACK_WHY="tar failed: $(head -n 1 "$work/tar.err")"; return 2; }
+  if [[ -s "$work/files" ]]; then
+    tar --no-wildcards "${excludes[@]}" -C "$path" --sort=name --numeric-owner \
+      -rf "$work/unit.tar" --null -T "$work/files" 2>"$work/tar.err"
+    rc=$?
+    # 1 = a file changed as tar read it: the settle check after the pack judges that
+    if [[ "$rc" -ge 2 ]]; then
+      GROVE_BACKUP_PACK_WHY="tar failed: $(grep -v 'changed as we read it\|removed before we read it' "$work/tar.err" | head -n 1)"
+      return 2
+    fi
+  fi
+
+  gzip -n <"$work/unit.tar" >"$out" 2>"$work/gz.err" \
+    || { GROVE_BACKUP_PACK_WHY="the temp tar could not be written: $(head -n 1 "$work/gz.err")"; return 2; }
+  sha="$(sha256sum <"$work/unit.tar")"
+  rm -rf "$stage" "$work/unit.tar"
+  printf '%s\n' "${sha%% *}" >"$out.sha"
 }
 
 ######################################################################
@@ -449,24 +845,22 @@ grove_backup_pack_change_is_live() {
 }
 
 ######################################################################
-# .what = tar one unit into a gz temp file, then hash its UNCOMPRESSED bytes
+# .what = tar one HOME unit (`~/.claude`, `~/.rhachet`) into a gz temp file,
+#         then hash its UNCOMPRESSED bytes
 #
-# .why the hash is of the uncompressed tar: a gzip upgrade changes every
-#   compressed byte and none of the content, so it would re-put every unit once
-# .why the tar is deterministic (`--sort=name`, numeric owner, gnu format with
-#   no atime): an untouched unit must hash the same on every run, or the skip
-#   never fires
+# .why deterministic (`--sort=name`, numeric owner, `gzip -n`): an untouched
+#   unit must hash the same on every pass, or the skip never fires
 # .why a temp FILE and not a stream to s3: the skip needs the hash before the put
 #
-# prints the sha256; rc 0 ok · 1 changed while read (retry-worthy) · 2 fault
+# writes the sha256 to <out>.sha; rc 0 ok · 1 changed while read (retry-worthy) · 2 fault
 # sets GROVE_BACKUP_PACK_WHY on rc 1 or 2
 ######################################################################
-grove_backup_pack() {
-  local kind="$1" home="$2" path="$3" out="$4"
+grove_backup_pack_home() {
+  local home="$1" path="$2" out="$3"
   local errf="$out.tarerr" gzerr="$out.gzerr" tar_rc gz_rc sha
   local -a flags changed codes
 
-  mapfile -t flags < <(grove_backup_pack_excludes "$kind" "$home" "$path")
+  mapfile -t flags < <(grove_backup_pack_excludes "$home" "$path")
 
   # ⚠️ both exit codes in ONE read: an assignment is a command, so a second
   #   `${PIPESTATUS[1]}` after `tar_rc=${PIPESTATUS[0]}` reads a reset array
@@ -494,7 +888,7 @@ grove_backup_pack() {
   fi
 
   sha="$(gzip -dc "$out" | sha256sum)"
-  printf '%s\n' "${sha%% *}"
+  printf '%s\n' "${sha%% *}" >"$out.sha"
 }
 
 ######################################################################
@@ -557,14 +951,27 @@ grove_backup_age_of() {
 #   ✓ 20m ago · 3 put · 9 skipped
 #   ✗ FAILED · <cause> · 3h
 #   ✗ STALE · last ok 3h ago        ✗ STALE · never
-#   ✗ NOT ENROLLED
+#   ⏳ the first run is at work      ✗ NOT ENROLLED
 #
 # usage: grove_backup_status_line [enrolled]   # enrolled = the timer is in place
-# rc 0 on ✓, 1 on ✗
+# rc 0 on ✓, 1 on all else
 ######################################################################
+# .what = is a backup run at work now? (a oneshot unit reads `activating` while it runs)
+grove_backup_run_active() {
+  [[ "$(systemctl show -p ActiveState --value grove-backup.service 2>/dev/null)" == activating ]]
+}
+
 grove_backup_status_line() {
   local enrolled="${1:-}" file verdict cause at last_ok put skipped age
   file="$(grove_backup_status_file)"
+
+  # 🛑 a pass writes its status only at its end, and a box's first pass packs
+  #   every tree. without this arm, every surface read `✗ STALE · never` over a
+  #   healthy first pass
+  if [[ ! -f "$file" ]] && grove_backup_run_active; then
+    echo "⏳ the first run is at work"
+    return 1
+  fi
 
   if [[ ! -f "$file" ]]; then
     [[ "$enrolled" == enrolled ]] && { echo "✗ STALE · never"; return 1; }

@@ -76,6 +76,14 @@
 #             `tofu` accepts a scan with NO attestation, and is a human's call
 #             to make explicitly — see the 🛑 at the trust step below
 #   --within  seconds to allow one apply   default 2700 (45m)
+#   --what    one bundle slug — the same steps 1-3, each apply narrowed to it
+#
+# 🛑 .--what is how ONE bundle reaches a grove — never a hand-typed push + send
+#      📜 2026-11-20: asked to apply 5.26.backup alone, a clone handed the human six
+#         commands (sync, trust, wake .ground, push, send plan, send apply) copied out
+#         of this file's own internals. each was a step this skill already owns, in an
+#         order it already enforces. a skill short one flag is a skill to extend, never
+#         a procedure to re-type (`rule.forbid.adhoc-shell`)
 #
 # guarantee:
 #   - exit 0 = the box provisioned AND passed the gate
@@ -110,8 +118,12 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "            tofu     — the check is skipped: a tailnet first contact, by your word"
   echo "            keep     — the trust step is not run"
   echo "  --within  seconds to allow one seat's apply               (default 2700)"
+  echo "  --what    apply ONE bundle (a slug) on both seats, not the whole tree"
+  echo "            the same reach, push, and ground-then-camper order; no grants,"
+  echo "            no key placement, no gate — those are claims about a WHOLE box"
   echo ""
   echo "examples:"
+  echo "  rhx git.grove.provision boot <name> --what 5.26.backup --mode apply    # one bundle"
   echo "  rhx git.grove.provision boot <name>                                    # plan"
   echo "  rhx git.grove.provision boot <name> --mode apply                       # the whole boot"
   echo "  rhx git.grove.provision boot <name> --mode apply --trust tofu          # a tailnet first contact"
@@ -139,6 +151,7 @@ MODE="plan"
 #    invocation. to default to 1 would make the preflight opt-in, which is the
 #    same as absent: a human who knew to ask for it did not need it.
 FROM=0
+WHAT=""
 ####################################################################
 # 🛑 the default is VERIFIED, and never `tofu`
 #
@@ -181,16 +194,17 @@ boot_input_refused() {
 
 while [[ $# -gt 0 ]]; do
   # a value flag with no value names itself, never a bash `unbound variable`
-  [[ "$1" =~ ^--(mode|from|trust|within)$ && $# -lt 2 ]] && boot_input_refused "$1 needs a value"
+  [[ "$1" =~ ^--(mode|from|trust|within|what)$ && $# -lt 2 ]] && boot_input_refused "$1 needs a value"
   case "$1" in
     --mode)   MODE="$2";   shift 2 ;;
+    --what)   WHAT="$2";   shift 2 ;;
     --from)   FROM="$2";   shift 2 ;;
     --trust)  TRUST="$2";  shift 2 ;;
     --within) WITHIN="$2"; shift 2 ;;
     --skill|--repo|--role) shift 2 ;;
     --) shift; [[ -z "$GROVE" ]] && { GROVE="${1:-}"; shift 2>/dev/null || true; } ;;
     -*) boot_input_refused "unknown flag '$1'" \
-          "valid: --mode plan|apply  --from 0-4  --trust verified|replace|tofu|keep  --within <secs>  --help" ;;
+          "valid: --mode plan|apply  --from 0-4  --trust verified|replace|tofu|keep  --within <secs>  --what <slug>  --help" ;;
     *) [[ -z "$GROVE" ]] && GROVE="$1"; shift ;;
   esac
 done
@@ -201,6 +215,9 @@ done
 [[ "$TRUST" =~ ^(verified|tofu|replace|keep)$ ]] ||
   boot_input_refused "--trust '$TRUST' is not verified, replace, tofu, or keep"
 [[ "$WITHIN" =~ ^[0-9]+$ ]] || boot_input_refused "--within '$WITHIN' is not a whole number of seconds"
+# 🛑 a LIVE clamp — the slug reaches a command line on a remote box
+[[ -z "$WHAT" || "$WHAT" =~ ^[A-Za-z0-9._-]+$ ]] ||
+  boot_input_refused "--what '$WHAT' is not a bundle slug ([A-Za-z0-9._-])" "list them: rhx grove.provision --mode plan"
 
 # the transport, shared so it cannot drift from every other grove read
 # (`rule.forbid.two-writers-on-one-artifact`)
@@ -277,11 +294,17 @@ if [[ -n "$BOOT_ORG" && "$BOOT_ORG" == *[!A-Za-z0-9._@-]* ]]; then
 fi
 
 [[ -n "$BOOT_ORG" ]] && UPGRADE="$UPGRADE --org $BOOT_ORG"
+[[ -n "$WHAT" ]] && UPGRADE="$UPGRADE --what $WHAT"
 
 echo "🐢 heres the wave..."
 echo ""
 echo "🌱 git.grove.provision boot $GROVE --mode $MODE"
-echo "   ├─ steps: $FROM..4"
+if [[ -n "$WHAT" ]]; then
+  echo "   ├─ what: $WHAT — one bundle, on each seat; no grants, keys, or gate"
+  echo "   ├─ steps: $(( FROM > 1 ? FROM : 1 ))..3"
+else
+  echo "   ├─ steps: $FROM..4"
+fi
 echo "   ├─ trust: $TRUST"
 echo "   ├─ within: ${WITHIN}s per apply"
 # ⚠️ an ABSENT org is reported out loud, because its consequence is silent: the
@@ -372,7 +395,8 @@ drive_seat() {
   local seat="$1" label="$2" step="$3" upgrade="${4:-$UPGRADE}"
   local log='$HOME/grove.provision.'"$label"'.log'
 
-  case "$(_prior_apply_at "$seat" "$log")" in
+  # a `--what` run follows a whole-tree one by design, so a prior log is no news there
+  [[ -z "$WHAT" ]] && case "$(_prior_apply_at "$seat" "$log")" in
     yes)
       say "│  ⚠️ this BOX already holds an apply log for $label"
       say "│     a second apply proves the SECOND run, and says none of what the"
@@ -640,7 +664,9 @@ _grant_param_github_token() {
   grove_provision_5_12_rack_param_name
 }
 
-if [[ "$FROM" -le 0 ]]; then
+# ⚠️ `--what` skips the grants: they are owed by the WHOLE tree, and one bundle
+#    asks a human for none of them
+if [[ "$FROM" -le 0 && -z "$WHAT" ]]; then
   say "├─ 0. grants"
 
   _grant_param="$(_grant_param_github_token)" || _grant_param=""
@@ -792,13 +818,26 @@ if [[ "$FROM" -le 3 ]]; then
   say "├─ 3. camper"
   # the keys are this step's NEXT act, so the apply defers an unplaced key row to it
   #   rather than halt one step short of the step that places it (`5.16.keys` verify)
-  drive_seat "$GROVE" camper 3 "GROVE_BOOT_PLACES_KEYS=1 $UPGRADE"
+  if [[ -n "$WHAT" ]]; then
+    drive_seat "$GROVE" camper 3
+  else
+    drive_seat "$GROVE" camper 3 "GROVE_BOOT_PLACES_KEYS=1 $UPGRADE"
 
-  # 🛑 then the KEYS, on the camper — the boot places them, never a human
-  boot_keys_place
+    # 🛑 then the KEYS, on the camper — the boot places them, never a human
+    boot_keys_place
 
-  # 🛑 then the ADMIN seat is read, so ground's cleanliness is proven by the boot itself
-  boot_admin_seat_clean
+    # 🛑 then the ADMIN seat is read, so ground's cleanliness is proven by the boot itself
+    boot_admin_seat_clean
+  fi
+fi
+
+# ⚠️ `--what` ends at the seats: the gate is a claim about a WHOLE box, and one
+#    bundle's applies prove that bundle alone (each verify ran inside its apply)
+if [[ -n "$WHAT" ]]; then
+  echo ""
+  [[ "$MODE" == "plan" ]] && { echo "🌱 plan only — no step ran. drive it with --mode apply"; exit 0; }
+  echo "🌳 $WHAT applied on $GROVE — ground, then camper, ONE apply each"
+  exit 0
 fi
 
 ######################################################################

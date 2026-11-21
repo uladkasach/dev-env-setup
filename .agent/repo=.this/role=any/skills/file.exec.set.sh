@@ -36,6 +36,11 @@ ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
 
 PATHS=()
 while [[ $# -gt 0 ]]; do
+  # a value flag with no value refuses: `shift 2` past the last arg shifts naught,
+  # so the loop would read the same flag forever
+  [[ "$1" =~ ^--(path|skill|repo|role)$ && $# -lt 2 ]] && {
+    echo "✋ ConstraintError: $1 needs a value" >&2
+    echo "   └─ see: rhx file.exec.set --help" >&2; exit 2; }
   case "$1" in
     --path) PATHS+=("${2:-}"); shift 2 ;;
     # rhachet injects these three into every skill it runs

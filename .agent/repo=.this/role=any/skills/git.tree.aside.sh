@@ -49,6 +49,11 @@ VERB=""
 TAG=""
 PATHS=()
 while [[ $# -gt 0 ]]; do
+  # a value flag with no value refuses: `shift 2` past the last arg shifts naught,
+  # so the loop would read the same flag forever
+  [[ "$1" =~ ^--(tag|path|skill|repo|role)$ && $# -lt 2 ]] && {
+    echo "✋ ConstraintError: $1 needs a value" >&2
+    echo "   └─ see: rhx git.tree.aside --help" >&2; exit 2; }
   case "$1" in
     --tag)  TAG="${2:-}"; shift 2 ;;
     --path) PATHS+=("${2:-}"); shift 2 ;;
@@ -62,9 +67,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 # .what = print the sha of the entry that holds this tag, or naught
+# .note = the subject reads `On <branch>: tree.aside: <tag>`. the compare is exact on
+#         all after the first `: `, so a foreign entry whose message merely ENDS in
+#         `tree.aside: <tag>` (`On main: wip tree.aside: feat`) never answers for it
 sha_of_tag() {
   git stash list --format='%H %gs' | while read -r sha subject; do
-    [[ "$subject" == *"$PREFIX $1" ]] && { echo "$sha"; break; }
+    [[ "${subject#*: }" == "$PREFIX $1" ]] && { echo "$sha"; break; }
   done
 }
 
@@ -97,7 +105,7 @@ case "$VERB" in
     if [[ -z "$TAG" ]]; then
       echo "🐚 git.tree.aside get"
       held="$(git stash list --format='%H %gs' | while read -r sha subject; do
-        [[ "$subject" == *"$PREFIX "* ]] && echo "$sha ${subject##*"$PREFIX "}"
+        [[ "${subject#*: }" == "$PREFIX "* ]] && echo "$sha ${subject#*: "$PREFIX "}"
       done)"
       [[ -n "$held" ]] || { echo "   └─ (none held)"; exit 0; }
       echo "$held" | while read -r sha tag; do echo "   ├─ $tag ($sha)"; done
@@ -106,9 +114,27 @@ case "$VERB" in
     sha="$(sha_of_tag "$TAG")"
     [[ -n "$sha" ]] || {
       echo "✋ ConstraintError: no entry holds tag '$TAG'" >&2
-      echo "   └─ see what is held: rhx git.tree.aside list" >&2
+      echo "   └─ see what is held: rhx git.tree.aside get" >&2
       exit 2
     }
+    # 🛑 refuse BEFORE the apply when HEAD moved a held path since the set: a 3-way
+    #   apply then writes conflict markers into the live file, and a held file is often
+    #   live config (measured 2026-11-20: a rebase moved .claude settings, the apply
+    #   wrote markers into them, and every permission check failed to parse)
+    moved=()
+    while IFS= read -r p; do
+      [[ -n "$p" ]] || continue
+      [[ "$(git rev-parse -q --verify "$sha^1:$p" 2>/dev/null)" == "$(git rev-parse -q --verify "HEAD:$p" 2>/dev/null)" ]] \
+        || moved+=("$p")
+    done < <(git stash show --name-only "$sha" 2>/dev/null)
+    if [[ "${#moved[@]}" -gt 0 ]]; then
+      echo "✋ ConstraintError: HEAD moved ${#moved[@]} held path(s) since '$TAG' was set" >&2
+      for p in "${moved[@]}"; do echo "   ├─ $p" >&2; done
+      echo "   ├─ the entry is KEPT, and no file was touched" >&2
+      echo "   └─ read what it holds: git stash show -p $sha" >&2
+      exit 2
+    fi
+
     git stash apply "$sha" >/dev/null || {
       echo "💥 MalfunctionError: the apply of '$TAG' ($sha) hit a conflict" >&2
       echo "   ├─ the entry is KEPT, so no edit is lost" >&2

@@ -40,8 +40,9 @@ echo "🌲 prove.grove-backup-scope-matches-infra"
 # .what = the source file's lines at a ref, or naught; rc 0 only when found
 read_source() {
   local ref="$1" out
-  out="$(rhx git.repo.get lines --in ahbode/infrastructure --ref "$ref" --paths "$SOURCE_PATH" 2>/dev/null)" \
-    || out="$(rhx git.repo.get lines --in ahbode/infrastructure --ref "$ref" --refresh off --paths "$SOURCE_PATH" 2>/dev/null)" \
+  # each read reaches the network, so each is bounded and fed no stdin
+  out="$(timeout -k 5 90 rhx git.repo.get lines --in ahbode/infrastructure --ref "$ref" --paths "$SOURCE_PATH" </dev/null 2>/dev/null)" \
+    || out="$(timeout -k 5 90 rhx git.repo.get lines --in ahbode/infrastructure --ref "$ref" --refresh off --paths "$SOURCE_PATH" </dev/null 2>/dev/null)" \
     || return 1
   [[ "$out" == *"GROVE_BACKUP_SCOPE"* ]] || return 1
   printf '%s\n' "$out"

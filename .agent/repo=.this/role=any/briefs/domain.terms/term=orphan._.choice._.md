@@ -30,8 +30,10 @@ forbidden synonym of two OTHER terms on the ground that it "already carries a di
 | D | an UNCITED artifact | `term=exhibit._.choice.reason.md:64` |
 | E | a tracked FILE whose delete was lost in a merge | commit `0edb2e8` |
 | **F** | **a PROCESS whose PARENT exited, so init adopted it** | `machine.diagnose.churn`, `machine.attribute.memory --orphans` |
+| G | a worktree DIR whose git registration is gone: `_worktrees/<dir>` with no `.git` | `grove.backup.unit` kind `orphan`, `grove.backup.restore --orphan` |
 
-A–C share the proposed `.what`: a record that outlived its referent. **D and E do not.** an
+A–C and G share the proposed `.what`: a record that outlived its referent. a G orphan outlived
+its worktree registration, and `git worktree list` no longer names it, so no reader reports it. **D and E do not.** an
 uncited artifact never had a referent to outlive, and a lost-delete file is a live twin of a
 file that moved — no referent died; the rename simply forked.
 

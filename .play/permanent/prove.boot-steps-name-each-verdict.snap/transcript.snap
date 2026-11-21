@@ -278,8 +278,12 @@ inputs:
             tofu     — the check is skipped: a tailnet first contact, by your word
             keep     — the trust step is not run
   --within  seconds to allow one seat's apply               (default 2700)
+  --what    apply ONE bundle (a slug) on both seats, not the whole tree
+            the same reach, push, and ground-then-camper order; no grants,
+            no key placement, no gate — those are claims about a WHOLE box
 
 examples:
+  rhx git.grove.provision boot <name> --what 5.26.backup --mode apply    # one bundle
   rhx git.grove.provision boot <name>                                    # plan
   rhx git.grove.provision boot <name> --mode apply                       # the whole boot
   rhx git.grove.provision boot <name> --mode apply --trust tofu          # a tailnet first contact
@@ -301,7 +305,7 @@ exit 0 = provisioned + gated | 3 = a step failed | 2 = bad input
 
 ## cli · refused: '--wat' (rc 2)
 ✋ ConstraintError: unknown flag '--wat'
-   ├─ valid: --mode plan|apply  --from 0-4  --trust verified|replace|tofu|keep  --within <secs>  --help
+   ├─ valid: --mode plan|apply  --from 0-4  --trust verified|replace|tofu|keep  --within <secs>  --what <slug>  --help
    ├─ fix: rhx git.grove.provision boot <name> --mode apply
    └─ every input: rhx git.grove.provision boot --help
 

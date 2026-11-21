@@ -1,0 +1,12 @@
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  ├─ ⇄ graft into <fixture>/fresh/<seat>/git/acme/widget (its files untouched)
+   │  ├─ feat-x                       = (already equal)
+   │  ├─ gone                         + new branch · 1 commit this clone lacked
+   │  ├─ main                         + fast-forward · 1 commit · checked out, its tree clean
+   │  └─ + 1 file of the dead checkout laid · 0 deletes applied
+   │     ├─ = notes.txt (kept: this clone changed it)
+   │     └─ to read the dead checkout whole: --into <dir>
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed

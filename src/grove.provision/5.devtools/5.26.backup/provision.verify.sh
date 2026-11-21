@@ -20,12 +20,15 @@
 
 grove_provision_5_26_backup_provision_verify() {
   if ! grove_provision_5_26_backup_applies; then
-    echo "   🌙 a ${GROVE_ENV_SERVER:-（underived）} box holds no grove role; grove backup is for groves"
+    echo "   🌙 a ${GROVE_ENV_SERVER:-（underived）} box holds no camp aws identity, so no grant can reach the backup bucket"
     return 0
   fi
 
   # shellcheck source=./grove.backup.operations.sh
-  source "$GROVE_SRC/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh"
+  source "$GROVE_SRC/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh" || {
+    echo "   💥 MalfunctionError: could not load grove.backup.operations.sh from this checkout" >&2
+    return 1
+  }
 
   # the fix names the seat that can make it: a seat with no sudo cannot enroll a root unit
   local failed=0 fix="rhx grove.provision --what 5.26.backup --mode apply"
@@ -40,7 +43,7 @@ grove_provision_5_26_backup_provision_verify() {
       absent=1
       failed=1
     elif ! diff -q "$src" "$dst" >/dev/null 2>&1; then
-      echo "   ✋ the installed $dst DIFFERS from this checkout" >&2
+      echo "   ✋ ConstraintError: the installed $dst DIFFERS from this checkout" >&2
       echo "      read the drift: diff $src $dst" >&2
       echo "      fix: $fix" >&2
       failed=1
@@ -48,7 +51,7 @@ grove_provision_5_26_backup_provision_verify() {
   done < <(grove_provision_5_26_backup_files)
 
   if [[ "$absent" -eq 1 ]]; then
-    echo "   ✗ grove backup · NOT ENROLLED" >&2
+    echo "   ✋ ConstraintError: grove backup · NOT ENROLLED" >&2
     echo "      └─ fix: $fix" >&2
     return 1
   fi
@@ -60,7 +63,7 @@ grove_provision_5_26_backup_provision_verify() {
   active="$(systemctl is-active grove-backup.timer 2>/dev/null)"
   enabled="$(systemctl is-enabled grove-backup.timer 2>/dev/null)"
   if [[ "$active" != active || "$enabled" != enabled ]]; then
-    echo "   ✗ grove backup · NOT ENROLLED · timer is ${active:-absent}, ${enabled:-absent}" >&2
+    echo "   ✋ ConstraintError: grove backup · NOT ENROLLED · timer is ${active:-absent}, ${enabled:-absent}" >&2
     echo "      └─ fix: $fix" >&2
     return 1
   fi
@@ -89,7 +92,9 @@ grove_provision_5_26_backup_provision_verify() {
     return "$failed"
   fi
 
-  echo "   ✗ grove backup · ${line#✗ }" >&2
+  # a run that enrolled and then failed is the SYSTEM's to fix (a grant, a bucket, a disk),
+  # so its header is a malfunction; the status line itself keeps its one shape for every surface
+  echo "   💥 MalfunctionError: grove backup · ${line#✗ }" >&2
   local owed
   owed="$(jq -r '.fix // empty' "$(grove_backup_status_file)" 2>/dev/null)"
   [[ -n "$owed" ]] && echo "      ├─ $owed" >&2

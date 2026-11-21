@@ -64,6 +64,17 @@ grove_provision_2_8_tmux_live_sockets() {
   done
 }
 
+# .what = the login shell this seat's passwd record names — the shell a new tmux pane
+#   is owed. empty when the record names none that runs
+# .why the record, never $SHELL: a tmux server's $SHELL is the one it was BORN with, and
+#   it outlives a chsh. one reader, so the upsert and the verify cannot disagree
+grove_provision_2_8_tmux_login_shell() {
+  local sh
+  sh="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)"
+  [[ -n "$sh" && -x "$sh" ]] && printf '%s' "$sh"
+  return 0
+}
+
 # .what = every conf tmux would load AFTER `~/.tmux.conf`, which is on disk
 # .why there can only be one: a later conf wins every option both name, so a
 #   shadow turns the repo's conf into a suggestion (m2, m10). the upsert retires

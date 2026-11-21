@@ -1,0 +1,90 @@
+
+## sync · plan
+rc=0
+🌲 git grove sync --mode plan
+   ├─ ✗ grove-dead — its grove is no tailnet peer: a dead or replaced box
+   │  └─ fix, once you confirm it is dead: git grove del grove-dead
+   ├─ + grove-new — declares hetzner.hetzbot; would register grove-new and grove-new.ground
+   ├─ ? grove-other — a grove peer with no entry, whose platform it did not declare (read: 'no answer')
+   │  ├─ ssh said: camper@grove-other: Permission denied (publickey).
+   │  └─ an ec2 grove registers by its tag: git grove set grove-other --exid <tag> --env <env>
+   └─ to write: git grove sync --mode apply
+
+## sync · apply
+rc=0
+🌲 git grove sync --mode apply
+   ├─ ✗ grove-dead — its grove is no tailnet peer: a dead or replaced box
+   │  └─ fix, once you confirm it is dead: git grove del grove-dead
+   ├─ + grove-new — declares hetzner.hetzbot; registered grove-new and grove-new.ground
+   │  └─ next, once you confirm the tailnet names this box: rhx git.grove.trust.gen --grove grove-new --mode apply --trust tofu
+   ├─ ? grove-other — a grove peer with no entry, whose platform it did not declare (read: 'no answer')
+   │  ├─ ssh said: camper@grove-other: Permission denied (publickey).
+   │  └─ an ec2 grove registers by its tag: git grove set grove-other --exid <tag> --env <env>
+   └─ each row above with a fix is a human's call
+
+## sync · apply again
+rc=0
+🌲 git grove sync --mode apply
+   ├─ ✗ grove-dead — its grove is no tailnet peer: a dead or replaced box
+   │  └─ fix, once you confirm it is dead: git grove del grove-dead
+   ├─ ? grove-other — a grove peer with no entry, whose platform it did not declare (read: 'no answer')
+   │  ├─ ssh said: camper@grove-other: Permission denied (publickey).
+   │  └─ an ec2 grove registers by its tag: git grove set grove-other --exid <tag> --env <env>
+   └─ each row above with a fix is a human's call
+
+## list · against the tailnet
+rc=0
+🌲 forest
+   ├─ 🌳 grove-a.ground → ground@grove-a:22 (ssh:grove-a.ground)
+   ├─ 🌳 grove-a → camper@grove-a:22 (ssh:grove-a)
+   ├─ 🌳 grove-dead → camper@grove-dead:22 (ssh:grove-dead)
+   ├─ 🌳 grove-ec2 → camper@localhost:36000 (ssh:grove-ec2)
+   ├─ 🌳 grove-new.ground → ground@grove-new:22 (ssh:grove-new.ground)
+   ├─ 🌳 grove-new → camper@grove-new:22 (ssh:grove-new)
+   ├─ ✗ grove-dead — its grove is no tailnet peer: a dead or replaced box
+   │  └─ fix, once you confirm it is dead: git grove del grove-dead
+   ├─ + grove-other — a grove on the tailnet with no entry here
+   └─ fix: git grove sync --mode apply
+
+## git.grove.list · aliases match
+rc=0
+🌲 forest
+   ├─ 🌳 grove-a.ground → ground@grove-a:22 (ssh:grove-a.ground)
+   ├─ 🌳 grove-a → camper@grove-a:22 (ssh:grove-a)
+   ├─ 🌳 grove-dead → camper@grove-dead:22 (ssh:grove-dead)
+   ├─ 🌳 grove-ec2 → camper@localhost:36000 (ssh:grove-ec2)
+   ├─ 🌳 grove-new.ground → ground@grove-new:22 (ssh:grove-new.ground)
+   ├─ 🌳 grove-new → camper@grove-new:22 (ssh:grove-new)
+   ├─ ✗ grove-dead — its grove is no tailnet peer: a dead or replaced box
+   │  └─ fix, once you confirm it is dead: git grove del grove-dead
+   ├─ + grove-other — a grove on the tailnet with no entry here
+   └─ fix: git grove sync --mode apply
+
+## git.grove.list · aliases differ
+rc=0
+⚠️ ~/.bash_aliases differs from this checkout, so an older git grove runs here
+   └─ fix: rhx grove.provision --what 2.7.aliases --mode apply
+
+🌲 forest
+   ├─ 🌳 grove-a.ground → ground@grove-a:22 (ssh:grove-a.ground)
+   ├─ 🌳 grove-a → camper@grove-a:22 (ssh:grove-a)
+   ├─ 🌳 grove-dead → camper@grove-dead:22 (ssh:grove-dead)
+   ├─ 🌳 grove-ec2 → camper@localhost:36000 (ssh:grove-ec2)
+   ├─ 🌳 grove-new.ground → ground@grove-new:22 (ssh:grove-new.ground)
+   ├─ 🌳 grove-new → camper@grove-new:22 (ssh:grove-new)
+   ├─ ✗ grove-dead — its grove is no tailnet peer: a dead or replaced box
+   │  └─ fix, once you confirm it is dead: git grove del grove-dead
+   ├─ + grove-other — a grove on the tailnet with no entry here
+   └─ fix: git grove sync --mode apply
+
+## network.tailnet.peers.get · tags
+rc=0
+🛰️ network.tailnet.peers.get
+   ├─ grove-a  online ✔  · tag:grove,tag:hetzner
+   └─ laptop-1  offline · last seen 2026-01-02T03:04
+
+## sync · no tailnet
+rc=2
+✋ ConstraintError: no tailnet answers on this box, so no drift can be read
+   fix: sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply
+

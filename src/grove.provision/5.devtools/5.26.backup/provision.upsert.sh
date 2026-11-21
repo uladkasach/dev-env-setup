@@ -17,7 +17,7 @@
 
 grove_provision_5_26_backup_provision_upsert() {
   if ! grove_provision_5_26_backup_applies; then
-    echo "   🌙 a ${GROVE_ENV_SERVER:-（underived）} box holds no grove role; grove backup is for groves"
+    echo "   🌙 a ${GROVE_ENV_SERVER:-（underived）} box holds no camp aws identity, so no grant can reach the backup bucket"
     return 0
   fi
 
@@ -50,11 +50,15 @@ grove_provision_5_26_backup_provision_upsert() {
   ####################################################################
   while IFS=$'\t' read -r src dst mode; do
     if [[ ! -f "$src" ]]; then
-      echo "   ✋ no $(basename "$src") at $src" >&2
+      echo "   💥 MalfunctionError: no $(basename "$src") at $src" >&2
       echo "      ⇒ this run's own checkout is incomplete" >&2
       return 1
     fi
-    sudo install -D -m "$mode" -o root -g root "$src" "$dst" || return 1
+    sudo install -D -m "$mode" -o root -g root "$src" "$dst" || {
+      echo "   💥 MalfunctionError: could not install $dst" >&2
+      echo "      ⇒ the agent stays at its prior version; read why above" >&2
+      return 1
+    }
   done < <(grove_provision_5_26_backup_files)
   echo "   • the agent, its library, grove-backup.service, and grove-backup.timer declared"
 
@@ -62,15 +66,15 @@ grove_provision_5_26_backup_provision_upsert() {
   # 2. reload FIRST, then enable — see the header
   ####################################################################
   sudo systemctl daemon-reload || {
-    echo "   ✋ systemctl daemon-reload failed" >&2
+    echo "   💥 MalfunctionError: systemctl daemon-reload failed" >&2
     echo "      ⇒ the new unit files are on disk and the OLD definitions stay live" >&2
     return 1
   }
 
   if sudo systemctl enable --now grove-backup.timer; then
-    echo "   • grove-backup.timer enabled and started (hourly, Persistent=true)"
+    echo "   • grove-backup.timer enabled and started (every 15 minutes, Persistent=true)"
   else
-    echo "   ✋ could not enable grove-backup.timer" >&2
+    echo "   💥 MalfunctionError: could not enable grove-backup.timer" >&2
     echo "      ⇒ no backup runs, and this grove's unpushed work has one copy" >&2
     echo "      read why: systemctl status grove-backup.timer" >&2
     return 1

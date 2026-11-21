@@ -1,0 +1,100 @@
+
+## git.tree.aside set --tag
+rc=2
+✋ ConstraintError: --tag needs a value
+   └─ see: rhx git.tree.aside --help
+
+## git.tree.aside set --tag x --path
+rc=2
+✋ ConstraintError: --path needs a value
+   └─ see: rhx git.tree.aside --help
+
+## file.exec.set --path
+rc=2
+✋ ConstraintError: --path needs a value
+   └─ see: rhx file.exec.set --help
+
+## brains.auth.reset.probe --node
+rc=2
+✋ ConstraintError: --node needs a value
+   fix: rhx brains.auth.reset.probe --help
+
+## brains.auth.reset.probe --kind
+rc=2
+✋ ConstraintError: --kind needs a value
+   fix: rhx brains.auth.reset.probe --help
+
+## brains.auth.reset.probe --from
+rc=2
+✋ ConstraintError: --from needs a value
+   fix: rhx brains.auth.reset.probe --help
+
+## grove.backup.get --from
+rc=2
+✋ ConstraintError: --from needs a value
+   └─ see: rhx grove.backup.get --help
+
+## grove.backup.get --skill
+rc=2
+✋ ConstraintError: --skill needs a value
+   └─ see: rhx grove.backup.get --help
+
+## grove.backup.restore --from
+rc=2
+✋ ConstraintError: --from needs a value
+   └─ see: rhx grove.backup.restore --help
+
+## grove.backup.restore --from grove-1 --of
+rc=2
+✋ ConstraintError: --of needs a value
+   └─ see: rhx grove.backup.restore --help
+
+## grove.backup.restore --from grove-1 --of a/b --tree
+rc=2
+✋ ConstraintError: --tree needs a value
+   └─ see: rhx grove.backup.restore --help
+
+## grove.backup.restore --from grove-1 --home
+rc=2
+✋ ConstraintError: --home needs a value
+   └─ see: rhx grove.backup.restore --help
+
+## grove.backup.restore --from grove-1 --orphan
+rc=2
+✋ ConstraintError: --orphan needs a value
+   └─ see: rhx grove.backup.restore --help
+
+## grove.backup.restore --from grove-1 --of a/b --setaside
+rc=2
+✋ ConstraintError: --setaside needs a value
+   └─ see: rhx grove.backup.restore --help
+
+## grove.backup.restore --from grove-1 --home .claude --into
+rc=2
+✋ ConstraintError: --into needs a value
+   └─ see: rhx grove.backup.restore --help
+
+## git.grove.play.stop grove-1 --play
+rc=2
+✋ ConstraintError: --play needs a value
+   fix: rhx git.grove.play.stop <grove> --play <name>
+
+## git.grove.play.stop grove-1 --play x --scratch
+rc=2
+✋ ConstraintError: --scratch needs a value
+   fix: rhx git.grove.play.stop <grove> --play <name>
+
+## git.grove.sync --mode
+rc=2
+✋ ConstraintError: --mode needs plan or apply
+
+## aws.reach.set --org ahbode --env test --gitroot
+rc=2
+✋ ConstraintError: --gitroot needs a value
+   see: rhx aws.reach.set help
+
+## aws.reach.del --org ahbode --env test --gitroot
+rc=2
+✋ ConstraintError: --gitroot needs a value
+   see: rhx aws.reach.del help
+

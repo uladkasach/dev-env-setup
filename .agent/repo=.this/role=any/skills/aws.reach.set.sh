@@ -105,6 +105,9 @@
 #   --from      path to a repo holding declapract.use.yml (default: cwd)
 #   --owner     rack owner + profile-name tail           (default: ehmpath)
 #   --region    aws region for the profile               (default: us-east-1)
+#   --gitroot   the git root every keyrack call runs from (default: cwd if a repo,
+#               else 5.12.rack's scratch root) — a caller that DECLARED the org there
+#               names it, so the write reads the declaration the caller laid
 #   --mode      plan (default) or apply
 #
 # guarantee:
@@ -137,6 +140,7 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "  --from      repo path holding declapract.use.yml      (default: cwd)"
   echo "  --owner     rack owner + profile-name tail            (default: ehmpath)"
   echo "  --region    aws region                                (default: us-east-1)"
+  echo "  --gitroot   git root for keyrack calls  (default: cwd if a repo, else the rack's)"
   echo "  --mode      plan (default) or apply"
   echo ""
   echo "it writes BOTH halves of the pointer:"
@@ -160,9 +164,15 @@ FROM="$PWD"
 OWNER="ehmpath"
 REGION="us-east-1"
 MODE="plan"
+GITROOT_GIVEN=""
 
 while [[ $# -gt 0 ]]; do
+  # a value flag with no value refuses: `shift 2` past the last arg shifts naught,
+  # so the loop would read the same flag forever
+  [[ "$1" =~ ^--(gitroot|org|env|assume|account|from|owner|region|mode|skill|repo|role)$ && $# -lt 2 ]] && {
+    echo "✋ ConstraintError: $1 needs a value" >&2; echo "   see: rhx aws.reach.set help" >&2; exit 2; }
   case "$1" in
+    --gitroot) GITROOT_GIVEN="$2"; shift 2 ;;
     --org)     ORG="$2";     shift 2 ;;
     --env)     ENV="$2";     shift 2 ;;
     --assume)  ROLE="$2";    shift 2 ;;
@@ -194,6 +204,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# a given rack root must be a repo, refused before any step reads or writes on its behalf
+[[ -z "$GITROOT_GIVEN" ]] || git -C "$GITROOT_GIVEN" rev-parse --git-dir >/dev/null 2>&1 || {
+  echo "✋ ConstraintError: --gitroot '$GITROOT_GIVEN' is not a git repo" >&2
+  echo "   fix: rhx grove.provision --what 5.12.rack --mode apply   (it owns the rack root)" >&2
+  exit 2
+}
 [[ -n "$ORG" ]] || { echo "✋ ConstraintError: --org is required (e.g. --org ahbode)" >&2; exit 2; }
 [[ -n "$ENV" ]] || { echo "✋ ConstraintError: --env is required (test|prep|prod|camp)" >&2; exit 2; }
 ####################################################################
@@ -647,8 +663,16 @@ fi
 #         repo; the cli demands one. the durable fix belongs in rhachet
 #         (`rule.require.solve-at-cause`) — until it lands, this is the seam
 ######################################################################
+# 🛑 a GIVEN root wins: the cwd's own keyrack.yml declares only its repo's org, so a
+#   run from a real checkout refused every cross-org row the caller had declared in
+#   the rack root (📜 2026-11-20, an ec2 grove: both `ehmpathy` rows read
+#   "not on this manifest's org allowlist", while a pushed checkout — no `.git`, so
+#   the fallback — passed the same rows)
 GITROOT="$PWD"
-if ! git -C "$PWD" rev-parse --git-dir >/dev/null 2>&1; then
+if [[ -n "$GITROOT_GIVEN" ]]; then
+  # a repo, by the check right after the parse
+  GITROOT="$GITROOT_GIVEN"
+elif ! git -C "$PWD" rev-parse --git-dir >/dev/null 2>&1; then
   GITROOT="$HOME/.local/state/keyrack.gitroot"
   if [[ ! -d "$GITROOT/.git" ]]; then
     echo "      └─ 💥 MalfunctionError: the cwd is not a git repo, and the box has no rack root" >&2

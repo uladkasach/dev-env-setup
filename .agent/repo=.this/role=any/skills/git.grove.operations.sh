@@ -938,3 +938,22 @@ _tally() {
   n=$(grep -oE "[0-9]+ $1" "$2" 2>/dev/null | tail -1 | grep -oE '[0-9]+' || true)
   echo "${n:-0}"
 }
+
+######################################################################
+# _play_pattern — the `pgrep -f` pattern that names ONE play by its file
+#
+# .what = `(^|/)[p]lay\.name\.play\.sh( |$)` for a play `play.name`
+# .why  = `git.grove.send --play` guarantees the file name `<name>.play.sh`,
+#         so a play is nameable on the box. two skills ask by it
+#         (`git.grove.play.await` reads, `git.grove.play.stop` ends), and a
+#         second copy of the pattern would take the next fix in one place only
+#         - dots escaped: `prove.x` never matches `proveax`
+#         - anchored: a `/` or line start before, a space or line end after
+#         - the first char bracketed: a shell whose argv holds the decoded
+#           pattern never matches itself
+######################################################################
+_play_pattern() {
+  local name="${1:?}" rest
+  rest="${name:1}"
+  printf '%s' "(^|/)[${name:0:1}]${rest//./\\.}\\.play\\.sh( |\$)"
+}

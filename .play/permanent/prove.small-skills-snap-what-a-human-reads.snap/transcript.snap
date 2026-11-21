@@ -1,0 +1,204 @@
+
+## tree.aside · --help
+rc=0
+git.tree.aside — set a tree's uncommitted edits aside under a tag, then lay them back
+
+usage:
+  rhx git.tree.aside set --tag <tag> --path <file> [--path <file> …]
+  rhx git.tree.aside get --tag <tag>
+  rhx git.tree.aside get                 # every entry held
+
+## tree.aside · bare get, none held
+rc=0
+🐢 lets set it aside...
+
+🐚 git.tree.aside get
+   └─ (none held)
+
+## tree.aside · set feat.old (a.txt)
+rc=0
+🐢 lets set it aside...
+
+🐚 git.tree.aside set --tag feat.old
+   ├─ sha: <sha>
+   └─ paths
+      └─ a.txt
+
+## tree.aside · set feat (b.txt)
+rc=0
+🐢 lets set it aside...
+
+🐚 git.tree.aside set --tag feat
+   ├─ sha: <sha>
+   └─ paths
+      └─ b.txt
+
+## tree.aside · a held tag refuses
+rc=2
+🐢 lets set it aside...
+
+✋ ConstraintError: tag 'feat' is already held
+   └─ lay it back first: rhx git.tree.aside get --tag feat
+
+## tree.aside · bare get lists both
+rc=0
+🐢 lets set it aside...
+
+🐚 git.tree.aside get
+   ├─ feat (<sha>)
+   ├─ feat.old (<sha>)
+
+## tree.aside · an absent tag refuses
+rc=2
+🐢 lets set it aside...
+
+✋ ConstraintError: no entry holds tag 'nope'
+   └─ see what is held: rhx git.tree.aside get
+
+## tree.aside · bare get lists no foreign entry
+rc=0
+🐢 lets set it aside...
+
+🐚 git.tree.aside get
+   ├─ feat (<sha>)
+   ├─ feat.old (<sha>)
+
+## tree.aside · get feat lays feat alone
+rc=0
+🐢 lets set it aside...
+
+🐚 git.tree.aside get --tag feat
+   ├─ sha: <sha>
+   └─ laid back, entry dropped
+
+## tree.aside · get feat.old lays it
+rc=0
+🐢 lets set it aside...
+
+🐚 git.tree.aside get --tag feat.old
+   ├─ sha: <sha>
+   └─ laid back, entry dropped
+
+## tree.aside · set moved (a.txt)
+rc=0
+🐢 lets set it aside...
+
+🐚 git.tree.aside set --tag moved
+   ├─ sha: <sha>
+   └─ paths
+      └─ a.txt
+
+## tree.aside · a moved path refuses, entry kept
+rc=2
+🐢 lets set it aside...
+
+✋ ConstraintError: HEAD moved 1 held path(s) since 'moved' was set
+   ├─ a.txt
+   ├─ the entry is KEPT, and no file was touched
+   └─ read what it holds: git stash show -p <sha>
+
+## tree.aside · the kept entry still lists
+rc=0
+🐢 lets set it aside...
+
+🐚 git.tree.aside get
+   ├─ moved (<sha>)
+
+## exec.set · --help
+rc=0
+file.exec.set — give a file inside this repo its exec bit
+
+usage:
+  rhx file.exec.set --path <file> [--path <file> …]
+
+it refuses a path outside this repo, a dir, or a symlink
+
+## exec.set · a file gains its bit
+rc=0
+🐢 lets make it runnable...
+
+🐚 file.exec.set
+   └─ + run.sh
+
+## exec.set · a second run reports, writes naught
+rc=0
+🐢 lets make it runnable...
+
+🐚 file.exec.set
+   └─ = run.sh (already runnable)
+
+## exec.set · a path outside the repo refuses
+rc=2
+✋ ConstraintError: <home>/.bash_aliases is outside this repo (<repo>)
+
+## exec.set · a dir refuses
+rc=2
+✋ ConstraintError: dir is no regular file
+
+## exec.set · a symlink refuses
+rc=2
+✋ ConstraintError: link.sh is a symlink; name the file it points at
+
+## exec.set · no --path refuses
+rc=2
+✋ ConstraintError: name at least one --path
+
+## reset.probe · --help
+rc=0
+######################################################################
+# .what = run the usage-reset reader on one usage node, and show what jq said
+#
+# .why  = `_brains_auth_reset_line` sinks jq's stderr and prints
+#         `? could not read the reset fields` on any failure, so a jq that
+#         cannot parse the program reads the same as a node that lacks the
+#         fields. this names which, with the jq version beside it
+#
+# usage:
+#   rhx brains.auth.reset.probe                      # the cli's real-offer shape
+#   rhx brains.auth.reset.probe --node '<json>' [--kind full|fable]
+#   rhx brains.auth.reset.probe --from checkout      # read this checkout's copy, not ~/
+#
+# guarantee:
+#   - READ-ONLY: no network, no account read; it runs the reader on the node given
+######################################################################
+
+## reset.probe · the default node
+rc=0
+🔬 brains.auth.reset.probe --kind full --from checkout
+   ├─ jq: <jq>
+   ├─ reader: 🎁 session reset available now
+   └─ jq stderr: (none) ✔
+
+## reset.probe · an unknown arg refuses
+rc=2
+✋ ConstraintError: unknown arg: --bogus
+   fix: rhx brains.auth.reset.probe --help
+
+## reset.probe · no installed reader refuses
+rc=2
+✋ ConstraintError: no reader at <home>/.bash_aliases.brains.auth.sh
+
+## grove.sync · --help
+rc=0
+git grove sync — register each new hetzner grove the tailnet holds; never deletes
+   usage: git grove sync [--mode plan|apply]   # plan is the default
+
+## grove.sync · an unknown arg refuses
+rc=2
+✋ ConstraintError: unknown arg '--bogus'
+   usage: git grove sync [--mode plan|apply]
+
+## grove.sync · a --mode outside plan|apply refuses
+rc=2
+✋ ConstraintError: --mode is plan or apply, got 'go'
+
+## reach.set · a --gitroot that is no repo refuses
+rc=2
+✋ ConstraintError: --gitroot '<home>/notrepo' is not a git repo
+   fix: rhx grove.provision --what 5.12.rack --mode apply   (it owns the rack root)
+
+## reach.del · a --gitroot that is no repo refuses
+rc=2
+✋ ConstraintError: --gitroot '<home>/notrepo' is not a git repo
+   fix: rhx grove.provision --what 5.12.rack --mode apply   (it owns the rack root)
+

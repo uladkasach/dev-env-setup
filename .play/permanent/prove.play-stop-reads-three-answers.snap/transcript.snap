@@ -1,0 +1,53 @@
+
+## no --play
+rc=2
+✋ ConstraintError: a grove and --play are required
+   fix: rhx git.grove.play.stop <grove> --play <name>
+
+## a bare --play, its value absent
+rc=2
+✋ ConstraintError: --play needs a value
+   fix: rhx git.grove.play.stop <grove> --play <name>
+
+## a --scratch outside .local/state
+rc=2
+✋ ConstraintError: --scratch must name a glob under .local/state/, got 'git/*'
+
+## a --scratch that climbs
+rc=2
+✋ ConstraintError: --scratch must name a glob under .local/state/, got '.local/state/../x'
+
+## pgrep finds none → none ran, rc 0
+rc=0
+🛑 git.grove.play.stop grove-1 --play x
+   ├─ stopped: none
+   ├─ disk after: <df>
+   └─ done
+
+## pgrep cannot answer → no verdict, rc 1
+rc=1
+🛑 git.grove.play.stop grove-1 --play x
+💥 MalfunctionError: the grove answered, but its pgrep did not, so no play was seen or stopped
+   └─ pgrep could not answer (rc 2)
+
+## the grove does not answer → rc 1
+rc=1
+🛑 git.grove.play.stop grove-1 --play x
+💥 MalfunctionError: the grove was not asked (ssh rc <pid>)
+   fix: rhx git.grove.wake grove-1 --mode apply, then rerun
+
+## the pattern is exact for prove.x
+rc=0
+🛑 git.grove.play.stop grove-1 --play prove.x
+   ├─ stopped: none
+   ├─ disk after: <df>
+   └─ done
+
+## a found play is stopped, its scratch removed
+rc=0
+🛑 git.grove.play.stop grove-1 --play x --scratch '.local/state/proof.*'
+   ├─ stopped: <pid> 
+   ├─ removed: .local/state/proof.abc<pid>
+   ├─ disk after: <df>
+   └─ done
+

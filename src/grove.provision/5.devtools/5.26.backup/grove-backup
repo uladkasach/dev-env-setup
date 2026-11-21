@@ -3,7 +3,7 @@
 # .what = back up every unit on this grove to its bucket, then write the status
 #
 # .who runs it
-#   - `grove-backup.service`, as camper, each hour (`grove-backup.timer`)
+#   - `grove-backup.service`, as camper, every 15 minutes (`grove-backup.timer`)
 #   - a human, by hand, from ground: `sudo systemctl start grove-backup.service`
 #   - a play, which SOURCES it and calls `grove_backup_run` against fixtures
 #
@@ -11,9 +11,9 @@
 #   1. one lock per box: a second run while one is active exits, never a double put
 #   2. the reach, in its written order (grove name → bucket name → credential);
 #      the first that fails is the cause, and the whole run fails on it
-#   3. the walk: every clone, worktree, and home dir of camper's home
-#   4. per unit: tar to an owner-only temp file, hash, compare against that unit's
-#      LATEST object of any date, put only on change (F8)
+#   3. the walk: every clone, worktree, and home dir of camper's home, stalest first
+#   4. per unit: skip a quiet one with no pack; else pack (a tree: self-contained,
+#      at one point in time), hash, put only on change, and mark it as it lands
 #   5. a unit that fails at run time is retried once, then named; the rest land
 #   6. the status, which every surface renders: ✓ only when every unit landed
 #
@@ -33,16 +33,92 @@ set -uo pipefail
 source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/grove.backup.operations.sh"
 
 ######################################################################
+# .what = one unit's fingerprint: its git state for a tree, its kind for a unit
+#         of plain files (a home dir, an orphan, a set-aside), whose change check
+#         is the ctime walk alone
+######################################################################
+grove_backup_unit_fingerprint() {
+  local kind="$1" path="$2"
+  grove_backup_unit_is_files "$kind" && { printf '%s' "$kind"; return 0; }
+  grove_backup_tree_fingerprint "$path"
+}
+
+# .what = does this kind ride as plain files, with no git state? rc 0 = yes
+grove_backup_unit_is_files() { [[ "$1" == home || "$1" == orphan || "$1" == setaside ]]; }
+
+######################################################################
+# .what = pack one tree until it reads a still tree, at most three packs
+#
+# .why a tree is captured at ONE point in time: an edit that lands mid-pack would
+#   pair a file of one moment with a git state of another. so the pack re-runs
+#   while its git state or any file moved under it; the third pack lands as is,
+#   marked `point_in_time: false`, so a tree in constant motion still lands
+#
+# sets UNIT_BEGAN + UNIT_FP to the start of the pack that landed; the sha lands in <out>.sha
+######################################################################
+grove_backup_pack_tree_settled() {
+  local kind="$1" path="$2" out="$3" tmp="$4" stamp="$tmp/pack.stamp" try pit fp_after
+  for try in 1 2 3; do
+    pit=true
+    [[ "$try" -eq 3 ]] && pit=false
+    UNIT_BEGAN="$(grove_backup_now_precise)"
+    touch -d "@$UNIT_BEGAN" "$stamp"
+    UNIT_FP="$(grove_backup_unit_fingerprint "$kind" "$path")"
+    grove_backup_pack_tree "$kind" "$path" "$out" "$tmp/pack" "$pit" || return 2
+    [[ "$try" -eq 3 ]] && return 0
+    fp_after="$(grove_backup_unit_fingerprint "$kind" "$path")"
+    [[ "$fp_after" == "$UNIT_FP" ]] && grove_backup_pack_settled "$path" "$stamp" && return 0
+    echo "   ↻ ${path##*/} · moved as it was packed · repack"
+  done
+}
+
+######################################################################
 # .what = one attempt at one unit
-# rc: 0 put · 1 skipped (unchanged) · 2 failed, retry-worthy · 3 denied
+# rc: 0 put · 1 skipped (quiet, or the same bytes) · 2 failed, retry-worthy · 3 denied
+#
+# .the order of the checks, cheapest first
+#   1. quiet: its fingerprint matches its mark, and no file under it changed since
+#      the mark — no pack, no aws call
+#   2. the same bytes as its mark — no aws call
+#   3. the same bytes as its latest object (a mark lost with the state dir) — one head
+#   4. else, the put
 ######################################################################
 grove_backup_unit_once() {
-  local kind="$1" user="$2" path="$3" unit="$4" tmp="$5" index="$6"
-  local out="$tmp/unit.tar.gz" sha latest facts sha_latest rc key
+  local kind="$1" path="$2" unit="$3" tmp="$4" index="$5"
+  local out="$tmp/unit.tar.gz" sha latest facts sha_latest rc key mark mark_checked checked
+  mark="$(grove_backup_mark_file "$unit")"
+  mkdir -p "$tmp/pack" && chmod 700 "$tmp/pack" || return 2
 
-  sha="$(grove_backup_pack "$kind" "$(grove_backup_seat_home)" "$path" "$out")" || return 2
+  # 1. quiet
+  UNIT_BEGAN="$(grove_backup_now_precise)"
+  UNIT_FP="$(grove_backup_unit_fingerprint "$kind" "$path")"
+  mark_checked="$(grove_backup_mark_get "$unit" origin_checked)"
+  if [[ -f "$mark" && "$(grove_backup_mark_get "$unit" fingerprint)" == "$UNIT_FP" && "$mark_checked" == true ]] \
+     && ! grove_backup_unit_moved_since "$path" "${mark%.json}.stamp"; then
+    grove_backup_mark_set "$unit" "$UNIT_BEGAN" "$(grove_backup_mark_get "$unit" sha)" "$UNIT_FP" true
+    return 1
+  fi
 
-  # the latest object of this unit, of ANY date — `date=` sorts as text
+  # the pack
+  checked=true
+  rm -f "$out.sha"
+  if grove_backup_unit_is_files "$kind"; then
+    grove_backup_pack_home "$(grove_backup_seat_home)" "$path" "$out" || return 2
+  else
+    GROVE_BACKUP_ORIGIN_CHECKED=true
+    grove_backup_pack_tree_settled "$kind" "$path" "$out" "$tmp" || return 2
+    checked="$GROVE_BACKUP_ORIGIN_CHECKED"
+  fi
+  sha="$(cat "$out.sha" 2>/dev/null)"
+  [[ -n "$sha" ]] || { GROVE_BACKUP_PACK_WHY="the pack wrote no hash"; return 2; }
+
+  # 2. the same bytes as its mark
+  if [[ "$sha" == "$(grove_backup_mark_get "$unit" sha)" ]]; then
+    grove_backup_mark_set "$unit" "$UNIT_BEGAN" "$sha" "$UNIT_FP" "$checked"
+    return 1
+  fi
+
+  # 3. the same bytes as its latest object, of ANY date — `date=` sorts as text
   latest="$(awk -F'\t' -v p="grove=$GROVE_BACKUP_GROVE/$unit/date=" 'index($1, p) == 1 { print $1 }' "$index" \
             | sort | tail -n 1)"
   if [[ -n "$latest" ]]; then
@@ -55,16 +131,40 @@ grove_backup_unit_once() {
       return 2
     fi
     sha_latest="$(cut -f1 "$facts" 2>/dev/null)"
-    [[ "$rc" -eq 0 && "$sha_latest" == "$sha" ]] && return 1
+    if [[ "$rc" -eq 0 && "$sha_latest" == "$sha" ]]; then
+      grove_backup_mark_set "$unit" "$UNIT_BEGAN" "$sha" "$UNIT_FP" "$checked"
+      return 1
+    fi
   fi
 
+  # 4. the put — and its mark, the moment it lands
   key="$(grove_backup_key "$GROVE_BACKUP_GROVE" "$unit" "$(grove_backup_today)")"
   grove_backup_s3_put "$out" "$key" "$sha"
   rc=$?
-  [[ "$rc" -eq 0 ]] && return 0
+  if [[ "$rc" -eq 0 ]]; then
+    grove_backup_mark_set "$unit" "$UNIT_BEGAN" "$sha" "$UNIT_FP" "$checked"
+    [[ "$checked" == false ]] && echo "   ⚠ $unit · origin did not answer; packed against this box's view of origin, packs again next pass"
+    return 0
+  fi
   [[ "$rc" -eq 3 ]] && return 3
   GROVE_BACKUP_PACK_WHY="the put failed: $GROVE_BACKUP_AWS_ERR"
   return 2
+}
+
+######################################################################
+# .what = the units, stalest first: a unit never landed goes before all others
+#
+# .why a pass that is cut short — a reboot, a kill — loses no ground: the next
+#   pass starts where the last one stopped, since the units it never reached
+#   hold the oldest marks
+######################################################################
+grove_backup_units_stalest_first() {
+  local line kind user path unit at
+  for line in "$@"; do
+    IFS=$'\t' read -r kind user path unit <<<"$line"
+    at="$(grove_backup_mark_get "$unit" at)"
+    printf '%s\t%s\n' "${at:-0}" "$line"
+  done | sort -t$'\t' -k1,1n -k5,5 | cut -f2-
 }
 
 ######################################################################
@@ -130,17 +230,18 @@ grove_backup_run() {
 
   echo "🌲 grove backup · grove=$GROVE_BACKUP_GROVE · $total units"
 
-  # 4 + 5. each unit, one retry each
+  # 4 + 5. each unit, stalest first, one retry each
+  mapfile -t units < <(grove_backup_units_stalest_first "${units[@]}")
   for line in "${units[@]}"; do
     IFS=$'\t' read -r kind user path unit <<<"$line"
     for attempt in 1 2; do
       GROVE_BACKUP_PACK_WHY=""
-      grove_backup_unit_once "$kind" "$user" "$path" "$unit" "$tmp" "$index"
+      grove_backup_unit_once "$kind" "$path" "$unit" "$tmp" "$index"
       rc=$?
       [[ "$rc" -ne 2 ]] && break
       [[ "$attempt" -eq 1 ]] && echo "   ↻ $unit · $GROVE_BACKUP_PACK_WHY · retry once"
     done
-    rm -f "$tmp/unit.tar.gz" "$tmp"/unit.tar.gz.*
+    rm -rf "$tmp/unit.tar.gz" "$tmp"/unit.tar.gz.* "$tmp/pack"
 
     [[ "$rc" -eq 0 ]] && { put=$((put + 1)); echo "   + $unit"; continue; }
     [[ "$rc" -eq 1 ]] && { skipped=$((skipped + 1)); continue; }

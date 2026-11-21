@@ -1,0 +1,17 @@
+🐢 lets see what grove-1 left...
+
+🗄️ grove.backup.get --from grove-1 --list
+   ├─ grove-1
+   │  ├─ user=<seat>
+   │  │  ├─ org=acme/repo=solo/tree=solo                             <date> STANDARD
+   │  │  ├─ org=acme/repo=widget/tree=widget                         <date> STANDARD
+   │  │  ├─ org=acme/repo=widget/tree=widget.feat-x                  <date> STANDARD
+   │  │  ├─ org=acme/repo=widget/tree=widget.spike                   <date> STANDARD
+   │  │  ├─ org=acme/orphan=widget.dropped                           <date> STANDARD
+   │  │  ├─ org=acme/repo=widget/setaside=widget.old.<sha>        <date> STANDARD
+   │  │  ├─ home=.claude                                             <date> STANDARD
+   │  │  └─ home=.rhachet                                            <date> STANDARD
+   └─ 8 units
+
+🥥 restore one: rhx grove.backup.restore --from grove-1 --of <org/repo> --tree <dir>
+   or all of this seat's: rhx grove.backup.restore --from grove-1 --all

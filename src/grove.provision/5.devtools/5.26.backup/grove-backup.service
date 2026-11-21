@@ -1,4 +1,4 @@
-# .what = one backup run of camper's home to this grove's bucket
+# .what = one backup pass of camper's home to this grove's bucket
 #
 # .why User=camper: only the camper seat holds `~/git`, `~/.claude`, and `~/.rhachet`
 #   (the scope `git backup` carries). as camper, the agent reaches aws as every brain
@@ -8,9 +8,16 @@
 # .why StateDirectory: systemd lays /var/lib/grove-backup at 0755, owned by camper,
 #   so the status file is world-readable and infra's stats read it without sudo
 #
-# .why Nice=10: a clone's own build or test outranks the hourly tar
+# .why the box's spare cycles only (Nice, CPUWeight, IOWeight, the idle io class):
+#   a clone's own build or test always outranks a backup. a busy box makes a pass
+#   slower, never a clone
 #
-# read a run with:
+# .why TimeoutStartSec=infinity: a pass that is cut short loses its progress past the last
+#   unit it landed, and a first pass on a full box can take hours. each aws call
+#   carries its own bound, so a hung endpoint still fails the pass. the timer never
+#   starts a second pass while one is active
+#
+# read a pass with:
 #   journalctl -u grove-backup -n 50
 
 [Unit]
@@ -26,4 +33,7 @@ Environment=AWS_RETRY_MODE=standard AWS_MAX_ATTEMPTS=5
 StateDirectory=grove-backup
 StateDirectoryMode=0755
 Nice=10
-TimeoutStartSec=55min
+CPUWeight=10
+IOWeight=10
+IOSchedulingClass=idle
+TimeoutStartSec=infinity

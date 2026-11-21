@@ -152,13 +152,23 @@ grove_provision_2_8_tmux_configure_upsert() {
   #    matters and reported it as refused (measured 2026-10-20). a socket with no
   #    server refuses at connect, so the wider bound costs time only on a live
   #    server that is slow — which is exactly the one owed the wait
+  # 🛑 a new pane execs the server's `default-shell`, which tmux took from its own $SHELL
+  #    at server START — so a server born before the login shell changed (a grove's seat
+  #    is made with bash, and zsh lands later) opens every pane in bash, with no zshrc
+  #    and no starship. 📜 2026-11-20, a hetzner grove: every camper
+  #    pane read `camper@host:~$`. so each live server is told the login record's shell
+  local login_shell
+  login_shell="$(grove_provision_2_8_tmux_login_shell)"
   for name in "${live[@]}"; do
-    if timeout -k 5 30 tmux -L "$name" source-file "$HOME/.tmux.conf" 2>/dev/null; then
+    if timeout -k 5 30 tmux -L "$name" source-file "$HOME/.tmux.conf" 2>/dev/null \
+       && { [[ -z "$login_shell" ]] \
+            || timeout -k 5 30 tmux -L "$name" set-option -g default-shell "$login_shell" 2>/dev/null; }; then
       sourced=$(( sourced + 1 ))
     else
       refused+=("$name")
     fi
   done
+  [[ -n "$login_shell" && ${#live[@]} -gt 0 ]] && echo "   • a new pane execs the login shell ($login_shell)"
 
   if [[ ${#live[@]} -eq 0 ]]; then
     echo "   • no tmux server up — the next one reads the conf fresh"

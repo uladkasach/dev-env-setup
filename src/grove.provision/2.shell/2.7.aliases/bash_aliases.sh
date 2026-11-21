@@ -2752,7 +2752,8 @@ git_alias_grove() {
       echo "  set <name> --exid <tag> --env <e> register a cloud grove, found by tag"
       echo "  wake <name>                       resume the box + open its duct"
       echo "  stop <name>                       hibernate the box"
-      echo "  list                              list registered groves"
+      echo "  list                              list registered groves, and their drift from the tailnet"
+      echo "  sync [--mode plan|apply]          register each new hetzner grove the tailnet holds"
       echo "  get <name>                        show one grove"
       echo "  del <name>                        unregister a grove"
       echo "  del --orphaned [--mode apply]     unregister every grove whose instance is gone"
@@ -2764,6 +2765,7 @@ git_alias_grove() {
     wake) rhx git.grove.wake "$@" ;;
     stop) rhx git.grove.stop "$@" ;;
     list) _git_grove_list "$@" ;;
+    sync) _git_grove_sync "$@" ;;
     get) _git_grove_get "$@" ;;
     del) _git_grove_del "$@" ;;
     send) _git_grove_send "$@" ;;
@@ -3081,12 +3083,14 @@ _git_grove_set() {
 # .what: list registered groves
 _git_grove_list() {
   local dir; dir="$(_git_grove_dir)"
+  # an empty forest still reads the drift: a fresh box is where a tailnet grove is most owed a name
   if [[ ! -d "$dir" ]] || [[ -z "$(ls -A "$dir" 2>/dev/null)" ]]; then
     echo "🌲 forest — no groves registered"
-    echo "   └─ register one: git grove set <name> --at <user@host:port>"
-    return 0
+    _git_grove_tailnet_groves >/dev/null 2>&1 \
+      || { echo "   └─ register one: git grove set <name> --at <user@host:port>"; return 0; }
+  else
+    echo "🌲 forest"
   fi
-  echo "🌲 forest"
   local f
   # ⚠️ `find`, not a bare glob — this file is read by zsh too, where a glob
   #    that matches no file is a HARD ERROR that aborts the whole function.
@@ -3108,6 +3112,171 @@ _git_grove_list() {
       echo "   ├─ 🌳 $n → $u@$h:$p (ssh:$a)"
     fi
   done < <(find "$dir" -maxdepth 1 -type f -name '*.json' 2>/dev/null | sort)
+
+  # the drift against the tailnet — a read only; `git grove sync` closes it
+  local drift kind
+  drift="$(_git_grove_drift)" || { echo "   └─ 🌙 no tailnet answers here, so the forest is not checked against it"; return 0; }
+  if [[ -z "$drift" ]]; then
+    echo "   └─ the forest matches the tailnet ✔"
+    return 0
+  fi
+  # each kind names its OWN fix: sync registers a new grove, and never deletes a dead one
+  local has_new=0
+  while IFS=$'\t' read -r kind n; do
+    if [[ "$kind" == gone ]]; then
+      echo "   ├─ ✗ $n — its grove is no tailnet peer: a dead or replaced box"
+      echo "   │  └─ fix, once you confirm it is dead: git grove del $n"
+    fi
+    [[ "$kind" == new ]] && { echo "   ├─ + $n — a grove on the tailnet with no entry here"; has_new=1; }
+  done <<<"$drift"
+  if [[ "$has_new" -eq 1 ]]; then
+    echo "   └─ fix: git grove sync --mode apply"
+    return 0
+  fi
+  echo "   └─ each ✗ above is a human's call"
+}
+
+# .what: the grove peers this box's tailnet holds → "name<TAB>online|offline" lines
+# .why the forest is a cache of hand writes; the tailnet is where a grove box lives,
+#   so a replaced box (a new name) or a dead one shows here first
+#   📜 2026-11-20: a replaced hetzner box left one dead row and no live one, and
+#   `git grove list` printed the dead row as a 🌳 while every reach dialed it
+# exit: 0 = read · 2 = no tailnet answers here (tailscale absent or mute)
+_git_grove_tailnet_groves() {
+  command -v tailscale >/dev/null 2>&1 || return 2
+  local js
+  js="$(timeout 10 tailscale status --json 2>/dev/null)" || return 2
+  printf '%s' "$js" | jq -r '
+    .Peer // {} | to_entries[] | .value
+    | ((.DNSName // "") | split(".")[0]) as $n
+    | select($n | startswith("grove-"))
+    | "\($n)\t\(if .Online then "online" else "offline" end)"' | sort
+}
+
+# .what: is this registry entry reached over the tailnet, so the tailnet can judge it?
+# .why an ec2 grove is reached through its ssm tunnel, on loopback, and found by its
+#   exid; the tailnet says naught of its instance (`git grove del --orphaned` asks aws)
+_git_grove_entry_is_tailnet() {
+  local f="$1" h x p
+  h="$(jq -r '.host // empty' "$f")"
+  x="$(jq -r '.exid // empty' "$f")"
+  p="$(jq -r '.platform // empty' "$f")"
+  [[ "$p" == hetzner.hetzbot ]] && return 0
+  [[ -n "$h" && "$h" != localhost && "$h" != "::1" && "$h" != 127.* ]] && return 0
+  [[ -z "$x" ]]
+}
+
+# .what: the box an entry names — a seat entry (`<grove>.ground`) lives or dies with its grove
+_git_grove_box_of_seat() { printf '%s' "${1%.ground}"; }
+
+# .what: the drift between the forest and the tailnet → "kind<TAB>name" lines
+#   gone <entry>  a tailnet-reached entry whose grove is no tailnet peer
+#   new  <peer>   a grove peer with no entry
+# exit: 0 = read · 2 = no tailnet answers here
+_git_grove_drift() {
+  local dir peers names f n
+  dir="$(_git_grove_dir)"
+  peers="$(_git_grove_tailnet_groves)" || return 2
+  names="$(cut -f1 <<<"$peers")"
+  # a tailnet with NO grove peer cannot judge an entry dead: it is likely another
+  # tailnet, so no entry is called gone on its silence
+  while IFS= read -r f; do
+    [[ -n "$names" ]] || break
+    [[ -f "$f" ]] || continue
+    _git_grove_entry_is_tailnet "$f" || continue
+    n="$(jq -r '.name' "$f")"
+    grep -qxF "$(_git_grove_box_of_seat "$n")" <<<"$names" || printf 'gone\t%s\n' "$n"
+  done < <(find "$dir" -maxdepth 1 -type f -name '*.json' 2>/dev/null | sort)
+  while IFS= read -r n; do
+    [[ -n "$n" && ! -f "$dir/$n.json" ]] && printf 'new\t%s\n' "$n"
+  done <<<"$names"
+  return 0
+}
+
+# .what: converge the forest toward the tailnet — register each new hetzner grove's two seats
+# .why the forest is written by hand on each box, so a replaced box leaves a dead row
+#   and no live one until a human notices; this closes what it can PROVE
+# 🛑 it registers only a box that DECLARES itself hetzner (`/etc/grove/platform`), read
+#   over the tailnet: the tailnet cannot tell an ec2 grove from a hetzner one, and an ec2
+#   grove registered as a tailnet grove would have boot lay the wrong platform on it
+# 🛑 it never deletes: `git grove del` owns that, with its crew refusal and its saved copy
+_git_grove_sync() {
+  local mode=plan
+  while [[ $# -gt 0 ]]; do
+    # a value flag with no value refuses: `shift 2` past the last arg shifts naught
+    [[ "$1" == --mode && $# -lt 2 ]] && { echo "✋ ConstraintError: --mode needs plan or apply" >&2; return 2; }
+    case "$1" in
+      --mode) mode="${2:-}"; shift 2 ;;
+      -h|--help)
+        echo "git grove sync — register each new hetzner grove the tailnet holds; never deletes"
+        echo "   usage: git grove sync [--mode plan|apply]   # plan is the default"
+        return 0 ;;
+      *) echo "✋ ConstraintError: unknown arg '$1'" >&2; echo "   usage: git grove sync [--mode plan|apply]" >&2; return 2 ;;
+    esac
+  done
+  [[ "$mode" == plan || "$mode" == apply ]] || { echo "✋ ConstraintError: --mode is plan or apply, got '$mode'" >&2; return 2; }
+
+  local drift
+  if ! drift="$(_git_grove_drift)"; then
+    echo "✋ ConstraintError: no tailnet answers on this box, so no drift can be read" >&2
+    echo "   fix: sudo -v && rhx grove.provision --what 5.23.tailscale --mode apply" >&2
+    return 2
+  fi
+
+  echo "🌲 git grove sync --mode $mode"
+  if [[ -z "$drift" ]]; then
+    echo "   └─ the forest matches the tailnet ✔"
+    return 0
+  fi
+
+  local kind n plat unproven=0
+  while IFS=$'\t' read -r kind n; do
+    if [[ "$kind" == gone ]]; then
+      echo "   ├─ ✗ $n — its grove is no tailnet peer: a dead or replaced box"
+      echo "   │  └─ fix, once you confirm it is dead: git grove del $n"
+      unproven=1
+      continue
+    fi
+
+    # ask the box itself; BatchMode, so naught prompts
+    # 🛑 known_hosts is neither READ nor WRITTEN here. a new box has no trusted key yet, and
+    #   trust needs a registry entry (`git.grove.trust.gen --grove`), so a read that waits on
+    #   trust deadlocks the first contact (📜 2026-11-20: "Host key verification failed").
+    #   this read only CLASSIFIES: no secret rides it, no agent is forwarded, and its answer
+    #   is compared to one literal. the trust itself stays a human's tofu, named below
+    # stderr is KEPT: "no answer" with no cause sends a human to guess host key vs auth vs file
+    local out err
+    err="$(mktemp)"
+    out="$(timeout -k 5 20 ssh -o BatchMode=yes -o ConnectTimeout=10 -o ForwardAgent=no \
+              -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o GlobalKnownHostsFile=/dev/null -o LogLevel=ERROR "camper@$n" \
+              cat /etc/grove/platform </dev/null 2>"$err")"
+    plat="$(tr -d '[:space:]' <<<"$out")"
+    local why; why="$(grep -v '^[[:space:]]*$' "$err" | tail -1)"; rm -f "$err"
+    if [[ "$plat" != hetzner.hetzbot ]]; then
+      echo "   ├─ ? $n — a grove peer with no entry, whose platform it did not declare (read: '${plat:-no answer}')"
+      [[ -n "$why" ]] && echo "   │  ├─ ssh said: $why"
+      echo "   │  └─ an ec2 grove registers by its tag: git grove set $n --exid <tag> --env <env>"
+      unproven=1
+      continue
+    fi
+
+    if [[ "$mode" == plan ]]; then
+      echo "   ├─ + $n — declares hetzner.hetzbot; would register $n and $n.ground"
+      continue
+    fi
+    _git_grove_set "$n" --at "camper@$n:22" --platform hetzner.hetzbot >/dev/null \
+      && _git_grove_set "$n.ground" --at "ground@$n:22" --platform hetzner.hetzbot >/dev/null \
+      || { echo "💥 MalfunctionError: the registry write for $n failed" >&2
+           echo "   └─ read what landed: git grove get $n" >&2; return 1; }
+    echo "   ├─ + $n — declares hetzner.hetzbot; registered $n and $n.ground"
+    echo "   │  └─ next, once you confirm the tailnet names this box: rhx git.grove.trust.gen --grove $n --mode apply --trust tofu"
+    unproven=1
+  done <<<"$drift"
+
+  [[ "$mode" == plan ]] && { echo "   └─ to write: git grove sync --mode apply"; return 0; }
+  [[ "$unproven" -eq 1 ]] && { echo "   └─ each row above with a fix is a human's call"; return 0; }
+  echo "   └─ the forest matches the tailnet ✔"
 }
 
 # .what: the ssh alias to reach a grove by name — refused when ssh would dial another seat

@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = every grove backs up its clones, worktrees, ~/.claude, and ~/.rhachet each hour
+# .what = every grove backs up its clones, worktrees, ~/.claude, and ~/.rhachet every
+#         15 minutes — each tree as one atomic, self-contained unit
 #
 # .why
 #   - a grove holds the only copy of its unpushed work; a hetzner box holds it on one ssd
 #   - the backup is the one path back once a box dies (`rhx grove.backup.restore`)
-#   - it declines off `cloud@*`: a laptop holds no grove role, a ci runner no unpushed work
+#   - it declines off `cloud@*`, on a PHYSICAL fact: only a camp grove carries the camp aws
+#     identity (an instance role, or the signer `[default]` names), and the bucket grants
+#     only that identity. a laptop or a ci runner has no credential that can write the
+#     bucket, and `aws.params` is never read off camp (`rule.require.aws-params-on-camp-groves-only`)
 #   - it runs after `5.6.aws`, which installs the cli the agent calls
 #
 # .what infra owes before a run is ✓ (each run names the one it lacks)
@@ -32,5 +36,5 @@ grove_provision_5_26_backup_files() {
     "$src/grove-backup.timer"           /etc/systemd/system/grove-backup.timer                   644
 }
 
-# .what = does this tier hold a grove role? — the one gate both phases ask
+# .what = does this tier carry the camp aws identity the bucket grants? — the one gate both phases ask
 grove_provision_5_26_backup_applies() { [[ "${GROVE_ENV_SERVER:-}" == cloud@* ]]; }

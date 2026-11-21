@@ -57,4 +57,13 @@ grove_provision_2_6_starship_configure_verify() {
     echo "     ⇒ a hand-edit, or a stale copy from before the last change:"
     echo "       diff $src $conf"
   fi
+
+  # a bash terminal draws starship too — the block the upsert findserts by marker
+  if grep -qF "# grove.provision:2.6.starship" "$HOME/.bashrc" 2>/dev/null; then
+    echo "   • ~/.bashrc inits starship ✔"
+  else
+    echo "   ✋ ~/.bashrc inits no starship, so a bash terminal draws a bare prompt" >&2
+    echo "      fix: rhx grove.provision --what 2.6.starship --mode apply" >&2
+    return 1
+  fi
 }
