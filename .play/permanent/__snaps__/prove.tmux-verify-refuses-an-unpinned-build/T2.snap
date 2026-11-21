@@ -1,0 +1,9 @@
+   • tmux present (3.5a, <fixture>/tmux) ✔
+   ✋ ConstraintError: no usable tpm at the path the conf runs (<fixture>/tpm/tpm)
+      ⇒ tmux starts with no plugins and prints a run-shell error on
+        every session — which reads as a broken conf, not an absent tool
+      ⇒ a clone killed mid-flight leaves exactly this: a dir, a .git,
+        and no usable entrypoint
+      fix: rhx grove.provision --what 2.8.tmux --mode apply
+           its upsert moves the carcass aside and re-clones it, so no
+           human owes an 'rm -rf'

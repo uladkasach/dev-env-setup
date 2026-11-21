@@ -78,15 +78,9 @@ grove_provision_1_1_keybinds_configure_upsert() {
   ####################################################################
   # make the conf edit LIVE — a reload on a live daemon, a start only on a dead one
   #
-  # 🛑 never `systemctl restart` a live keyd
-  #   - at START, keyd waits for every key on every connected board to read released
-  #   - a magic keyboard reports BTN_0 (0x100) as held, always
-  #   - ⇒ a start with that board connected spins at 100% cpu forever, grabs no
-  #     board at all, and caps is plain caps on every keyboard
-  #   - boot never hits it: bluetooth connects AFTER keyd is up, via the hotplug
-  #     path, which skips the wait
-  #   - `keyd reload` re-reads every conf and re-matches every device with no wait
-  #   - 📜 measured 2026-10-19: restart → hung, 66 min of cpu; reload → 0%, both boards matched
+  # 🛑 never `systemctl restart` a live keyd: a start with a magic keyboard connected
+  #   hangs at 100% cpu and grabs no board (`gotcha.keyd-start-hangs-on-a-magic-keyboard`);
+  #   `keyd reload` re-matches every device with no wait
   ####################################################################
   local keyd_live_cmd="sudo keyd reload"
   systemctl is-active --quiet keyd || keyd_live_cmd="sudo systemctl restart keyd"
@@ -130,22 +124,10 @@ grove_provision_1_1_keybinds_xkb_swap_strip() {
 # .what = keynav autostart, at login — user-level, so it needs no root
 ######################################################################
 grove_provision_1_1_keybinds_keynav_autostart() {
-  # ⚠️ the guard greps a SLUG MARKER, never the code it writes
-  #   - a grep for the command couples the guard to the command's exact text
-  #   - any edit to that command stops the guard from ever matching a healthy file
-  #   - ⇒ every run appends another copy
-  #   - the append is not idempotent, only the guard makes it so
-  #   - a `# grove: <slug>` marker is coupled to the CLAIM, so the command is free to change
-  #   - (rule.require.idempotent-install-procedures)
-  #
-  # 🛑 keep the LEGACY grep beside the marker — do not drop it
-  #   - every box converged before 2026-07-31 holds the old block, which carries no marker
-  #   - the fence word also moved `# devenv:` → `# grove:` on 2026-09-02
-  #   - ⇒ on an old box the `$marker` grep MISSES
-  #   - `$legacy` matches the CONTENT line, which neither change touched
-  #   - so an old box lands on the elif and is left alone
-  #   - ⇒ without it, the change that repairs idempotence would break it once on every extant box
-  #   - it may be dropped only once no box predates the fence rename
+  # ⚠️ the guard greps a SLUG MARKER, never the command it writes: a command grep
+  #   misses once the command is edited, and the append repeats (rule.require.idempotent-install-procedures)
+  # 🛑 keep the LEGACY grep: boxes converged before the marker (and the `# devenv:` →
+  #   `# grove:` fence rename) hold an unmarked block; drop it only once no such box remains
   local profile="$HOME/.profile"
   local marker="# grove: keynav autostart at login"
   local legacy='(keynav && echo "keynav started"'

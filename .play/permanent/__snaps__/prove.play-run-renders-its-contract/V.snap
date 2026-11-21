@@ -1,0 +1,4 @@
+   ✋ ConstraintError: 'lint.stub-reads' does not name a verb this runner drives
+      ⇒ allowed: prove.* verify.* diagnose.* await.* hibernate.*
+      ⇒ the verb says what the play may do to the box, so an unnamed
+        one carries no such promise

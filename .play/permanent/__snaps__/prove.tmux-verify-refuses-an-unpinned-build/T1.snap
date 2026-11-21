@@ -1,0 +1,10 @@
+   • tmux present (3.5a, <fixture>/tmux) ✔
+   ✋ ConstraintError: tpm is present but NOT at the commit this repo declares
+      ⇒ tpm's tip is shell code ~/.tmux.conf RUNS on every session, so
+        this box executes different code than a box at the pin — which
+        is the deterministic clause of one-command provision
+      ⇒ a -d guard cannot see a sha at all, so under one this goes
+        unreported on every apply
+      read why: cat <fixture>/tpm/.git/HEAD
+      fix: rhx grove.provision --what 2.8.tmux --mode apply
+           its upsert moves the adrift tpm aside and re-clones it

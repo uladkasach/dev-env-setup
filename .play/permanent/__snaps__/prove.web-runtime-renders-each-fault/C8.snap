@@ -1,0 +1,5 @@
+   ✋ ConstraintError: the pinned commit is absent from https://example.com/x.tgz
+      expected: 1111111111111111111111111111111111111111
+      ⇒ upstream force-pushed or deleted it. do NOT relax the pin to
+        make this pass — find what the sha should now be and bump it
+      ⇒ removed the partial clone at <fixture>/clone, so a re-run refetches it

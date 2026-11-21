@@ -23,14 +23,42 @@ grove_provision_2_8_tmux_configure_upsert() {
   local conf_src="$GROVE_SRC/grove.provision/2.shell/2.8.tmux/tmux.conf"
 
   if [[ ! -f "$conf_src" ]]; then
-    echo "   ✋ the checkout has no tmux.conf at $conf_src" >&2
+    echo "   ✋ ConstraintError: the checkout has no tmux.conf at $conf_src" >&2
     echo "      ⇒ \$GROVE_SRC is this run's own checkout, so an absent file here" >&2
     echo "        means the checkout is incomplete rather than that the path is wrong" >&2
     return 1
   fi
 
-  if ! cp "$conf_src" "$HOME/.tmux.conf"; then
-    echo "   ✋ could not write ~/.tmux.conf" >&2
+  # which plugins does the conf name, other than tpm itself? read from the CHECKOUT, so a
+  #   refusal below leaves ~/.tmux.conf as it was
+  local wanted=()
+  local name
+  while read -r name; do
+    [[ -n "$name" && "$name" != "tpm" ]] && wanted+=("$name")
+  done < <(grove_provision_2_8_tmux_plugin_names_of_conf "$conf_src")
+
+  # 🛑 refuse a plugin this repo pins no commit for BEFORE the conf lands: tpm's install takes
+  #    its tip, a source into a live server runs its .tmux, and so would the next server start or
+  #    a `prefix + I` — the verify's ✋ would come after that code has run once
+  local unpinned=()
+  for name in "${wanted[@]}"; do
+    grove_provision_2_8_tmux_plugin_at "$name" >/dev/null || unpinned+=("$name")
+  done
+  if [[ "${#unpinned[@]}" -gt 0 ]]; then
+    echo "   ✋ ConstraintError: the conf names a tmux plugin this repo pins no commit for: ${unpinned[*]}" >&2
+    echo "      ⇒ ~/.tmux.conf is left as it was, no plugin was installed, and no live server" >&2
+    echo "        sourced the conf" >&2
+    echo "      fix: pin it in 2.8.tmux/_.sh (plugin_names, plugin_url, plugin_at), or drop" >&2
+    echo "        its @plugin line from tmux.conf" >&2
+    return 1
+  fi
+
+  # each step's own complaint rides inside its ✋ as the cause, never as a bare line above it
+  local step_err
+  # LC_ALL=C on each captured step: its words ride as `cause:`, alike on every box
+  if ! step_err="$(LC_ALL=C cp "$conf_src" "$HOME/.tmux.conf" 2>&1)"; then
+    echo "   ✋ ConstraintError: could not write ~/.tmux.conf" >&2
+    echo "      cause: ${step_err#cp: }" >&2
     echo "      ⇒ tmux keeps its PRIOR conf, so the plugin install below would" >&2
     echo "        fetch the OLD plugin list and report success" >&2
     return 1
@@ -39,15 +67,16 @@ grove_provision_2_8_tmux_configure_upsert() {
 
   # there can only be one: a conf tmux loads AFTER ours wins every option both
   # name. it is MOVED aside, never deleted — a human's edits stay readable (m10)
-  local shadow stamp; stamp="$(date +%Y%m%d-%H%M%S)"
+  local shadow stamp; stamp="$(grove_provision_2_8_tmux_backup_stamp)"
   while IFS= read -r shadow; do
     [[ -n "$shadow" ]] || continue
-    if mv "$shadow" "$shadow.bak.$stamp"; then
+    if step_err="$(LC_ALL=C mv "$shadow" "$shadow.bak.$stamp" 2>&1)"; then
       echo "   • shadow conf retired: $shadow → $shadow.bak.$stamp"
       echo "     ⇒ it loaded AFTER ~/.tmux.conf and overrode it; read it there if"
       echo "       a line in it was wanted, then move that line into this bundle"
     else
-      echo "   ✋ could not move the shadow conf aside: $shadow" >&2
+      echo "   ✋ ConstraintError: could not move the shadow conf aside: $shadow" >&2
+      echo "      cause: ${step_err#mv: }" >&2
       echo "      ⇒ tmux loads it after ~/.tmux.conf, so every option it names" >&2
       echo "        still overrides the one this repo declares" >&2
       return 1
@@ -60,7 +89,7 @@ grove_provision_2_8_tmux_configure_upsert() {
   local tpm_install="$HOME/.tmux/plugins/tpm/bin/install_plugins"
 
   if [[ ! -x "$tpm_install" ]]; then
-    echo "   ✋ tpm's install_plugins is absent ($tpm_install)" >&2
+    echo "   ✋ ConstraintError: tpm's install_plugins is absent ($tpm_install)" >&2
     echo "      ⇒ the conf is on disk but its plugins cannot be fetched, so every" >&2
     echo "        tmux session prints a run-shell error and loads none of them" >&2
     echo "      fix: rhx grove.provision --what 2.8.tmux --mode apply" >&2
@@ -73,28 +102,31 @@ grove_provision_2_8_tmux_configure_upsert() {
   local sock="grove_tpm"
   local plugin_dir="$HOME/.tmux/plugins"
 
-  # which plugins does the conf name, other than tpm itself?
-  local wanted=()
-  local line name
-  while read -r line; do
-    name="${line##*/}"
-    name="${name%\'}"
-    name="${name%\"}"
-    [[ -n "$name" && "$name" != "tpm" ]] && wanted+=("$name")
-  done < <(grep -oE "@plugin +['\"][^'\"]+" "$HOME/.tmux.conf" | awk '{print $2}')
-
   # ⚠️ every tmux call below is BOUNDED — this first one cleans up a corpse from
   #    an interrupted run, the likeliest wedge (`rule.require.bounded-probes-in-verifies`)
   timeout -k 2 5 tmux -L "$sock" kill-server 2>/dev/null || true
 
   if ! timeout -k 5 15 tmux -L "$sock" -f "$HOME/.tmux.conf" new-session -d -s tpm_init 2>/dev/null; then
-    echo "   ✋ could not start an isolated tmux server to install the plugins" >&2
+    echo "   ✋ ConstraintError: could not start an isolated tmux server to install the plugins" >&2
     echo "      ⇒ tpm reads its plugin list from a server that has LOADED the conf," >&2
     echo "        so with no such server the install finds an empty list and" >&2
     echo "        reports success with no plugins fetched" >&2
-    echo "      ⇒ a conf that does not parse is the usual cause: tmux refuses to" >&2
-    echo "        start a server on a bad config" >&2
     echo "      read why: tmux -L $sock -f ~/.tmux.conf new-session -d -s tpm_init" >&2
+    return 1
+  fi
+
+  # ⚠️ a conf that does not parse does NOT stop the server: tmux starts, drops the whole
+  #    file, and holds no @plugin — so tpm would install an empty list and report success.
+  #    `source-file -n` parses without a run, and is the one read that names the fault
+  local parse_err
+  if ! parse_err="$(timeout -k 2 5 tmux -L "$sock" source-file -n "$HOME/.tmux.conf" 2>&1)"; then
+    timeout -k 2 5 tmux -L "$sock" kill-server 2>/dev/null || true
+    echo "   ✋ ConstraintError: ~/.tmux.conf does not parse, so tmux loads none of it" >&2
+    [[ -n "$parse_err" ]] && echo "      cause: $(printf '%s\n' "$parse_err" | head -n 1)" >&2
+    echo "      ⇒ a server still starts on it, with every option and every @plugin" >&2
+    echo "        dropped, so tpm would find an empty list and report success" >&2
+    echo "      fix: repair the line named above in the checkout's tmux.conf, then" >&2
+    echo "        rhx grove.provision --what 2.8.tmux --mode apply" >&2
     return 1
   fi
 
@@ -108,10 +140,7 @@ grove_provision_2_8_tmux_configure_upsert() {
   # await the clones, then judge by what is ON DISK — see the ⚠️ above
   local waited=0 absent=()
   while [[ "$waited" -lt 90 ]]; do
-    absent=()
-    for name in "${wanted[@]}"; do
-      [[ -d "$plugin_dir/$name" ]] || absent+=("$name")
-    done
+    mapfile -t absent < <(grove_provision_2_8_tmux_plugins_absent_under "$plugin_dir" "${wanted[@]}")
     [[ ${#absent[@]} -eq 0 ]] && break
     sleep 3
     waited=$(( waited + 3 ))
@@ -121,7 +150,7 @@ grove_provision_2_8_tmux_configure_upsert() {
   timeout -k 2 5 tmux -L "$sock" kill-server 2>/dev/null || true
 
   if [[ ${#absent[@]} -gt 0 ]]; then
-    echo "   ✋ tpm did not land every plugin the conf names: ${absent[*]}" >&2
+    echo "   ✋ ConstraintError: tpm did not land every plugin the conf names: ${absent[*]}" >&2
     echo "      ⇒ this is SILENT at runtime: tmux starts, the conf loads, and the" >&2
     echo "        plugin's keybinds and status segments are simply omitted with no" >&2
     echo "        error anywhere. the human finds it by a dead keypress" >&2
@@ -142,7 +171,7 @@ grove_provision_2_8_tmux_configure_upsert() {
   #    its line, and an un-sourced server still RUNS it (m7)
   # ⚠️ a FAILED socket is counted and named, never fatal — the verify grades it.
   #    an ABSENT server is a pass: the next one reads the file fresh
-  local live=() sourced=0 refused=()
+  local live=() sourced=0 refused=() line
   while read -r line; do
     [[ -n "$line" ]] && live+=("$line")
   done < <(grove_provision_2_8_tmux_live_sockets)
