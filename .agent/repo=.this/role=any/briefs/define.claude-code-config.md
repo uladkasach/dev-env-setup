@@ -7,7 +7,7 @@ converges it into `~/.claude/settings.json`. that file is the SOLE writer of eve
 
 ## .where
 
-`src/grove.provision/5.devtools/5.3.brains/configure.upsert.sh` renders the patch;
+`src/grove.provision/5.devtools/5.3.brains/_.sh` renders the patch;
 `configure.verify.sh` asserts each key back, pair by pair.
 
 | key | effect |
@@ -103,7 +103,7 @@ model id. base id follows the `claude-opus-N-M` pattern.
 
 ## .how to change the default model
 
-1. edit the `patch` line in `5.3.brains/configure.upsert.sh` — **both** `model` and
+1. edit the `patch` line in `5.3.brains/_.sh` — **both** `model` and
    `env.ANTHROPIC_MODEL`, at one value
 2. edit the paired rows in `configure.verify.sh`, or the verify reddens
 3. apply it:

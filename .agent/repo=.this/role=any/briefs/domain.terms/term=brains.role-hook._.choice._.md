@@ -26,8 +26,8 @@ a role hook belongs in the settings of the repo that enrolled the role. in `~/.c
 it fires in every session on the box, in every repo — so home must hold zero.
 
 ## .refs
-- src/grove.provision/5.devtools/5.3.brains/configure.upsert.sh   # the selector, the strip
-- src/grove.provision/5.devtools/5.3.brains/configure.verify.sh   # the zero claim
+- src/grove.provision/5.devtools/5.3.brains/_.sh   # the selector, the strip
+- src/grove.provision/5.devtools/5.3.brains/_.sh   # the zero claim
 - .play/permanent/prove.claude-home-settings-refuses-a-foreign-write.play.sh
 - .behavior/v2026_10_20.fix-home-claude-settings-lock/.fulcrums/inventory.of=fulcrums.case=F2-role-hook-by-author-prefix.md
 

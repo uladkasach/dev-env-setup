@@ -17,8 +17,8 @@ settings file. every tree's `.claude/settings.json` is an arrow (two hops) to
 the word names the DIRECTION, which is the whole hazard: a write travels along it to the far end.
 
 ## .refs
-- src/grove.provision/5.devtools/5.3.brains/configure.upsert.sh   # the boot gate's arrow check
-- src/grove.provision/5.devtools/5.3.brains/configure.verify.sh   # the writable ✋ names it
+- src/grove.provision/5.devtools/5.3.brains/_.sh   # the boot gate's arrow check
+- src/grove.provision/5.devtools/5.3.brains/_.sh   # the writable ✋ names it
 - .play/permanent/prove.claude-home-settings-refuses-a-foreign-write.play.sh   # the fixture's arrow
 
 ## .reason

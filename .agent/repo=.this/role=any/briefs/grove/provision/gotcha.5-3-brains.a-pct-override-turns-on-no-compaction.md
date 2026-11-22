@@ -76,6 +76,6 @@ relayed from the web, 2026-10-22:
 ## .see also
 
 - `define.5-3-brains.declared-keys` — the env flag table
-- `5.3.brains/configure.upsert.sh` — the one home for the key
+- `5.3.brains/_.sh` — the one home for the key
 - https://startdebugging.net/2026/10/how-to-give-each-claude-code-subagent-its-own-compaction-threshold-with-autocompactwindow/
 - https://www.turboai.dev/blog/claude-autocompact-pct-override-guide
