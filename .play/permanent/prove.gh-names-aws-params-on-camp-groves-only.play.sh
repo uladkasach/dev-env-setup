@@ -2,7 +2,8 @@
 ######################################################################
 # .what = prove 5.4.gh names aws.params on a CAMP grove (any platform), and
 #         names no aws.params on a local or house grove — whose fix names
-#         `--vault os.secure` instead
+#         `--vault os.secure` instead; and that 2.2.git's credential helper, on an
+#         absent token, names the vault of the seat's own tier
 #
 # .why  = the gate is the TIER, never the platform
 #         (`rule.require.aws-params-on-camp-groves-only`). a camp grove carries the
@@ -201,6 +202,49 @@ else
   fail "5.12.rack · a stale entry off camp was not named: rc=$(cat "$fixture/rc"): $(tr '\n' '|' < "$fixture/out")"
 fi
 rm -f "$fixture/state/stale"
+
+####################################################################
+# 2.2.git's credential helper — an absent token's fix names the TIER's vault:
+#   os.secure on a laptop, aws.params on a camp grove, both (labelled) when the
+#   tier is unread. the stub rhx answers empty, so the helper takes its decline
+####################################################################
+HELPER="$HERE/src/grove.provision/2.shell/2.2.git/git-credential-keyrack.sh"
+hbin="$fixture/bin.helper"
+mkdir -p "$hbin"
+for tool in bash env cat tail timeout; do
+  real="$(command -v "$tool")" || { fail "the read tool '$tool' is absent on this box"; exit 1; }
+  ln -s "$real" "$hbin/$tool"
+done
+ln -s "$bin/rhx" "$hbin/rhx"
+
+run_helper_arm() {
+  # $1 = GROVE_ENV_SERVER, or empty for an unread tier
+  ( export PATH="$hbin" GIT_CREDENTIAL_KEYRACK_REPO="$fixture"
+    if [[ -n "$1" ]]; then export GROVE_ENV_SERVER="$1"; else unset GROVE_ENV_SERVER; fi
+    printf 'protocol=https\nhost=github.com\n\n' | bash "$HELPER" get > "$fixture/out" 2>&1
+    echo "$?" > "$fixture/rc" )
+  transcript+="## 2.2.git helper · ${1:-<unread tier>}"$'\n'"rc=$(cat "$fixture/rc")"$'\n'"$(sed "s#$fixture#<fixture>#g" "$fixture/out")"$'\n\n'
+}
+
+run_helper_arm local@unix
+if [[ "$(cat "$fixture/rc")" == 0 ]] && grep -q -- '--vault os.secure' "$fixture/out" \
+   && ! grep -q -- '--vault aws.params' "$fixture/out"; then
+  pass "2.2.git helper · local@unix → the absent fix names --vault os.secure, never aws.params"
+else
+  fail "2.2.git helper · local@unix → rc=$(cat "$fixture/rc"): $(tr '\n' '|' < "$fixture/out")"
+fi
+run_helper_arm cloud@aws.ec2
+if grep -q -- '--vault aws.params' "$fixture/out" && ! grep -q -- '--vault os.secure' "$fixture/out"; then
+  pass "2.2.git helper · cloud@aws.ec2 → the absent fix names --vault aws.params"
+else
+  fail "2.2.git helper · cloud@aws.ec2 → $(tr '\n' '|' < "$fixture/out")"
+fi
+run_helper_arm ""
+if grep -q -- '--vault <vault>' "$fixture/out" && grep -qF 'os.secure on a laptop' "$fixture/out"; then
+  pass "2.2.git helper · unread tier → names <vault>, and labels both vaults by tier"
+else
+  fail "2.2.git helper · unread tier → $(tr '\n' '|' < "$fixture/out")"
+fi
 
 # shellcheck source=/dev/null
 source "$HERE/.play/permanent/play.snap.operations.sh"

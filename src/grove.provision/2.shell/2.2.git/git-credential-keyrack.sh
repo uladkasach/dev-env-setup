@@ -144,9 +144,18 @@ if [[ -z "$TOKEN" ]]; then
   echo "                  rhx keyrack unlock --owner ehmpath --env camp" >&2
   echo "    errored 💥  the aws.params vault cannot load its peers. fix at cause:" >&2
   echo "                  rhx grove.provision --what 5.3.brains --mode apply" >&2
+  # 🛑 the vault is the TIER's, never one literal: aws.params on a laptop writes
+  #    into whatever account the shell holds (rule.require.aws-params-on-camp-groves-only)
+  case "${GROVE_ENV_SERVER:-}" in
+    cloud@*)         VAULT_FIX="aws.params" ;;
+    local@*|house@*) VAULT_FIX="os.secure" ;;
+    *)               VAULT_FIX="<vault>" ;;
+  esac
   echo "    absent 🫧   no value was ever stored. a set is the fix:" >&2
   echo "                  cd $REPO && rhx keyrack set --owner ehmpath \\" >&2
-  echo "                    --key GITHUB_TOKEN --org @all --env camp --vault aws.params" >&2
+  echo "                    --key GITHUB_TOKEN --org @all --env camp --vault $VAULT_FIX" >&2
+  [[ "$VAULT_FIX" == "<vault>" ]] && \
+    echo "                  <vault> = aws.params on a camp grove (cloud@*), os.secure on a laptop (local@*, house@*)" >&2
   echo "                  (answer BOTH prompts at a tty; never pipe them)" >&2
   echo "    refused     the value is there and github rejects it — mint a fresh" >&2
   echo "                pat, then re-set the same slug" >&2

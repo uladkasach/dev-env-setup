@@ -299,4 +299,92 @@ rc=1
       ⇒ no unlock off a camp grove can read it, so every unlock on this box fails on it
       fix: rhx grove.provision --what 5.12.rack --mode apply
 
+## 2.2.git helper · local@unix
+rc=0
+git-credential-keyrack: no readable @all.camp.GITHUB_TOKEN — declines
+  ⚠️ this message CANNOT name the cause, and must not pretend to.
+     the get above is run with stderr discarded, because git must never
+     see keyrack's chatter on a decline path. so what reached here is one
+     empty string, and at least four different faults produce it.
+
+  ⇒ ask the box, which CAN tell them apart:
+      rhx git.grove.send <grove> --play diagnose.grove-github-credential
+    or run the same get by hand, with its stderr kept:
+      cd <fixture> && rhx keyrack get --owner ehmpath --key GITHUB_TOKEN \
+        --org @all --env camp --unlock --allow-dangerous --value
+
+  the four it will be, and the fix for each — measured 2026-08-06:
+    locked 🔒   the session lapsed (540m). a re-unlock is the whole fix:
+                  rhx keyrack unlock --owner ehmpath --env camp
+    errored 💥  the aws.params vault cannot load its peers. fix at cause:
+                  rhx grove.provision --what 5.3.brains --mode apply
+    absent 🫧   no value was ever stored. a set is the fix:
+                  cd <fixture> && rhx keyrack set --owner ehmpath \
+                    --key GITHUB_TOKEN --org @all --env camp --vault os.secure
+                  (answer BOTH prompts at a tty; never pipe them)
+    refused     the value is there and github rejects it — mint a fresh
+                pat, then re-set the same slug
+
+  ⚠️ the pat needs scope 'repo' to serve this helper. 'read:org' is a
+     SEPARATE capability that serves gh's discovery, not the clone
+
+## 2.2.git helper · cloud@aws.ec2
+rc=0
+git-credential-keyrack: no readable @all.camp.GITHUB_TOKEN — declines
+  ⚠️ this message CANNOT name the cause, and must not pretend to.
+     the get above is run with stderr discarded, because git must never
+     see keyrack's chatter on a decline path. so what reached here is one
+     empty string, and at least four different faults produce it.
+
+  ⇒ ask the box, which CAN tell them apart:
+      rhx git.grove.send <grove> --play diagnose.grove-github-credential
+    or run the same get by hand, with its stderr kept:
+      cd <fixture> && rhx keyrack get --owner ehmpath --key GITHUB_TOKEN \
+        --org @all --env camp --unlock --allow-dangerous --value
+
+  the four it will be, and the fix for each — measured 2026-08-06:
+    locked 🔒   the session lapsed (540m). a re-unlock is the whole fix:
+                  rhx keyrack unlock --owner ehmpath --env camp
+    errored 💥  the aws.params vault cannot load its peers. fix at cause:
+                  rhx grove.provision --what 5.3.brains --mode apply
+    absent 🫧   no value was ever stored. a set is the fix:
+                  cd <fixture> && rhx keyrack set --owner ehmpath \
+                    --key GITHUB_TOKEN --org @all --env camp --vault aws.params
+                  (answer BOTH prompts at a tty; never pipe them)
+    refused     the value is there and github rejects it — mint a fresh
+                pat, then re-set the same slug
+
+  ⚠️ the pat needs scope 'repo' to serve this helper. 'read:org' is a
+     SEPARATE capability that serves gh's discovery, not the clone
+
+## 2.2.git helper · <unread tier>
+rc=0
+git-credential-keyrack: no readable @all.camp.GITHUB_TOKEN — declines
+  ⚠️ this message CANNOT name the cause, and must not pretend to.
+     the get above is run with stderr discarded, because git must never
+     see keyrack's chatter on a decline path. so what reached here is one
+     empty string, and at least four different faults produce it.
+
+  ⇒ ask the box, which CAN tell them apart:
+      rhx git.grove.send <grove> --play diagnose.grove-github-credential
+    or run the same get by hand, with its stderr kept:
+      cd <fixture> && rhx keyrack get --owner ehmpath --key GITHUB_TOKEN \
+        --org @all --env camp --unlock --allow-dangerous --value
+
+  the four it will be, and the fix for each — measured 2026-08-06:
+    locked 🔒   the session lapsed (540m). a re-unlock is the whole fix:
+                  rhx keyrack unlock --owner ehmpath --env camp
+    errored 💥  the aws.params vault cannot load its peers. fix at cause:
+                  rhx grove.provision --what 5.3.brains --mode apply
+    absent 🫧   no value was ever stored. a set is the fix:
+                  cd <fixture> && rhx keyrack set --owner ehmpath \
+                    --key GITHUB_TOKEN --org @all --env camp --vault <vault>
+                  <vault> = aws.params on a camp grove (cloud@*), os.secure on a laptop (local@*, house@*)
+                  (answer BOTH prompts at a tty; never pipe them)
+    refused     the value is there and github rejects it — mint a fresh
+                pat, then re-set the same slug
+
+  ⚠️ the pat needs scope 'repo' to serve this helper. 'read:org' is a
+     SEPARATE capability that serves gh's discovery, not the clone
+
 
