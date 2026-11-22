@@ -12,6 +12,7 @@
 #   2. a two-segment name   — flagged (the shape it missed)
 #   3. a clean diff         — exit 0, no hit
 #   4. the bite             — the same scan with the segment group cut misses row 2
+#   5. a forge's ssh user   — passes; a personal address on the same line still fails
 #
 # .what it does to the box
 #   - every write lands under one `mktemp -d`, removed on exit. no network
@@ -99,6 +100,19 @@ claim "4a. the cut copy lacks the segment group (the fixture took)" bash -c '! g
 repo_with "# measured on $TWO, camper seat"
 out="$(scan_with "$FIX/scan.cut.sh")"; rc=$?
 claim "4b. without the group, the two-segment name passes clean (exit 0)" [ "$rc" -eq 0 ]
+
+######################################################################
+# row 5 — a forge's ssh user is no person; a personal address beside it still is
+######################################################################
+FORGE="git@""github.com"
+PERSON="jane.doe""@gmail.com"
+repo_with "push url: $FORGE:acme/repo.git"
+out="$(scan_with "$SKILL")"; rc=$?
+claim "5a. a forge's ssh user passes (exit 0)" [ "$rc" -eq 0 ]
+repo_with "push url: $FORGE:acme/repo.git, ask $PERSON"
+out="$(scan_with "$SKILL")"; rc=$?
+claim "5b. a personal address on the same line still fails (exit 1)" [ "$rc" -eq 1 ]
+claim "5c. the hit names the person, never the forge user" bash -c '[[ "$1" == *"email  $2"* && "$1" != *"email  $3"* ]]' _ "$out" "$PERSON" "$FORGE"
 
 echo ""
 echo "🌊 $passed held · $failed failed"
