@@ -501,11 +501,7 @@
    ├─ profile: acme.test.ehmpath
    ├─ box:     laptop (local@unix — no platform identity)
    └─ ✋ ConstraintError: a laptop, and 'acme.test.ehmpath' is NOT declared
-
-  why: on a laptop this profile is an SSO login, whose sso_start_url
-       this skill has no truthful source for. it will not invent one.
-  fix: declare it with aws's own tool, naming the profile exactly —
-    aws configure sso --profile acme.test.ehmpath
-  then re-run this to set the rack half.
+      ├─ why: on a laptop this profile is an sso login, whose sso_start_url this skill has no truthful source for
+      └─ fix: declare it with aws's own tool, then rerun this to set the rack half: aws configure sso --profile acme.test.ehmpath
 
 

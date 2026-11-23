@@ -129,13 +129,16 @@ def _open(boss, window):
 
 
 # the tmux mode — the kitty window holds a real tmux session
-def _await(check, then, label, tries=0):
+def _await(check, then, label, tries=0, why=None):
     if check():
         return then()
     if tries >= 60:
         _say(f'{label}=miss want=True got=False')
+        # name which half dropped, so a miss carries its cause
+        if why:
+            _say(why())
         return None
-    _after(0.25, lambda: _await(check, then, label, tries + 1))
+    _after(0.25, lambda: _await(check, then, label, tries + 1, why))
 
 
 def _tmux_flow(boss, window):
@@ -153,7 +156,9 @@ def _tmux_flow(boss, window):
         #    it opens kitty's overlay over a scrollback that holds only the screen
         (getattr(window, 'user_vars', {}) or {}).pop('in_tmux', None)
         _kitten().handle_result([], None, window.id, boss)
-        _await(lambda: var('visual_select_tmux') and drawn(), opened, 'popup_view_opened')
+        _await(lambda: var('visual_select_tmux') and drawn(), opened, 'popup_view_opened',
+               why=lambda: f"popup_mark={var('visual_select_tmux')} popup_drawn={drawn()} "
+                           f"last_rows={[r.rstrip() for r in window.as_text().splitlines() if r.strip()][-3:]}")
 
     def opened():
         _row('popup_view_opened', 'True', 'True')

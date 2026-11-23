@@ -85,7 +85,10 @@ boot_resume_line() {
   #   the key is laid, trust.gen answers "already trusted" and the resume re-proves it,
   #   where `keep` would skip the very step that failed (the tailnet trust halt)
   [[ -n "${BOOT_RESUME_TRUST:-}" ]] && trust="$BOOT_RESUME_TRUST"
-  printf '%s git.grove.provision boot %s --mode apply --from %s --trust %s' "$RHX" "$GROVE" "$step" "$trust"
+  # --what rides along: a resume without it converges the WHOLE tree, where the
+  #   human asked for one bundle (measured 2026-11-22: a 5.26.backup boot's step-1
+  #   halt printed a resume that would have applied every bundle)
+  printf '%s git.grove.provision boot %s --mode apply --from %s --trust %s%s' "$RHX" "$GROVE" "$step" "$trust" "${WHAT:+ --what $WHAT}"
 }
 
 # .what = is this grove reached over the tailnet? (the registry's host, by the shared reader)
@@ -332,6 +335,20 @@ boot_seat_outran_halt() {
     "do NOT re-send; read whether the log still grows, and wait while it does —" \
     "$RHX git.grove.send $seat --reply --what 'stat -c %y $log'" \
     "$RHX git.grove.send $seat --reply --what '$slice | tail -4'"
+}
+
+######################################################################
+# .what = the last line of a `--what` boot — what ran, on which seats
+# .why  = `--what` ends at the seats (the gate is a claim about a WHOLE box), so
+#   this line is the whole verdict a human reads; a function so
+#   `prove.boot-steps-name-each-verdict` can render each arm with no live seat
+######################################################################
+boot_what_summary() {
+  echo ""
+  [[ "$MODE" == "plan" ]] && { echo "🌱 plan only — no step ran. drive it with --mode apply"; return 0; }
+  # name only the seats that ran: --from 3 skips the ground step
+  [[ "$FROM" -le 2 ]] && { echo "🌳 $WHAT applied on $GROVE — ground, then camper, ONE apply each"; return 0; }
+  echo "🌳 $WHAT applied on $GROVE — camper alone (--from $FROM skipped ground), ONE apply"
 }
 
 ######################################################################

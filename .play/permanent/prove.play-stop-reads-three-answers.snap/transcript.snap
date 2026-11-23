@@ -2,12 +2,17 @@
 ## no --play
 rc=2
 ✋ ConstraintError: a grove and --play are required
-   fix: rhx git.grove.play.stop <grove> --play <name>
+   └─ fix: rhx git.grove.play.stop <grove> --play <name>
 
 ## a bare --play, its value absent
 rc=2
 ✋ ConstraintError: --play needs a value
-   fix: rhx git.grove.play.stop <grove> --play <name>
+   └─ fix: rhx git.grove.play.stop <grove> --play <name>
+
+## a --play that is no play name
+rc=2
+✋ ConstraintError: --play takes a play name, got 'a/b'
+   └─ fix: name the play alone, letters, digits, . _ - only: --play prove.some-play
 
 ## a --scratch outside .local/state
 rc=2
@@ -33,8 +38,8 @@ rc=1
 ## the grove does not answer → rc 1
 rc=1
 🛑 git.grove.play.stop grove-1 --play x
-💥 MalfunctionError: the grove was not asked (ssh rc <pid>)
-   fix: rhx git.grove.wake grove-1 --mode apply, then rerun
+💥 MalfunctionError: the grove was not asked (ssh rc 255)
+   └─ fix: rhx git.grove.wake grove-1 --mode apply, then rerun
 
 ## the pattern is exact for prove.x
 rc=0
@@ -46,8 +51,8 @@ rc=0
 ## a found play is stopped, its scratch removed
 rc=0
 🛑 git.grove.play.stop grove-1 --play x --scratch '.local/state/proof.*'
-   ├─ stopped: <pid> 
-   ├─ removed: .local/state/proof.abc<pid>
+   ├─ stopped: <pid>
+   ├─ removed: .local/state/proof.abc123
    ├─ disk after: <df>
    └─ done
 

@@ -1,0 +1,35 @@
+## the first ask
+rc=0
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --orphan acme/widget.dropped --into <fixture>/aside/thaw
+   ├─ org=acme/orphan=widget.dropped · <date> · DEEP_ARCHIVE
+   │  └─ 🌙 sits in DEEP_ARCHIVE
+   │     ├─ thaw requested
+   │     ├─ eta: 12–48h
+   │     └─ resume with the same command
+   └─ 1 unit · 0 restored · 0 already here · 1 await a thaw · 0 refused · 0 failed
+
+## the resume, while it thaws
+rc=0
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --orphan acme/widget.dropped --into <fixture>/aside/thaw
+   ├─ org=acme/orphan=widget.dropped · <date> · DEEP_ARCHIVE
+   │  └─ 🌙 sits in DEEP_ARCHIVE; its thaw is in progress
+   │     ├─ asked <age> ago; eta 12–48h from the ask
+   │     └─ resume with the same command, once it reads
+   └─ 1 unit · 0 restored · 0 already here · 1 await a thaw · 0 refused · 0 failed
+
+## the resume, once thawed
+rc=0
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --orphan acme/widget.dropped --into <fixture>/aside/thaw
+   ├─ org=acme/orphan=widget.dropped · <date> · DEEP_ARCHIVE
+   │  ├─ into <fixture>/aside/thaw
+   │  ├─ + .agent/… (1 file)
+   │  └─ 🌙 2 files cut as a credential never left grove-1; re-derive each here
+   │     ├─ .env
+   │     └─ notes.txt
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed

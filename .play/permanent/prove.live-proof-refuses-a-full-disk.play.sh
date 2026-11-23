@@ -42,7 +42,7 @@ echo "🌲 prove.live-proof-refuses-a-full-disk"
 case_run() {
   local label="$1" want="$2" phrase="$3" out rc
   shift 3
-  out="$(env PATH="$stubs:$PATH" HOME="$home" "$@" bash "$PLAY" 2>&1)" && rc=0 || rc=$?
+  out="$(env PATH="$stubs:$PATH" HOME="$home" "$@" timeout -k 2 60 bash "$PLAY" </dev/null 2>&1)" && rc=0 || rc=$?
   if [[ "$rc" -eq "$want" && "$out" == *"$phrase"* ]]; then
     echo "   • $label → rc=$rc ✔"
     return 0

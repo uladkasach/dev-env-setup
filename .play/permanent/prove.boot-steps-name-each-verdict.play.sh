@@ -46,6 +46,7 @@ login_mask="$(id -un)"
 [[ "$login_mask" == camper || "$login_mask" == ground ]] && login_mask=""
 record() {
   local text="${2//$fixture/<fix>}"
+  text="${text//$HOME/<home>}"
   [[ -n "$login_mask" ]] && text="${text//$login_mask/<login>}"
   transcript+="## $1 (rc $3)"$'\n'"$text"$'\n\n'
 }
@@ -296,6 +297,11 @@ out="$(TRUST=replace run_step '' apply boot_resume_line_0 2>&1)"
 check "resume · step 0 carries the trust asked for" has "$out" "--from 0 --trust replace"
 out="$(TRUST=replace run_step '' apply boot_resume_line_2 2>&1)"
 check "resume · step 2 keeps the trust that held" has "$out" "--from 2 --trust keep"
+# a one-bundle boot resumes as one bundle: a resume without --what converges the whole tree
+out="$(WHAT=5.26.backup TRUST=verified run_step '' apply boot_resume_line_0 2>&1)"
+check "resume · a --what boot's resume carries its --what" has "$out" "--from 0 --trust verified --what 5.26.backup"
+out="$(WHAT='' TRUST=verified run_step '' apply boot_resume_line_0 2>&1)"
+check "resume · a whole-tree boot's resume names no --what" bash -c '[[ "$1" != *--what* ]]' _ "$out"
 
 ####################################################################
 # arm 4 — step 1's ground alias: no wake writes it, so the boot does, from the
@@ -374,14 +380,49 @@ check "cli · --help → names each input with its default" \
 check "cli · --help → carries a paste-ready example" has "$out" "rhx git.grove.provision boot <name> --mode apply --trust tofu"
 check "cli · --help → rc 0" test "$rc" -eq 0
 
-for bad in "--wat" "" "grove-demo --mode" "grove-demo --mode yes" "grove-demo --from 7" "grove-demo --trust maybe" "grove-demo --within soon"; do
+for bad in "--wat" "" "grove-demo --mode" "grove-demo --mode yes" "grove-demo --from 7" "grove-demo --trust maybe" "grove-demo --within soon" \
+  "grove-demo --what" "grove-demo --what a;b" "grove-demo --what 2.8.tmux --from 4"; do
   # shellcheck disable=SC2086 # the words are the argv under test
   out="$(boot_cli $bad)"; rc=$?
   record "cli · refused: '${bad:-<no args>}'" "$out" "$rc"
+  # the fix is the call with what the caller already named: its grove, else <name>
+  grove_named="<name>"; [[ "$bad" == grove-demo* ]] && grove_named=grove-demo
   check "cli · '${bad:-<no args>}' → a qualified ✋, the fix, the help, rc 2" \
-    bash -c '[[ "$1" == "✋ ConstraintError: "* && "$1" == *"fix: rhx git.grove.provision boot <name>"* && "$1" == *"--help"* && "$2" -eq 2 ]]' _ "$out" "$rc"
+    bash -c '[[ "$1" == "✋ ConstraintError: "* && "$1" == *"fix: rhx git.grove.provision boot $3"* && "$1" == *"--help"* && "$2" -eq 2 ]]' _ "$out" "$rc" "$grove_named"
 done
+check "cli · a --what refusal's fix keeps --what, never widens to the whole tree" \
+  has "$(boot_cli grove-demo --what 2.8.tmux --from 4)" "fix: rhx git.grove.provision boot grove-demo --what 2.8.tmux --from 2"
 check "cli · an unknown flag → names every valid flag" has "$(boot_cli --wat)" "--within <secs>"
+
+# the --what plan, end to end: a plan reaches no seat (each step prints a `would`),
+#   so the real skill runs whole here, against the fixture's registry and a stub rhx
+printf '{"name":"grove-demo.ground","user":"ground","host":"grove-demo-1","port":22}\n' > "$ground_reg"
+jq -n '{host: "localhost"}' >"$fixture/forest/groves/grove-demo.json"
+boot_plan() { ( export HOME="$fixture/home" PATH="$fixture/sshbin:$PATH" RHX="$fixture/bin/rhx"; boot_cli grove-demo --what 2.8.tmux "$@" ); }
+for from in 0 3; do
+  out="$(boot_plan --from "$from")"; rc=$?
+  record "cli · --what plan, --from $from" "$out" "$rc"
+  check "cli · --what plan --from $from → names the one bundle, on each seat" has "$out" "what: 2.8.tmux — one bundle, on each seat; no grants, keys, or gate"
+  check "cli · --what plan --from $from → ends on the plan-only line, rc 0" \
+    bash -c '[[ "$(tail -1 <<<"$1")" == "🌱 plan only — no step ran. drive it with --mode apply" && "$2" -eq 0 ]]' _ "$out" "$rc"
+  check "cli · --what plan --from $from → no grant, key, or gate step" \
+    bash -c '[[ "$1" != *"0. grants"* && "$1" != *"4. "* && "$1" != *"keys.set"* ]]' _ "$out"
+done
+check "cli · --what plan --from 3 → steps 3..3, no ground step" bash -c '[[ "$1" == *"steps: 3..3"* && "$1" != *"2. ground"* ]]' _ "$(boot_plan --from 3)"
+
+# the --what apply verdicts — the line a human reads once the seats converge
+for from in 0 3; do
+  out="$(WHAT=2.8.tmux FROM=$from run_step '' apply boot_what_summary 2>&1)"; rc=$?
+  record "what summary, apply, --from $from" "$out" "$rc"
+done
+check "what summary · --from 0 → ground, then camper" \
+  has "$(WHAT=2.8.tmux FROM=0 run_step '' apply boot_what_summary)" "🌳 2.8.tmux applied on grove-demo — ground, then camper, ONE apply each"
+check "what summary · --from 3 → camper alone, says ground was skipped" \
+  has "$(WHAT=2.8.tmux FROM=3 run_step '' apply boot_what_summary)" "🌳 2.8.tmux applied on grove-demo — camper alone (--from 3 skipped ground), ONE apply"
+check "what summary · plan → no step ran" \
+  has "$(WHAT=2.8.tmux FROM=0 run_step '' plan boot_what_summary)" "🌱 plan only — no step ran"
+check "what summary · the boot ends a --what run through it" \
+  bash -c '[[ "$(grep -c "^  boot_what_summary$" "$1")" -eq 1 ]]' _ "$SKILLS/git.grove.provision.boot.sh"
 
 ####################################################################
 # arm 6 — the sink every halt line passes through (`__duct_strip_escapes`):

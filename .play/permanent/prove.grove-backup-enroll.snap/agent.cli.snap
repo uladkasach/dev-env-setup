@@ -1,0 +1,28 @@
+$ grove-backup --help (exit 0)
+grove-backup — back up this grove's units to its bucket, then write the status
+
+usage:
+  grove-backup            one pass, as camper (the timer runs it every 15 minutes)
+  grove-backup --line     the one status line every surface prints
+  grove-backup --adopt    as camper: this box writes the prefix its name already holds
+  grove-backup --help     this text
+
+a pass by hand, from ground: sudo systemctl start grove-backup.service
+
+$ grove-backup --bogus (exit 2)
+✋ ConstraintError: unknown argument '--bogus'
+   └─ see: grove-backup --help
+
+$ grove-backup --line extra (exit 2)
+✋ ConstraintError: --line takes no other word
+   └─ see: grove-backup --help
+
+$ grove-backup --line (exit 0)
+✓ <age> ago · 2 put · 5 skipped
+
+$ grove-backup --adopt (exit 0)
+✓ grove backup · this box now writes its name's prefix; the next pass lands
+
+$ sudo grove-backup (exit 2)
+✋ ConstraintError: grove-backup runs as camper, never as root
+   └─ a pass by hand, from ground: sudo systemctl start grove-backup.service

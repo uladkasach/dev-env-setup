@@ -33,8 +33,7 @@ grove_provision_4_5_nvim_configure_verify() {
     failed=1
   fi
   # .what = 1b. the plugin lockfile is on the box AND matches this checkout
-  # .why lazy-lock.json is the only pin on 14 unpinned repos; nvim-treesitter's
-  #   `build = ':TSUpdate'` EXECUTES whatever tip an unpinned clone lands on
+  # .why the only pin on 14 repos; nvim-treesitter's `:TSUpdate` EXECUTES an unpinned tip
   local lock_src="$bundle_dir/lazy-lock.json"
   local lock_dst="$HOME/.config/nvim/lazy-lock.json"
   if [[ ! -r "$lock_dst" ]]; then
@@ -56,8 +55,7 @@ grove_provision_4_5_nvim_configure_verify() {
     failed=1
   fi
   # .what = 1c. the super+v selector setup is on the box AND matches this checkout
-  # .why kitty's overlay and tmux's popup both `-S` this exact path; absent or
-  #   stale, super+v opens a plain nvim whose keys do not match the gesture
+  # .why kitty's overlay and tmux's popup both `-S` this exact path
   local sel_src="$bundle_dir/visual_select.lua"
   local sel_dst="$HOME/.config/nvim/visual_select.lua"
   if [[ ! -r "$sel_dst" ]]; then
@@ -74,19 +72,15 @@ grove_provision_4_5_nvim_configure_verify() {
     failed=1
   fi
   # .what = 2. nvim can actually LOAD it (skipped if absent; provision.verify claims that)
-  # .why the BINARY, never the name — `2.7.aliases` exports a `nvim` function
-  #   (the memory cap), so the bare name would load-test the WRAPPER
+  # .why the BINARY: `2.7.aliases` exports a `nvim` function, so the name would test the WRAPPER
   local bin
   bin="$(bundle.bin.of nvim)"
   if [[ -z "$bin" ]]; then
     echo "   🌙 nvim is absent, so the config cannot be load-tested. provision.verify names that defect and its fix"
     return $failed
   fi
-  # .why wrapped in `timeout`: a headless start bootstraps lazy.nvim, which on a box with
-  #   no plugins clones from github — a dead network raises no error (rule.require.bounded-probes-in-verifies)
-  # .why 60s, not zero-tolerance: a first plugin sync takes tens of seconds on a healthy
-  #   network, so a timeout here is a 🌙, never a fail; claim 3 shares this one start
-  # 🛑 a bound on DURATION is not a bound on what CODE arrives — claim 3b reads that at cause
+  # .why bounded: a start with no plugins clones from github (rule.require.bounded-probes-in-verifies)
+  # .why 60s, a timeout a 🌙: a first sync is slow. what CODE arrives is claim 3b's read
   local out rc
   out="$(timeout -k 10 60 "$bin" -n --headless \
     -c 'lua io.write(("GUARDOPTS modeline=%s modelineexpr=%s exrc=%s lazypin=%s\n"):format(vim.o.modeline, vim.o.modelineexpr, vim.o.exrc, vim.g.lazy_pinned))' \
@@ -104,10 +98,8 @@ grove_provision_4_5_nvim_configure_verify() {
     failed=1
   fi
   # .what = 3. 🛑 a FILE may not configure the editor that opens it
-  # .why modeline/modelineexpr/exrc are remote-chosen config applied on OPEN, and
-  #   git.grove.pull writes a tree a grove named — one keystroke is the whole trigger
-  # .why asked of a RUNNING editor, never grepped from the file: a checkout can drop the
-  #   guard on a LATER line where a `cmp` above still agrees
+  # .why modeline/modelineexpr/exrc apply remote-chosen config on OPEN, of a tree a grove named
+  # .why asked of a RUNNING editor: a LATER line can drop the guard where a grep still agrees
   # .refs = gotcha.4-5-nvim.demo=configure-verify-measurements, m1-m2
   local guard_line
   guard_line="$(printf '%s\n' "$out" | grep -o 'GUARDOPTS .*' | tail -1 || true)"
@@ -135,10 +127,8 @@ fix: pin all three off near the top of $src — vim.o.modeline = false / modelin
     failed=1
   fi
   # .what = 3b. 🛑 no plugin is fetched without a pin
-  # .why an unpinned start clones all 14 repos at tip, and nvim-treesitter's
-  #   `build = ':TSUpdate'` executes that tip — the trigger needs only `nvim`, on the laptop
-  # .why `false` is the SAFE state (declined, no pin), never a ✋; the arm that matters is
-  #   `nil` — a config that predates this pin sets no such variable, and clones at tip
+  # .why an unpinned start clones 14 repos at tip, and `:TSUpdate` executes it — on `nvim` alone
+  # .why `false` is SAFE (no pin, no fetch); `nil` is a config that predates the pin, and fetches
   if [[ -z "$guard_line" ]]; then
     : # claim 3 already reported the absent report, and named its cause
   elif [[ "$guard_line" == *"lazypin=true"* ]]; then
@@ -154,11 +144,9 @@ fix: pin all three off near the top of $src — vim.o.modeline = false / modelin
     failed=1
   fi
   # .what = 4-6. 🛑 imagemagick may not hand a grove's bytes to another program
-  # .why debian's default policy declares no coder rule, and an absent rule is PERMITTED —
-  #   PS/EPS/PDF/XPS reach ghostscript on a tree git.grove.pull wrote
+  # .why debian's policy has no coder rule, so PS/EPS/PDF/XPS reach ghostscript by default
   # .why three claims: currency (cmp), effect (an eps is refused), cost (a png still reads)
-  # .why none of the three set `failed` — provision.upsert treats imagemagick as non-fatal,
-  #   so a hard-fail verify here would contradict its own upsert; they still PRINT
+  # .why none sets `failed`: provision.upsert treats imagemagick as non-fatal; they still PRINT
   # .refs = gotcha.4-5-nvim.demo=configure-verify-measurements, m3-m5
   local pol_src="$bundle_dir/imagemagick.policy.xml"
   # ── 4. currency — the fence inside the file imagemagick READS matches this checkout
@@ -178,8 +166,7 @@ fix: pin all three off near the top of $src — vim.o.modeline = false / modelin
     echo "   🌙 could not make a temp dir, so the imagemagick policy is unproven"
     return $failed
   fi
-  # a benign postscript file, its `%%` header the EPS format's own mandated syntax —
-  # the question is only whether the CODER is reached
+  # a benign postscript file: the question is only whether the CODER is reached
   printf '%s\n' \
     '%!PS-Adobe-3.0 EPSF-3.0' \
     '%%BoundingBox: 0 0 8 8' \
@@ -199,10 +186,8 @@ fix: pin all three off near the top of $src — vim.o.modeline = false / modelin
       "$extra"
   fi
   # .what = 6. the cost half — a policy that bites the render set breaks a silent draw
-  # .why the render set is DERIVED from init.lua's IMAGE_DIFF_EXTS, never typed here — one
-  #   hand-written copy already drifted from it (m4)
-  # .why a SKIPPED format is not a PASSED one — each row `continue`s when the build cannot
-  #   write it, separating "cost is zero" from "no format was measured" (rule.forbid.failhide)
+  # .why the render set is DERIVED from init.lua's IMAGE_DIFF_EXTS; a typed copy drifted (m4)
+  # .why a format the build cannot write is SKIPPED, never PASSED (rule.forbid.failhide)
   local cost_exts cost_n=0 cost_ok=0 png_fail=""
   cost_exts="$(awk '/IMAGE_DIFF_EXTS = \{/,/\}/' "$src" 2>/dev/null | grep -oE '[a-z0-9]+ = true' | cut -d' ' -f1 | sort -u || true)"
   if [[ -z "$cost_exts" ]]; then
@@ -225,7 +210,6 @@ fix: pin all three off near the top of $src — vim.o.modeline = false / modelin
     echo "   • and it costs the declared render set zero ✔ ($cost_ok of $cost_n read)"
     [[ "$cost_ok" -eq "$cost_n" ]] || echo "      ⚠️ $(( cost_n - cost_ok )) format(s) this build cannot write were NOT read"
   elif [[ -n "$png_fail" ]]; then
-    # the set is echoed from `$cost_exts`, the SAME value the loop read, so a hand-typed list is never a second holder of the fact
     _nvim_verify_say "the imagemagick policy REFUSES a format this repo renders: $png_fail" \
       "⇒ init.lua's IMAGE_DIFF_EXTS declares $(printf '%s' "$cost_exts" | tr '\n' ' ')renderable" \
       "⇒ likely routed through a DELEGATE, closed wholesale by \`delegate rights=none pattern=*\`" \

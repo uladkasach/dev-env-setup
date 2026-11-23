@@ -21,6 +21,14 @@ grove_provision_5_26_backup_provision_upsert() {
     return 0
   fi
 
+  # jq reads the status file the verify renders, and the agent's library writes it —
+  #   so it lands in PROVISION, ahead of the verify that needs it
+  #   (`rule.require.bundles-own-their-dependencies`). a converged box holds it already
+  if ! command -v jq >/dev/null 2>&1; then
+    pkg_install jq || return 1
+    echo "   • jq installed — the backup status is json"
+  fi
+
   ####################################################################
   # 0. what is ALREADY true — read before any privilege is asked for
   ####################################################################
@@ -71,12 +79,11 @@ grove_provision_5_26_backup_provision_upsert() {
     return 1
   }
 
-  if sudo systemctl enable --now grove-backup.timer; then
-    echo "   • grove-backup.timer enabled and started (every 15 minutes, Persistent=true)"
-  else
+  sudo systemctl enable --now grove-backup.timer || {
     echo "   💥 MalfunctionError: could not enable grove-backup.timer" >&2
     echo "      ⇒ no backup runs, and this grove's unpushed work has one copy" >&2
-    echo "      read why: systemctl status grove-backup.timer" >&2
+    echo "      ⇒ read why: systemctl status grove-backup.timer" >&2
     return 1
-  fi
+  }
+  echo "   • grove-backup.timer enabled and started (every 15 minutes, Persistent=true)"
 }

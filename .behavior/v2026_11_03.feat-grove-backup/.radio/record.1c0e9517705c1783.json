@@ -1,0 +1,19 @@
+{
+  "key": "1c0e9517705c1783",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-bhuild"
+  },
+  "exid": null,
+  "title": "dispatcher: forbid handoffs in .agent/repo=.this; a handoff lives in its route",
+  "description": "## .what\n\na rule for the dispatcher role: **forbid handoffs in `.agent/repo=.this/`.** a handoff lives in the\nroute that raised it: `.behavior/<route>/handoff.<owner>.<subject>.md`.\n\n## .why\n\n- a handoff is temporary: a live ask of another owner, moot the day that owner lands it.\n  `.agent/repo=.this/` holds what stays true (rules, howtos, terms, invariants)\n- the route raised the ask, holds its evidence, and closes with it. outside the route the ask\n  outlives its context and reads as settled doctrine\n- every brief under `.agent/repo=.this/` costs a boot path line every session, so a stale ask\n  taxes every reader\n\n## .the test\n\n> will this file be wrong, or moot, once another owner acts? yes → a handoff; it goes in the route\n\n## .enforcement\n\n- a `handoff.*` under `.agent/repo=.this/` = blocker; move it to the route that raised it\n- a durable brief that cites a route handoff as ground for a durable claim = blocker; state the\n  durable fact in its own words\n\n## .measured\n\nuladkasach/dev-env-setup, 2026-11-22: a driver wrote an infra handoff into\n`.agent/repo=.this/role=any/briefs/grove/backup/`, then listed it under boot `not` to fit the\nbudget. the human ruled it belongs in the route. a second, older handoff sat in `briefs/creds/`\nthe same way. both moved; the repo carries `rule.forbid.handoffs-in-agent-repo-this` locally.\n\n## .ask\n\nadd `rule.forbid.handoffs-in-agent-repo-this` to the dispatcher role's briefs, say-level and\nshort, so every repo that enrolls the dispatcher inherits it. a dispatch skill that writes a\nhandoff should default its path to the bound route.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 15,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "713"
+}

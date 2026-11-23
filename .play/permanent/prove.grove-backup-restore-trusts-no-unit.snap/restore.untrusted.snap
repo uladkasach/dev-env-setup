@@ -1,0 +1,345 @@
+
+## every id outside the shapes, under --all
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --all
+   ├─ org=acme/repo=../tree=.. · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (its id is outside every shape a backup writes); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   ├─ home=.ssh · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (its id is outside every shape a backup writes); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 2 units · 0 restored · 0 already here · 0 await a thaw · 2 refused · 0 failed
+
+## a named unit with a .. field
+✋ ConstraintError: that names no unit a backup writes: each name is plain, never . or .., never _worktrees or _setaside
+   └─ see what grove-1 holds: rhx grove.backup.get --from grove-1 --list
+
+## a file it lays reaches .git
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.githook
+   ├─ org=acme/repo=widget/tree=widget.githook · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (a file it lays reaches .git, or its name holds a newline); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## a delete leaves the tree
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.escape
+   ├─ org=acme/repo=widget/tree=widget.escape · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (a delete leaves the tree or reaches .git); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## a head_sha that is no commit id
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.badsha
+   ├─ org=acme/repo=widget/tree=widget.badsha · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (head_sha is no commit id); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## a head_ref that is no branch
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.badref
+   ├─ org=acme/repo=widget/tree=widget.badref · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (head_ref is no branch ref); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## an origin that reads as a flag
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.badorigin
+   ├─ org=acme/repo=widget/tree=widget.badorigin · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (origin is no plain git url); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## a file through a link HEAD laid
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.throughlink
+   ├─ org=acme/repo=widget/tree=widget.throughlink · <date> · STANDARD
+   │  ├─ + its clone <fixture>/t5.widget.throughlink/<seat>/git/acme/widget, from origin
+   │  ├─ main                         = (already equal)
+   │  ├─ ⇄ the live main is checked out in another worktree; this worktree takes grove-1/main
+   │  └─ ✋ ConstraintError: evil/pwn would lay through a link in this checkout; naught more of the unit is laid
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 0 refused · 1 failed
+
+## a planted orphan
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --orphan acme/widget.planted
+   ├─ org=acme/orphan=widget.planted · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (a file it lays reaches .git, or its name holds a newline); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## a dead origin, its mark cleared with its dir
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  └─ 💥 MalfunctionError: origin could not be cloned: /nonexistent/none.git
+   │     └─ fatal: repository '/nonexistent/none.git' does not exist; rerun once origin answers
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 0 refused · 1 failed
+
+## an origin that asks for auth
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  └─ 💥 MalfunctionError: origin could not be cloned: https://example.com/acme/widget.git
+   │     └─ fatal: could not read Username for 'https://example.com': terminal prompts disabled; this grove's git credential did not answer: from the laptop, rhx git.grove.ready.verify grove-1 --from 5, then rerun
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 0 refused · 1 failed
+
+## a stale mark
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  ├─ ⚠️ a cut restore's mark sat beside <fixture>/t8/<seat>/git/acme/widget, which that restore did not lay; the mark is cleared, and <fixture>/t8/<seat>/git/acme/widget is kept as it stands
+   │  └─ ⇄ graft into <fixture>/t8/<seat>/git/acme/widget (each file it changed is kept)
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a sha that reads as an option
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.refopt
+   ├─ org=acme/repo=widget/tree=widget.refopt · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (a line of refs.txt is no '<sha> <ref>' pair); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## a ref with a control byte
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.refesc
+   ├─ org=acme/repo=widget/tree=widget.refesc · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (refs.txt names a ref no pass writes (a '-' or '.' at a part's head, '..', or a control byte)); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## a ref part that opens with a dash
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.refdash
+   ├─ org=acme/repo=widget/tree=widget.refdash · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (refs.txt names a ref no pass writes (a '-' or '.' at a part's head, '..', or a control byte)); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## a mid-rebase exec and a nested git dir
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  ├─ 🌙 1 nested git dir laid inert: 1 config key cut, since a key can run a command on the next git act
+   │  ├─ 🌙 1 hook of a nested git dir laid NOT executable: read each, then arm it: chmod +x <hook>
+   │  ├─ 🌙 2 exec lines of a rebase held as a comment, since --continue runs each: read the todo, then restore each you trust: git rebase --edit-todo
+   │  └─ + laid at <fixture>/t9/<seat>/git/acme/widget, from origin and its own unit
+   │     ├─ HEAD detached at <sha>
+   │     └─ 3 files laid · 0 deletes applied
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a nested repo under a home unit
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --home .claude
+   ├─ home=.claude · <date> · STANDARD
+   │  ├─ 🌙 1 nested git dir laid inert: 1 config key cut, since a key can run a command on the next git act
+   │  ├─ into <fixture>/t10/<seat>/.claude
+   │  ├─ + plugins/… (2 files)
+   │  └─ 🌙 the brain login never left grove-1; log in here: rhx brains.auth.set
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a hooks dir planted as a link
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.hooklink
+   ├─ org=acme/repo=widget/tree=widget.hooklink · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (its .grove-backup/repo/hooks is a link or a special file, and a restore would follow it); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## an exclude planted as a link
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.excludelink
+   ├─ org=acme/repo=widget/tree=widget.excludelink · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (its .grove-backup/repo/exclude is a link or a special file, and a restore would follow it); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## a head_ref that reads as an option
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.headdash
+   ├─ org=acme/repo=widget/tree=widget.headdash · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (head_ref is no branch ref); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## a hook in the pack
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  ├─ 🌙 hook pre-push laid, NOT executable: read it, then arm it: chmod +x <fixture>/t11/<seat>/git/acme/widget/.git/hooks/pre-push
+   │  ├─ 🌙 1 file cut as a credential never left grove-1; re-derive each here
+   │  │  └─ .grove-backup/repo/hooks/pre-commit
+   │  └─ + laid at <fixture>/t11/<seat>/git/acme/widget, from origin and its own unit
+   │     ├─ HEAD main · 0 commits not on its upstream
+   │     └─ 0 files laid · 0 deletes applied
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a nested HEAD that is a link
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  ├─ 🌙 1 nested git dir laid inert: 1 config key cut, since a key can run a command on the next git act
+   │  ├─ 🌙 1 hook of a nested git dir laid NOT executable: read each, then arm it: chmod +x <hook>
+   │  └─ + laid at <fixture>/t12/<seat>/git/acme/widget, from origin and its own unit
+   │     ├─ HEAD detached at <sha>
+   │     └─ 3 files laid · 0 deletes applied
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a committed nested repo
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  ├─ 🌙 1 nested git dir laid inert: 1 config key cut, since a key can run a command on the next git act
+   │  ├─ 🌙 1 hook of a nested git dir laid NOT executable: read each, then arm it: chmod +x <hook>
+   │  └─ + laid at <fixture>/t13/<seat>/git/acme/widget, from origin and its own unit
+   │     ├─ HEAD detached at <sha>
+   │     └─ 1 file laid · 0 deletes applied
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a nested HEAD link under a home unit
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --home .claude
+   ├─ home=.claude · <date> · STANDARD
+   │  ├─ 🌙 1 nested git dir laid inert: 1 config key cut, since a key can run a command on the next git act
+   │  ├─ 🌙 1 hook of a nested git dir laid NOT executable: read each, then arm it: chmod +x <hook>
+   │  ├─ into <fixture>/t14/<seat>/.claude
+   │  ├─ + plugins/… (3 files)
+   │  └─ 🌙 the brain login never left grove-1; log in here: rhx brains.auth.set
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a commondir in and out of the tree
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  ├─ 🌙 1 commondir pointer dropped: each named a dir outside the tree, where git would read config and hooks
+   │  ├─ 🌙 3 nested git dirs laid inert: 1 config key cut, since a key can run a command on the next git act
+   │  ├─ 🌙 1 hook of a nested git dir laid NOT executable: read each, then arm it: chmod +x <hook>
+   │  └─ + laid at <fixture>/t16/<seat>/git/acme/widget, from origin and its own unit
+   │     ├─ HEAD detached at <sha>
+   │     └─ 6 files laid · 0 deletes applied
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a commondir under a home unit
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --home .claude
+   ├─ home=.claude · <date> · STANDARD
+   │  ├─ 🌙 2 nested git dirs laid inert: 1 config key cut, since a key can run a command on the next git act
+   │  ├─ 🌙 1 hook of a nested git dir laid NOT executable: read each, then arm it: chmod +x <hook>
+   │  ├─ into <fixture>/t17/<seat>/.claude
+   │  ├─ + plugins/… (5 files)
+   │  └─ 🌙 the brain login never left grove-1; log in here: rhx brains.auth.set
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a lay through a link, first
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --all
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  └─ + laid at <fixture>/t18/<seat>/git/acme/widget, from origin and its own unit
+   │     ├─ HEAD detached at <sha>
+   │     └─ 0 files laid · 0 deletes applied
+   ├─ org=acme/repo=widget/tree=widget.D · <date> · STANDARD
+   │  ├─ main                         = (live is ahead; kept)
+   │  ├─ ⇄ the live main differs from this tree's HEAD; this worktree takes grove-1/main
+   │  └─ + laid at <fixture>/t18/<seat>/git/acme/_worktrees/widget.D, linked into <fixture>/t18/<seat>/git/acme/widget
+   │     ├─ HEAD detached at <sha>
+   │     └─ 0 files laid · 0 deletes applied
+   ├─ org=acme/orphan=widget.D · <date> · STANDARD
+   │  └─ = evil/pwn2 (kept: its dir here is a link)
+   └─ 3 units · 2 restored · 1 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a lay through a link, again
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --all
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  └─ ⇄ graft into <fixture>/t18/<seat>/git/acme/widget (each file it changed is kept)
+   ├─ org=acme/repo=widget/tree=widget.D · <date> · STANDARD
+   │  └─ = already here; kept as it stands
+   ├─ org=acme/orphan=widget.D · <date> · STANDARD
+   │  └─ = evil/pwn2 (kept: its dir here is a link)
+   └─ 3 units · 1 restored · 2 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a husky hooks path
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.hk
+   ├─ org=acme/repo=widget/tree=widget.hk · <date> · STANDARD
+   │  ├─ hk                           + new branch · 0 commits this clone lacked
+   │  └─ + laid at <fixture>/t19/<seat>/git/acme/_worktrees/widget.hk, linked into <fixture>/t19/<seat>/git/acme/widget
+   │     ├─ HEAD detached at <sha>
+   │     └─ 0 files laid · 0 deletes applied
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a credential under a home unit
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --home .claude
+   ├─ home=.claude · <date> · STANDARD
+   │  ├─ into <fixture>/t20/<seat>/.claude
+   │  ├─ + projects/… (1 file)
+   │  ├─ 🌙 .credentials.json not laid: a backup never carries it, so this unit's copy is no backup's; place this box's own
+   │  └─ 🌙 the brain login never left grove-1; log in here: rhx brains.auth.set
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## an unreadable checkout HEAD
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.unreadhead
+   ├─ org=acme/repo=widget/tree=widget.unreadhead · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit names what no backup writes (its checkout HEAD cannot be read); naught of it is laid
+   │     └─ no pass writes such a unit; read who did: rhx grove.backup.get --from grove-1 --list
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## an unreadable index
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.unreadindex
+   ├─ org=acme/repo=widget/tree=widget.unreadindex · <date> · STANDARD
+   │  ├─ + its clone <fixture>/t13.widget.unreadindex/<seat>/git/acme/widget, from origin
+   │  ├─ main                         = (live is ahead; kept)
+   │  ├─ ⇄ the live main differs from this tree's HEAD; this worktree takes grove-1/main
+   │  └─ 💥 MalfunctionError: the unit's index could not be laid into <fixture>/t13.widget.unreadindex/<seat>/git/acme/widget/.git/worktrees/widget.unreadindex (Permission denied); the tree stays marked laid in part
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 0 refused · 1 failed
+
+## a files unit of an unread version
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --home .claude
+   ├─ home=.claude · <date> · STANDARD
+   │  └─ ✋ ConstraintError: this unit's manifest is version '99'; this restore reads version 2
+   │     └─ a newer agent wrote it: pull this repo, then rerun
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## the repo config and hook rows of a planted unit
+⚠️ 8 config keys dropped, since no backup writes it so: alias.pwn core.sshCommand core.fsmonitor remote.origin.uploadpack remote.origin.url remote.origin.push branch.feat.remote remote.upstream.url
+🌙 hook pre-commit laid, NOT executable: read it, then arm it: chmod +x <fixture>/r/.git/hooks/pre-commit

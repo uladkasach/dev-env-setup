@@ -114,6 +114,16 @@ claim "sync apply again · the hetzner box is no longer new"   lacks "grove-new 
 grove list; snap "list · against the tailnet"
 claim "list · names the dead row with its del"  has "git grove del grove-dead"
 
+# a converged forest: every hetzner row is a live peer and every peer a row, so no drift
+STUB_TS_JSON="$(peers_json grove-a grove-new grove-dead)"
+grove sync; snap "sync · the forest matches"
+claim "sync clean · rc 0"                        test "$RC" -eq 0
+claim "sync clean · says the forest matches"     has "the forest matches the tailnet ✔"
+claim "sync clean · names no del, no register"   bash -c '[[ "$1" != *"git grove del"* && "$1" != *"would register"* ]]' _ "$OUT"
+grove list; snap "list · the forest matches"
+claim "list clean · says the forest matches"     has "the forest matches the tailnet ✔"
+STUB_TS_JSON="$(peers_json grove-a grove-new grove-other)"
+
 # the two skills a human runs: git.grove.list warns on STDOUT when the installed aliases
 #   differ from this checkout; network.tailnet.peers.get prints each peer's acl tags
 SKILLS="$HERE/.agent/repo=.this/role=any/skills"

@@ -66,6 +66,8 @@ case_bare git.grove.play.stop   grove-1 --play x --scratch
 case_bare git.grove.sync        --mode
 case_bare aws.reach.set         --org ahbode --env test --gitroot
 case_bare aws.reach.del         --org ahbode --env test --gitroot
+case_bare play.run              --all --family
+case_bare play.run              --within
 
 # shellcheck source=/dev/null
 source "$HERE/.play/permanent/play.snap.operations.sh"

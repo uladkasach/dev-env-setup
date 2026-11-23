@@ -17,17 +17,17 @@ rc=2
 ## brains.auth.reset.probe --node
 rc=2
 ✋ ConstraintError: --node needs a value
-   fix: rhx brains.auth.reset.probe --help
+   └─ fix: rhx brains.auth.reset.probe --help
 
 ## brains.auth.reset.probe --kind
 rc=2
 ✋ ConstraintError: --kind needs a value
-   fix: rhx brains.auth.reset.probe --help
+   └─ fix: rhx brains.auth.reset.probe --help
 
 ## brains.auth.reset.probe --from
 rc=2
 ✋ ConstraintError: --from needs a value
-   fix: rhx brains.auth.reset.probe --help
+   └─ fix: rhx brains.auth.reset.probe --help
 
 ## grove.backup.get --from
 rc=2
@@ -77,12 +77,12 @@ rc=2
 ## git.grove.play.stop grove-1 --play
 rc=2
 ✋ ConstraintError: --play needs a value
-   fix: rhx git.grove.play.stop <grove> --play <name>
+   └─ fix: rhx git.grove.play.stop <grove> --play <name>
 
 ## git.grove.play.stop grove-1 --play x --scratch
 rc=2
 ✋ ConstraintError: --scratch needs a value
-   fix: rhx git.grove.play.stop <grove> --play <name>
+   └─ fix: rhx git.grove.play.stop <grove> --play <name>
 
 ## git.grove.sync --mode
 rc=2
@@ -97,4 +97,14 @@ rc=2
 rc=2
 ✋ ConstraintError: --gitroot needs a value
    see: rhx aws.reach.del help
+
+## play.run --all --family
+rc=2
+✋ ConstraintError: --family needs a slug prefix
+   └─ e.g.: --family prove.grove-backup
+
+## play.run --within
+rc=2
+✋ ConstraintError: --within needs a value
+   └─ e.g.: --within 900 (seconds per play; the default)
 

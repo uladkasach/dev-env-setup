@@ -357,20 +357,13 @@ echo "   ├─ box:     $HOSTKIND ($HOSTWHY)"
 if [[ "$HOSTKIND" == "laptop" ]]; then
   if grep -q "^\[profile ${PROFILE}\]" "$CFG" 2>/dev/null; then
     echo "   └─ ✔ a laptop, and '$PROFILE' is already declared — no work"
-    echo ""
-    echo "🔭 already reachable"
-    echo "   ├─ this skill authors GROVE bodies (role_arn + IMDS)."
-    echo "   │  a laptop's body is an sso login, owned by 'aws configure sso'"
-    echo "   └─ prove it:  aws sts get-caller-identity --profile $PROFILE"
+    echo "      ├─ a laptop's body is an sso login, owned by 'aws configure sso'; this skill authors grove bodies"
+    echo "      └─ prove it: aws sts get-caller-identity --profile $PROFILE"
     exit 0
   fi
   echo "   └─ ✋ ConstraintError: a laptop, and '$PROFILE' is NOT declared" >&2
-  echo "" >&2
-  echo "  why: on a laptop this profile is an SSO login, whose sso_start_url" >&2
-  echo "       this skill has no truthful source for. it will not invent one." >&2
-  echo "  fix: declare it with aws's own tool, naming the profile exactly —" >&2
-  echo "    aws configure sso --profile $PROFILE" >&2
-  echo "  then re-run this to set the rack half." >&2
+  echo "      ├─ why: on a laptop this profile is an sso login, whose sso_start_url this skill has no truthful source for" >&2
+  echo "      └─ fix: declare it with aws's own tool, then rerun this to set the rack half: aws configure sso --profile $PROFILE" >&2
   exit 2
 fi
 
@@ -669,10 +662,9 @@ fi
 #   "not on this manifest's org allowlist", while a pushed checkout — no `.git`, so
 #   the fallback — passed the same rows)
 GITROOT="$PWD"
-if [[ -n "$GITROOT_GIVEN" ]]; then
-  # a repo, by the check right after the parse
-  GITROOT="$GITROOT_GIVEN"
-elif ! git -C "$PWD" rev-parse --git-dir >/dev/null 2>&1; then
+# a given root is a repo, by the check right after the parse
+[[ -n "$GITROOT_GIVEN" ]] && GITROOT="$GITROOT_GIVEN"
+if [[ -z "$GITROOT_GIVEN" ]] && ! git -C "$PWD" rev-parse --git-dir >/dev/null 2>&1; then
   GITROOT="$HOME/.local/state/keyrack.gitroot"
   if [[ ! -d "$GITROOT/.git" ]]; then
     echo "      └─ 💥 MalfunctionError: the cwd is not a git repo, and the box has no rack root" >&2

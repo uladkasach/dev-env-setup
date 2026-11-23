@@ -1,0 +1,63 @@
+## a worktree, aside, its pass in constant motion
+rc=0
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.spike --into <fixture>/aside/pit
+   ├─ org=acme/repo=widget/tree=widget.spike · <date> · STANDARD
+   │  ├─ + stash · 1 entry
+   │  └─ + laid aside at <fixture>/aside/pit, a clone of its own
+   │     ├─ HEAD detached at <sha>
+   │     ├─ ⚠️ it moved through each pack of its last pass; files may span a few seconds
+   │     └─ 1 file laid · 0 deletes applied
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a clone with no origin, aside
+rc=0
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/solo --tree solo --into <fixture>/aside/solo
+   ├─ org=acme/repo=solo/tree=solo · <date> · STANDARD
+   │  ├─ 🌙 1 file cut as a credential never left grove-1; re-derive each here
+   │  │  └─ store.jks
+   │  └─ + laid at <fixture>/aside/solo, whole from its own unit (it has no origin)
+   │     ├─ HEAD main
+   │     └─ 0 files laid · 0 deletes applied
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## an orphan, aside
+rc=0
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --orphan acme/widget.dropped --into <fixture>/aside/dropped
+   ├─ org=acme/orphan=widget.dropped · <date> · STANDARD
+   │  ├─ into <fixture>/aside/dropped
+   │  ├─ + .agent/… (1 file)
+   │  └─ 🌙 2 files cut as a credential never left grove-1; re-derive each here
+   │     ├─ .env
+   │     └─ notes.txt
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## a set-aside tree, aside
+rc=0
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --setaside widget.old.<sha> --into <fixture>/aside/setaside
+   ├─ org=acme/repo=widget/setaside=widget.old.<sha> · <date> · STANDARD
+   │  ├─ into <fixture>/aside/setaside
+   │  ├─ + .agent/… (1 file)
+   │  └─ 🌙 1 file cut as a credential never left grove-1; re-derive each here
+   │     └─ notes.txt
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed
+
+## one home dir, in place
+rc=0
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --home .rhachet
+   ├─ home=.rhachet · <date> · STANDARD
+   │  ├─ into <fixture>/fresh-home/<seat>/.rhachet
+   │  ├─ + meter/… (1 file)
+   │  ├─ 🌙 1 file cut as a credential never left grove-1; re-derive each here
+   │  │  └─ meter/notes.txt
+   │  └─ 🌙 keyrack/ not laid: it is sealed to the host key of the box that wrote it; to place this grove's own, from the laptop: rhx git.grove.auth.keys.set grove-1 --mode apply
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed

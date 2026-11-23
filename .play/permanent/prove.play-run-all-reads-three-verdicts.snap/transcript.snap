@@ -46,12 +46,13 @@ rc=0
 
 ## --all with --play → two subjects, refused
 rc=2
-   ✋ ConstraintError: --all and --play name two subjects; pick one
+✋ ConstraintError: --all and --play name two subjects
+   └─ pick one: rhx play.run --all, or rhx play.run --play <name>
 
 ## an unknown flag → refused, names the valid
 rc=2
-   ✋ ConstraintError: unknown flag: --every
-      valid: --play <slug>  --list  --all  --within <secs>  --resnap  --help
+✋ ConstraintError: unknown flag: --every
+   └─ valid: --play <slug>  --list  --all [--family <prefix>]  --within <secs>  --resnap  --help
 
 ## --help → the usage
 rc=0
@@ -60,12 +61,15 @@ usage:
   rhx play.run --play prove.nvim-fetches-no-unpinned-plugin
   rhx play.run --play prove.git-alias-seam --within 600
   rhx play.run --all
+  rhx play.run --all --family prove.grove-backup
 
 options:
   --play SLUG    the play to run. the `.play.sh` suffix is optional
   --list         name every play this box can run, then exit
   --all          run every play --list names, one verdict line each; each
                  play's full output lands in a log dir the summary names
+  --family PRE   with --all: only the plays whose slug starts with PRE. a
+                 prefix that matches no play halts, never a vacuous pass
   --within SECS  bound per play, in seconds (default 900)
   --resnap       rewrite the play's `.snap` baselines (exports GROVE_RESNAP=1);
                  a play with no baseline ignores it. review the diff before a commit
@@ -78,4 +82,29 @@ exit:
   1 = the play failed, or malfunctioned (--all: at least one did)
   2 = a constraint: bad args, no such play, a forbidden verb, or a timeout
       (--all: none failed, and at least one declined or timed out)
+
+## --all --family · only the family runs → 0
+rc=0
+🎭 play.run --all --family prove.a --within 30
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
+   └─ verdicts
+      ├─ ✔ prove.a-passes
+      └─ 1 passed · 0 declined · 0 failed
+
+🌲 every play passed
+
+## --all --family · no play matches → refused
+rc=2
+🎭 play.run --all --family prove.zz --within 30
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
+   └─ verdicts
+      └─ 0 passed · 0 declined · 0 failed
+
+✋ ConstraintError: no tracked play starts with 'prove.zz'
+   └─ read what exists: rhx play.run --list
+
+## --family with no --all → refused
+rc=2
+✋ ConstraintError: --family narrows --all
+   └─ add --all, or name one play with --play
 

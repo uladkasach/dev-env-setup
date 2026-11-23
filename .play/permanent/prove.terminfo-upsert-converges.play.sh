@@ -26,9 +26,14 @@ failed=0
 fail() { echo "   💥 MalfunctionError: $1" >&2; failed=1; }
 claim() { local label="$1"; shift; if "$@"; then echo "   • $label ✔"; else fail "$label"; fi; }
 
-OUT=""
+OUT="" transcript=""
+APPLY_N=0
+# each apply's words and the ~/.bashrc it leaves, snapped: the human reads both
 apply() {
-  OUT="$(env HOME="$home" bash -c 'source "$1"; grove_provision_4_3_1_terminfo_configure_upsert' _ "$UPSERT" </dev/null 2>&1)"
+  local rc
+  APPLY_N=$(( APPLY_N + 1 ))
+  OUT="$(timeout -k 2 20 env HOME="$home" bash -c 'source "$1"; grove_provision_4_3_1_terminfo_configure_upsert' _ "$UPSERT" </dev/null 2>&1)" && rc=0 || rc=$?
+  transcript+="## apply $APPLY_N (exit $rc)"$'\n'"${OUT//$home/<home>}"$'\n'"### ~/.bashrc after"$'\n'"$(cat "$home/.bashrc")"$'\n\n'
 }
 markers() { grep -cF "# grove.provision:4.3.1.terminfo" "$home/.bashrc"; }
 legacy() { grep -cF "# grove.provision:44.terminfo.kitty" "$home/.bashrc"; }
@@ -52,6 +57,11 @@ claim "apply 2 · the file is byte for byte the same" test "$(cat "$home/.bashrc
 apply
 claim "apply 3 · still one block"               test "$(markers)" -eq 1
 claim "apply 3 · still prunes naught"           test -z "$(grep -F 'pruned' <<<"$OUT")"
+
+# shellcheck source=/dev/null
+source "$HERE/.play/permanent/play.snap.operations.sh"
+play_snap_verify dir="$HERE/.play/permanent/prove.terminfo-upsert-converges.snap" name=transcript actual="$transcript" \
+  || failed=1
 
 [[ "$failed" -eq 0 ]] && echo "🌲 all claims held ✔"
 exit "$failed"

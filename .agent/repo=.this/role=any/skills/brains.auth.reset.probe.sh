@@ -17,6 +17,20 @@
 ######################################################################
 set -uo pipefail
 
+probe_help() {
+  echo "brains.auth.reset.probe — run the usage-reset reader on one node, and show what jq said"
+  echo ""
+  echo "usage:"
+  echo "  rhx brains.auth.reset.probe                      the cli's real-offer shape"
+  echo "  rhx brains.auth.reset.probe --node '<json>' [--kind full|fable]"
+  echo "  rhx brains.auth.reset.probe --from checkout      read this checkout's copy, not ~/"
+  echo ""
+  echo "options:"
+  echo "  --node <json>      the usage node to read (default: the real-offer shape)"
+  echo "  --kind full|fable  which reset row to read (default: full)"
+  echo "  --from installed|checkout  whose reader runs (default: installed)"
+}
+
 node='{"juniper_tide":{"eligible":true,"in_experiment":true,"arm":"reset","available":true}}'
 kind="full"
 from="installed"
@@ -25,19 +39,21 @@ while [[ $# -gt 0 ]]; do
   # so the loop would read the same flag forever
   [[ "$1" =~ ^--(node|kind|from|skill|repo|role)$ && $# -lt 2 ]] && {
     echo "✋ ConstraintError: $1 needs a value" >&2
-    echo "   fix: rhx brains.auth.reset.probe --help" >&2; exit 2; }
+    echo "   └─ fix: rhx brains.auth.reset.probe --help" >&2; exit 2; }
   case "$1" in
     --node) node="${2:-}"; shift 2 ;;
     --kind) kind="${2:-}"; shift 2 ;;
     --from) from="${2:-}"; shift 2 ;;
     --skill|--repo|--role) shift 2 ;;
-    --help|-h) sed -n '2,17p' "${BASH_SOURCE[0]}"; exit 0 ;;
-    *) echo "✋ ConstraintError: unknown arg: $1" >&2; echo "   fix: rhx brains.auth.reset.probe --help" >&2; exit 2 ;;
+    --help|-h) probe_help; exit 0 ;;
+    *) echo "✋ ConstraintError: unknown arg: $1" >&2; echo "   └─ fix: rhx brains.auth.reset.probe --help" >&2; exit 2 ;;
   esac
 done
 
 file="$HOME/.bash_aliases.brains.auth.sh"
-[[ "$from" == "checkout" ]] && file="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)/src/grove.provision/2.shell/2.7.aliases/brains.auth.sh"
+# the checkout's root is four dirs above this skill, never `git rev-parse`: a grove's pushed
+#   checkout holds no `.git`, so a rev-parse there answers naught and the path loses its root
+[[ "$from" == "checkout" ]] && file="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)/src/grove.provision/2.shell/2.7.aliases/brains.auth.sh"
 [[ -f "$file" ]] || { echo "✋ ConstraintError: no reader at $file" >&2; exit 2; }
 
 # shellcheck disable=SC1090
@@ -53,4 +69,5 @@ echo "   ├─ reader: $(_brains_auth_reset_line "$node" "$kind")"
 err="$(jq -r --arg kind "$kind" "$prog" <<< "$node" 2>&1 >/dev/null)"
 [[ -z "$err" ]] && { echo "   └─ jq stderr: (none) ✔"; exit 0; }
 echo "   └─ jq stderr"
-while IFS= read -r l; do echo "      │ $l"; done <<< "$err"
+# each line jq said, a child branch under its label, the last one closed
+awk '{ l[n++] = $0 } END { for (i = 0; i < n; i++) print "      " (i == n - 1 ? "└─ " : "├─ ") l[i] }' <<< "$err"

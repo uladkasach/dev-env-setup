@@ -3082,14 +3082,14 @@ _git_grove_set() {
 
 # .what: list registered groves
 _git_grove_list() {
-  local dir; dir="$(_git_grove_dir)"
+  local dir empty=1; dir="$(_git_grove_dir)"
+  [[ -d "$dir" && -n "$(ls -A "$dir" 2>/dev/null)" ]] && empty=0
+  [[ "$empty" -eq 0 ]] && echo "🌲 forest"
   # an empty forest still reads the drift: a fresh box is where a tailnet grove is most owed a name
-  if [[ ! -d "$dir" ]] || [[ -z "$(ls -A "$dir" 2>/dev/null)" ]]; then
+  if [[ "$empty" -eq 1 ]]; then
     echo "🌲 forest — no groves registered"
     _git_grove_tailnet_groves >/dev/null 2>&1 \
       || { echo "   └─ register one: git grove set <name> --at <user@host:port>"; return 0; }
-  else
-    echo "🌲 forest"
   fi
   local f
   # ⚠️ `find`, not a bare glob — this file is read by zsh too, where a glob
@@ -3145,7 +3145,7 @@ _git_grove_list() {
 _git_grove_tailnet_groves() {
   command -v tailscale >/dev/null 2>&1 || return 2
   local js
-  js="$(timeout 10 tailscale status --json 2>/dev/null)" || return 2
+  js="$(timeout -k 2 10 tailscale status --json </dev/null 2>/dev/null)" || return 2
   printf '%s' "$js" | jq -r '
     .Peer // {} | to_entries[] | .value
     | ((.DNSName // "") | split(".")[0]) as $n
@@ -3193,6 +3193,22 @@ _git_grove_drift() {
   return 0
 }
 
+# .what: the platform a box declares (`/etc/grove/platform`), read as camper over ssh;
+#   ssh's stderr lands in $2, so a no-answer can name its cause
+# 🛑 known_hosts is neither READ nor WRITTEN here. a new box has no trusted key yet, and
+#   trust needs a registry entry (`git.grove.trust.gen --grove`), so a read that waits on
+#   trust deadlocks the first contact (📜 2026-11-20: "Host key verification failed").
+#   this read only CLASSIFIES: no secret rides it, no agent is forwarded, and its answer
+#   is compared to one literal. the trust itself stays a human's tofu
+_git_grove_platform_of() {
+  local out
+  out="$(timeout -k 5 20 ssh -o BatchMode=yes -o ConnectTimeout=10 -o ForwardAgent=no \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o GlobalKnownHostsFile=/dev/null -o LogLevel=ERROR "camper@$1" \
+            cat /etc/grove/platform </dev/null 2>"$2")"
+  tr -d '[:space:]' <<<"$out"
+}
+
 # .what: converge the forest toward the tailnet — register each new hetzner grove's two seats
 # .why the forest is written by hand on each box, so a replaced box leaves a dead row
 #   and no live one until a human notices; this closes what it can PROVE
@@ -3238,21 +3254,12 @@ _git_grove_sync() {
       continue
     fi
 
-    # ask the box itself; BatchMode, so naught prompts
-    # 🛑 known_hosts is neither READ nor WRITTEN here. a new box has no trusted key yet, and
-    #   trust needs a registry entry (`git.grove.trust.gen --grove`), so a read that waits on
-    #   trust deadlocks the first contact (📜 2026-11-20: "Host key verification failed").
-    #   this read only CLASSIFIES: no secret rides it, no agent is forwarded, and its answer
-    #   is compared to one literal. the trust itself stays a human's tofu, named below
-    # stderr is KEPT: "no answer" with no cause sends a human to guess host key vs auth vs file
-    local out err
+    # ask the box itself. stderr is KEPT: "no answer" with no cause sends a human to guess
+    #   host key vs auth vs file
+    local err why
     err="$(mktemp)"
-    out="$(timeout -k 5 20 ssh -o BatchMode=yes -o ConnectTimeout=10 -o ForwardAgent=no \
-              -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              -o GlobalKnownHostsFile=/dev/null -o LogLevel=ERROR "camper@$n" \
-              cat /etc/grove/platform </dev/null 2>"$err")"
-    plat="$(tr -d '[:space:]' <<<"$out")"
-    local why; why="$(grep -v '^[[:space:]]*$' "$err" | tail -1)"; rm -f "$err"
+    plat="$(_git_grove_platform_of "$n" "$err")"
+    why="$(grep -v '^[[:space:]]*$' "$err" | tail -1)"; rm -f "$err"
     if [[ "$plat" != hetzner.hetzbot ]]; then
       echo "   ├─ ? $n — a grove peer with no entry, whose platform it did not declare (read: '${plat:-no answer}')"
       [[ -n "$why" ]] && echo "   │  ├─ ssh said: $why"

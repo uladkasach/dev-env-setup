@@ -255,10 +255,9 @@ if [[ "$RACK_REACHABLE" -eq 1 ]]; then
   # 🛑 a GIVEN root wins, as in `aws.reach.set`: the cwd's keyrack.yml allows its
   #   own repo's org only, so a cross-org del run from a real checkout refuses
   GITROOT="$PWD"
-  if [[ -n "$GITROOT_GIVEN" ]]; then
-    # a repo, by the check right after the parse
-    GITROOT="$GITROOT_GIVEN"
-  elif ! git -C "$PWD" rev-parse --git-dir >/dev/null 2>&1; then
+  # a given root is a repo, by the check right after the parse
+  [[ -n "$GITROOT_GIVEN" ]] && GITROOT="$GITROOT_GIVEN"
+  if [[ -z "$GITROOT_GIVEN" ]] && ! git -C "$PWD" rev-parse --git-dir >/dev/null 2>&1; then
     GITROOT="$HOME/.local/state/keyrack.gitroot"
     if [[ ! -d "$GITROOT/.git" ]]; then
       echo "      └─ 💥 MalfunctionError: the cwd is not a git repo, and the box has no rack root" >&2

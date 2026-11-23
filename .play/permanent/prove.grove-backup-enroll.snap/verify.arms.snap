@@ -1,0 +1,40 @@
+# verify (exit 0)
+   • grove backup · enrolled · next run in <age> ✔
+
+# verify (exit 0)
+   • grove backup · ✓ <age> ago · 2 put · 5 skipped · next run in <age> ✔
+
+# verify (exit 1)
+   💥 MalfunctionError: grove backup · FAILED · 1 of 7 units did not land · <age> · last ok <age> ago
+      ├─ free space on the disk
+      ├─ user=c/org=a/repo=w/tree=w: disk · 3 MiB free
+      └─ read the runs, as ground: sudo journalctl -u grove-backup --since -3h
+
+# verify (exit 0)
+   • grove backup · ⏳ the first run is at work · next run in <age> ✔
+
+# verify (exit 1)
+   💥 MalfunctionError: grove backup · STALE · never
+      └─ read the runs, as ground: sudo journalctl -u grove-backup --since -3h
+
+# verify (exit 0)
+   • grove backup · ⏳ a pass is at work · last ok <age> ago · next run in <age> ✔
+
+# verify (exit 1)
+   💥 MalfunctionError: grove backup · STALE · last ok <age> ago
+      └─ read the runs, as ground: sudo journalctl -u grove-backup --since -3h
+
+# verify (exit 1)
+   ✋ ConstraintError: the installed <fixture>/root/etc/systemd/system/grove-backup.timer DIFFERS from this checkout
+      ├─ read the drift: diff <fixture>/src/grove.provision/5.devtools/5.26.backup/grove-backup.timer <fixture>/root/etc/systemd/system/grove-backup.timer
+      └─ fix: rhx grove.provision --what 5.26.backup --mode apply
+   💥 MalfunctionError: grove backup · STALE · never
+      └─ read the runs, as ground: sudo journalctl -u grove-backup --since -3h
+
+# verify (exit 1)
+   ✋ ConstraintError: grove backup · NOT ENROLLED · timer is inactive, disabled
+      └─ fix: rhx grove.provision --what 5.26.backup --mode apply
+
+# verify (exit 1)
+   ✋ ConstraintError: grove backup · NOT ENROLLED
+      └─ fix: rhx grove.provision --what 5.26.backup --mode apply

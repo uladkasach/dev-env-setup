@@ -32,20 +32,22 @@ while [[ $# -gt 0 ]]; do
   # so the loop would read the same flag forever
   [[ "$1" =~ ^--(play|scratch|repo|role|skill)$ && $# -lt 2 ]] && {
     echo "✋ ConstraintError: $1 needs a value" >&2
-    echo "   fix: rhx git.grove.play.stop <grove> --play <name>" >&2; exit 2; }
+    echo "   └─ fix: rhx git.grove.play.stop <grove> --play <name>" >&2; exit 2; }
   case "$1" in
     --play)    PLAY="${2:-}"; shift 2 ;;
     --scratch) SCRATCH="${2:-}"; shift 2 ;;
     --help|-h) sed -n '/^# usage:/,/^######/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//;$d'; exit 0 ;;
     --repo|--role|--skill) shift 2 ;;
-    -*) echo "✋ ConstraintError: unknown arg '$1'" >&2; echo "   fix: rhx git.grove.play.stop <grove> --play <name>" >&2; exit 2 ;;
-    *)  [[ -z "$GROVE" ]] || { echo "✋ ConstraintError: two groves named: '$GROVE' and '$1'" >&2; exit 2; }
+    -*) echo "✋ ConstraintError: unknown arg '$1'" >&2; echo "   └─ fix: rhx git.grove.play.stop <grove> --play <name>" >&2; exit 2 ;;
+    *)  [[ -z "$GROVE" ]] || { echo "✋ ConstraintError: two groves named: '$GROVE' and '$1'" >&2
+          echo "   └─ fix: name one: rhx git.grove.play.stop <grove> --play <name>" >&2; exit 2; }
         GROVE="$1"; shift ;;
   esac
 done
 [[ -n "$GROVE" && -n "$PLAY" ]] || { echo "✋ ConstraintError: a grove and --play are required" >&2
-  echo "   fix: rhx git.grove.play.stop <grove> --play <name>" >&2; exit 2; }
-[[ "$PLAY" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "✋ ConstraintError: --play takes a play name, got '$PLAY'" >&2; exit 2; }
+  echo "   └─ fix: rhx git.grove.play.stop <grove> --play <name>" >&2; exit 2; }
+[[ "$PLAY" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "✋ ConstraintError: --play takes a play name, got '$PLAY'" >&2
+  echo "   └─ fix: name the play alone, letters, digits, . _ - only: --play prove.some-play" >&2; exit 2; }
 if [[ -n "$SCRATCH" ]]; then
   [[ "$SCRATCH" == .local/state/* && "$SCRATCH" != *..* && "$SCRATCH" =~ ^[A-Za-z0-9._/*-]+$ ]] \
     || { echo "✋ ConstraintError: --scratch must name a glob under .local/state/, got '$SCRATCH'" >&2; exit 2; }
@@ -64,7 +66,8 @@ kids() { local p; for p in "\$@"; do echo "\$p"; kids \$(pgrep -P "\$p"); done; 
 roots=\$(pgrep -u "\$(id -u)" -f -- "\$pat"); prc=\$?
 # three answers, never two: pgrep 0 = a match, 1 = none; any other code is no answer
 case "\$prc" in 0|1) ;; *) echo "pgrep could not answer (rc \$prc)"; exit 3 ;; esac
-all=\$(kids \$roots | sort -u | tr '\n' ' ')
+# paste joins with no blank after the last pid, so the row ends on it
+all=\$(kids \$roots | sort -u | paste -sd ' ')
 echo "stopped: \${all:-none}"
 [ -n "\$all" ] && kill -TERM \$all 2>/dev/null
 left=""
@@ -81,9 +84,10 @@ echo "🛑 git.grove.play.stop $GROVE --play $PLAY${SCRATCH:+ --scratch '$SCRATC
 out="$(timeout -k 5 60 ssh -o BatchMode=yes -o ConnectTimeout=10 "$DUCT_HOST" "bash -c \"\$(printf %s '$b64' | base64 -d)\"" </dev/null 2>&1)"; rc=$?
 if [[ "$rc" -eq 3 ]]; then
   echo "💥 MalfunctionError: the grove answered, but its pgrep did not, so no play was seen or stopped" >&2
-  printf '%s\n' "$out" | __duct_strip_escapes | sed 's/^/   └─ /' >&2; exit 1
+  printf '%s\n' "$out" | __duct_strip_escapes \
+    | awk '{ l[n++] = $0 } END { for (i = 0; i < n; i++) print "   " (i == n - 1 ? "└─ " : "├─ ") l[i] }' >&2; exit 1
 fi
 [[ "$rc" -eq 0 ]] || { echo "💥 MalfunctionError: the grove was not asked (ssh rc $rc)" >&2
-  echo "   fix: rhx git.grove.wake $GROVE --mode apply, then rerun" >&2; exit 1; }
+  echo "   └─ fix: rhx git.grove.wake $GROVE --mode apply, then rerun" >&2; exit 1; }
 printf '%s\n' "$out" | __duct_strip_escapes | sed 's/^/   ├─ /'
 echo "   └─ done"

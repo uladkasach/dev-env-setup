@@ -1,0 +1,39 @@
+## apply 1 (exit 0)
+   • .bashrc — pruned a legacy erase block (# grove.provision:44.terminfo.kitty)
+   • .bashrc — erase declaration appended ✔
+   • takes effect in the NEXT interactive session (rc files are read at login)
+### ~/.bashrc after
+# a human line
+
+# grove.provision:4.3.1.terminfo
+# .what — erase on ^? (DEL, 0x7f), which kitty and every modern terminal send
+# .why
+#   - when the tty erases on ^H instead, backspace is echoed rather than acted on
+#   - an unhandled erase is drawn as a SPACE
+[[ -t 0 ]] && stty erase '^?' 2>/dev/null
+
+## apply 2 (exit 0)
+   • .bashrc already carries the erase declaration — no work
+### ~/.bashrc after
+# a human line
+
+# grove.provision:4.3.1.terminfo
+# .what — erase on ^? (DEL, 0x7f), which kitty and every modern terminal send
+# .why
+#   - when the tty erases on ^H instead, backspace is echoed rather than acted on
+#   - an unhandled erase is drawn as a SPACE
+[[ -t 0 ]] && stty erase '^?' 2>/dev/null
+
+## apply 3 (exit 0)
+   • .bashrc already carries the erase declaration — no work
+### ~/.bashrc after
+# a human line
+
+# grove.provision:4.3.1.terminfo
+# .what — erase on ^? (DEL, 0x7f), which kitty and every modern terminal send
+# .why
+#   - when the tty erases on ^H instead, backspace is echoed rather than acted on
+#   - an unhandled erase is drawn as a SPACE
+[[ -t 0 ]] && stty erase '^?' 2>/dev/null
+
+

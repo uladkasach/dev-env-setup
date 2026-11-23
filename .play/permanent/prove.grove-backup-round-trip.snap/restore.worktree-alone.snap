@@ -5,6 +5,9 @@
    │  ├─ + its clone <fixture>/fresh/<seat>/git/acme/widget, from origin
    │  ├─ + stash · 1 entry
    │  ├─ feat-x                       + new branch · 2 commits this clone lacked
+   │  ├─ 🌙 1 staged path of a secret shape left unstaged; its copy never left the dead grove
+   │  ├─ 🌙 1 file cut as a credential never left grove-1; re-derive each here
+   │  │  └─ .env.local
    │  └─ + laid at <fixture>/fresh/<seat>/git/acme/_worktrees/widget.feat-x, linked into <fixture>/fresh/<seat>/git/acme/widget
    │     ├─ HEAD feat-x
    │     └─ 3 files laid · 1 delete applied

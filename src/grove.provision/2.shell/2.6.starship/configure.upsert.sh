@@ -42,12 +42,12 @@ grove_provision_2_6_starship_configure_upsert() {
 GROVE_STARSHIP_BASHRC_MARKER="# grove.provision:2.6.starship"
 grove_provision_2_6_starship_bashrc_upsert() {
   local rc="$HOME/.bashrc"
-  [[ -f "$rc" ]] || : >"$rc"
+  [[ -f "$rc" ]] || : >"$rc" || { echo "   💥 MalfunctionError: could not make $rc" >&2; return 1; }
   if grep -qF "$GROVE_STARSHIP_BASHRC_MARKER" "$rc"; then
     echo "   • ~/.bashrc already inits starship — no work"
     return 0
   fi
-  cat >>"$rc" <<'EOF'
+  cat >>"$rc" <<'EOF' || { echo "   💥 MalfunctionError: could not append the starship init to $rc" >&2; return 1; }
 
 # grove.provision:2.6.starship
 # .what — the starship prompt in an interactive bash, as zshrc does for zsh

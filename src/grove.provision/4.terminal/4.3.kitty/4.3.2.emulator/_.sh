@@ -32,7 +32,7 @@ _kitty_loader_get() {
 from kitty.config import load_config
 o = load_config('$conf')
 print($expr)
-" 2>/dev/null | tail -1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+" </dev/null 2>/dev/null | tail -1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
 # .what = claim 2f of configure.verify: a BEL requests no focus, per kitty's loader

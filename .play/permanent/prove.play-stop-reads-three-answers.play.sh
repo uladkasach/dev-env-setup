@@ -63,8 +63,11 @@ case_run() {
   local envs=()
   while [[ $# -gt 0 && "$1" != "--" ]]; do envs+=("$1"); shift; done
   shift
-  out="$(env PATH="$stubs:$PATH" HOME="$home" "${envs[@]}" bash "$SKILL" "$@" 2>&1)" && rc=0 || rc=$?
-  out="$(printf '%s\n' "$out" | sed -E 's/disk after: .*/disk after: <df>/; s/[0-9]{2,}/<pid>/g')"
+  out="$(timeout -k 2 30 env PATH="$stubs:$PATH" HOME="$home" "${envs[@]}" bash "$SKILL" "$@" </dev/null 2>&1)" && rc=0 || rc=$?
+  # mask only the pid this play planted, by its exact value: a blanket digit mask would also
+  #   hide an exit code (`ssh rc 255`) and a fixture's own name (`proof.abc123`)
+  out="$(printf '%s\n' "$out" | sed -E 's/disk after: .*/disk after: <df>/')"
+  [[ -n "$sleeper" ]] && out="${out//$sleeper/<pid>}"
   transcript+=$'\n'"## $label"$'\n'"rc=$rc"$'\n'"$out"$'\n'
   if [[ "$rc" -eq "$want" ]]; then
     echo "   • $label → rc=$rc ✔"
@@ -77,6 +80,7 @@ case_run() {
 # the parser — each malformed call refuses at once (rc 2)
 case_run "no --play"                                   2 -- grove-1
 case_run "a bare --play, its value absent"             2 -- grove-1 --play
+case_run "a --play that is no play name"              2 -- grove-1 --play 'a/b'
 case_run "a --scratch outside .local/state"            2 -- grove-1 --play x --scratch 'git/*'
 case_run "a --scratch that climbs"                     2 -- grove-1 --play x --scratch '.local/state/../x'
 

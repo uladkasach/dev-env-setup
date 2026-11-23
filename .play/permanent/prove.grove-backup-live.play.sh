@@ -33,7 +33,7 @@ fi
 
 failed=0
 held() { echo "   • $1 ✔"; }
-miss() { echo "   ✋ $1"; failed=1; }
+miss() { echo "   ✋ ConstraintError: $1"; failed=1; }
 
 echo "🔬 prove.grove-backup-live"
 
@@ -79,12 +79,12 @@ done
 [[ "$waited" -gt 0 ]] && echo "   ├─ the pass settled after ~$((waited / 60))m"
 
 # ── the run: did a scheduled backup succeed?
-line="$(timeout -k 10 600 rhx grove.backup.get 2>&1 | grep -E '✓|✗' | tail -1)"
+line="$(timeout -k 10 600 rhx grove.backup.get </dev/null 2>&1 | grep -E '✓|✗' | tail -1)"
 echo "   ├─ status: ${line:-<none>}"
 [[ "$line" == *✓* ]] && held "a scheduled backup succeeded" || miss "no successful backup: ${line:-the status line is absent}"
 
 # ── the bucket: this grove's units
-units="$(timeout -k 10 600 rhx grove.backup.get --from "$grove" --list 2>&1)"
+units="$(timeout -k 10 600 rhx grove.backup.get --from "$grove" --list </dev/null 2>&1)"
 grep -E 'home=|units$' <<<"$units" | sed 's/^/   │ /'
 [[ "$units" == *home=.claude* ]] && held "the bucket holds this grove's .claude unit" \
   || miss "the bucket lists no .claude unit for $grove"
@@ -94,9 +94,14 @@ work="$(mktemp -d "$HOME/.local/state/grove-backup-live.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
 aside="$work/claude"
 
-out="$(timeout -k 10 600 rhx grove.backup.restore --from "$grove" --home .claude --into "$aside" 2>&1)"; rc=$?
+# the bound catches a hang, never a pace: it scales with this box's own .claude, since a fixed
+#   600s cried wolf on the ec2 grove's 8.1 GiB unit, which lays whole in 510s (~63s a GiB)
+claude_gib="$(du -s --apparent-size -BG "$HOME/.claude" 2>/dev/null | cut -f1 | tr -dc '0-9')"
+bound=$(( 300 + 150 * ${claude_gib:-0} ))
+out="$(timeout -k 10 "$bound" rhx grove.backup.restore --from "$grove" --home .claude --into "$aside" </dev/null 2>&1)"; rc=$?
 sed 's/^/   │ /' <<<"$out"
-[[ "$rc" -eq 0 ]] && held "restore --home .claude --into exits 0" || miss "restore exited $rc"
+[[ "$rc" -eq 0 ]] && held "restore --home .claude --into exits 0, within ${bound}s for ${claude_gib:-0} GiB" \
+  || miss "restore exited $rc (124 = past its ${bound}s bound for ${claude_gib:-0} GiB)"
 
 [[ ! -e "$aside/.credentials.json" ]] && held "no plaintext credential landed" \
   || miss ".credentials.json landed — the cut failed"
@@ -141,7 +146,7 @@ else
   repo="${tree_unit#*/repo=}"; repo="${repo%%/*}"
   tree="${tree_unit##*/tree=}"
   echo "   ├─ conversation: $org/$repo tree=$tree · $rel"
-  out="$(timeout -k 10 600 rhx grove.backup.restore --from "$grove" --of "$org/$repo" --tree "$tree" --into "$work/tree" 2>&1)"; rc=$?
+  out="$(timeout -k 10 600 rhx grove.backup.restore --from "$grove" --of "$org/$repo" --tree "$tree" --into "$work/tree" </dev/null 2>&1)"; rc=$?
   sed 's/^/   │ /' <<<"$out" | tail -12
   [[ "$rc" -eq 0 ]] && held "restore --of $org/$repo --tree $tree --into exits 0" || miss "tree restore exited $rc"
   laid="$work/tree/$rel"

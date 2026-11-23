@@ -39,15 +39,12 @@ grove_provision_5_26_backup_provision_verify() {
   ####################################################################
   local src dst mode absent=0
   while IFS=$'\t' read -r src dst mode; do
-    if [[ ! -f "$dst" ]]; then
-      absent=1
-      failed=1
-    elif ! diff -q "$src" "$dst" >/dev/null 2>&1; then
-      echo "   ✋ ConstraintError: the installed $dst DIFFERS from this checkout" >&2
-      echo "      read the drift: diff $src $dst" >&2
-      echo "      fix: $fix" >&2
-      failed=1
-    fi
+    [[ -f "$dst" ]] || { absent=1; failed=1; continue; }
+    diff -q "$src" "$dst" >/dev/null 2>&1 && continue
+    echo "   ✋ ConstraintError: the installed $dst DIFFERS from this checkout" >&2
+    echo "      ├─ read the drift: diff $src $dst" >&2
+    echo "      └─ fix: $fix" >&2
+    failed=1
   done < <(grove_provision_5_26_backup_files)
 
   if [[ "$absent" -eq 1 ]]; then
@@ -92,6 +89,13 @@ grove_provision_5_26_backup_provision_verify() {
     return "$failed"
   fi
 
+  # a first run still at work past the grace is a healthy pass, never a ✗ (a large seat
+  #   takes hours to pack the first time); the next verify after it lands reads its verdict
+  if [[ "$line" == ⏳* ]]; then
+    echo "   • grove backup · ${line}${next_in} ✔"
+    return "$failed"
+  fi
+
   # a run that enrolled and then failed is the SYSTEM's to fix (a grant, a bucket, a disk),
   # so its header is a malfunction; the status line itself keeps its one shape for every surface
   echo "   💥 MalfunctionError: grove backup · ${line#✗ }" >&2
@@ -99,6 +103,6 @@ grove_provision_5_26_backup_provision_verify() {
   owed="$(jq -r '.fix // empty' "$(grove_backup_status_file)" 2>/dev/null)"
   [[ -n "$owed" ]] && echo "      ├─ $owed" >&2
   jq -r '.failures[]? | "      ├─ \(.unit): \(.why)"' "$(grove_backup_status_file)" 2>/dev/null | head -n 10 >&2
-  echo "      └─ read the runs: journalctl -u grove-backup --since -3h" >&2
+  echo "      └─ read the runs, as ground: sudo journalctl -u grove-backup --since -3h" >&2
   return 1
 }

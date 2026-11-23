@@ -12,9 +12,8 @@
 #
 # .the read
 #   - `rhx git.repo.get`, which reaches the private repo where this box can
-#   - infra main first, the merged source. while main lacks the file (owed
-#     item 4), the play reads infra#64's branch, holds the clamp against it, and
-#     DECLINES with exit 2 — so a run never reads green against an unmerged source
+#   - infra main alone, the merged source; a branch is never read, so a run never
+#     reads green against an unmerged source
 #   - unreachable → ✋, exit 2. a clamp that cannot read its source proves naught,
 #     and it never passes in silence
 #
@@ -29,7 +28,6 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$HERE/src/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh"
 
 SOURCE_PATH='provision/aws.infra/account=camp/grove/groveBackupScope.ts'
-BRANCH='origin/beav/feat-hetzner-cloud-grove'
 
 failed=0
 pass() { echo "   • $1 ✔"; }
@@ -53,15 +51,11 @@ field_of() {
   grep -E "^[[:space:]│]*[0-9]+:[[:space:]]+$2:" <<<"$1" | head -n 1 | grep -oE "'[^']*'" | tr -d "'"
 }
 
-on_main=1
 if ! text="$(read_source origin/main)"; then
-  on_main=0
-  if ! text="$(read_source "$BRANCH")"; then
-    echo "   ✋ ConstraintError: GROVE_BACKUP_SCOPE could not be read from ahbode/infrastructure" >&2
-    echo "      ⇒ neither origin/main nor $BRANCH answered for $SOURCE_PATH" >&2
-    echo "      ⇒ run this where \`rhx git.repo.get\` reaches the infra repo (a grove, or the laptop)" >&2
-    exit 2
-  fi
+  echo "   ✋ ConstraintError: GROVE_BACKUP_SCOPE could not be read from ahbode/infrastructure" >&2
+  echo "      ⇒ origin/main did not answer for $SOURCE_PATH" >&2
+  echo "      ⇒ run this where \`rhx git.repo.get\` reaches the infra repo (a grove, or the laptop)" >&2
+  exit 2
 fi
 
 mapfile -t infra_dirs < <(field_of "$text" dirs)
@@ -81,10 +75,5 @@ theirs_exclude="$(printf '%s\n' "${infra_exclude[@]}" | sort)"
 [[ "$ours_exclude" != "$theirs_exclude" ]] && fail "excludes drift — agent: $(tr '\n' ' ' <<<"$ours_exclude")· infra: $(tr '\n' ' ' <<<"$theirs_exclude")"
 
 [[ "$failed" -ne 0 ]] && exit 1
-if [[ "$on_main" -eq 0 ]]; then
-  echo "🌙 declined: the clamp holds against $BRANCH, and infra main lacks the file" >&2
-  echo "   └─ owed by ahbode/infrastructure: GROVE_BACKUP_SCOPE on main (owed item 4)" >&2
-  exit 2
-fi
 echo "🌲 all claims held ✔"
 exit 0

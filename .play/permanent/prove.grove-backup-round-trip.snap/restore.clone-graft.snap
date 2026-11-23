@@ -2,11 +2,17 @@
 
 🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget
    ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
-   │  ├─ ⇄ graft into <fixture>/fresh/<seat>/git/acme/widget (its files untouched)
+   │  ├─ ⇄ graft into <fixture>/fresh/<seat>/git/acme/widget (each file it changed is kept)
    │  ├─ feat-x                       = (already equal)
    │  ├─ gone                         + new branch · 1 commit this clone lacked
    │  ├─ main                         + fast-forward · 1 commit · checked out, its tree clean
-   │  └─ + 1 file of the dead checkout laid · 0 deletes applied
-   │     ├─ = notes.txt (kept: this clone changed it)
-   │     └─ to read the dead checkout whole: --into <dir>
+   │  ├─ topic                        ≠ diverged (live <sha>, grove-1 <sha>); landed as grove-1/topic
+   │  ├─ + 4 files of the dead checkout laid · 0 deletes applied
+   │  │  ├─ = notes.txt (kept: this clone changed it)
+   │  │  └─ to read the dead checkout whole, lay it aside: rhx grove.backup.restore --from grove-1 --of acme/widget --tree widget --into <dir>
+   │  └─ 🌙 4 files cut as a credential never left grove-1; re-derive each here
+   │     ├─ .env
+   │     ├─ certs/site.pem
+   │     ├─ deploy.txt
+   │     └─ token.txt
    └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed

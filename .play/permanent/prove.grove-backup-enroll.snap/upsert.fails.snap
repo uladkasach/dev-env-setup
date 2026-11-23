@@ -1,0 +1,24 @@
+# upsert, a file the install refuses (exit 1)
+install: cannot create regular file: Permission denied
+   💥 MalfunctionError: could not install <fixture>/root.fail/usr/local/lib/grove-backup/grove-backup
+      ⇒ the agent stays at its prior version; read why above
+
+# upsert, a daemon-reload that fails (exit 1)
+   • the agent, its library, grove-backup.service, and grove-backup.timer declared
+   💥 MalfunctionError: systemctl daemon-reload failed
+      ⇒ the new unit files are on disk and the OLD definitions stay live
+
+# upsert, a timer that will not enable (exit 1)
+   • the agent, its library, grove-backup.service, and grove-backup.timer declared
+   💥 MalfunctionError: could not enable grove-backup.timer
+      ⇒ no backup runs, and this grove's unpushed work has one copy
+      ⇒ read why: systemctl status grove-backup.timer
+
+# upsert, a checkout that lacks the agent (exit 1)
+   💥 MalfunctionError: no grove-backup at <fixture>/absent/grove-backup
+      ⇒ this run's own checkout is incomplete
+
+# upsert, a box with no jq (exit 0)
+   • jq installed — the backup status is json
+   • the agent, its library, grove-backup.service, and grove-backup.timer declared
+   • grove-backup.timer enabled and started (every 15 minutes, Persistent=true)

@@ -82,6 +82,11 @@ case_run "--all · a play that drains stdin → every later play still runs → 
 case_run "--all with --play → two subjects, refused" 2 green    --all --play prove.a-passes
 case_run "an unknown flag → refused, names the valid" 2 green   --every 5
 case_run "--help → the usage"                        0 green    --help
+# --family runs only its own plays: in the mixed suite, `prove.a` reaches the pass alone, so a
+#   filter that leaked the decline or the failure would read 2 or 1, never 0
+case_run "--all --family · only the family runs → 0"   0 mixed    --all --family prove.a --within 30
+case_run "--all --family · no play matches → refused"  2 mixed    --all --family prove.zz --within 30
+case_run "--family with no --all → refused"            2 mixed    --family prove.a
 
 # a fold that dropped a play is the defect this clamp exists for: each verdict
 #   line must name its own play, in the mixed suite

@@ -23,7 +23,7 @@ fi
 
 failed=0
 held() { echo "   • $1 ✔"; }
-miss() { echo "   ✋ $1"; failed=1; }
+miss() { echo "   ✋ ConstraintError: $1"; failed=1; }
 
 echo "🔬 prove.camper-prompt-is-starship"
 
@@ -42,10 +42,22 @@ if timeout -k 2 10 tmux list-sessions </dev/null >/dev/null 2>&1; then
 fi
 
 # the binary, as an INTERACTIVE shell resolves it (a login shell's PATH, not this play's)
-bin="$(timeout -k 2 20 zsh -ilc 'command -v starship' </dev/null 2>/dev/null | tail -1)"
+#   each probe runs in its own session (`setsid -w`), with no terminal of its own. a play
+#   sent down a duct holds the pane's tty, and an interactive bash there takes job control
+#   from a background process group: the kernel stops it, and the bound kills it with no
+#   answer, so the probe read empty on a seat whose PATH was sound (measured on a hetzner grove)
+ishell() { timeout -k 2 20 setsid -w "$1" -ilc "$2" </dev/null 2>/dev/null | grep '^/' | tail -1; }
+bin="$(ishell zsh 'command -v starship')"
 [[ -n "$bin" ]] && held "starship on an interactive zsh PATH ($bin)" || miss "starship is absent from an interactive zsh PATH"
-bbin="$(timeout -k 2 20 bash -ilc 'command -v starship' </dev/null 2>/dev/null | grep '^/' | tail -1)"
-[[ -n "$bbin" ]] && held "starship on an interactive bash PATH ($bbin)" || miss "starship is absent from an interactive bash PATH"
+bbin="$(ishell bash 'command -v starship')"
+if [[ -n "$bbin" ]]; then
+  held "starship on an interactive bash PATH ($bbin)"
+else
+  # name the cause: bash -l reads the FIRST of these it finds, and only that one
+  first="$(for f in ~/.bash_profile ~/.bash_login ~/.profile; do [[ -e "$f" ]] && { echo "$f"; break; }; done)"
+  bpath="$(ishell bash 'echo "$PATH"')"
+  miss "starship is absent from an interactive bash PATH (login file: ${first:-none}; PATH: ${bpath:-no answer within 20s})"
+fi
 
 # the hook, in each rc a shell reads
 for rc in ~/.zshrc ~/.bashrc; do
@@ -61,5 +73,5 @@ done
 #   play's shell has none, so such a read reports the no-tty default on every box
 
 [[ "$failed" -eq 0 ]] && { echo "   └─ a new camper terminal shows starship ✔"; exit 0; }
-echo "   └─ ✋ a new camper terminal does not show starship — each ✋ above is a cause"
+echo "   └─ ✋ ConstraintError: a new camper terminal does not show starship — each ✋ above is a cause"
 exit 1

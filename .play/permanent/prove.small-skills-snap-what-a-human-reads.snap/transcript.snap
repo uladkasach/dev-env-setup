@@ -8,12 +8,48 @@ usage:
   rhx git.tree.aside get --tag <tag>
   rhx git.tree.aside get                 # every entry held
 
+## tree.aside · no verb refuses
+rc=2
+✋ ConstraintError: name a verb: set or get
+   └─ see: rhx git.tree.aside --help
+
+## tree.aside · two verbs refuse
+rc=2
+✋ ConstraintError: name one verb
+   └─ see: rhx git.tree.aside --help
+
+## tree.aside · an unknown argument refuses
+rc=2
+✋ ConstraintError: unknown argument '--bogus'
+   └─ see: rhx git.tree.aside --help
+
+## tree.aside · set with no --tag refuses
+rc=2
+🐢 lets set it aside...
+
+✋ ConstraintError: set needs --tag
+   └─ see: rhx git.tree.aside --help
+
+## tree.aside · set with no --path refuses
+rc=2
+🐢 lets set it aside...
+
+✋ ConstraintError: set needs at least one --path
+   └─ see: rhx git.tree.aside --help
+
 ## tree.aside · bare get, none held
 rc=0
-🐢 lets set it aside...
+🐢 lets see what is aside...
 
 🐚 git.tree.aside get
    └─ (none held)
+
+## tree.aside · set on an unedited path refuses
+rc=2
+🐢 lets set it aside...
+
+✋ ConstraintError: naught to set aside: no named path differs from HEAD
+   └─ name a path you changed: git status --short
 
 ## tree.aside · set feat.old (a.txt)
 rc=0
@@ -42,30 +78,30 @@ rc=2
 
 ## tree.aside · bare get lists both
 rc=0
-🐢 lets set it aside...
+🐢 lets see what is aside...
 
 🐚 git.tree.aside get
    ├─ feat (<sha>)
-   ├─ feat.old (<sha>)
+   └─ feat.old (<sha>)
 
 ## tree.aside · an absent tag refuses
 rc=2
-🐢 lets set it aside...
+🐢 lets lay it back...
 
 ✋ ConstraintError: no entry holds tag 'nope'
    └─ see what is held: rhx git.tree.aside get
 
 ## tree.aside · bare get lists no foreign entry
 rc=0
-🐢 lets set it aside...
+🐢 lets see what is aside...
 
 🐚 git.tree.aside get
    ├─ feat (<sha>)
-   ├─ feat.old (<sha>)
+   └─ feat.old (<sha>)
 
 ## tree.aside · get feat lays feat alone
 rc=0
-🐢 lets set it aside...
+🐢 lets lay it back...
 
 🐚 git.tree.aside get --tag feat
    ├─ sha: <sha>
@@ -73,7 +109,7 @@ rc=0
 
 ## tree.aside · get feat.old lays it
 rc=0
-🐢 lets set it aside...
+🐢 lets lay it back...
 
 🐚 git.tree.aside get --tag feat.old
    ├─ sha: <sha>
@@ -90,19 +126,20 @@ rc=0
 
 ## tree.aside · a moved path refuses, entry kept
 rc=2
-🐢 lets set it aside...
+🐢 lets lay it back...
 
-✋ ConstraintError: HEAD moved 1 held path(s) since 'moved' was set
-   ├─ a.txt
+✋ ConstraintError: HEAD moved 1 held path since 'moved' was set
+   ├─ moved since the set
+   │  └─ a.txt
    ├─ the entry is KEPT, and no file was touched
-   └─ read what it holds: git stash show -p <sha>
+   └─ fix: read what it holds, then settle each path by hand: git stash show -p <sha>
 
 ## tree.aside · the kept entry still lists
 rc=0
-🐢 lets set it aside...
+🐢 lets see what is aside...
 
 🐚 git.tree.aside get
-   ├─ moved (<sha>)
+   └─ moved (<sha>)
 
 ## exec.set · --help
 rc=0
@@ -142,25 +179,61 @@ rc=2
 ## exec.set · no --path refuses
 rc=2
 ✋ ConstraintError: name at least one --path
+   └─ see: rhx file.exec.set --help
+
+## exec.set · an unknown argument refuses
+rc=2
+✋ ConstraintError: unknown argument '--bogus'
+   └─ see: rhx file.exec.set --help
+
+## tree.aside · outside a repo refuses
+rc=2
+✋ ConstraintError: no git repo here
+   └─ run it from inside the repo whose tree it is
+
+## exec.set · outside a repo refuses
+rc=2
+✋ ConstraintError: no git repo here
+   └─ run it from inside the repo whose file it is
+
+## play.stop · --help
+rc=0
+usage:
+  rhx git.grove.play.stop <grove> --play <name>
+  rhx git.grove.play.stop <grove> --play <name> --scratch '.local/state/<prefix>.*'
+
+guarantee:
+  - asks over its own ssh, around the pane (as git.grove.play.await does)
+  - scoped to the ssh user's own processes; the pattern names the play FILE
+  - TERM to the play and each descendant, KILL to any left after 5s
+  - --scratch globs are relative to $HOME and must sit under .local/state/
+  - reports the processes stopped, the scratch removed, and the disk after
+  - a pgrep that cannot answer is no "none ran": it exits 1, as await reads it
+  - exit 0 = stopped (or none ran) · 1 = the box or its pgrep did not answer · 2 = bad args
+
+## play.stop · an unknown arg refuses
+rc=2
+✋ ConstraintError: unknown arg '--bogus'
+   └─ fix: rhx git.grove.play.stop <grove> --play <name>
+
+## play.stop · two groves refuse
+rc=2
+✋ ConstraintError: two groves named: 'grove-a' and 'grove-b'
+   └─ fix: name one: rhx git.grove.play.stop <grove> --play <name>
 
 ## reset.probe · --help
 rc=0
-######################################################################
-# .what = run the usage-reset reader on one usage node, and show what jq said
-#
-# .why  = `_brains_auth_reset_line` sinks jq's stderr and prints
-#         `? could not read the reset fields` on any failure, so a jq that
-#         cannot parse the program reads the same as a node that lacks the
-#         fields. this names which, with the jq version beside it
-#
-# usage:
-#   rhx brains.auth.reset.probe                      # the cli's real-offer shape
-#   rhx brains.auth.reset.probe --node '<json>' [--kind full|fable]
-#   rhx brains.auth.reset.probe --from checkout      # read this checkout's copy, not ~/
-#
-# guarantee:
-#   - READ-ONLY: no network, no account read; it runs the reader on the node given
-######################################################################
+brains.auth.reset.probe — run the usage-reset reader on one node, and show what jq said
+
+usage:
+  rhx brains.auth.reset.probe                      the cli's real-offer shape
+  rhx brains.auth.reset.probe --node '<json>' [--kind full|fable]
+  rhx brains.auth.reset.probe --from checkout      read this checkout's copy, not ~/
+
+options:
+  --node <json>      the usage node to read (default: the real-offer shape)
+  --kind full|fable  which reset row to read (default: full)
+  --from installed|checkout  whose reader runs (default: installed)
 
 ## reset.probe · the default node
 rc=0
@@ -169,10 +242,32 @@ rc=0
    ├─ reader: 🎁 session reset available now
    └─ jq stderr: (none) ✔
 
+## reset.probe · a node jq cannot parse
+rc=0
+🔬 brains.auth.reset.probe --kind full --from checkout
+   ├─ jq: <jq>
+   ├─ reader: ? could not read the reset fields
+   └─ jq stderr
+      └─ jq: <jq>
+
+## reset.probe · saved grants, the full row
+rc=0
+🔬 brains.auth.reset.probe --kind full --from checkout
+   ├─ jq: <jq>
+   ├─ reader: 🎁 3 saved · 2 usable now · first expires dec 01
+   └─ jq stderr: (none) ✔
+
+## reset.probe · saved grants, the fable row
+rc=0
+🔬 brains.auth.reset.probe --kind fable --from checkout
+   ├─ jq: <jq>
+   ├─ reader: 🎀 1 saved · usable now · expires dec 09
+   └─ jq stderr: (none) ✔
+
 ## reset.probe · an unknown arg refuses
 rc=2
 ✋ ConstraintError: unknown arg: --bogus
-   fix: rhx brains.auth.reset.probe --help
+   └─ fix: rhx brains.auth.reset.probe --help
 
 ## reset.probe · no installed reader refuses
 rc=2
@@ -192,6 +287,54 @@ rc=2
 rc=2
 ✋ ConstraintError: --mode is plan or apply, got 'go'
 
+## reach.set · --help
+rc=0
+aws.reach.set — give this box one org+env's aws identity, both halves
+
+usage:
+  rhx aws.reach.set --org <org> --env <env> [--assume <role>] [--mode apply]
+
+options:
+  --org       the org the account belongs to            (required)
+  --env       test | prep | prod | camp                 (required)
+  --assume    role to assume there                      (required, except --env camp)
+              (NOT --role: rhachet injects that into every skill)
+  --account   12-digit account id     (read from declapract.use.yml if absent)
+  --from      repo path holding declapract.use.yml      (default: cwd)
+  --owner     rack owner + profile-name tail            (default: ehmpath)
+  --region    aws region                                (default: us-east-1)
+  --gitroot   git root for keyrack calls  (default: cwd if a repo, else the rack's)
+  --mode      plan (default) or apply
+
+it writes BOTH halves of the pointer:
+  1. [profile <org>.<env>.<owner>]  in ~/.aws/config   (the body, per box)
+  2. <org>.<env>.AWS_PROFILE        on the rack        (the name, everywhere)
+
+examples:
+  rhx aws.reach.set --org ahbode --env test --assume <prep-oidc-role> --mode apply
+  rhx aws.reach.set --org ahbode --env camp --mode apply
+
+## reach.del · --help
+rc=0
+aws.reach.del — take one org+env's reach off this box, both halves
+
+usage:
+  rhx aws.reach.del --org <org> --env <env> [--mode apply]
+
+options:
+  --org       the org whose reach to remove            (required)
+  --env       the env whose reach to remove            (required)
+  --owner     rack owner + profile-name tail           (default: ehmpath)
+  --gitroot   git root for the keyrack del  (default: cwd if a repo, else the rack's)
+  --mode      plan (default) or apply
+
+it removes BOTH halves of the pointer:
+  1. [profile <org>.<env>.<owner>]  from ~/.aws/config  (the body)
+  2. <org>.<env>.AWS_PROFILE        from the rack       (the name)
+
+🛑 a stale profile is a DECLARATION drift — reap it by the one command:
+  rhx grove.provision --what 5.13.reach --mode apply
+
 ## reach.set · a --gitroot that is no repo refuses
 rc=2
 ✋ ConstraintError: --gitroot '<home>/notrepo' is not a git repo
@@ -201,4 +344,26 @@ rc=2
 rc=2
 ✋ ConstraintError: --gitroot '<home>/notrepo' is not a git repo
    fix: rhx grove.provision --what 5.12.rack --mode apply   (it owns the rack root)
+
+## reach.set · a laptop profile with no sso login refuses
+rc=2
+🐢 heres the wave...
+
+🔭 aws.reach.set --org ahbode --env test --mode plan
+   ├─ profile: ahbode.test.ehmpath
+   ├─ box:     laptop (local@unix — no platform identity)
+   └─ ✋ ConstraintError: a laptop, and 'ahbode.test.ehmpath' is NOT declared
+      ├─ why: on a laptop this profile is an sso login, whose sso_start_url this skill has no truthful source for
+      └─ fix: declare it with aws's own tool, then rerun this to set the rack half: aws configure sso --profile ahbode.test.ehmpath
+
+## reach.set · a laptop profile already declared needs no work
+rc=0
+🐢 heres the wave...
+
+🔭 aws.reach.set --org ahbode --env test --mode plan
+   ├─ profile: ahbode.test.ehmpath
+   ├─ box:     laptop (local@unix — no platform identity)
+   └─ ✔ a laptop, and 'ahbode.test.ehmpath' is already declared — no work
+      ├─ a laptop's body is an sso login, owned by 'aws configure sso'; this skill authors grove bodies
+      └─ prove it: aws sts get-caller-identity --profile ahbode.test.ehmpath
 

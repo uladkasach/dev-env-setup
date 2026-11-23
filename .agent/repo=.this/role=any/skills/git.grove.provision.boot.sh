@@ -182,12 +182,15 @@ WHAT=""
 TRUST="verified"
 WITHIN=2700
 
-# a bad input names itself, the fix, and the help — then exits 2 (the caller fixes it)
+# a bad input names itself, ONE next step, and the help — then exits 2 (the caller fixes it)
+#   the hint, where the refusal has one, IS that step; else the call itself, with what the caller
+#   already named (its grove, its --what), so a fix never widens a one-bundle boot to the whole tree
 boot_input_refused() {
-  local what="$1" hint="${2:-}"
+  local what="$1" hint="${2:-}" call="rhx git.grove.provision boot ${GROVE:-<name>}"
+  [[ "${WHAT:-}" =~ ^[A-Za-z0-9._-]+$ ]] && call+=" --what $WHAT"
   echo "✋ ConstraintError: $what" >&2
-  [[ -n "$hint" ]] && echo "   ├─ $hint" >&2
-  echo "   ├─ fix: rhx git.grove.provision boot <name> --mode apply" >&2
+  [[ -n "$hint" && "$hint" != fix:* ]] && echo "   ├─ $hint" >&2
+  if [[ "$hint" == fix:* ]]; then echo "   ├─ $hint" >&2; else echo "   ├─ fix: $call --mode apply" >&2; fi
   echo "   └─ every input: rhx git.grove.provision boot --help" >&2
   exit 2
 }
@@ -218,6 +221,9 @@ done
 # 🛑 a LIVE clamp — the slug reaches a command line on a remote box
 [[ -z "$WHAT" || "$WHAT" =~ ^[A-Za-z0-9._-]+$ ]] ||
   boot_input_refused "--what '$WHAT' is not a bundle slug ([A-Za-z0-9._-])" "list them: rhx grove.provision --mode plan"
+# `--what` runs the two seat steps (2, 3) and no gate: a --from past them would apply naught
+[[ -z "$WHAT" || "$FROM" -le 3 ]] ||
+  boot_input_refused "--from $FROM skips both seats, so --what would apply naught" "fix: rhx git.grove.provision boot ${GROVE:-<name>} --what $WHAT --from 2 --mode apply (both seats), or --from 3 (camper alone)"
 
 # the transport, shared so it cannot drift from every other grove read
 # (`rule.forbid.two-writers-on-one-artifact`)
@@ -639,8 +645,7 @@ drive_seat() {
 #      | the EPHEMERAL_VIA_GITHUB_APP rows | a human, but not YET — the mint needs
 #      |   | a tty ON THE BOX, and at minute 0 of a first boot no box exists
 #
-#      ⇒ each is a CLAIM, and the reach ask is filed in
-#        `briefs/creds/handoff.infra.grove-account-reach.md`.
+#      ⇒ each is a CLAIM, and the reach ask is ahbode/infrastructure's.
 #
 #      ⚠️ a rung for either would answer 🌙 on every run, forever. a rung whose
 #         verdict never varies reports no fact while it claims to — and it is the
@@ -834,9 +839,7 @@ fi
 # ⚠️ `--what` ends at the seats: the gate is a claim about a WHOLE box, and one
 #    bundle's applies prove that bundle alone (each verify ran inside its apply)
 if [[ -n "$WHAT" ]]; then
-  echo ""
-  [[ "$MODE" == "plan" ]] && { echo "🌱 plan only — no step ran. drive it with --mode apply"; exit 0; }
-  echo "🌳 $WHAT applied on $GROVE — ground, then camper, ONE apply each"
+  boot_what_summary
   exit 0
 fi
 

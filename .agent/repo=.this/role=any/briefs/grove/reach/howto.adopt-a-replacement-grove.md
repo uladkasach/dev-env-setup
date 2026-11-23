@@ -150,13 +150,35 @@ short-circuits every `*.upsert` and still runs every `*.verify`, so it tells you
 what a fresh box lacks before anything writes. read it for what is ABSENT, not only for what
 is red (`rule.require.every-function-has-a-driver`).
 
+## .then restore its work from the backup
+
+every camp grove backs up camper's `~/git`, `~/.claude`, and `~/.rhachet` every 15 minutes
+(`howdoes.a-grove-backs-up-and-restores`). so the dead grove's trees, their unpushed commits, and
+their conversations come back. after the converge, as camper, from this repo's checkout on the
+new grove:
+
+```sh
+cd ~/git/more/dev-env-setup
+rhx grove.backup.get --from <old-name> --list        # what the dead grove left
+rhx grove.backup.restore --from <old-name> --all     # lay every unit; a rerun resumes
+```
+
+⚠️ **a new grove that kept the old name writes no backup until it adopts the prefix.** its first
+pass reads `✗ … holds a backup this box never wrote`, so it never lays near-empty units over the
+dead grove's latest. restore first, then adopt:
+
+```sh
+/usr/local/lib/grove-backup/grove-backup --adopt
+```
+
 ## .what does NOT carry over
 
 a replacement box is a fresh disk. these are gone, and are not the upgrade's job:
 
 | gone | how it comes back |
 |---|---|
-| every clone under `~/git` | re-clone; `5.10.repos` |
+| every clone under `~/git` | the restore above; a repo the backup never held: re-clone, `5.10.repos` |
+| a plaintext credential in a tree (`.env`, `*.pem`, a token in a file) | re-derive it through keyrack; the restore names each path the backup cut |
 | the keyrack's `os.secure` entries | re-place by hand — a REPLICA vault lives on the disk |
 | ssh host keys | `trust.gen --on-changed replace` — the VERIFIED rung, never tofu (see the mirror case above) |
 | containers + volumes (a testdb) | the suite recreates it |
@@ -177,6 +199,14 @@ rhx git.grove.send <old> --play verify.grove-safe-to-wipe
 it asserts no repo holds uncommitted or unpushed work, no stash exists, and no credential
 lives only on that disk. exit 3 = there is work to rescue.
 
+⇒ **first ask the backup, which is cheaper.** on the old box, `rhx grove.backup.get` reads its
+last pass. a ✓ means every tree landed as of that pass; only work since then is at risk. one pass
+by hand closes that window, run by the agent itself as camper through the duct:
+`rhx git.grove.send <old> --reply --within 3600 --what grove-backup`. the agent holds one lock per
+box, so a pass the timer already began makes this one exit, never a double put. a first pass, or
+the first after a cut rule changes, packs every tree and can run for hours; `rhx grove.backup.get`
+reads its verdict once it returns. the hash compare below is owed only where the backup reads ✗.
+
 ⚠️ **its AT RISK verdict is correct and not yet actionable.** "dirty" there means *"differs
 from the grove's git HEAD"*, which is exactly what a pushed copy is supposed to be — the
 audit answers *"is any file unique here?"* with *"some file is dirty here"*.
@@ -192,6 +222,7 @@ the work to rescue.
 
 - `howto.adopt-a-replacement-grove.demo=stale-registry-and-trust-mismatches` — the dated
   measurements behind the mirror case and the audit above
+- `howdoes.a-grove-backs-up-and-restores` — what the backup holds, and how a restore lays it
 - `howto.provision-a-grove.md` — the fuller provision path
 - `howto.bootstrap-a-grove-from-scratch.md` — how a bare box first reaches this repo
 - `rule.require.trust-but-verify` — the general form of the stale-entry trap

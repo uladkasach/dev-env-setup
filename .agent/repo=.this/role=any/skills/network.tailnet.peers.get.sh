@@ -52,7 +52,7 @@ main() {
   fi
 
   local js
-  if ! js="$(timeout 10 tailscale status --json 2>/dev/null)"; then
+  if ! js="$(timeout -k 2 10 tailscale status --json </dev/null 2>/dev/null)"; then
     echo "💥 MalfunctionError: tailscaled did not answer in 10s" >&2
     echo "   read why: systemctl status tailscaled" >&2
     return 1

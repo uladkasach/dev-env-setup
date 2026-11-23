@@ -46,6 +46,22 @@ rc=0
    ├─ + grove-other — a grove on the tailnet with no entry here
    └─ fix: git grove sync --mode apply
 
+## sync · the forest matches
+rc=0
+🌲 git grove sync --mode plan
+   └─ the forest matches the tailnet ✔
+
+## list · the forest matches
+rc=0
+🌲 forest
+   ├─ 🌳 grove-a.ground → ground@grove-a:22 (ssh:grove-a.ground)
+   ├─ 🌳 grove-a → camper@grove-a:22 (ssh:grove-a)
+   ├─ 🌳 grove-dead → camper@grove-dead:22 (ssh:grove-dead)
+   ├─ 🌳 grove-ec2 → camper@localhost:36000 (ssh:grove-ec2)
+   ├─ 🌳 grove-new.ground → ground@grove-new:22 (ssh:grove-new.ground)
+   ├─ 🌳 grove-new → camper@grove-new:22 (ssh:grove-new)
+   └─ the forest matches the tailnet ✔
+
 ## git.grove.list · aliases match
 rc=0
 🌲 forest

@@ -51,7 +51,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ "${#PATHS[@]}" -gt 0 ]] || { echo "✋ ConstraintError: name at least one --path" >&2; exit 2; }
+[[ "${#PATHS[@]}" -gt 0 ]] || {
+  echo "✋ ConstraintError: name at least one --path" >&2
+  echo "   └─ see: rhx file.exec.set --help" >&2; exit 2; }
+
+# .what = the glyph a tree row takes: └─ for the last of $2 rows, ├─ for the rest
+tree_glyph() { [[ "$1" -eq $(( $2 - 1 )) ]] && printf '└─' || printf '├─'; }
 
 # refuse the whole set before any write, so a bad path leaves no partial change
 for p in "${PATHS[@]}"; do
@@ -66,7 +71,7 @@ echo ""
 echo "🐚 file.exec.set"
 for i in "${!PATHS[@]}"; do
   p="${PATHS[$i]}"
-  glyph="├─"; [[ "$i" -eq $(( ${#PATHS[@]} - 1 )) ]] && glyph="└─"
+  glyph="$(tree_glyph "$i" "${#PATHS[@]}")"
   if [[ -x "$p" ]]; then
     echo "   $glyph = ${p#"$ROOT"/} (already runnable)"
     continue

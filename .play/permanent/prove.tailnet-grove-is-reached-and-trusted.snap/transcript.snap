@@ -22,7 +22,8 @@ commands:
   set <name> --exid <tag> --env <e> register a cloud grove, found by tag
   wake <name>                       resume the box + open its duct
   stop <name>                       hibernate the box
-  list                              list registered groves
+  list                              list registered groves, and their drift from the tailnet
+  sync [--mode plan|apply]          register each new hetzner grove the tailnet holds
   get <name>                        show one grove
   del <name>                        unregister a grove
   del --orphaned [--mode apply]     unregister every grove whose instance is gone

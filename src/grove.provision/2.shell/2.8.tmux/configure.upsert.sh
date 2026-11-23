@@ -160,9 +160,7 @@ grove_provision_2_8_tmux_configure_upsert() {
   local login_shell
   login_shell="$(grove_provision_2_8_tmux_login_shell)"
   for name in "${live[@]}"; do
-    if timeout -k 5 30 tmux -L "$name" source-file "$HOME/.tmux.conf" 2>/dev/null \
-       && { [[ -z "$login_shell" ]] \
-            || timeout -k 5 30 tmux -L "$name" set-option -g default-shell "$login_shell" 2>/dev/null; }; then
+    if grove_provision_2_8_tmux_server_tell "$name" "$login_shell"; then
       sourced=$(( sourced + 1 ))
     else
       refused+=("$name")
@@ -187,4 +185,16 @@ grove_provision_2_8_tmux_configure_upsert() {
 
   echo "     ⚠️ a live CLIENT still needs a reattach: terminal-features (RGB,"
   echo "        extkeys, clipboard) are negotiated at attach, never at source"
+}
+
+# .what = load the conf into one live server, then tell it the login shell a new pane execs
+# .why one act per server, so the upsert's loop reads as a count and a play drives the act
+#   alone. a closed stdin keeps tmux off the caller's socket list, and fails a prompt at once
+# usage: grove_provision_2_8_tmux_server_tell <socket> <login shell, or empty>
+# exit: 0 = both landed (or no login shell to tell) · 1 = the server refused either
+grove_provision_2_8_tmux_server_tell() {
+  local name="$1" login_shell="$2"
+  timeout -k 5 30 tmux -L "$name" source-file "$HOME/.tmux.conf" </dev/null 2>/dev/null || return 1
+  [[ -z "$login_shell" ]] && return 0
+  timeout -k 5 30 tmux -L "$name" set-option -g default-shell "$login_shell" </dev/null 2>/dev/null
 }

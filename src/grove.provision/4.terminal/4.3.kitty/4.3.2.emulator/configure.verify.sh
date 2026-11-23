@@ -56,7 +56,7 @@ grove_provision_4_3_2_emulator_configure_verify() {
   local kitten unparsed=()
   for kitten in "${kittens[@]}"; do
     [[ -f "$conf_dir/$kitten" ]] || continue
-    kitty +runpy "
+    timeout -k 5 20 kitty +runpy "
 import sys
 src = open('$conf_dir/$kitten').read()
 try:
@@ -64,7 +64,7 @@ try:
 except SyntaxError as e:
     print('%s:%s %s' % ('$kitten', e.lineno, e.msg))
     sys.exit(1)
-" >/dev/null 2>&1 || unparsed+=("$kitten")
+" </dev/null >/dev/null 2>&1 || unparsed+=("$kitten")
   done
   if [[ ${#unparsed[@]} -gt 0 ]]; then
     _kitty_verify_fail "${#unparsed[@]} kitten(s) do not parse: ${unparsed[*]}" \
@@ -195,7 +195,7 @@ load_config('$conf', accumulate_bad_lines=bad)
 for b in bad:
     print('BADLINE line %s: %s' % (b.number, b.exception))
 print('PARSE_READ_OK')
-" 2>&1)" || parse_rc=$?
+" </dev/null 2>&1)" || parse_rc=$?
     if [[ "$parse_rc" -ne 0 ]] || [[ "$parse_out" != *PARSE_READ_OK* ]]; then
       echo "   🌙 kitty's config loader did not answer; parse unproven"
       echo "      ⇒ it said: $(printf '%s' "$parse_out" | head -2 | tr '\n' ' ')"

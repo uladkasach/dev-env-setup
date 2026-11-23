@@ -37,7 +37,13 @@ get_help() {
   echo "  --list            list, rather than read this box's status"
   echo "  --from <grove>    the grove whose units to list (implies --list)"
   echo ""
+  echo "exit:"
+  echo "  0  the read completed — a ✗ FAILED or ✗ STALE status included: the verdict is the line, not the exit"
+  echo "  1  the bucket gave no answer; a retry may cure it"
+  echo "  2  a constraint: bad args, a credential or grant, no such grove"
+  echo ""
   echo "to restore a unit:  rhx grove.backup.restore --help"
+  echo "on a grove, run each from this repo's checkout: cd ~/git/more/dev-env-setup"
 }
 
 # the root is four dirs above this skill, never `git rev-parse`: a grove's checkout
@@ -62,17 +68,34 @@ get_status() {
   status="$(grove_backup_status_file)"
   systemctl is-enabled grove-backup.timer >/dev/null 2>&1 && enrolled=enrolled
   line="$(grove_backup_status_line "$enrolled")"
+  # the bundle enrolls a camp grove alone; off one, a fix that names it would decline
+  if [[ ! -f "$status" && -z "$enrolled" && "${GROVE_ENV_SERVER:-}" != cloud@* ]]; then
+    echo "   └─ backup: 🌙 not on this box: the grove backup runs on camp groves (cloud@*); this is ${GROVE_ENV_SERVER:-an undeclared server}"
+    echo "      └─ a laptop's own work rides by its git remotes, and \`git backup\` by hand"
+    return 0
+  fi
   if [[ ! -f "$status" ]]; then
     echo "   └─ backup: $line"
-    [[ -z "$enrolled" ]] && echo "      └─ fix: rhx grove.provision --what 5.26.backup --mode apply"
+    # the enroll writes root units: a seat with no sudo (camper) cannot make it
+    if [[ -z "$enrolled" ]]; then
+      local seat_note=""
+      sudo -n true 2>/dev/null || seat_note=", from the seat with sudo (ground); this seat holds none"
+      echo "      └─ fix: rhx grove.provision --what 5.26.backup --mode apply$seat_note"
+    fi
     return 0
   fi
 
   echo "   ├─ backup: $line"
-  echo "   │  └─ last run: $(jq -r '"\(.at) · \(.units) units · \(.put) put · \(.skipped) skipped · \(.failed) failed"' "$status")"
+  # a pass refused before its units (a denied grant) reaches none of them: the counts add up
+  #   only with that remainder named, else `✗ FAILED` sits over `0 failed`
+  echo "   │  └─ last run: $(jq -r '
+    ((.units // 0) - (.put // 0) - (.skipped // 0) - (.failed // 0)) as $unreached
+    | "\(.at) · \(.units) units · \(.put) put · \(.skipped) skipped · \(.failed) failed"
+      + (if $unreached > 0 then " · \($unreached) not reached" else "" end)' "$status")"
   fix="$(jq -r '.fix // empty' "$status")"
   failures="$(jq -r '.failures[]? | "\(.unit): \(.why)"' "$status")"
-  if [[ -z "$fix" && -z "$failures" ]]; then
+  # a ✓ line needs no why; a ✗ line with no stored cause (a STALE one) still names the journal
+  if [[ -z "$fix" && -z "$failures" && "$line" != ✗* ]]; then
     echo "   └─ last ok: $(jq -r '.last_ok // "never"' "$status")"
     return 0
   fi
@@ -80,7 +103,7 @@ get_status() {
   echo "   └─ why"
   [[ -n "$fix" ]] && echo "      ├─ $fix"
   [[ -n "$failures" ]] && while IFS= read -r f; do echo "      ├─ $f"; done <<<"$failures"
-  echo "      └─ journalctl -u grove-backup -n 50"
+  echo "      └─ the run's full text, as ground (camper cannot read the journal): sudo journalctl -u grove-backup -n 50"
   return 0
 }
 
@@ -109,31 +132,58 @@ fail_list() {
 # .what = print each grove prefix with its latest backup, as one tree
 ######################################################################
 print_groves() {
-  local own lines=() g lm rc i
+  local own names=() dates=() g lm rc i scoped=""
   grove_backup_s3_prefixes "$GET_TMP/prefixes"; rc=$?
+  # a grant scoped per grove refuses the fleet-wide list (S8): list the groves this box
+  #   reaches, and name who holds the rest
+  if [[ "$rc" -eq 3 ]]; then
+    scoped=true
+    grove_backup_groves_in_reach >"$GET_TMP/reach"; rc=$?
+    [[ "$rc" -eq 2 ]] && { GROVE_BACKUP_CAUSE="unreadable: $GROVE_BACKUP_DECL_BROKEN"; GROVE_BACKUP_FIX="owed by ahbode/infrastructure: one grove slug on its first line"; fail_reach; }
+    sed 's|.*|grove=&/|' "$GET_TMP/reach" >"$GET_TMP/prefixes"
+  fi
   [[ "$rc" -eq 0 ]] || fail_list "$rc"
 
   while IFS= read -r g; do
     grove_backup_s3_list "grove=$g/" "$GET_TMP/keys"; rc=$?
     [[ "$rc" -eq 0 ]] || fail_list "$rc"
-    lm="$(cut -f2 "$GET_TMP/keys" | sort | tail -n 1)"
-    lm="$(date -u -d "$lm" +%Y-%m-%dT%H:%MZ 2>/dev/null || echo "$lm")"
-    lines+=("$(printf '%-24s %s' "$g" "$lm")")
+    lm="$(grove_backup_latest_object_time "$GET_TMP/keys")"
+    names+=("$g"); dates+=("${lm:-(none yet)}")
   done < <(grove_backup_groves_of_prefixes <"$GET_TMP/prefixes")
 
-  own="$(grove_backup_decl_read "$(grove_backup_name_file)" "$GROVE_BACKUP_SLUG_PATTERN")" \
-    && ! grep -qxF "grove=$own/" "$GET_TMP/prefixes" \
-    && lines+=("$(printf '%-24s %s' "$own" "(none yet)")")
+  # this box's own grove, before its first backup lands, reads `(none yet)`
+  own="$(grove_backup_decl_read "$(grove_backup_name_file)" "$GROVE_BACKUP_SLUG_PATTERN")" || own=""
+  if [[ -n "$own" ]] && ! grep -qxF "grove=$own/" "$GET_TMP/prefixes"; then
+    names+=("$own"); dates+=("(none yet)")
+  fi
 
-  for i in "${!lines[@]}"; do echo "   ├─ ${lines[$i]}"; done
-  echo "   └─ $(plural "${#lines[@]}" grove)"
+  # .why the date leads: its width is fixed (a stamp, or `(none yet)` padded to one), so every
+  #   date and every name share a column, and no long name widens another row
+  for i in "${!names[@]}"; do printf '   ├─ %-17s %s\n' "${dates[$i]}" "${names[$i]}"; done
+  [[ -z "$scoped" ]] && { echo "   └─ $(grove_backup_plural "${#names[@]}" grove)"; return 0; }
+  echo "   ├─ $(grove_backup_plural "${#names[@]}" grove) in this box's reach"
+  echo "   └─ the grant reaches this grove and its declared predecessor alone; the admin tier lists the fleet"
 }
+
+# .what = one seat's rows from the units file ("user<TAB>rank<TAB>unit<TAB>date<TAB>class"),
+#   each as `<date> <class, padded> <unit>`
+# .why the fixed-width fields lead: a tree name runs to ~90 chars, so a name-first row padded to
+#   the longest would widen every row past a narrow terminal. date-first aligns with no name pad
+unit_rows_of_seat() {
+  awk -F'\t' -v u="$1" '
+    NR == FNR { if (length($5) > w) w = length($5); next }
+    $1 == u { printf "%s %-" w "s %s\n", $4, $5, $3 }
+  ' "$GET_TMP/units" "$GET_TMP/units"
+}
+
+# .what = the distinct seats in the units file, in its sorted order (the seat is column 1)
+units_seats() { cut -f1 "$GET_TMP/units" | uniq; }
 
 ######################################################################
 # .what = every unit one grove left, its latest date and class, grouped by seat
 ######################################################################
 print_units() {
-  local from="$1" rc total=0 u i glyph unit key class
+  local from="$1" rc total=0 u i j trunk glyph unit key class
   local -a users rows
   grove_backup_s3_list "grove=$from/" "$GET_TMP/keys"; rc=$?
   [[ "$rc" -eq 0 ]] || fail_list "$rc"
@@ -148,7 +198,13 @@ print_units() {
 
   # one row per unit, from its latest object: "user<TAB>rank<TAB>unit<TAB>date<TAB>class"
   #   rank lists units in the order `--all` lays them (grove_backup_unit_rank)
+  #   a key any box may write is untrusted: an id outside the shapes a pass writes prints
+  #   with each byte outside a plain name as `?`, flagged as one no restore lays
   grove_backup_units_latest <"$GET_TMP/keys" | while IFS=$'\t' read -r unit key class; do
+    if ! grove_backup_unit_is_valid "$unit"; then
+      printf '%s\t9\t%s\t%s\t%s\n' "?" "${unit//[^A-Za-z0-9._@+=\/-]/?}" "$(grove_backup_key_day "$key" | tr -c 'A-Za-z0-9-' '?')" "✋ refused: no shape a pass writes"
+      continue
+    fi
     printf '%s\t%s\t%s\t%s\t%s\n' "$(grove_backup_unit_field "$unit" user)" "$(grove_backup_unit_rank "$unit")" \
       "$(grove_backup_unit_without_seat "$unit")" "$(grove_backup_key_day "$key")" "$class"
   done | sort -t$'\t' -k1,1 -k2,2 -k3,3 >"$GET_TMP/units"
@@ -157,20 +213,27 @@ print_units() {
   echo ""
   echo "🗄️ grove.backup.get --from $from --list"
   echo "   ├─ $from"
-  mapfile -t users < <(cut -f1 "$GET_TMP/units" | uniq)
-  for u in "${users[@]}"; do
-    echo "   │  ├─ user=$u"
-    mapfile -t rows < <(awk -F'\t' -v u="$u" '$1 == u { printf "%-56s %s %s\n", $3, $4, $5 }' "$GET_TMP/units")
+  mapfile -t users < <(units_seats)
+  for j in "${!users[@]}"; do
+    u="${users[$j]}"
+    # the last seat closes its branch, so its rows hang under a blank, never a `│`
+    trunk="│  "
+    [[ "$j" -eq $(( ${#users[@]} - 1 )) ]] && trunk="   "
+    echo "   │  $(grove_backup_tree_glyph "$j" "${#users[@]}") user=$u"
+    mapfile -t rows < <(unit_rows_of_seat "$u")
     for i in "${!rows[@]}"; do
-      glyph="├─"; [[ "$i" -eq $(( ${#rows[@]} - 1 )) ]] && glyph="└─"
-      echo "   │  │  $glyph ${rows[$i]}"
+      echo "   │  $trunk$(grove_backup_tree_glyph "$i" "${#rows[@]}") ${rows[$i]}"
     done
     total=$(( total + ${#rows[@]} ))
   done
   echo "   └─ $total units"
   echo ""
-  echo "🥥 restore one: rhx grove.backup.restore --from $from --of <org/repo> --tree <dir>"
-  echo "   or all of this seat's: rhx grove.backup.restore --from $from --all"
+  echo "🥥 restore, as the row's seat, from this repo's checkout (cd ~/git/more/dev-env-setup)"
+  echo "   ├─ org=<o>/repo=<r>/tree=<t>       rhx grove.backup.restore --from $from --of <o>/<r> --tree <t>"
+  echo "   ├─ org=<o>/orphan=<d>              rhx grove.backup.restore --from $from --orphan <o>/<d>"
+  echo "   ├─ org=<o>/repo=<r>/setaside=<s>   rhx grove.backup.restore --from $from --of <o>/<r> --setaside <s>"
+  echo "   ├─ home=<h>                        rhx grove.backup.restore --from $from --home <h>"
+  echo "   └─ every unit of the seat          rhx grove.backup.restore --from $from --all"
 }
 
 ######################################################################
@@ -205,7 +268,11 @@ get_main() {
   [[ "$list" -eq 0 ]] && { get_status; return 0; }
 
   grove_backup_reach_check no || fail_reach
-  GET_TMP="$(mktemp -d)"
+  # an unmade scratch dir would root every path below at /, so it halts here
+  GET_TMP="$(mktemp -d)" && [[ -d "$GET_TMP" ]] || {
+    echo "💥 MalfunctionError: could not make a scratch dir" >&2
+    echo "   └─ check the disk and \$TMPDIR: df -h \"\${TMPDIR:-/tmp}\"" >&2
+    exit 1; }
   trap 'rm -rf "$GET_TMP"' EXIT
 
   if [[ -z "$from" ]]; then
