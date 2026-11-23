@@ -67,9 +67,15 @@ fi
 
 # install from the lock; never rewrite it, never run a lifecycle step
 skip_lifecycle="--ignore-scripts"   # pnpm's own flag name; unavoidable
-if ! out="$(timeout 600 pnpm install --frozen-lockfile "$skip_lifecycle" 2>&1)"; then
+if ! out="$(timeout 600 pnpm install --frozen-lockfile "$skip_lifecycle" --loglevel debug 2>&1)"; then
+  # the full debug output lands in a log: a patch refusal's cause sits far above the tail
+  log_dir="$root/.log/role=any/skill=pnpm.modules.sync"
+  mkdir -p "$log_dir"
+  log="$log_dir/$(date -u +%Y%m%dT%H%M%SZ).log"
+  printf '%s\n' "$out" > "$log"
   echo "   └─ 💥 MalfunctionError: pnpm install --frozen-lockfile failed" >&2
-  printf '%s\n' "$out" | tail -n 20 | sed 's/^/      /' >&2
+  printf '%s\n' "$out" | grep -v '^Progress:' | grep -iE 'err|fail|patch|hunk|cannot|denied' | tail -n 20 | sed 's/^/      /' >&2
+  echo "      log: ${log#"$root/"}" >&2
   echo "      fix: a stale lock? run pnpm.lockfile.sync --mode apply, then rerun" >&2
   exit 1
 fi

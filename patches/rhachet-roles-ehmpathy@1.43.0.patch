@@ -1,0 +1,23 @@
+diff --git a/dist/domain.roles/mechanic/skills/git.commit/git.commit.push.sh b/dist/domain.roles/mechanic/skills/git.commit/git.commit.push.sh
+old mode 100644
+new mode 100755
+index 9c8aee2..738231a
+--- a/dist/domain.roles/mechanic/skills/git.commit/git.commit.push.sh
++++ b/dist/domain.roles/mechanic/skills/git.commit/git.commit.push.sh
+@@ -493,7 +493,15 @@ fi
+ [[ "$DEBUG" == "true" ]] && echo "[debug] apply mode: push to origin..." >&2
+ 
+ PUSH_EXIT=0
+-PUSH_OUTPUT=$(git push origin HEAD --force-with-lease 2>&1) || PUSH_EXIT=$?
++# as-human: the push rides the human's gh login too, scoped to this one command.
++# the empty helper resets the seat's list (a keyrack helper declines on a laptop),
++# then gh answers. no global config changes. upstream: rhachet-roles-ehmpathy#1471
++if [[ "$AUTH" == "as-human" ]]; then
++  PUSH_OUTPUT=$(env -u GH_TOKEN -u GITHUB_TOKEN git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin HEAD --force-with-lease 2>&1) || PUSH_EXIT=$?
++fi
++if [[ "$AUTH" != "as-human" ]]; then
++  PUSH_OUTPUT=$(git push origin HEAD --force-with-lease 2>&1) || PUSH_EXIT=$?
++fi
+ [[ "$DEBUG" == "true" ]] && echo "[debug] push exit=$PUSH_EXIT" >&2
+ [[ "$DEBUG" == "true" ]] && echo "[debug] push output: $PUSH_OUTPUT" >&2
+ 

@@ -1,0 +1,19 @@
+{
+  "key": "80fee0675161274e",
+  "kind": "create",
+  "repo": {
+    "owner": "uladkasach",
+    "name": "dev-env-setup"
+  },
+  "exid": null,
+  "title": "fix(2.2.git): a laptop https push has a credential helper after keyrack",
+  "description": "# 🌙 dream: a laptop's https push has a credential helper after keyrack\n\n- kind: fix\n- owner: this repo, `2.2.git`\n- caught 2026-11-22\n\n## .the cue that fired\n\n`rhx git.commit.push --mode apply --auth as-human` failed on the laptop: `git-credential-keyrack`\ndeclined (no camp token on a local seat), no helper followed, and git died on a username prompt.\n\n## .the gap, precisely\n\n`2.2.git` declares `credential.\"https://github.com\".helper` = the keyrack helper on every seat. it\nserves only a camp grove. on `local@unix` it declines by design, and the bundle declares no next\nhelper, so an https push from a laptop has no credential path at all, even with `gh auth login` live.\n\n## .the shape of the fix\n\non `local@*`, add gh's helper after keyrack (`git config --global --add\ncredential.\"https://github.com\".helper '!gh auth git-credential'`), and let `configure.verify`\ngrade both values, in order. a clamp in a temp HOME: keyrack declines, gh's stub answers, the\npush reaches a local bare remote.\n\nthe upstream twin: ehmpathy/rhachet-roles-ehmpathy#1471 (`--auth as-human` never reaches the push).\n\n## .why it is not done in this round\n\nit changes global git config on every laptop, a bundle this PR does not own (seed S6: the PR ships\nonly this behavior). it is the human's call whether the laptop fix or the upstream fix goes first.",
+  "status": null,
+  "via": "os.fileops",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 17,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "d90343ce"
+}
