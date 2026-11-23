@@ -32,6 +32,18 @@ rc=0
 
 🌲 every play passed
 
+## --all · a play that drains stdin → every later play still runs → 0
+rc=0
+🎭 play.run --all --within 30
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
+   └─ verdicts
+      ├─ ✔ prove.a-drains-stdin
+      ├─ ✔ prove.b-passes
+      ├─ ✔ prove.c-passes
+      └─ 3 passed · 0 declined · 0 failed
+
+🌲 every play passed
+
 ## --all with --play → two subjects, refused
 rc=2
    ✋ ConstraintError: --all and --play name two subjects; pick one

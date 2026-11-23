@@ -50,14 +50,21 @@
 #         rows. the callers say so loudly; this reader does not fail
 ######################################################################
 grove_org_declared() {
-  local root manifest
-  root="$(dirname "${GROVE_SRC:-}")"
-  manifest="$root/.agent/keyrack.yml"
+  grove_org_of_manifest "$(dirname "${GROVE_SRC:-}")/.agent/keyrack.yml"
+}
 
+# .what = the `org:` one keyrack manifest declares, by path; empty if absent
+# .why  = the one reader of that line's grammar. `grove_org_declared` asks it of
+#         this checkout; `5.26.commitorgs` asks it of each crew tree, the org the
+#         commit gate (`get_org_from_keyrack`) will key on. two copies of one
+#         anchored grep would drift apart in silence
+grove_org_of_manifest() {
+  local manifest="$1"
   [[ -f "$manifest" ]] || return 0
 
-  grep -m1 -E '^org:[[:space:]]*[^[:space:]]' "$manifest" \
-    | sed -E 's/^org:[[:space:]]*//; s/[[:space:]]+$//'
+  # the gate's own grammar: the FIRST `org:` line, every blank stripped. an empty first
+  # line names no org, as the gate reads it — never a later line
+  grep -m1 -E '^org:' "$manifest" | sed 's/^org:[[:space:]]*//' | tr -d '[:space:]'
 }
 
 ######################################################################

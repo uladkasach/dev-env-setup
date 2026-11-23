@@ -11,6 +11,15 @@
 # guarantee:
 #   - hermetic: a fixture registry, a stub seat writer, a stub `rhx`; all in
 #     mktemp. the grove name is invented
+#
+# .the stand-ins, each in the .mock / .why / .real form
+#   - .mock = `rhx` — the answers of `git.grove.auth.keys.set` and `duct.reboot`
+#     .why  = each real skill reaches a live grove over ssh; a boot step's job is to read
+#             their answers and render a verdict, which is what this play grades
+#     .real = keys.set runs live in every boot of a real grove
+#   - .mock = `grove_ssh_platform_findsert`, the ground seat's declaration writer
+#     .why  = it writes `/etc/grove/platform` on a live box over ssh, with sudo
+#     .real = its own verdicts are pinned in prove.platform-findsert-names-each-verdict
 ######################################################################
 
 set -u
@@ -55,6 +64,9 @@ run_step() {
   jq -n --arg p "$1" --arg h "${HOST:-localhost}" \
     '{host: $h} + (if $p == "" then {} else {platform: $p} end)' > "$fixture/forest/groves/grove-demo.json"
   (
+    # the boot's own shell options (git.grove.provision.boot.sh: `set -uo pipefail`): a step
+    #   graded under looser options than the boot runs it hides a pipe that fails only there
+    set -o pipefail
     export GIT_FOREST_DIR="$fixture/forest"
     GROVE=grove-demo MODE="$2" RHX="$fixture/bin/rhx" BOOT_ORG=ahbode
     # shellcheck source=/dev/null

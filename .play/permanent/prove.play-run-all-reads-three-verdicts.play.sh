@@ -50,6 +50,11 @@ mkrepo() {
 mkrepo mixed    prove.a-passes=0 prove.b-declines=2 prove.c-fails=1
 mkrepo declined prove.a-passes=0 prove.b-declines=2
 mkrepo green    prove.a-passes=0
+# a play that drains its stdin, ahead of two more: `--all` must still reach both
+mkrepo greedy   prove.a-drains-stdin=0 prove.b-passes=0 prove.c-passes=0
+printf '#!/usr/bin/env bash\ncat > /dev/null\necho "stub prove.a-drains-stdin read its stdin dry"\nexit 0\n' \
+  > "$fixture/greedy/.play/permanent/prove.a-drains-stdin.play.sh"
+git -C "$fixture/greedy" add -A
 
 # one case — $1 = label · $2 = exit wanted · $3 = repo · then the skill's args
 case_run() {
@@ -73,6 +78,7 @@ case_run() {
 case_run "--all · a pass, a decline, a failure → 1"  1 mixed    --all --within 30
 case_run "--all · a pass and a decline → 2"          2 declined --all --within 30
 case_run "--all · every play passes → 0"             0 green    --all --within 30
+case_run "--all · a play that drains stdin → every later play still runs → 0" 0 greedy --all --within 30
 case_run "--all with --play → two subjects, refused" 2 green    --all --play prove.a-passes
 case_run "an unknown flag → refused, names the valid" 2 green   --every 5
 case_run "--help → the usage"                        0 green    --help
@@ -84,6 +90,16 @@ for want in "✔ prove.a-passes" "🌙 prove.b-declines" "💥 prove.c-fails" "1
     echo "   • the mixed suite names '$want' ✔"
   else
     cry "   💥 MalfunctionError: the mixed suite never names '$want'"
+    failed=1
+  fi
+done
+
+# a play that reads stdin must not swallow the queue: every play after it is still named
+for want in "✔ prove.b-passes" "✔ prove.c-passes" "3 passed · 0 declined · 0 failed"; do
+  if [[ "$transcript" == *"$want"* ]]; then
+    echo "   • after a play that drains stdin, the suite names '$want' ✔"
+  else
+    cry "   💥 MalfunctionError: after a play that drains stdin, the suite never names '$want'"
     failed=1
   fi
 done

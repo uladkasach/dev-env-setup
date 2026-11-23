@@ -65,6 +65,10 @@ grove_provision_5_devtools() {
   #   over a gate that never closes
   bundle.upgrade 5.18.openhours
 
+  # .why AFTER 5.4.gh: it allows, in the commit meter, each unset org the token gh
+  #   holds can push to; a block is kept, and a local grove declines
+  bundle.upgrade 5.26.commitorgs
+
   # LAST: the crew boot gate reads this marker, so a box declares itself a work
   #   grove only once every bundle above has converged it
   bundle.upgrade 5.25.purpose
