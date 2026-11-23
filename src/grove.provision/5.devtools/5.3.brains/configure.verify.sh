@@ -323,6 +323,7 @@ _grove_provision_5_3_brains_settings_claims() {
     '.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE' '"50"' 'the auto-compact threshold' \
     '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW' '"1000000"' 'the auto-compact window, which turns threshold compaction on for subagents too' \
     '.env.CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS' '"450000"' 'the idle-compaction floor' \
+    '.env.CLAUDE_CODE_DISABLE_MOUSE' '"1"' 'the mouse capture, off so a wheel tick never recalls prompt history' \
     '.disableClaudeAiConnectors' 'true' 'the claude.ai connector fetch' \
     '.permissions.defaultMode' '"auto"' 'the auto default mode' \
     '(.permissions.deny // []) | index("Agent")' 'null' 'the subagent tool, never denied' \

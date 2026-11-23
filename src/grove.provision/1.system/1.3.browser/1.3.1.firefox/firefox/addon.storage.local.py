@@ -173,12 +173,14 @@ def main():
         want[name] = val == "true"
 
     uuid = find_uuid(args.profile, args.addon_id)
-    db = find_db(args.profile, uuid) if uuid else None
-    if not db:
-        print(f"absent: no storage.local db for {args.addon_id} (has it ever run?)")
-        return 5
 
+    # 🛑 the db search reads sqlite too, so it sits inside the lock guard:
+    #    a live firefox can hold the lock at the search as well as at the patch
     try:
+        db = find_db(args.profile, uuid) if uuid else None
+        if not db:
+            print(f"absent: no storage.local db for {args.addon_id} (has it ever run?)")
+            return 5
         return patch(db, args, want)
     except sqlite3.OperationalError as error:
         # a live firefox may hold the db locked; that is the quit-owed case, not a malfunction

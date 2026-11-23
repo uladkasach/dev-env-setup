@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=keynav
+Comment=move and click the pointer by keyboard — declared by grove bundle 1.1.keybinds
+Exec=/usr/bin/keynav
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

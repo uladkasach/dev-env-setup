@@ -13,6 +13,11 @@
 # usage:
 #   tmux.sockets.get.sh             # every socket, a summary row each
 #   tmux.sockets.get.sh --sessions  # also list each server's sessions
+#   tmux.sockets.get.sh --key C-Up  # also each server's LIVE root bind for a key
+#
+#   --key answers "did this server take the conf?" — a bind change is live the
+#   moment a server sources it, so a server that still shows the old bind is
+#   the one a window misbehaves on. repeat --key for several keys
 #
 # guarantee:
 #   - read-only; asks each server, signals none, unlinks no socket
@@ -22,10 +27,13 @@
 set -uo pipefail
 
 SHOW_SESSIONS=0
+KEYS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skill) shift 2 ;;
     --sessions) SHOW_SESSIONS=1; shift ;;
+    --key) [[ -n "${2:-}" ]] || { echo "✋ ConstraintError: --key needs a key name, e.g. --key C-Up" >&2; exit 2; }
+           KEYS+=("$2"); shift 2 ;;
     -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "✋ ConstraintError: unknown arg: $1" >&2; exit 2 ;;
   esac
@@ -72,4 +80,9 @@ for sock in "${SOCKS[@]}"; do
   if (( SHOW_SESSIONS == 1 )); then
     printf '%s\n' "$sessions" | grep . | sed "s/^/   $p     · /"
   fi
+  # the live root bind, one line per key; `(unbound)` when the server holds none
+  for key in "${KEYS[@]}"; do
+    bind="$(timeout 2 tmux -S "$sock" list-keys -T root "$key" 2>/dev/null | tr -s ' ' | head -c 300)"
+    echo "   $p     ⌨ $key: ${bind:-(unbound)}"
+  done
 done

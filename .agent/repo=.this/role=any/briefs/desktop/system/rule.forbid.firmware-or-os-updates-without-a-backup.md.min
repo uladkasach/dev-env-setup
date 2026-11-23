@@ -1,0 +1,9 @@
+# rule.forbid.firmware-or-os-updates-without-a-backup
+
+never recommend a firmware, kernel, or os package update (`linux-firmware`, `firmware-*`, bios, `fwupdmgr`, `apt upgrade`) as a fix. one bad firmware takes wifi, gpu, or boot with it, and lands after the chat ends.
+
+gate, in order: 1. human confirms a full backup — no → stop · 2. its changelog names THIS platform — no → it cannot fix this · 3. rollback named. then offer it as an option with its risk, never "safe".
+
+today's fix is a reset the box supports, or an external device that bypasses the broken one.
+
+blocker: an update recommended before backup, changelog, or rollback.

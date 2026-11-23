@@ -1,0 +1,15 @@
+# rule.require.install-via-procedures
+
+hand a human the repo's entrypoint, never a one-off command and never a `source <file> && <function>` pair:
+
+```bash
+rhx grove.provision --what <slug> --mode apply
+```
+
+why: reproducible (the repo is the record) · idempotent · verified by the bundle's `*.verify` · previewable via `--mode plan` · one source of truth.
+
+find the slug: `rhx grove.provision --mode plan` lists every one; the bundle path is the slug (`src/grove.provision/5.devtools/5.2.rust/` → `--what 5.2.rust`).
+
+exception: a one-off only to unblock now, while its bundle is written; the bundle must follow.
+
+blocker: a one-off handed over where a bundle exists · a `source` + call instruction · a change applied with no bundle to reproduce it.

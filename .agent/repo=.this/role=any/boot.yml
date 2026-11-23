@@ -26,6 +26,8 @@ always:
       - briefs/grove/provision/rule.forbid.deferred-provision-defects.md
       # it governs the instant before a raw command is typed
       - briefs/shell/rule.forbid.adhoc-shell.md
+      # it governs the instant before an update is recommended — no backup, no firmware or os update
+      - briefs/desktop/system/rule.forbid.firmware-or-os-updates-without-a-backup.md
 
     # reference — fetch on demand
     ref:
