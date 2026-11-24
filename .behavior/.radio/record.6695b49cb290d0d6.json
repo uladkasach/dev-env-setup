@@ -1,0 +1,19 @@
+{
+  "key": "6695b49cb290d0d6",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-ehmpathy"
+  },
+  "exid": null,
+  "title": "fix(mechanic): 8 uses deny rules read their * literally on claude-code 2.1.330",
+  "description": "## .what\n\nclaude-code 2.1.330 warns at session start that 8 deny rules, generated from role=mechanic into each actor's settings, read their `*` literally. a rule that mixes a mid-pattern `*` with the `:*` suffix is matched as a literal prefix, so it likely never matches.\n\n## .the rules\n\n- `Bash(rhx git.branch.uses --org * allow:*)`\n- `Bash(rhx git.branch.uses --org * del:*)`\n- `Bash(rhx git.commit.uses --org * allow:*)`\n- `Bash(rhx git.commit.uses --org * del:*)`\n- `Bash(npx rhachet run --skill git.branch.uses --org * allow:*)`\n- `Bash(npx rhachet run --skill git.branch.uses --org * del:*)`\n- `Bash(npx rhachet run --skill git.commit.uses --org * allow:*)`\n- `Bash(npx rhachet run --skill git.commit.uses --org * del:*)`\n\n## .the harm\n\nthese rules stop a clone that grants itself commit or branch quota for an org. while they never match, that gate is open.\n\nthe 2.1.282 release notes say mid-pattern `:*` rules were skipped in settings files before that version. so the gap likely predates 2.1.330; this is read from the notes, not probed.\n\n## .the fix\n\nin the mechanic role's settings source: `allow:*` -> `allow*`, `del:*` -> `del*` (the cli's own suggestion).\n\nalso flagged by the same cli, seen in one session on 2.1.330: `Write(.route/**)` in allow is ignored by file checks; the cli asks for `Edit(.route/**)`.\n\n## .the clamp\n\nan enrolled clone on claude-code 2.1.330 starts with zero `Deny rule` / `Permission allow rule` warnings, and `rhx git.commit.uses --org <org> allow` from a clone is denied.\n\n## .source\n\nfirst seen in uladkasach/dev-env-setup, 2026-11-23, at session start.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 16,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "1482"
+}

@@ -140,6 +140,33 @@ grove_provision_5_3_brains_provision_verify() {
   fi
 
   ####################################################################
+  # the `rhx` a shell runs must be the pnpm global copy this bundle installs
+  #
+  # ⚠️ rhachet has no pin, so a version check cannot catch a shadow
+  #   - 📜 2026-11-23: an fnm npm-global rhachet 1.51.0 sat ahead of pnpm's
+  #     1.54.1 on PATH. `rhx upgrade --self --which global` raised pnpm's copy,
+  #     exited 0, and the bare `rhx` still ran 1.51.0
+  #   - ⇒ ask WHERE the bare name resolves, never what pnpm holds
+  ####################################################################
+  if command -v rhx >/dev/null 2>&1; then
+    local rhx_live pnpm_bin
+    rhx_live="$(command -v rhx)"
+    pnpm_bin="$(timeout -k 5 "$GROVE_BRAIN_PROBE_SECONDS" pnpm bin -g 2>/dev/null || true)"
+
+    if [[ -z "$pnpm_bin" ]]; then
+      echo "   🌙 pnpm did not name its global bin, so rhx's origin is unproven"
+    elif [[ "$rhx_live" == "$pnpm_bin/rhx" ]]; then
+      echo "   • rhx resolves to the pnpm global copy ✔"
+    else
+      echo "   ✋ rhx resolves to $rhx_live, not the pnpm global copy at $pnpm_bin/rhx" >&2
+      echo "      ⇒ a shadow outranks pnpm on PATH, so an upgrade of the pnpm copy" >&2
+      echo "        reaches no shell — rhx runs whatever version the shadow holds" >&2
+      echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+      failed=1
+    fi
+  fi
+
+  ####################################################################
   # rhachet's PEERS — asked by a REQUIRE, because every cheaper probe is blind
   #
   # ⚠️ this claim needs its own check

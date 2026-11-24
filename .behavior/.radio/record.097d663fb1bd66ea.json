@@ -1,0 +1,19 @@
+{
+  "key": "097d663fb1bd66ea",
+  "kind": "create",
+  "repo": {
+    "owner": "uladkasach",
+    "name": "dev-env-setup"
+  },
+  "exid": null,
+  "title": "fix(boot): ambient actor boot.md is 463.7k chars, over the 150k limit of claude-code",
+  "description": "## .what\n\nclaude-code warns at session start:\n\n```\n.agent/.actors/actor.via.repo=ambient/brain/.claude/boot.md is over the 150.0k-char limit (463.7k chars)\n```\n\n`/context` reports the file at ~188k tokens: 19% of a 1m window spent before the first message.\n\n## .the first move: measure per role\n\nthe file concatenates every enrolled role's say-level briefs and skills. no per-role breakdown is measured yet. sort the chars by `repo=*/role=*` before any cut, and let the largest group name the cause.\n\n## .the likely levers\n\n- demote say-level briefs to ref in each role's `boot.yml`\n- ship `.md.min` twins for the long say-level briefs\n- trim the role set the ambient actor enrolls\n- a role owned by another repo is fixed there: dispatch a task upstream per role over budget\n\n## .the clamp\n\na session on the ambient actor starts with no over-limit notice for boot.md.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 17,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "215"
+}

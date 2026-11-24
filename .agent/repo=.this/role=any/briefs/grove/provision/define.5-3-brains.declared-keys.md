@@ -44,7 +44,6 @@ this patch is the sole home of every brain knob (`rule.require.brain-config-has-
 | `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | a 1M window from the `env` source, so threshold compaction runs in every context — subagents included — and the 50% lands at 500k | `ok()`, per call |
 | `CLAUDE_CODE_SUBAGENT_MODEL` | subagents on `claude-sonnet-5-5[1m]`, never the session's opus | `Ik6()` |
 | `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` | idle compaction fires past 450k tokens, not its 200k default | none in 2.1.280; idle compaction ships in 2.1.299. declared ahead of the pin bump |
-| `CLAUDE_CODE_DISABLE_MOUSE` | mouse mode `off`: inside tmux the fullscreen tui maps a wheel tick to prompt history (anthropics/claude-code#38810, #58364), and tmux delivers a true SGR wheel event, never an arrow (`rhx tmux.scroll.probe`). the fullscreen view stays; PgUp/PgDn scroll it (#66601) | `uO()` |
 
 the subagent tool is allowed (see `subagents are allowed`), so the subagent model is live.
 

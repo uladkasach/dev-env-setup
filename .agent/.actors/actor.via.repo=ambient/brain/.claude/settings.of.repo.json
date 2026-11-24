@@ -569,5 +569,9 @@
     "type": "command",
     "command": "node -e \"import('rhachet-roles-bhrain/cli/route.status.line').then(m => m.routeStatusLine())\"",
     "padding": 0
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
   }
 }

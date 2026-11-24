@@ -1,0 +1,19 @@
+{
+  "key": "692ab8915677d554",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet"
+  },
+  "exid": null,
+  "title": "fix(upgrade): --which global upgrades the copy nobody runs when two globals exist",
+  "description": "## .what\n\n`rhx upgrade --self --which global` picks a package manager by presence (pnpm if present, else npm), never by WHERE the live rhx is installed. so on a box with two global copies it upgrades the one nobody runs, and exits 0.\n\n## .measured (2026-11-23, a linux laptop with fnm + pnpm)\n\n- `which -a rhx` → `~/.local/share/fnm/aliases/default/bin/rhx` (npm global, rhachet 1.51.0) FIRST, then `~/.local/share/pnpm/rhx` (pnpm global)\n- `rhx upgrade --self --which global` raised the pnpm copy to 1.54.1 and exited 0\n- the bare `rhx` still ran 1.51.0\n- likely origin (inference, unproven): the v2026_04_07 fix-upgrade-global shipped npm-only, which planted the npm copy; later pnpm-first upgrades never reached it\n\n## .cause\n\n`src/domain.operations/upgrade/execNpmInstallGlobal.ts`:\n\n```ts\nconst asPackageManagerFromPresence = ({ presence }) => presence === 'present' ? 'pnpm' : 'npm';\n```\n\n- no read of which install is live on PATH\n- no post-install check that the live binary moved\n- an `unreadable` probe falls back to npm, which can plant a second copy\n\n## .the shape of the fix\n\n1. **upgrade the copy that runs**: derive the manager from `realpath(process.argv[1])` — under the pnpm global store → pnpm; under `npm root -g` → npm. presence is the fallback only when neither matches\n2. **verify after install**: look up `rhx` on PATH, ask its version. not the target → ✋ ConstraintError that names the shadow path and the exact command to remove it. never exit 0 while the live rhx is stale\n3. **no silent second install**: an unreadable pnpm probe must not fall back to npm when a pnpm-owned copy exists\n4. **clamp**: hermetic test with two fake globals at different versions on a temp PATH. the upgrade either moves the PATH-first copy or fails loud with the shadow named. revert the fix → red\n\n## .downstream note\n\nuladkasach/dev-env-setup now prunes npm-global rhachet shadows in its 5.3.brains bundle and verifies the `rhx` on PATH is the pnpm copy. that is a net for one repo; the fix belongs here so every box converges.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": null,
+  "heldSeq": 18,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "826"
+}
