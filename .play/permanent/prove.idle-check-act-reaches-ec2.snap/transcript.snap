@@ -1,0 +1,15 @@
+guard: ✔ the wrapper refuses every aws call but a stop, and every stop it passes carries --dry-run
+imds: ✔ imds answers a token, an instance id (i-…), and a region (<area>-<zone>-<n>)
+dryrun: ✔ the act sent stop-instances --hibernate for this box to real ec2, which answered DryRunOperation
+   │ exit=1
+   │ idle-hibernate: sleep — idle=<n>s limit=<n>s, newest=<kind> <source>; seen traces=<n> pts=<n> ducts=<n> — hibernate now
+   │ aws ec2 stop-instances --hibernate --instance-ids <instance-id> --region <region> --dry-run
+   │ idle-hibernate: 💥 MalfunctionError: aws refused stop-instances --hibernate for <instance-id>, so the box did not sleep: aws: [ERROR]: An error occurred (DryRunOperation) when calling the StopInstances operation: Request would have succeeded, but DryRun flag is set.
+   │    └─ fix: none owed: aws answered a dry run — the stop would have succeeded, and none was made; the check retries next tick
+nocreds: ✔ with no credential the real aws refuses, and the check names it with its fix
+   │ exit=1
+   │ idle-hibernate: sleep — idle=<n>s limit=<n>s, newest=<kind> <source>; seen traces=<n> pts=<n> ducts=<n> — hibernate now
+   │ idle-hibernate: 💥 MalfunctionError: aws refused stop-instances --hibernate for <instance-id>, so the box did not sleep: aws: [ERROR]: An error occurred (NoCredentials): Unable to locate credentials. You can configure credentials by running "aws login".
+   │    └─ fix: the box holds no live aws credentials: read its instance profile (rhx aws.whoami); the check retries next tick
+systemd: ✔ the bounded reader gets this box's systemd answers: LoadState, is-enabled, DropInPaths
+

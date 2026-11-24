@@ -1,0 +1,47 @@
+#!/bin/bash
+IDLE_LIMIT=10800
+
+NOW=$(date +%s)
+STIR=0
+
+bump() {
+  [ -n "$1" ] || return 0
+  [ "$1" -gt "$STIR" ] && STIR=$1
+  return 0
+}
+
+bump $((NOW - $(cut -d. -f1 /proc/uptime)))
+
+while IFS='	' read -r UNDER NAMED; do
+  [ -n "$UNDER" ] || continue
+  bump "$(find $UNDER -name "$NAMED" -printf '%T@\n' 2>/dev/null | cut -d. -f1 | sort -rn | head -1)"
+done <<'TRACES'
+/home/*/.claude/projects	*.jsonl
+TRACES
+
+bump "$(find /dev/pts -mindepth 1 -maxdepth 1 -type c -printf '%T@\n' 2>/dev/null | cut -d. -f1 | sort -rn | head -1)"
+
+IDLE_FOR=$((NOW - STIR))
+[ $IDLE_FOR -ge $IDLE_LIMIT ] || exit 0
+
+echo "idle-hibernate: idle=$IDLE_FOR limit=$IDLE_LIMIT (seconds) — hibernate now"
+
+command -v aws >/dev/null 2>&1 || {
+  echo "idle-hibernate: REFUSED — no aws cli on PATH, so stop-instances cannot be called" >&2
+  exit 1
+}
+
+TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+IID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
+[ -n "$IID" ] && [ -n "$REGION" ] || {
+  echo "idle-hibernate: REFUSED — imds gave no instance-id/region (iid=$IID region=$REGION)" >&2
+  exit 1
+}
+
+if aws ec2 stop-instances --hibernate --instance-ids "$IID" --region "$REGION"; then
+  echo "idle-hibernate: stop-instances --hibernate accepted for $IID"
+else
+  echo "idle-hibernate: FAILED — aws refused stop-instances --hibernate for $IID" >&2
+  exit 1
+fi

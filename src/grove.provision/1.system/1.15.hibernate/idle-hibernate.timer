@@ -1,0 +1,9 @@
+[Unit]
+Description=check idle every 5 minutes
+
+[Timer]
+OnBootSec=300
+OnUnitActiveSec=300
+
+[Install]
+WantedBy=timers.target

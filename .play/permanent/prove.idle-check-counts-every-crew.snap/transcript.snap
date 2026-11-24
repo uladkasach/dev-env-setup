@@ -1,0 +1,439 @@
+## worktree (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/git/org/_worktrees/tree/.agent/.actors/actor/brain/.claude/projects/d/c.jsonl; seen traces=3 pts=1 ducts=0
+### stderr
+
+
+## mainclone (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/git/org/repo/.agent/.actors/actor/brain/.claude/projects/d/m.jsonl; seen traces=3 pts=1 ducts=0
+### stderr
+
+
+## human (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0
+### stderr
+
+
+## boot (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=boot <fix>/proc/uptime; seen traces=3 pts=1 ducts=0
+### stderr
+
+
+## keystroke (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=pts <fix>/dev/pts/0; seen traces=3 pts=1 ducts=0
+### stderr
+
+
+## output (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+## ptmx (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+## idle (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+## imdsempty (exit 1)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+### stderr
+idle-hibernate: 💥 MalfunctionError: imds gave no instance-id/region (iid=empty region=empty), so the box did not sleep
+   └─ fix: read the box's metadata options (http-endpoint enabled, hop limit >= 1); the check retries next tick
+
+## awsrefused (exit 1)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+### stderr
+idle-hibernate: 💥 MalfunctionError: aws refused stop-instances --hibernate for stub, so the box did not sleep: An error occurred (UnauthorizedOperation)
+   └─ fix: the instance role lacks ec2:StopInstances on this instance: grant it in the role's policy; the check retries next tick
+
+## noaws (exit 1)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+### stderr
+idle-hibernate: 💥 MalfunctionError: no aws cli on PATH, so stop-instances cannot be called, and the box did not sleep
+   └─ fix: the first boot installs aws, so read the box's cloud-init output log for why it failed; then from the ground seat, rhx grove.provision --what 5.6.aws --mode apply; the check retries next tick
+
+## edgehold (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0
+### stderr
+
+
+## edgesleep (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+## future (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/git/org/_worktrees/tree/.agent/.actors/actor/brain/.claude/projects/d/c.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: trace unreadable — <fix>/home/u/.claude/projects/d/h.jsonl is stamped <n>s in the future
+   └─ fix: set the box clock right (timedatectl), or touch the file to now
+
+## freshunread (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=2 pts=1 ducts=0; and 1 source(s) unreadable (each a 💥 line on stderr), so this run exits 1
+### stderr
+idle-hibernate: 💥 MalfunctionError: trace unreadable — find: '<fix>/home/u/git/org/_worktrees/tree/.agent/.actors/actor/brain/.claude/projects/d': Permission denied
+   └─ fix: read the error as the root's owner (uid <uid>): a dir it cannot enter, a mount that refuses, an i/o fault, or a loop
+
+## ptsunread (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=0 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: pts unreadable — find: '<fix>/dev/pts': Permission denied
+   └─ fix: the unit runs as root; read why <fix>/dev/pts refused it
+
+## duct (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=duct <fix>/tmp/tmux-1/default crew:0; seen traces=3 pts=1 ducts=1
+### stderr
+
+
+## silentduct (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=1 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+## pipe (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=10003 pts=1 ducts=0 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+## unreadable (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: duct unreadable — tmux at <fix>/tmp/tmux-2/default did not answer: error connecting to <fix>/tmp/tmux-2/default (Permission denied)
+   └─ fix: read tmux's text above; reap the socket only once no server holds it (lsof -U <fix>/tmp/tmux-2/default)
+
+## refused (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=2 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: trace unreadable — find: '<fix>/home/u/git/org/_worktrees/tree/.agent/.actors/actor/brain/.claude/projects/d': Permission denied
+   └─ fix: read the error as the root's owner (uid <uid>): a dir it cannot enter, a mount that refuses, an i/o fault, or a loop
+
+## ioerror (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 4 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: trace unreadable — find: '<fix>/home/u/.claude/projects': Input/output error
+   └─ fix: read the error as the root's owner (uid <uid>): a dir it cannot enter, a mount that refuses, an i/o fault, or a loop
+idle-hibernate: 💥 MalfunctionError: trace unreadable — find: '<fix>/home/u/git/org/_worktrees/tree/.agent/.actors/actor/brain/.claude/projects': Input/output error
+   └─ fix: read the error as the root's owner (uid <uid>): a dir it cannot enter, a mount that refuses, an i/o fault, or a loop
+idle-hibernate: 💥 MalfunctionError: trace unreadable — find: '<fix>/home/u/git/org/repo/.agent/.actors/actor/brain/.claude/projects': Input/output error
+   └─ fix: read the error as the root's owner (uid <uid>): a dir it cannot enter, a mount that refuses, an i/o fault, or a loop
+idle-hibernate: 💥 MalfunctionError: pts unreadable — find: '<fix>/dev/pts': Input/output error
+   └─ fix: the unit runs as root; read why <fix>/dev/pts refused it
+
+## noboot (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: boot unreadable — cut: <fix>/proc/uptime: No such file or directory
+   └─ fix: read <fix>/proc/uptime by hand; a box with no procfs cannot judge its own idle
+
+## moved (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: duct unreadable — a tmux server runs, and no socket under <fix>/tmp/tmux-*/* answered
+   └─ fix: find its socket (lsof -U -a -p $(pgrep -o -x 'tmux: server')), then widen TMUX_SOCKETS in this check to reach it
+
+## stale (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+## vanished (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+## dropowner (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=duct <fix>/tmp/tmux-6/default crew:0; seen traces=3 pts=1 ducts=1
+### stderr
+
+
+## notmux (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: duct unreadable — a tmux server runs, and no tmux client is on PATH to read it
+   └─ fix: the server's own tmux sits off the unit's PATH: read Environment=PATH= in idle-hibernate.service against $(command -v tmux) as the crew's seat
+
+## pgrepfault (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: duct unreadable — pgrep could not search for a tmux server: pgrep: cannot read the process table
+   └─ fix: the unit runs as root; read why pgrep cannot read the process table
+
+## hung (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: duct unreadable — tmux at <fix>/tmp/tmux-7/default did not answer: timeout
+   └─ fix: the server did not answer within 5s; read it by hand (tmux -S <fix>/tmp/tmux-7/default list-windows), and reap the socket only once no server holds it
+
+## budget (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=boot <fix>/proc/uptime; seen traces=0 pts=0 ducts=0; but 7 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: trace unreadable — the -1s read budget ran out before the sweep of <fix>/home/u/.claude/projects (as uid <uid>)
+   └─ fix: the sweeps before this one spent the budget; the record names each — read which ran long, and why its tree is large or slow
+idle-hibernate: 💥 MalfunctionError: trace unreadable — the -1s read budget ran out before the sweep of <fix>/home/u/git/org/_worktrees/tree/.agent/.actors/actor/brain/.claude/projects (as uid <uid>)
+   └─ fix: the sweeps before this one spent the budget; the record names each — read which ran long, and why its tree is large or slow
+idle-hibernate: 💥 MalfunctionError: trace unreadable — the -1s read budget ran out before the sweep of <fix>/home/u/git/org/repo/.agent/.actors/actor/brain/.claude/projects (as uid <uid>)
+   └─ fix: the sweeps before this one spent the budget; the record names each — read which ran long, and why its tree is large or slow
+idle-hibernate: 💥 MalfunctionError: pts unreadable — the -1s read budget ran out before the sweep of <fix>/dev/pts
+   └─ fix: the sweeps before this one spent the budget; the record names each — read which ran long, and why its tree is large or slow
+idle-hibernate: 💥 MalfunctionError: duct unreadable — the sweep passed its -1s budget before <fix>/tmp/tmux-8/default
+   └─ fix: reap stale sockets under <fix>/tmp/tmux-*/*; each live server answers in well under 5s
+idle-hibernate: 💥 MalfunctionError: duct unreadable — 1 tmux server ran through the sweep, and 0 sat under <fix>/tmp/tmux-*/*
+   └─ fix: find each server's socket (lsof -U -a -p <pid>); widen TMUX_SOCKETS in this check, or restore the socket
+idle-hibernate: 💥 MalfunctionError: duct unreadable — a tmux server runs, and no socket under <fix>/tmp/tmux-*/* answered
+   └─ fix: find its socket (lsof -U -a -p $(pgrep -o -x 'tmux: server')), then widen TMUX_SOCKETS in this check to reach it
+
+## unswept (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=1; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: duct unreadable — 2 tmux servers ran through the sweep, and 1 sat under <fix>/tmp/tmux-*/*
+   └─ fix: find each server's socket (lsof -U -a -p <pid>); widen TMUX_SOCKETS in this check, or restore the socket
+
+## scope (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=duct <fix>/tmp/tmux-10/default crew:0; seen traces=3 pts=1 ducts=1
+### stderr
+
+
+## findkill (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=boot <fix>/proc/uptime; seen traces=0 pts=0 ducts=0; but 4 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: trace unreadable — the sweep of <fix>/home/u/.claude/projects (as uid <uid>): find exited 137 with no error text (a kill, or an oom)
+   └─ fix: read the kernel log for an oom kill or a signal (journalctl -k) — the box holds meanwhile
+idle-hibernate: 💥 MalfunctionError: trace unreadable — the sweep of <fix>/home/u/git/org/_worktrees/tree/.agent/.actors/actor/brain/.claude/projects (as uid <uid>): find exited 137 with no error text (a kill, or an oom)
+   └─ fix: read the kernel log for an oom kill or a signal (journalctl -k) — the box holds meanwhile
+idle-hibernate: 💥 MalfunctionError: trace unreadable — the sweep of <fix>/home/u/git/org/repo/.agent/.actors/actor/brain/.claude/projects (as uid <uid>): find exited 137 with no error text (a kill, or an oom)
+   └─ fix: read the kernel log for an oom kill or a signal (journalctl -k) — the box holds meanwhile
+idle-hibernate: 💥 MalfunctionError: pts unreadable — the sweep of <fix>/dev/pts: find exited 137 with no error text (a kill, or an oom)
+   └─ fix: read the kernel log for an oom kill or a signal (journalctl -k) — the box holds meanwhile
+
+## hostilename (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: duct unreadable — tmux at <fix>/tmp/tmux-h/x?[31m?idle-hibernate: sleep forged did not answer: timeout
+   └─ fix: the server did not answer within 5s; read it by hand (tmux -S <fix>/tmp/tmux-h/x?[31m?idle-hibernate: sleep forged list-windows), and reap the socket only once no server holds it
+
+## linkedroot (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/v/.claude/projects/d/l.jsonl; seen traces=4 pts=1 ducts=0
+### stderr
+
+
+## codex (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.codex/sessions/2026/11/21/rollout-x.jsonl; seen traces=4 pts=1 ducts=0
+### stderr
+
+
+## junkduct (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: duct unreadable — tmux at <fix>/tmp/tmux-11/default answered no window rows: hello
+   └─ fix: read what listens at <fix>/tmp/tmux-11/default (lsof -U <fix>/tmp/tmux-11/default); a tmux server answers one '<epoch> <session>:<window>' row per window
+
+## lostserver (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+## mismatch (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: duct unreadable — tmux at <fix>/tmp/tmux-13/default did not answer: protocol version mismatch (client 8, server 7)
+   └─ fix: a tmux upgrade left this server on its old protocol; never restart it under a crew — read it with the binary it runs (its pid's exe link in procfs, with -S <fix>/tmp/tmux-13/default list-windows -a); the hold lifts when its crew ends
+
+## bornmidsweep (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=duct <fix>/tmp/tmux-14/default crew:0; seen traces=3 pts=1 ducts=1
+### stderr
+
+
+## slowwalk (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=boot <fix>/proc/uptime; seen traces=0 pts=0 ducts=0; but 4 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: trace unreadable — the sweep of <fix>/home/u/.claude/projects (as uid <uid>) passed the 1s read budget (exit 124)
+   └─ fix: the tree is too large or its mount too slow for one tick; read its size and its mount — the box holds meanwhile
+idle-hibernate: 💥 MalfunctionError: trace unreadable — the 1s read budget ran out before the sweep of <fix>/home/u/git/org/_worktrees/tree/.agent/.actors/actor/brain/.claude/projects (as uid <uid>)
+   └─ fix: the sweeps before this one spent the budget; the record names each — read which ran long, and why its tree is large or slow
+idle-hibernate: 💥 MalfunctionError: trace unreadable — the 1s read budget ran out before the sweep of <fix>/home/u/git/org/repo/.agent/.actors/actor/brain/.claude/projects (as uid <uid>)
+   └─ fix: the sweeps before this one spent the budget; the record names each — read which ran long, and why its tree is large or slow
+idle-hibernate: 💥 MalfunctionError: pts unreadable — the 1s read budget ran out before the sweep of <fix>/dev/pts
+   └─ fix: the sweeps before this one spent the budget; the record names each — read which ran long, and why its tree is large or slow
+
+## actlate (exit 1)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+### stderr
+idle-hibernate: 💥 MalfunctionError: the reads ran <n>s past their window, so the stop act would not fit the unit's bound, and the box did not sleep
+   └─ fix: the trace roots are too large or their mount too slow for one tick — read their size and their mount; the check retries next tick
+
+## hostilepath (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: trace unreadable — find: '<fix>/home/u/.claude/projects/d/x: No such file or directory': Permission denied
+   └─ fix: read the error as the root's owner (uid <uid>): a dir it cannot enter, a mount that refuses, an i/o fault, or a loop
+
+## hostilename.benign (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: duct unreadable — tmux at <fix>/tmp/tmux-b/x (Connection refused) did not answer: error connecting to <fix>/tmp/tmux-b/x (Connection refused) (Permission denied)
+   └─ fix: read tmux's text above; reap the socket only once no server holds it (lsof -U <fix>/tmp/tmux-b/x (Connection refused))
+
+## traceowner (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/git/org/_worktrees/tree/.agent/.actors/actor/brain/.claude/projects/d/c.jsonl; seen traces=3 pts=1 ducts=0
+### stderr
+
+
+## wakegap (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=wake <fix>/run/idle-hibernate.last — the last tick sat <n>s back, past the 900s tick gap; seen traces=3 pts=1 ducts=0
+### stderr
+
+
+## wakecarry (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=wake <fix>/run/idle-hibernate.last, carried from the tick that saw the wake; seen traces=3 pts=1 ducts=0
+### stderr
+
+
+## wakeover (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+## wakebadrecord (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: wake unreadable — the last record's first line names no time: garbage
+   └─ fix: the next tick rewrites <fix>/run/idle-hibernate.last; a record this check did not write is a second writer on it
+
+## sleeprecord (exit 0)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0
+### stderr
+
+
+## record (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+## record.loud (exit 1)
+### stdout
+idle-hibernate: hold — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0; but 1 source(s) unreadable (each a 💥 line on stderr), and a box the check cannot read is held, never slept
+### stderr
+idle-hibernate: 💥 MalfunctionError: duct unreadable — a tmux server runs, and no socket under <fix>/tmp/tmux-*/* answered
+   └─ fix: find its socket (lsof -U -a -p $(pgrep -o -x 'tmux: server')), then widen TMUX_SOCKETS in this check to reach it
+
+## recordnodir (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+idle-hibernate: 💥 MalfunctionError: could not write <fix>/run/idle-hibernate.last-sleep (its record would read exit=unanswered) — mktemp: failed to create file via template '<fix>/run/idle-hibernate.last-sleep.XXXXXX': No such file or directory
+   └─ fix: the unit runs as root; read why <fix>/run refused the write. the verdict above still stands
+idle-hibernate: 💥 MalfunctionError: could not write <fix>/run/idle-hibernate.last-sleep (its record would read exit=0) — mktemp: failed to create file via template '<fix>/run/idle-hibernate.last-sleep.XXXXXX': No such file or directory
+   └─ fix: the unit runs as root; read why <fix>/run refused the write. the verdict above still stands
+idle-hibernate: 💥 MalfunctionError: could not write <fix>/run/idle-hibernate.last (its record would read exit=0) — mktemp: failed to create file via template '<fix>/run/idle-hibernate.last.XXXXXX': No such file or directory
+   └─ fix: the unit runs as root; read why <fix>/run refused the write. the verdict above still stands
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+## recordnorename (exit 0)
+### stdout
+idle-hibernate: sleep — idle=<n>s limit=10800s, newest=trace <fix>/home/u/.claude/projects/d/h.jsonl; seen traces=3 pts=1 ducts=0 — hibernate now
+idle-hibernate: stop-instances --hibernate accepted for stub
+### stderr
+mv: cannot move to '<fix>/run/idle-hibernate.last-sleep': Read-only file system
+idle-hibernate: 💥 MalfunctionError: could not write <fix>/run/idle-hibernate.last-sleep (its record would read exit=unanswered) — the error is above
+   └─ fix: the unit runs as root; read why <fix>/run refused the write. the verdict above still stands
+mv: cannot move to '<fix>/run/idle-hibernate.last-sleep': Read-only file system
+idle-hibernate: 💥 MalfunctionError: could not write <fix>/run/idle-hibernate.last-sleep (its record would read exit=0) — the error is above
+   └─ fix: the unit runs as root; read why <fix>/run refused the write. the verdict above still stands
+mv: cannot move to '<fix>/run/idle-hibernate.last': Read-only file system
+idle-hibernate: 💥 MalfunctionError: could not write <fix>/run/idle-hibernate.last (its record would read exit=0) — the error is above
+   └─ fix: the unit runs as root; read why <fix>/run refused the write. the verdict above still stands
+### aws
+stub aws ec2 stop-instances --hibernate --instance-ids stub --region stub
+
+

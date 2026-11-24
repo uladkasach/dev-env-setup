@@ -15,7 +15,7 @@
 #   - drifted → 💥, with the diff. to accept a drift, rerun with
 #       rhx play.run --play <play> --resnap
 #     (it exports GROVE_RESNAP=1, which rewrites the file; review it in the diff)
-#   - under CI, GROVE_RESNAP is refused: a ci run never rewrites a baseline
+#   - under CI, GROVE_RESNAP is refused: a CI run never rewrites a baseline
 #
 # .mask  = a caller strips every value that differs per run or per box (a
 #          mktemp dir, a codename) BEFORE the call; this helper compares bytes
@@ -36,11 +36,16 @@ play_snap_verify() {
       dir=*)    dir="${arg#dir=}" ;;
       name=*)   name="${arg#name=}" ;;
       actual=*) actual="${arg#actual=}" ;;
-      *) echo "   💥 MalfunctionError: play_snap_verify: unknown arg '${arg%%=*}'" >&2; return 1 ;;
+      *) echo "   💥 MalfunctionError: the snapshot check got an unknown arg '${arg%%=*}' — it takes dir=, name=, actual=" >&2; return 1 ;;
     esac
   done
-  if [[ -z "$dir" || -z "$name" ]]; then
-    echo "   💥 MalfunctionError: play_snap_verify needs dir= and name=" >&2
+  # name the absent arg, each one: "needs dir= and name=" alone leaves the play author to guess
+  local absent=""
+  [[ -n "$dir" ]] || absent="dir="
+  [[ -n "$name" ]] || absent="${absent:+$absent and }name="
+  if [[ -n "$absent" ]]; then
+    echo "   💥 MalfunctionError: the snapshot check was called with no $absent — so it cannot find a snapshot" >&2
+    echo "      ⇒ fix: pass dir=<play>.snap and name=<snap>, beside actual=" >&2
     return 1
   fi
 
@@ -49,14 +54,15 @@ play_snap_verify() {
   # under ci a snap is never written: an absent one was deleted or never committed,
   #   and a re-baseline there would pass the very drift the snap exists to catch
   if [[ ! -f "$file" && -n "${CI:-}" ]]; then
-    echo "   💥 MalfunctionError: no snapshot at $file, and CI is set — a ci run never writes one" >&2
-    echo "      fix: run the play locally, review the new snap in the diff, commit it" >&2
+    echo "   💥 MalfunctionError: no snapshot at $file, and CI is set — a CI run never writes one" >&2
+    echo "      ⇒ fix: run the play locally, review the new snap in the diff, commit it" >&2
     return 1
   fi
 
   # a resnap under ci would pass the very drift the snap exists to catch
   if [[ "${GROVE_RESNAP:-}" == 1 && -n "${CI:-}" ]]; then
-    echo "   💥 MalfunctionError: GROVE_RESNAP=1 under CI — a ci run never rewrites a snapshot" >&2
+    echo "   💥 MalfunctionError: GROVE_RESNAP=1 under CI — a CI run never rewrites a snapshot" >&2
+    echo "      ⇒ fix: resnap locally, review the snap in the diff, commit it" >&2
     return 1
   fi
 
@@ -83,8 +89,14 @@ play_snap_verify() {
   fi
 
   # drift — show it, and name the deliberate step that accepts it
+  # the diff sits under the 💥 at the tree's continuation depth, so it reads as part of it
   echo "   💥 MalfunctionError: '$name' drifted from its snapshot ($file)" >&2
-  diff <(printf '%s\n' "$actual") "$file" | head -40 >&2
-  echo "      ⇒ if the new output is right: rhx play.run --play <this play> --resnap, then review the diff" >&2
+  echo "      ├─ the diff (< this run, > the snapshot)" >&2
+  # a cut diff says so: one read as whole hides the rest of the drift
+  local delta; delta="$(diff <(printf '%s\n' "$actual") "$file")"
+  local total; total="$(printf '%s\n' "$delta" | wc -l)"
+  printf '%s\n' "$delta" | head -40 | sed 's/^/      │  /' >&2
+  [[ "$total" -le 40 ]] || echo "      │  … $(( total - 40 )) more diff line(s) not shown" >&2
+  echo "      └─ fix, if the new output is right: rhx play.run --play <this play> --resnap, then review the diff" >&2
   return 1
 }

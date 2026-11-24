@@ -107,7 +107,7 @@ while [[ $# -gt 0 ]]; do
     #    about a subject the caller never named
     *)
       echo "   ✋ ConstraintError: unknown flag: $1" >&2
-      echo "      valid: --play <slug>  --list  --all  --within <secs>  --resnap  --help" >&2
+      echo "      ⇒ valid: --play <slug>  --list  --all  --within <secs>  --resnap  --help" >&2
       exit 2 ;;
   esac
 done
@@ -121,27 +121,33 @@ fi
 ######################################################################
 # --list. the DIR is the inventory, so this reads it rather than a list
 ######################################################################
+# ⚠️ --list names a subject too, so beside --all or --play it is two subjects. a silent
+#    precedence would answer one question while the caller asked another
+if [[ "$LIST" -eq 1 && ( "$ALL" -eq 1 || -n "$PLAY" ) ]]; then
+  other="--all"; [[ -n "$PLAY" ]] && other="--play"
+  echo "   ✋ ConstraintError: --list and $other name two subjects; pick one" >&2
+  exit 2
+fi
+
 if [[ "$LIST" -eq 1 ]]; then
-  echo "🎭 play.run --list"
-  echo "   ├─ $PLAYDIR"
-  echo "   └─ store: git ls-files (the INDEX, not the disk)"
-  n=0
   # ⚠️ the INDEX, to match what --play will accept. a disk glob here would
   #    ADVERTISE a play the runner then refuses — and worse, would print a
   #    grove-authored file beside the repo's own, which is how a human is
   #    invited to run it
-  while IFS= read -r f; do
-    [[ -n "$f" ]] || continue
-    printf '      %s\n' "$(basename "$f" .play.sh)"
-    n=$(( n + 1 ))
-  done < <(git -C "$ROOT" ls-files -- '.play/permanent/*.play.sh' 2>/dev/null)
-  [[ "$n" -gt 0 ]] || echo "      (none)"
-  echo ""
-  echo "   $n play(s)"
+  mapfile -t listed < <(git -C "$ROOT" ls-files -- '.play/permanent/*.play.sh' 2>/dev/null)
+  echo "🎭 play.run --list"
+  echo "   ├─ dir: $PLAYDIR"
+  echo "   ├─ store: git ls-files (the index, not the disk)"
+  echo "   └─ plays (${#listed[@]})"
+  if [[ "${#listed[@]}" -eq 0 ]]; then echo "      └─ (none)"; fi
+  for i in "${!listed[@]}"; do
+    glyph="├─"; [[ "$i" -eq $(( ${#listed[@]} - 1 )) ]] && glyph="└─"
+    echo "      $glyph $(basename "${listed[$i]}" .play.sh)"
+  done
 
   # ⚠️ an UNTRACKED play in that dir is absent from the list above, and silence
   #    about it is the failhide: it is either work in progress, or a file
-  #    something else put there. say how many, and never which — a name printed
+  #    another writer put there. say how many, and never which — a name printed
   #    here is the invitation this check exists to withhold
   u=0
   for f in "$PLAYDIR"/*.play.sh; do
@@ -149,10 +155,10 @@ if [[ "$LIST" -eq 1 ]]; then
     git -C "$ROOT" ls-files --error-unmatch -- "$f" >/dev/null 2>&1 || u=$(( u + 1 ))
   done
   if [[ "$u" -gt 0 ]]; then
-    echo "   ⚠️ and $u untracked .play.sh file(s) sit in that dir, unlisted" >&2
-    echo "      ⇒ this runner refuses each of them. if one is yours, git add it;" >&2
-    echo "        if it is not, read it — a pulled tree can write here" >&2
-    echo "      read them:  git -C $ROOT status --short .play/permanent" >&2
+    echo "   ✋ ConstraintError: $u untracked .play.sh file(s) sit in that dir, unlisted" >&2
+    echo "      ├─ this runner refuses each of them" >&2
+    echo "      ├─ fix: if one is yours, git add it; if it is not, read it — a pulled tree can write here" >&2
+    echo "      └─ read them: git -C $ROOT status --short .play/permanent" >&2
     exit 2
   fi
   exit 0
@@ -170,9 +176,19 @@ fi
 ######################################################################
 if [[ "$ALL" -eq 1 ]]; then
   [[ -z "$PLAY" ]] || { echo "   ✋ ConstraintError: --all and --play name two subjects; pick one" >&2; exit 2; }
+  # the suite is read once, before any write: an empty suite would loop zero times and print
+  #   `every play passed` — the same failhide the absent-dir guard above refuses
+  mapfile -t plays < <(git -C "$ROOT" ls-files -- '.play/permanent/*.play.sh' 2>/dev/null)
+  if [[ "${#plays[@]}" -eq 0 ]]; then
+    echo "   ✋ ConstraintError: no tracked play in $PLAYDIR" >&2
+    echo "      ⇒ an empty suite proves no claim, so this halts rather than report a pass" >&2
+    echo "      ⇒ if you just wrote one: git add .play/permanent/<slug>.play.sh" >&2
+    exit 2
+  fi
   # the suite's logs land in the checkout's gitignored `.log/`, where a ship report reads the
   #   full-suite verdict — never a random /tmp dir no reader knows to look in
-  logdir="$ROOT/.log/role=mechanic/skill=play.run/what=all/$(date -u +%Y-%m-%dT%H-%M-%SZ).pid$$"
+  # under the role that owns this skill (`role=any`), so a caller finds it where it looks
+  logdir="$ROOT/.log/role=any/skill=play.run/what=all/$(date -u +%Y-%m-%dT%H-%M-%SZ).pid$$"
   mkdir -p "$logdir" || { echo "   💥 MalfunctionError: could not create the log dir $logdir" >&2; exit 1; }
   summary="$logdir/summary.log"
   # every verdict line goes to stdout and to the summary, so the log holds what the human saw
@@ -181,7 +197,7 @@ if [[ "$ALL" -eq 1 ]]; then
   say "   ├─ logs: ${logdir#"$ROOT"/}"
   say "   └─ verdicts"
   passed=0; declined=0; failed=0
-  while IFS= read -r f; do
+  for f in "${plays[@]}"; do
     [[ -n "$f" ]] || continue
     slug="$(basename "$f" .play.sh)"
     prc=0
@@ -191,7 +207,7 @@ if [[ "$ALL" -eq 1 ]]; then
       2) declined=$(( declined + 1 )); say "      ├─ 🌙 $slug — declined or timed out" ;;
       *) failed=$(( failed + 1 ));     say "      ├─ 💥 $slug — failed (exit $prc)" ;;
     esac
-  done < <(git -C "$ROOT" ls-files -- '.play/permanent/*.play.sh' 2>/dev/null)
+  done
   say "      └─ $passed passed · $declined declined · $failed failed"
   echo ""
   [[ "$failed" -gt 0 ]] && { echo "   💥 MalfunctionError: $failed play(s) failed — read each log under ${logdir#"$ROOT"/}" >&2; exit 1; }
@@ -217,7 +233,7 @@ case "$PLAY" in
     echo "   ✋ ConstraintError: a play is named by SLUG, never by path: '$PLAY'" >&2
     echo "      ⇒ every play lives in $PLAYDIR, so a path adds no reach and" >&2
     echo "        would let this runner become a general shell" >&2
-    echo "      read what exists: rhx play.run --list" >&2
+    echo "      ⇒ read what exists: rhx play.run --list" >&2
     exit 2 ;;
 esac
 
@@ -227,8 +243,8 @@ TARGET="$PLAYDIR/$PLAY.play.sh"
 
 if [[ ! -r "$TARGET" ]]; then
   echo "   ✋ ConstraintError: no play named '$PLAY'" >&2
-  echo "      looked for: $TARGET" >&2
-  echo "      read what exists: rhx play.run --list" >&2
+  echo "      ⇒ looked for: $TARGET" >&2
+  echo "      ⇒ read what exists: rhx play.run --list" >&2
   exit 2
 fi
 
@@ -281,7 +297,7 @@ case "$PLAY" in
     echo "   ✋ ConstraintError: '$PLAY' is a repair play, and this repo has no such verb" >&2
     echo "      ⇒ a play that moves a box FORWARD toward the declared state is" >&2
     echo "        a BUNDLE (rule.forbid.repair-plays)" >&2
-    echo "      fix: rhx grove.provision --what <slug> --mode apply" >&2
+    echo "      ⇒ fix: rhx grove.provision --what <slug> --mode apply" >&2
     exit 2 ;;
   *)
     echo "   ✋ ConstraintError: '$PLAY' does not name a verb this runner drives" >&2
@@ -313,12 +329,14 @@ echo ""
 if [[ "$rc" -eq 0 ]]; then
   echo "🌲 $PLAY ✔"
 elif [[ "$rc" -eq 124 || "$rc" -eq 137 ]]; then
-  echo "   ✋ ConstraintError: $PLAY did not finish within ${WITHIN}s, so it proved no claim" >&2
+  # 🌙, the same mark `--all` gives a timeout and a decline: neither is a verdict, so neither is ✋ or 💥
+  echo "   🌙 $PLAY did not finish within ${WITHIN}s, so it proved no claim" >&2
   echo "      ⇒ a bound that elapses is not a verdict about the subject" >&2
-  echo "      read it wider: rhx play.run --play $PLAY --within 3600" >&2
+  echo "      ⇒ read it wider: rhx play.run --play $PLAY --within 3600" >&2
   exit 2
 elif [[ "$rc" -eq 2 ]]; then
-  echo "   ✋ ConstraintError: $PLAY declined — its subject is absent, so it proved no claim" >&2
+  echo "   🌙 $PLAY declined — its subject is absent, so it proved no claim" >&2
+  echo "      ⇒ the play names what it lacked above; supply it, then run it again" >&2
   exit 2
 else
   echo "   💥 MalfunctionError: $PLAY failed (exit $rc)" >&2

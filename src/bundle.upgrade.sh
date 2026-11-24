@@ -380,19 +380,23 @@ bundle.root.declines() {
   # .why `$slug` resolves here: bash `local` is dynamically scoped, so this reads
   #    the innermost `bundle.upgrade`'s slug — the PHASE. strip the phase name
   #    to hand the human the bundle
+  local bundle="${slug:-<this bundle>}"
+  bundle="${bundle%.provision.upsert}"; bundle="${bundle%.provision.verify}"
+  bundle="${bundle%.configure.upsert}"; bundle="${bundle%.configure.verify}"
   if [[ "${GROVE_ENV_SERVER:-}" == local@unix ]]; then
-    local bundle="${slug:-<this bundle>}"
-    bundle="${bundle%.provision.upsert}"; bundle="${bundle%.provision.verify}"
-    bundle="${bundle%.configure.upsert}"; bundle="${bundle%.configure.verify}"
     echo "      ⇒ on a laptop the seat with root is its human. run this ONCE, from a"
     echo "        terminal — the sudo -v is what lets the rhx run below reach root:"
     echo "        sudo -v && rhx grove.provision --what $bundle --mode apply"
     return 0
   fi
 
-  echo "      ⇒ a seat converges its own \$HOME; this lives outside it, and the"
-  echo "        seat with sudo runs this same bundle and sets it there"
-  echo "      ⇒ no step is owed by this seat, and none by a human"
+  # ⚠️ this decline fires only where the fact does NOT hold, so the seat with sudo has
+  #    not set it yet — one apply IS owed there. "none by a human" was false on every
+  #    drifted grove: measured 2026-11-21, it printed three lines above the verify's
+  #    own "fix, from the ground seat: … --mode apply" on a box the stopgap held
+  echo "      ⇒ a seat converges its own \$HOME; this lives outside it"
+  echo "      ⇒ no step is owed by this seat; the seat with sudo owes one apply:"
+  echo "        rhx grove.provision --what $bundle --mode apply"
   return 0
 }
 

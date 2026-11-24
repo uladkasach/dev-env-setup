@@ -25,6 +25,8 @@
 #     1.12.firewall  no inbound connection, on a local grove (nftables + its unit)
 #     1.13.exitnode  the vpn switch: mullvad on/off, paused for a captive portal
 #     1.14.updates   unattended security updates, never a reboot, on every box
+#     1.15.hibernate a cloud grove's idle check — hibernates after 3h with no
+#                    stir, never under a crew at work (ec2 only)
 #
 # .why most apply to EVERY box
 #   - a screen-gate reads "no EFFECT here" as "cannot be HELD here", so `1.1`
@@ -51,4 +53,5 @@ grove_provision_1_system() {
   bundle.upgrade 1.12.firewall
   bundle.upgrade 1.13.exitnode
   bundle.upgrade 1.14.updates
+  bundle.upgrade 1.15.hibernate
 }
