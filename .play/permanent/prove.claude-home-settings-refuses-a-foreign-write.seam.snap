@@ -14,6 +14,7 @@
          • the auto-compact threshold holds the declared value ✔
          • the auto-compact window, which turns threshold compaction on for subagents too holds the declared value ✔
          • the idle-compaction floor holds the declared value ✔
+         • the mouse capture, left on (with it off, kitty turns each wheel tick into an arrow key) holds the declared value ✔
          • the claude.ai connector fetch holds the declared value ✔
          • the auto default mode holds the declared value ✔
          • the subagent tool, never denied holds the declared value ✔

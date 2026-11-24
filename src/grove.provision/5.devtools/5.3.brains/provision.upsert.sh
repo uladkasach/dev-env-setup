@@ -20,24 +20,39 @@
 # the pins live in this bundle's `_.sh` (GROVE_BRAIN_{CLAUDE,CODEX}_PIN) —
 # both halves read them: the installs below and the verify's probes
 
-_grove_provision_5_3_brains_prune_claude_shadows() {
+_grove_provision_5_3_brains_prune_npm_shadows() {
   ##################################################################
-  # .what = uninstall @anthropic-ai/claude-code from every fnm node version
-  # .why  = `fnm env --use-on-cd` puts fnm's multishell bin ahead of
-  #   $PNPM_HOME on some shells, and the $PNPM_HOME prepend is order-
-  #   sensitive (`5.1.node/configure.upsert.sh`). so a stray
-  #   `npm install -g @anthropic-ai/claude-code` — or claude's own
-  #   native-installer migration — can outrank the pinned pnpm copy on
-  #   PATH, with no other check to notice the swap. the verify CAN detect
-  #   the resulting drift (it asks the live binary), but a re-apply that
-  #   never removes the shadow would redden forever
+  # .what = uninstall each named package from every fnm node version's
+  #         npm global, so only the pnpm global copy is left on PATH
+  # .why  = `fnm env --use-on-cd` puts fnm's bin ahead of $PNPM_HOME on
+  #   some shells, and the $PNPM_HOME prepend is order-sensitive
+  #   (`5.1.node/configure.upsert.sh`). so a stray `npm install -g <pkg>`
+  #   can outrank the pnpm copy this bundle converges on, with no other
+  #   check to notice the swap. a re-apply that never removes the shadow
+  #   would redden forever, or worse, report ✔ on a pnpm copy nobody runs
   #   (`rule.require.one-command-provision`, the re-apply-loops-forever shape)
+  #   - claude-code: a stray npm install, or claude's own native-installer migration
+  #   - rhachet: 📜 2026-11-23, `rhx upgrade --self --which global` raised
+  #     pnpm's rhachet to 1.54.1 while the bare `rhx` resolved to an
+  #     fnm npm-global 1.51.0 — the upgrade exited 0 and reached no shell
   ##################################################################
   local fnm_home="${FNM_DIR:-$HOME/.local/share/fnm}"
-  local nodedir pruned=0
+  local pkg
+
+  for pkg in "$@"; do
+    _grove_provision_5_3_brains_prune_npm_shadow "$fnm_home" "$pkg" || return 1
+  done
+  return 0
+}
+
+_grove_provision_5_3_brains_prune_npm_shadow() {
+  local fnm_home="$1" pkg="$2"
+  local nodedir pkg_parent pkg_base
 
   for nodedir in "$fnm_home"/node-versions/*/installation; do
-    [[ -d "$nodedir/lib/node_modules/@anthropic-ai/claude-code" ]] || continue
+    [[ -d "$nodedir/lib/node_modules/$pkg" ]] || continue
+    pkg_parent="$(dirname "$nodedir/lib/node_modules/$pkg")"
+    pkg_base="$(basename "$pkg")"
 
     ################################################################
     # 🛑 clear npm's leftover temp dir FIRST, or the uninstall below
@@ -58,7 +73,7 @@ _grove_provision_5_3_brains_prune_claude_shadows() {
     #    reach the box at all
     ################################################################
     local stale
-    for stale in "$nodedir"/lib/node_modules/@anthropic-ai/.claude-code-*; do
+    for stale in "$pkg_parent/.$pkg_base"-*; do
       [[ -d "$stale" ]] || continue
       rm -rf "$stale" || {
         echo "   ✋ could not clear npm's leftover temp dir at $stale" >&2
@@ -72,16 +87,13 @@ _grove_provision_5_3_brains_prune_claude_shadows() {
     # invoke npm by absolute path, via its own node — the interactive `npm`
     # shell function routes to pnpm when no package-lock.json is present, so
     # a bare `npm uninstall -g` here would remove the pnpm copy we mean to keep
-    "$nodedir/bin/node" "$nodedir/bin/npm" uninstall -g @anthropic-ai/claude-code >/dev/null 2>&1 || {
-      echo "   ✋ failed to prune npm-global claude-code shadow at $nodedir" >&2
-      echo "      fix: '$nodedir/bin/node' '$nodedir/bin/npm' uninstall -g @anthropic-ai/claude-code" >&2
+    "$nodedir/bin/node" "$nodedir/bin/npm" uninstall -g "$pkg" >/dev/null 2>&1 || {
+      echo "   ✋ failed to prune npm-global $pkg shadow at $nodedir" >&2
+      echo "      fix: '$nodedir/bin/node' '$nodedir/bin/npm' uninstall -g $pkg" >&2
       return 1
     }
-    echo "   • pruned npm-global claude-code shadow at $(basename "$(dirname "$nodedir")")"
-    pruned=1
+    echo "   • pruned npm-global $pkg shadow at $(basename "$(dirname "$nodedir")")"
   done
-
-  [[ "$pruned" -eq 1 ]] || true
   return 0
 }
 
@@ -103,6 +115,10 @@ grove_provision_5_3_brains_provision_upsert() {
     echo "   • jq installed — the settings merge needs it"
   fi
 
+  # prune npm-global shadows BEFORE the pnpm installs, so PATH order cannot
+  # let a stray copy outrank the one these lines converge on
+  _grove_provision_5_3_brains_prune_npm_shadows rhachet @anthropic-ai/claude-code || return 1
+
   # rhachet is not pinned; the brains ARE — the split is WHO PUBLISHES
   # (`_.sh` states it beside the two pins). `web_pnpm`, never a bare `pnpm`
   # (.refs = gotcha.5-3-brains-peers.demo=optional-peer-outages)
@@ -117,10 +133,6 @@ grove_provision_5_3_brains_provision_upsert() {
   web_pnpm install -g declastruct declastruct-aws || return 1
 
   web_pnpm install -g "@openai/codex@$GROVE_BRAIN_CODEX_PIN" || return 1
-
-  # prune a shadow BEFORE the pinned install, so PATH order cannot leave a
-  # stray npm-global copy outranking the pnpm one this line converges on
-  _grove_provision_5_3_brains_prune_claude_shadows || return 1
 
   web_pnpm install -g \
     --allow-build=@anthropic-ai/claude-code \

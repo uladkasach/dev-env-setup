@@ -3134,19 +3134,39 @@ _brains_auth_render() {
 # .why  = a stable order a human learns once: sun → sat by the local weekday + clock of each
 #   account's weekly reset. a dark account sorts by its last-known reset, which recurs at the
 #   same weekday + clock, so it never moves. an account with no known reset sorts last.
-# .note = ties (and the unknowns) break on the name, so the order is total
+# .note = resets within 5 minutes of each other are one TIE, broken on the name
+#   - a reset time jitters by seconds from one renewal to the next, so a strict time order
+#     would swap two accounts that renew together on every few reads
+#   - a tie is a CLUSTER, never a fixed 5-minute slot: a slot edge would still split two
+#     resets a minute apart. each cluster spans 5 minutes from its earliest member
+#   - the unknowns share one key, so they form one cluster, ordered by name too
 _brains_auth_reaches_in_reset_order() {
   local combined="$1" lastknown="${2:-}" reach iso key
   [[ -n "$lastknown" ]] || lastknown='{}'
   while IFS=$'\t' read -r reach iso; do
     [[ -n "$reach" ]] || continue
-    key='9-9999'
-    [[ -n "$iso" ]] && key="$(date -d "$iso" '+%w-%H%M' 2>/dev/null)" || true
-    [[ -n "$key" ]] || key='9-9999'
+    key=''
+    [[ -n "$iso" ]] && key="$(_brains_auth_minute_of_week "$iso")" || true
+    [[ -n "$key" ]] || key='99999'
     printf '%s\t%s\n' "$key" "$reach"
   done < <(jq -r --argjson lk "$lastknown" '
     to_entries[] | [.key, (.value.seven_day.resets_at? // $lk[.key].seven_day.resets_at? // "")] | @tsv
-  ' <<< "$combined" 2>/dev/null) | sort -t $'\t' -k1,1 -k2,2 | cut -f2
+  ' <<< "$combined" 2>/dev/null) \
+    | sort -t $'\t' -k1,1n -k2,2 \
+    | awk -F'\t' 'NR == 1 || $1 - anchor > 5 { anchor = $1; cluster++ } { printf "%06d\t%s\n", cluster, $2 }' \
+    | sort -t $'\t' -k1,1 -k2,2 | cut -f2
+}
+
+# .what = the minute of the week (sun 00:00 = 0) of an iso stamp, in local time; empty if unparsed
+# .why  = a weekly reset recurs at one weekday + clock, so this one number orders it and
+#   measures the gap between two resets
+_brains_auth_minute_of_week() {
+  local wdhm wd hh mm
+  wdhm="$(date -d "$1" '+%w %H %M' 2>/dev/null)" || return 0
+  [[ -n "$wdhm" ]] || return 0
+  # `read`, never `set -- $wdhm`: this file is sourced into zsh too, which does not word-split
+  read -r wd hh mm <<< "$wdhm"
+  echo $(( wd * 1440 + 10#$hh * 60 + 10#$mm ))
 }
 
 # .what = the money budget, as its own tree: each account's next charge, soonest first

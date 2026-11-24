@@ -18,9 +18,12 @@
 #   rhx brains.claude.strings --pattern 'rate_limit_reset'
 #   rhx brains.claude.strings --pattern '/api/oauth/[a-z_/]+' --window 0
 #   rhx brains.claude.strings --pattern 'reset' --limit 50
+#   rhx brains.claude.strings --pattern 'claude-fable-[0-9-]+' --which latest
 #
 # options:
 #   --pattern  an extended regex (grep -E) to find — required
+#   --which    pin (default) = the `claude` on PATH · latest = the `claude.latest`
+#              candidate that 5.3.brains installs beside it, for a trial
 #   --window   chars of context on each side of a hit (default 120)
 #   --limit    max hits printed (default 40); a cap, so a broad pattern
 #              cannot flood the caller
@@ -37,16 +40,18 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "brains.claude.strings"
   echo ""
   echo "usage:"
-  echo "  rhx brains.claude.strings --pattern <ere> [--window N] [--limit N]"
+  echo "  rhx brains.claude.strings --pattern <ere> [--window N] [--limit N] [--which pin|latest]"
   exit 0
 fi
 
 PATTERN=""
 WINDOW=120
 LIMIT=40
+WHICH=pin
 while [[ $# -gt 0 ]]; do
   case $1 in
     --pattern) PATTERN="$2"; shift 2 ;;
+    --which) WHICH="$2"; shift 2 ;;
     --window) WINDOW="$2"; shift 2 ;;
     --limit) LIMIT="$2"; shift 2 ;;
     --skill|--repo|--role) shift 2 ;;
@@ -58,23 +63,40 @@ done
 [[ -n "$PATTERN" ]] || { echo "✋ ConstraintError: --pattern is required" >&2; exit 2; }
 [[ "$WINDOW" =~ ^[0-9]+$ && "$LIMIT" =~ ^[0-9]+$ ]] \
   || { echo "✋ ConstraintError: --window and --limit take whole numbers" >&2; exit 2; }
+[[ "$WHICH" == pin || "$WHICH" == latest ]] \
+  || { echo "✋ ConstraintError: --which takes pin or latest, not '$WHICH'" >&2; exit 2; }
+
+####################################################################
+# the candidate — the `latest` pointer 5.3.brains keeps under its prefix
+####################################################################
+if [[ "$WHICH" == latest ]]; then
+  bin="$HOME/.local/opt/claude/latest/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
+  [[ -f "$bin" ]] || {
+    echo "✋ ConstraintError: no claude.latest candidate at $bin" >&2
+    echo "   fix: set GROVE_BRAIN_CLAUDE_LATEST_PIN in 5.3.brains/_.sh, then rhx grove.provision --what 5.3.brains --mode apply" >&2
+    exit 2
+  }
+  bin="$(readlink -f "$bin")"
+fi
 
 ####################################################################
 # the binary the box's `claude` actually runs — the pnpm shim's package, whose
 # `bin/claude.exe` holds the embedded js. the shim is the one PATH hands a human
 ####################################################################
-shim="$(command -v claude 2>/dev/null)"
-[[ -n "$shim" ]] || { echo "💥 MalfunctionError: no claude on PATH (5.3.brains installs it)" >&2; exit 1; }
-pkg="$(dirname "$(readlink -f "$shim")")"
-bin=""
-for candidate in "$pkg/bin/claude.exe" "$pkg/../bin/claude.exe" "$pkg/claude.exe" "$pkg/cli.js"; do
-  [[ -f "$candidate" ]] && { bin="$(readlink -f "$candidate")"; break; }
-done
-if [[ -z "$bin" ]]; then
+if [[ "$WHICH" == pin ]]; then
+  shim="$(command -v claude 2>/dev/null)"
+  [[ -n "$shim" ]] || { echo "💥 MalfunctionError: no claude on PATH (5.3.brains installs it)" >&2; exit 1; }
+  pkg="$(dirname "$(readlink -f "$shim")")"
+  bin=""
+  for candidate in "$pkg/bin/claude.exe" "$pkg/../bin/claude.exe" "$pkg/claude.exe" "$pkg/cli.js"; do
+    [[ -f "$candidate" ]] && { bin="$(readlink -f "$candidate")"; break; }
+  done
+fi
+if [[ "$WHICH" == pin && -z "$bin" ]]; then
   # the shim may live in a pnpm bin dir; find the package beside the global store
   bin="$(ls -1 "${PNPM_HOME:-$HOME/.local/share/pnpm}"/global/5/.pnpm/@anthropic-ai+claude-code@*/node_modules/@anthropic-ai/claude-code/bin/claude.exe 2>/dev/null | tail -1)"
 fi
-[[ -n "$bin" && -f "$bin" ]] || { echo "💥 MalfunctionError: no claude binary found from shim $shim" >&2; exit 1; }
+[[ -n "$bin" && -f "$bin" ]] || { echo "💥 MalfunctionError: no claude binary found from shim ${shim:-}" >&2; exit 1; }
 
 echo "🔭 brains.claude.strings"
 echo "   ├─ binary:  $bin"

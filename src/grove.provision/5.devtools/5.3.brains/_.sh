@@ -25,7 +25,7 @@
 #
 # .refs = gotcha.5-3-brains-pins.demo=publish-path-and-drift.md
 ####################################################################
-GROVE_BRAIN_CLAUDE_PIN="2.1.280"
+GROVE_BRAIN_CLAUDE_PIN="2.1.330"
 GROVE_BRAIN_CODEX_PIN="0.128.0"
 
 ####################################################################

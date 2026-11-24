@@ -80,8 +80,24 @@ if (( MEM_AVAIL_PCT < MEM_THRESHOLD )); then
   MEM_LOW=1
 fi
 
-# cache ps output
-PS_BY_CPU=$(ps aux --sort=-%cpu)
+# .what = rank cpu by the burn over a LIVE 1s window, not by `ps %cpu`
+# .why  = `ps %cpu` is lifetime cpu over elapsed, with elapsed in whole
+#         seconds. a newborn's ticks over a rounded-down age read as an
+#         impossible figure — 2700% on a 12-core box (2026-11-22) — so every
+#         newborn floated to the top and hid the real burners. top's second
+#         iteration is a true per-interval delta. the rows are shaped like
+#         `ps aux` ($2 pid, $3 cpu, $4 mem, header first) so every reader
+#         below stays unchanged
+# .note = LC_ALL=C pins the decimal point; a comma locale breaks the sort
+PS_BY_CPU=$(
+  echo "USER PID %CPU %MEM"
+  LC_ALL=C top -b -n 2 -d 1 -w 512 2>/dev/null \
+    | awk '/^top -/ { n++ } n == 2 && $1 ~ /^[0-9]+$/ {
+             printf "%s %s %s %s - - - - - - %s\n", $2, $1, $9, $10, $12
+           }' \
+    | LC_ALL=C sort -k3 -rn
+)
+# memory has no such artifact: rss is a level, not a rate
 PS_BY_MEM=$(ps aux --sort=-%mem)
 
 format_top_procs() {
@@ -103,6 +119,29 @@ format_top_procs() {
 extract_pids() {
   local limit="${2:-4}"  # default top 3 (NR>1 means skip header)
   echo "$1" | awk -v limit="$limit" 'NR>1 && NR<=limit {print $2}' | tr '\n' ' '
+}
+
+# .what = keep only the pids that still live now
+# .why  = the ps snapshot ages by the time a hint prints. a pid that exited
+#         is no kill target, and a kill on a REUSED pid ends an innocent
+#         process. so every hint and every --kill reads liveness at its moment
+filter_live_pids() {
+  local pid
+  for pid in $1; do
+    if [[ -r /proc/$pid/stat ]]; then printf '%s ' "$pid"; fi
+  done
+  return 0
+}
+
+# .what = print the kill hint for a pid list, or say none is left to kill
+print_kill_hint() {
+  local live
+  live=$(filter_live_pids "$1")
+  if [[ -z "$live" ]]; then
+    echo "  │    └─ 🌙 all exited before re-read — naught to kill"
+    return
+  fi
+  echo "  │    └─ 🪄 kill -9 $live"
 }
 
 TOP_CPU=$(format_top_procs "$PS_BY_CPU" "cpu" "$MAX_ROW")
@@ -186,7 +225,7 @@ fi
 echo "$PS_BY_CPU" | awk -v max="$MAX_ROW" 'NR>1 && NR<=max {printf "%s %s %s\n", $2, $3, $4}' | while read pid cpu mem; do
   print_proc_details "$pid" "${cpu%.*}" "${mem%.*}" "  │    "
 done
-echo "  │    └─ 🪄 kill -9 $CPU_PIDS"
+print_kill_hint "$CPU_PIDS"
 if [[ $MEM_LOW -eq 1 || $FULL_MODE -eq 1 ]]; then
   # get memory stats for display
   MEM_TOTAL_KB=$(awk '/MemTotal/{print $2}' /proc/meminfo)
@@ -250,18 +289,20 @@ if [[ $MEM_LOW -eq 1 || $FULL_MODE -eq 1 ]]; then
   echo "$PS_BY_MEM" | awk 'NR>1 && NR<=11 {printf "%s %s %s\n", $2, $3, $4}' | while read pid cpu mem; do
     print_proc_details "$pid" "${cpu%.*}" "${mem%.*}" "  │    "
   done
-  echo "  │    └─ 🪄 kill -9 $MEM_PIDS"
+  print_kill_hint "$MEM_PIDS"
 fi
 
 # handle --kill mode
 if [[ -n "$KILL_MODE" ]]; then
   echo ""
   if [[ "$KILL_MODE" == "cpu" ]]; then
-    echo "Kill top CPU processes: $CPU_PIDS"
-    kill -9 $CPU_PIDS 2>/dev/null
+    CPU_PIDS_LIVE=$(filter_live_pids "$CPU_PIDS")
+    echo "Kill top CPU processes: ${CPU_PIDS_LIVE:-none left alive}"
+    [[ -n "$CPU_PIDS_LIVE" ]] && kill -9 $CPU_PIDS_LIVE 2>/dev/null
   elif [[ "$KILL_MODE" == "mem" ]]; then
-    echo "Kill top MEM processes: $MEM_PIDS"
-    kill -9 $MEM_PIDS 2>/dev/null
+    MEM_PIDS_LIVE=$(filter_live_pids "$MEM_PIDS")
+    echo "Kill top MEM processes: ${MEM_PIDS_LIVE:-none left alive}"
+    [[ -n "$MEM_PIDS_LIVE" ]] && kill -9 $MEM_PIDS_LIVE 2>/dev/null
   else
     # kill by prefix, optionally filtered to cpu or mem list
     if [[ "$KILL_TYPE" == "cpu" ]]; then

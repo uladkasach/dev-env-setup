@@ -29,7 +29,8 @@
 #   - (rule.forbid.failhide)
 #
 # guarantee:
-#   - READ-ONLY. it reads /etc/keyd, the xkb config, and systemd; repairs no state
+#   - READ-ONLY. it reads /etc/keyd, the xkb config, systemd, ~/.profile, and
+#     keynav's autostart entry; repairs no state
 #
 # exit:
 #   0 = the declaration holds, as far as it can be observed from here
@@ -131,6 +132,36 @@ grove_provision_1_1_keybinds_configure_verify() {
     else
       echo "   • keyd is idle, not stuck in its start-up key wait ✔"
     fi
+  fi
+
+  ####################################################################
+  # 4c. keynav starts from the desktop session, never from a login shell
+  #
+  # .why both halves
+  #   - a profile line starts a keynav in every login shell and leaks it
+  #     (the why: `_.sh`, above `keybinds_keynav_entry_at`)
+  #   - the entry is what makes the strip safe: with neither, keynav would not
+  #     start at all, and it is the human's daily pointer
+  ####################################################################
+  local keynav_fix="rhx grove.provision --what 1.1.keybinds --mode apply"
+  if keybinds_keynav_profile_holds; then
+    echo "   ✋ ~/.profile still starts keynav — every login shell (ssh, tests) leaks one" >&2
+    echo "      fix: $keynav_fix" >&2
+    failed=$(( failed + 1 ))
+  else
+    echo "   • ~/.profile starts no keynav ✔"
+  fi
+  if [[ "${GROVE_ENV_SERVER:-}" == local@unix ]]; then
+    if cmp -s "$(keybinds_keynav_entry_src)" "$(keybinds_keynav_entry_at)"; then
+      echo "   • keynav autostart entry matches this checkout ✔"
+    else
+      echo "   ✋ keynav autostart entry is absent or drifted at $(keybinds_keynav_entry_at)" >&2
+      echo "      ⇒ keynav will not start at the next graphical login" >&2
+      echo "      fix: $keynav_fix" >&2
+      failed=$(( failed + 1 ))
+    fi
+    echo "   🌙 unverified — that cosmic READS the entry shows only at the next login."
+    echo "      after one, keynav should be up with no shell involved: rhx machine.process.stop --match keynav --long"
   fi
 
   ####################################################################

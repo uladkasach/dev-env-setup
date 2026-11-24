@@ -6,11 +6,9 @@ from kittens.tui.handler import result_handler
 # super+v — a keyboard-only line selector over what the window shows
 #
 # .the gesture, the same in both holders
-#   - super+v        enter the selector view (and again, to leave it)
-#   - right-alt+j/k  move a line down / up (keyd turns them into plain down / up)
-#   - enter          begin a line selection; enter again ends it
-#   - ctrl+c         copy the selection, and stay in the view
-#   - ctrl+x, q, esc leave the view
+#   - super+v        enter the view (and again, to leave it)
+#   - inside, plain vim: shift+v selects, k moves, ctrl+c copies, :q leaves
+#   - ctrl+d k / j   jump to the prior / next shell command (visual_select.lua)
 #
 # 🛑 the view is ALWAYS nvim, over the history of whoever owns the SCROLLBACK —
 #   the same one fact scroll_window.py reads
@@ -117,11 +115,13 @@ def handle_result(args, answer, target_window_id, boss: Boss) -> None:
 
     # tmux's popup view is open: super+v again closes it
     #   - tmux runs no key bind while a popup is open, so TMUX_KEY would reach
-    #     the popup's nvim as noise; escape is the key that nvim leaves on
+    #     the popup's nvim as noise; type the quit into it instead
+    #   - ctrl+\ ctrl+n reaches normal mode from any mode (a selection, a half
+    #     typed `:`), then `:qa!` leaves — stock vim, no map in the view needed
     #   - the popup's nvim sets this var on open and clears it on leave
     #     (4.5.nvim/visual_select.lua)
     if user_vars.get(VAR_TMUX_VIEW):
-        window.write_to_child(b'\x1b')
+        window.write_to_child(b'\x1c\x0e:qa!\r')
         return
 
     # a tmux client in front: tmux owns the history, so tmux opens the view

@@ -77,10 +77,15 @@ QUIET_INFO=""
 #         claude TUIs redraw through it — and a kill ends every session at
 #         once. machine.diagnose.churn holds hosts out of its blame list for
 #         the identical reason (2026-09-05). a host is reported, never offered
-#         as a kill target, and `--kill` never reaches one
+#         as a kill target, and `--kill` never reaches one. the abandoned-reaper
+#         (`machine_resource_procs_reap_abandoned`) holds the same list; keep
+#         the three in step
+# .note = `execsnoop-bpfcc` is a host by the same arithmetic: system76-scheduler
+#         spawns it at boot to watch every exec, so its cpu is the box's spawn
+#         rate, not a wedge. a fork storm lights it up; the storm is the cause
 __is_host() {
   case "$1" in
-    "tmux: server"|kitty|cosmic-comp|Xwayland|gnome-shell|systemd|pipewire|wireplumber) return 0 ;;
+    "tmux: server"|kitty|cosmic-comp|Xwayland|gnome-shell|systemd|pipewire|wireplumber|execsnoop-bpfcc|bwrap) return 0 ;;
     *) return 1 ;;
   esac
 }

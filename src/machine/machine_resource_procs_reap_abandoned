@@ -6,11 +6,12 @@
 # .what = a process is ABANDONED when all four hold:
 #           1. it is ours (uid = the caller's)
 #           2. its spawner died — it was reparented to our `systemd --user`
-#              (the session's subreaper), or to pid 1 while that manager is down
+#              (the session's subreaper) or to pid 1
 #           3. it is NOT the oldest process in its own cgroup. the oldest is the
 #              cgroup's OWNER — kitty, an app, a service's main process — and an
 #              owner is reparented by design, never abandoned
 #           4. it is older than --min-age (default 24h)
+#         and it is no HOST (tmux server, kitty, …) — see `is_host`
 #
 # .why  = on 2026-10-07 ~254 abandoned processes (nearly all node) accrued under
 #         the user manager across a 35-day session, to 27.4G RAM + 45G swap.
@@ -102,10 +103,28 @@ is_cgroup_owner() {
   return 0
 }
 
-# .what = does this pid meet all four rules?
+# .what = hosts: processes that CONTAIN other work and are reparented by design
+# .why  = a tmux server double-forks to daemonize, and kitty is launched into a
+#         scope it did not open, so both pass rules 1–4 while they carry live
+#         sessions. the plan run on 2026-11-22 listed 10 tmux servers (one 214h
+#         old) and 13 kitty windows as abandoned — an armed timer would have
+#         ended every session at once. `bwrap` is flatpak's sandbox around an
+#         app (firefox): reparented by design, and its kill takes the app with
+#         it. a host is never abandoned. the list is
+#         the one `machine_resource_procs_find_spinner` and
+#         `machine_usage_diagnose` hold hosts out by; keep the three in step
+is_host() {
+  case "$(cat "/proc/$1/comm" 2>/dev/null)" in
+    "tmux: server"|kitty|cosmic-comp|Xwayland|gnome-shell|systemd|pipewire|wireplumber|execsnoop-bpfcc|bwrap) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# .what = does this pid meet all four rules, and is it no host?
 is_abandoned() {
   local pid="$1" ppid age
   [[ "$(uid_of "$pid")" == "$MY_UID" ]] || return 1
+  is_host "$pid" && return 1
   ppid="$(ppid_of "$pid")" || return 1
   [[ "$ppid" == 1 || ( -n "$UM_PID" && "$ppid" == "$UM_PID" ) ]] || return 1
   [[ "$pid" == "$UM_PID" ]] && return 1

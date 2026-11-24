@@ -10,7 +10,7 @@
 #
 # guarantee:
 #   - idempotent: the conf is re-declared from this file's text
-#   - idempotent: the profile hook is guarded by a grep for its own marker
+#   - idempotent: keynav's autostart entry is compared whole before any write
 ######################################################################
 
 grove_provision_1_1_keybinds_configure_upsert() {
@@ -48,7 +48,7 @@ grove_provision_1_1_keybinds_configure_upsert() {
   if [[ "$default_live" == "$conf_default_want" && "$apple_live" == "$conf_apple_want" && "$conf_count" -eq 2 ]]; then
     echo "   • keyd remap already declared — default.conf + apple.conf, and no other ✔"
     grove_provision_1_1_keybinds_xkb_swap_strip
-    grove_provision_1_1_keybinds_keynav_autostart
+    grove_provision_1_1_keybinds_keynav_autostart || return 1
     return 0
   fi
 
@@ -56,7 +56,7 @@ grove_provision_1_1_keybinds_configure_upsert() {
   if ! pkg_can_sudo; then
     bundle.root.declines "the keyd remap confs" \
       "/etc/keyd holds $conf_count conf(s); default.conf $([[ "$default_live" == "$conf_default_want" ]] && echo matches || echo differs); apple.conf $([[ "$apple_live" == "$conf_apple_want" ]] && echo matches || echo differs)"
-    grove_provision_1_1_keybinds_keynav_autostart
+    grove_provision_1_1_keybinds_keynav_autostart || return 1
     return 0
   fi
 
@@ -127,39 +127,63 @@ grove_provision_1_1_keybinds_xkb_swap_strip() {
 }
 
 ######################################################################
-# .what = keynav autostart, at login — user-level, so it needs no root
+# .what = keynav starts once per graphical login, from an xdg autostart entry —
+#         and never from ~/.profile (the why: `_.sh`, above `keybinds_keynav_entry_at`)
+#
+# guarantee:
+#   - user-level, so it needs no root
+#   - idempotent: the strip is a no-op once neither profile line remains, and
+#     the entry is rewritten only when its bytes differ from the template
+#   - every tier loses the profile lines; only `local@unix` gets the entry,
+#     since a cloud grove has no graphical session to read it
 ######################################################################
 grove_provision_1_1_keybinds_keynav_autostart() {
-  # ⚠️ the guard greps a SLUG MARKER, never the code it writes
-  #   - a grep for the command couples the guard to the command's exact text
-  #   - any edit to that command stops the guard from ever matching a healthy file
-  #   - ⇒ every run appends another copy
-  #   - the append is not idempotent, only the guard makes it so
-  #   - a `# grove: <slug>` marker is coupled to the CLAIM, so the command is free to change
-  #   - (rule.require.idempotent-install-procedures)
-  #
-  # 🛑 keep the LEGACY grep beside the marker — do not drop it
-  #   - every box converged before 2026-07-31 holds the old block, which carries no marker
-  #   - the fence word also moved `# devenv:` → `# grove:` on 2026-09-02
-  #   - ⇒ on an old box the `$marker` grep MISSES
-  #   - `$legacy` matches the CONTENT line, which neither change touched
-  #   - so an old box lands on the elif and is left alone
-  #   - ⇒ without it, the change that repairs idempotence would break it once on every extant box
-  #   - it may be dropped only once no box predates the fence rename
-  local profile="$HOME/.profile"
-  local marker="# grove: keynav autostart at login"
-  local legacy='(keynav && echo "keynav started"'
+  grove_provision_1_1_keybinds_keynav_profile_strip || return 1
 
-  if grep -qF "$marker" "$profile" 2>/dev/null; then
-    echo "   • keynav autostart already declared"
-  elif grep -qF "$legacy" "$profile" 2>/dev/null; then
-    echo "   • keynav autostart already declared (pre-marker block; left as is)"
-  else
-    cat <<'EOF' >> "$profile"
-
-# grove: keynav autostart at login
-(keynav && echo "keynav started" || echo "keynav already up") &
-EOF
-    echo "   • keynav autostart declared in ~/.profile"
+  if [[ "${GROVE_ENV_SERVER:-}" != local@unix ]]; then
+    echo "   🌙 keynav autostart declined — tier '${GROVE_ENV_SERVER:-<unset>}' has no graphical session"
+    return 0
   fi
+
+  local src at
+  src="$(keybinds_keynav_entry_src)"
+  at="$(keybinds_keynav_entry_at)"
+  if cmp -s "$src" "$at"; then
+    echo "   • keynav autostart entry matches this checkout ✔"
+    return 0
+  fi
+  mkdir -p "$(dirname "$at")" || return 1
+  cp "$src" "$at" || return 1
+  echo "   • keynav autostart entry declared → $at (read at the next graphical login)"
+}
+
+######################################################################
+# .what = remove both forms of the old keynav start from ~/.profile
+#
+# .why a line filter, not a block delete
+#   - two forms exist: the `# grove:` marker + its command, and the older
+#     command alone, with no marker (boxes converged before 2026-07-31)
+#   - each line is matched by fixed string, so no regex escape can misfire
+#   - every other line of ~/.profile survives byte for byte
+#
+# .why `cat >` and not `mv`
+#   - it writes through the extant inode, so the file's mode and owner hold
+######################################################################
+grove_provision_1_1_keybinds_keynav_profile_strip() {
+  local profile="$HOME/.profile" kept
+  if ! keybinds_keynav_profile_holds; then
+    echo "   • ~/.profile starts no keynav ✔"
+    return 0
+  fi
+  kept="$(mktemp)" || return 1
+  awk -v m="$KEYBINDS_KEYNAV_PROFILE_MARKER" -v l="$KEYBINDS_KEYNAV_PROFILE_LEGACY" \
+    'index($0, m) == 0 && index($0, l) == 0' "$profile" > "$kept" \
+    && cat "$kept" > "$profile"
+  local rc=$?
+  rm -f "$kept"
+  if [[ "$rc" -ne 0 ]]; then
+    echo "   ✋ could not strip the keynav lines from ~/.profile" >&2
+    return 1
+  fi
+  echo "   • keynav start removed from ~/.profile — every login shell had started one"
 }

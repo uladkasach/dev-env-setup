@@ -155,7 +155,12 @@ CENSUS=$(ps -eo comm=,rss= 2>/dev/null \
 #         pane's redraw. this report printed `🪤 wedged … tmux: (pid 19210) 241h
 #         at 48.1% cpu → kill -9`, and that kill ends every session at once
 #         (2026-10-21). the list is the one `machine_resource_procs_find_spinner`
-#         holds hosts out by; keep the two in step.
+#         holds hosts out by; keep it in step with that list and with
+#         `machine_resource_procs_reap_abandoned`'s `is_host`.
+# .note = `execsnoop-bpfcc` is a host too: system76-scheduler spawns it at boot
+#         to watch every exec, so its cpu tracks the box's spawn rate. it read
+#         `wedged … 210h at 8.6%` through a fork storm it merely observed
+#         (2026-11-22); the storm is the concern, and the loop row names it.
 # .note = comm may hold a space (`tmux: server`), so it is fields 5..NF, never $5
 #
 # .note = `pcpu` is a LIFETIME average (cpu time / elapsed), so on its own it
@@ -164,7 +169,7 @@ CENSUS=$(ps -eo comm=,rss= 2>/dev/null \
 #         window, read from /proc/<pid>/stat ticks. both must clear 5%
 WEDGED_CAND=$(ps -eo etimes=,pcpu=,pid=,tty=,comm= 2>/dev/null \
   | awk 'BEGIN {
-           split("tmux: server|kitty|cosmic-comp|Xwayland|gnome-shell|systemd|pipewire|wireplumber", h, "|")
+           split("tmux: server|kitty|cosmic-comp|Xwayland|gnome-shell|systemd|pipewire|wireplumber|execsnoop-bpfcc|bwrap", h, "|")
            for (i in h) host[h[i]] = 1
          }
          {

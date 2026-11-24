@@ -175,6 +175,39 @@ l = right
 EOF
 }
 
+####################################################################
+# keynav's start — an xdg autostart entry, read once per GRAPHICAL login
+#
+# 🛑 .why never `~/.profile`
+#   - `~/.profile` runs for EVERY login shell: ssh, `bash -l`, and each test
+#     harness that spawns `sh -l`. each one started a keynav in the shell's cwd,
+#     and the keynav outlived the shell
+#   - 📜 2026-11-22: the health report found keynav twice under a `-sh` parent
+#     in a deleted test dir (`/tmp/work-test-cwd-*`, `/tmp/work-test-alive-*`).
+#     it was also the ONLY keynav on the box — the human's daily keynav had
+#     been born by accident in a test, since `~/.profile` at graphical login
+#     runs before any display exists
+#   - an autostart entry is read by the desktop session alone, inside it, with
+#     its display — the precedent and the reason: `5.24.vpntray`
+#
+# .why `Exec=` is an absolute path
+#   - systemd's xdg-autostart generator escapes `$`, and the desktop entry spec
+#     expands no variables (`5.24.vpntray`, 📜 2026-11-13)
+#
+# .why the profile readers stay
+#   - the upsert STRIPS both forms from every box that still holds one; the
+#     verify asserts neither remains. the legacy form predates the marker
+####################################################################
+keybinds_keynav_entry_src() { printf '%s' "$GROVE_SRC/grove.provision/1.system/1.1.keybinds/keynav.desktop"; }
+keybinds_keynav_entry_at()  { printf '%s/.config/autostart/keynav.desktop' "$HOME"; }
+KEYBINDS_KEYNAV_PROFILE_MARKER="# grove: keynav autostart at login"
+KEYBINDS_KEYNAV_PROFILE_LEGACY='(keynav && echo "keynav started"'
+
+# .what = does ~/.profile still start keynav, in either form?
+keybinds_keynav_profile_holds() {
+  grep -qF -e "$KEYBINDS_KEYNAV_PROFILE_MARKER" -e "$KEYBINDS_KEYNAV_PROFILE_LEGACY" "$HOME/.profile" 2>/dev/null
+}
+
 grove_provision_1_1_keybinds() {
   bundle.upgrade 1.1.keybinds.provision.upsert
   bundle.upgrade 1.1.keybinds.provision.verify

@@ -21,7 +21,9 @@
 #
 # .the bytes, each one what kitty sends for the human's press
 #   - super+v        1b 5b 39 39 39 39 7e   CSI 9999 ~  (visual_select.py)
+#   - super+v again  1c 0e 3a 71 61 21 0d   ^\ ^N :qa!  (visual_select.py, popup open)
 #   - right-alt+j/k  1b 5b 42 / 1b 5b 41    Down / Up   (keyd vimarrows)
+#   - shift+v, j, q  56 / 6a / 71
 #   - enter          0d
 #   - ctrl+c         1b 5b 39 39 3b 36 75   CSI 99;6u   (copy_notify.py)
 #   - ctrl+x         03                     ^C          (kitty.conf)
@@ -127,31 +129,30 @@ check "the view shows the history, bare"                    "$(row_bare 200 && e
 press 67 67
 check "the view reaches the first line (gg)"                "$(row_bare 1 && echo reached)" "reached"
 
-press 0d
-press 1b 5b 42
+# plain vim: shift+v selects, j extends, ctrl+c copies and ends the selection
+press 56
+press 6a
 press 1b 5b 39 39 3b 36 75
 check "ctrl+c sent the copy to the terminal (OSC 52)"       "$(buffer_of "$OUTER_SOCK")" "1 2"
 [[ "$(buffer_of "$OUTER_SOCK")" == "1 2" ]] || echo "      · the view after ctrl+c: $(screen | grep -v '^$' | tail -2 | tr '\n' '|')"
-check "ctrl+c keeps the selection"                          "$(screen | grep -qE '^ v-line ' && echo kept)" "kept"
+check "ctrl+c ends the selection, as y does"                "$(screen | grep -qE '^ normal ' && echo ended)" "ended"
 
-press 1b
-await_view closed; check "escape leaves the view"           "$(view_open && echo open || echo closed)" "closed"
+press 3a 71 61 21 0d
+await_view closed; check ":qa! leaves the view"             "$(view_open && echo open || echo closed)" "closed"
 
 # super+v AGAIN closes it through kitty (tmux runs no bind while a popup is
-# open), so that link is proven in the real-kitty stage below, not here
+# open): the kitten types ctrl+\ ctrl+n :qa! — driven here from a selection,
+# the reach to the popup itself is proven in the real-kitty stage below
 press 1b 5b 39 39 39 39 7e; await_view open
-press 03
-await_view closed; check "ctrl+x leaves the view"           "$(view_open && echo open || echo closed)" "closed"
-
-press 1b 5b 39 39 39 39 7e; await_view open
-press 71
-await_view closed; check "q leaves the view"                "$(view_open && echo open || echo closed)" "closed"
+press 56
+press 1c 0e 3a 71 61 21 0d
+await_view closed; check "kitty's quit keys leave from a selection" "$(view_open && echo open || echo closed)" "closed"
 
 ######################################################################
-# copy-mode keeps the same keys, however it is entered: the wheel,
-# ctrl+right-alt+k, or super+v on a tmux before 3.3
+# copy-mode keeps tmux's stock vi keys, plus ctrl+c / ctrl+x / super+v,
+# however it is entered: the wheel, ctrl+right-alt+k, or super+v on tmux < 3.3
 echo ""
-echo "🔭 does tmux copy-mode, however entered, hold the same keys?"
+echo "🔭 does tmux copy-mode hold its stock keys, plus ctrl+c?"
 echo ""
 tmux -L "$SOCK" delete-buffer 2>/dev/null
 tmux -L "$OUTER_SOCK" delete-buffer 2>/dev/null
@@ -164,8 +165,8 @@ press 1b 5b 41
 press 1b 5b 41
 check "right-alt+k moves, with no selection" "$(state '#{selection_present}')" "0"
 
-press 0d
-check "enter begins a selection"            "$(state '#{selection_present}')" "1"
+press 56
+check "shift+v begins a selection"          "$(state '#{selection_present}')" "1"
 
 press 1b 5b 41
 press 1b 5b 39 39 3b 36 75
@@ -174,9 +175,14 @@ check "ctrl+c keeps the selection"          "$(state '#{selection_present}')" "1
 check "ctrl+c copied the two lines"         "$(buffer_of "$SOCK")" "198 199"
 check "ctrl+c sent the copy to the terminal" "$(buffer_of "$OUTER_SOCK")" "198 199"
 
-press 0d
-check "enter again ends the selection"      "$(state '#{pane_in_mode}:#{selection_present}')" "1:0"
+press 1b
+check "escape clears the selection (stock)" "$(state '#{pane_in_mode}:#{selection_present}')" "1:0"
 
+press 56
+press 0d
+check "enter copies and leaves (stock)"     "$(state '#{pane_in_mode}')" "0"
+
+enter_copy_mode
 press 1b 5b 39 39 39 39 7e
 check "super+v leaves copy-mode"            "$(state '#{pane_in_mode}')" "0"
 
@@ -189,18 +195,9 @@ press 1b 5b 39 39 3b 36 75
 check "ctrl+c with no selection leaves"     "$(state '#{pane_in_mode}')" "0"
 
 enter_copy_mode
-press 0d
+press 56
 press 71
 check "q leaves from a selection"           "$(state '#{pane_in_mode}')" "0"
-
-enter_copy_mode
-press 1b
-check "escape leaves, with no selection"    "$(state '#{pane_in_mode}')" "0"
-
-enter_copy_mode
-press 0d
-press 1b
-check "escape leaves from a selection"      "$(state '#{pane_in_mode}')" "0"
 
 ######################################################################
 # the nvim setup, headless, against the real init.lua; the probe's bare arm
@@ -272,6 +269,6 @@ fi
 
 echo ""
 [[ "$FAILED" -eq 0 ]] \
-  && echo "🌲 one nvim view in every holder: open, move, select, copy, end, leave" \
+  && echo "🌲 one plain vim view in every holder: open, select, copy, jump, leave" \
   || echo "✋ a link in the gesture dropped its press — read the stages above"
 exit "$FAILED"

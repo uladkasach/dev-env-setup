@@ -471,7 +471,7 @@ _grove_provision_5_3_brains_settings_boot_gate() {
 #     commander left empty is kept exactly as found (arm 18c), as the strip keeps his empties (18a)
 ####################################################################
 _grove_provision_5_3_brains_reap_filter() {
-  echo 'del(.env.DISABLE_UPDATES, .env.CLAUDE_CODE_SKIP_UPDATE_CHECK)
+  echo 'del(.env.DISABLE_UPDATES, .env.CLAUDE_CODE_SKIP_UPDATE_CHECK, .env.CLAUDE_CODE_DISABLE_MOUSE)
     | if (.permissions.deny | type) == "array" and (.permissions.deny | index("Agent")) != null
       then .permissions.deny -= ["Agent"]
         | if .permissions.deny == [] then del(.permissions.deny) else . end

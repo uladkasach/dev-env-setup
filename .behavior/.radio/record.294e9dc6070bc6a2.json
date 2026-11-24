@@ -1,0 +1,19 @@
+{
+  "key": "294e9dc6070bc6a2",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-bhrowser"
+  },
+  "exid": null,
+  "title": "fix(browser.action): playbooks use export const action, --play takes relative paths, chromium install gets a skill",
+  "description": "## .what\n\nthree gaps in `browser.action` / `browser.start`, met while a playbook ran from another repo (dev-env-setup, 2026-11-22).\n\n## .the export contract — keep `export const action`\n\nthe loader demands `export const action = async ({ page, browser }) => {...}`; `howto.browser-action-playbooks` documents `export default async (page, ctx)`. a reader who follows the brief gets `playbook must export an action function`.\n\n- **prefer the `export const action` pattern**: a named export, greppable, and the loader already enforces it\n- fix the brief (and every example in the role) to match the loader; add no `export default` fallback\n- the refusal should print the expected shape: `export const action = async ({ page }) => { ... }`\n\n## .`--play` takes a relative path\n\n`--play .temp/x.play.ts` is read as a package name; `--play ./.temp/x.play.ts` is looked up against the skill dir inside node_modules. only an absolute path works.\n\n- anchor a non-absolute `--play` at the caller cwd before import (join it onto `process.cwd()`)\n\n## .chromium install has no skill\n\n`browser.start` refuses with \"chromium not found\" and hints a raw `npx playwright install chromium`, which a permission hook blocks.\n\n- ship a skill (e.g. `browser.chromium.set`) that runs the role-pinned playwright cli `install chromium`; idempotent, no sudo\n- name that skill in the `browser.start` refusal\n- the box-wide libs stay a host concern (sudo + playwright install-deps)\n\n## .acceptance\n\n- a playbook with `export const action` runs via a repo-relative `--play`\n- every brief example matches the loader contract\n- a box with no chromium gets a refusal that names a runnable skill",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 15,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "39"
+}

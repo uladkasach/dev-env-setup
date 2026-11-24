@@ -2,13 +2,14 @@
 --         no tmux holds the window (4.3.2.emulator/visual_select.py), against
 --         the REAL init.lua, and read the mode, selection, and yank per press
 --
--- .why  = the overlay's keys are buffer maps over a config that already binds a
---         global <CR> and a visual <C-c>; a buffer map that fails to outrank
---         them drops the press with no error
+-- .why  = the view is plain vim plus ONE addition, the ctrl+d k / j command
+--         jumps. a buffer map that fails to outrank init.lua's global <C-d>
+--         chords drops the press with no error; a leftover map would make a
+--         stock key (enter, escape, q) do aught but what vim does
 --
 -- .the arms
 --   control  the setup sourced, as visual_select.py sources it → every row hit
---   bare     no setup → enter must NOT begin a selection. if it does, the
+--   bare     no setup → ctrl+d k must NOT land on a prompt. if it does, the
 --            probe cannot tell the setup from nvim's own keys
 --
 -- .the env
@@ -46,10 +47,13 @@ if not _G.nvim_errorlog then
   return vim.cmd('qa!')
 end
 
--- the world: what `@screen_scrollback` hands nvim — history, then the blank
+-- the world: what `@screen_scrollback` hands nvim — history with two starship
+-- prompts in it (a bare `➜`, and one led by a status glyph), then the blank
 -- rows below the prompt
 local lines = {}
 for i = 1, 40 do lines[#lines + 1] = tostring(i) end
+lines[10] = '➜ echo one'
+lines[30] = '💥1 ➜ echo two'
 lines[#lines + 1] = ''
 lines[#lines + 1] = ''
 vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
@@ -76,33 +80,50 @@ if arm == 'control' then
   --    prove.visual-select-overlay reads it off the screen a real kitty draws
 end
 
-press('<CR>')
-local begun = mode() == 'V'
-row('enter_begins', tostring(begun), arm == 'control' and 'true' or 'false')
+-- the discriminator first: in a selection from the last line, ctrl+d k lands on
+-- the prompt at 30 with the setup, and anywhere else without it
+press('V')
+press('<C-d>k')
+local landed = vim.fn.line('.')
+press('<Esc>')
+row('ctrl_d_k_reaches_the_prompt', tostring(landed == 30), arm == 'control' and 'true' or 'false')
 if arm ~= 'control' then return vim.cmd('qa!') end
 
-press('<Up>')
-row('up_extends', vim.fn.line('v') .. '-' .. vim.fn.line('.'), '40-39')
-
+-- plain vim: shift+v selects, k extends, ctrl+c copies as init.lua's visual map does
+vim.cmd('normal! G')
+vim.fn.search('\\S', 'bcW')
+press('V')
+row('shift_v_begins', mode(), 'V')
+press('k')
+row('k_extends', vim.fn.line('v') .. '-' .. vim.fn.line('.'), '40-39')
 press('<C-S-c>')
 row('ctrl_c_copies', tostring(yanked), '39,40')
-row('ctrl_c_keeps_selection', mode(), 'V')
+row('ctrl_c_ends_as_y_does', mode(), 'n')
 
-press('<CR>')
-row('enter_ends', mode(), 'n')
+-- command jumps grow a selection by whole commands, and move in normal mode too
+vim.cmd('normal! G')
+vim.fn.search('\\S', 'bcW')
+press('V')
+press('<C-d>k')
+row('ctrl_d_k_selects_to_the_command', vim.fn.line('v') .. '-' .. vim.fn.line('.'), '40-30')
+press('<C-d>k')
+row('ctrl_d_k_again_reaches_the_prior', tostring(vim.fn.line('.')), '10')
+press('<C-d>k')
+row('ctrl_d_k_stops_at_the_first', tostring(vim.fn.line('.')), '10')
+press('<C-d>j')
+row('ctrl_d_j_reaches_the_next', tostring(vim.fn.line('.')), '30')
+row('the_selection_holds', mode(), 'V')
+press('<Esc>')
+press('<C-d><C-k>')
+row('ctrl_held_ctrl_d_k_in_normal', tostring(vim.fn.line('.')), '10')
+press('<C-d><CR>')
+row('ctrl_held_ctrl_d_j_through_tmux', tostring(vim.fn.line('.')), '30')
 
--- ctrl+x: the map is read rather than pressed, since a press ends the probe
-local leave = vim.fn.maparg('<C-c>', 'n', false, true)
-row('ctrl_x_leaves', tostring(leave.buffer == 1 and leave.rhs:match('qa!') ~= nil), 'true')
-local leave_x = vim.fn.maparg('<C-c>', 'x', false, true)
-row('ctrl_x_leaves_from_a_selection', tostring(leave_x.buffer == 1 and leave_x.rhs:match('qa!') ~= nil), 'true')
-local leave_q = vim.fn.maparg('q', 'x', false, true)
-row('q_leaves_from_a_selection', tostring(leave_q.buffer == 1 and leave_q.rhs:match('qa!') ~= nil), 'true')
-local leave_esc = vim.fn.maparg('<Esc>', 'n', false, true)
-row('esc_leaves', tostring(leave_esc.buffer == 1 and leave_esc.rhs:match('qa!') ~= nil), 'true')
-local leave_esc_x = vim.fn.maparg('<Esc>', 'x', false, true)
-row('esc_leaves_from_a_selection', tostring(leave_esc_x.buffer == 1 and leave_esc_x.rhs:match('qa!') ~= nil), 'true')
-local leave_c = vim.fn.maparg('<C-S-c>', 'n', false, true)
-row('ctrl_c_with_no_selection_leaves', tostring(leave_c.buffer == 1 and leave_c.rhs:match('qa!') ~= nil), 'true')
+-- no stock key is overridden: enter, escape, q, and ctrl+c are vim's own here
+for _, k in ipairs({ { '<CR>', 'n' }, { '<CR>', 'x' }, { '<Esc>', 'n' }, { '<Esc>', 'x' },
+                     { 'q', 'n' }, { 'q', 'x' }, { '<C-c>', 'x' }, { '<C-S-c>', 'x' } }) do
+  local m = vim.fn.maparg(k[1], k[2], false, true)
+  row('stock_' .. k[2] .. '_' .. k[1]:gsub('[<>]', ''), tostring(m.buffer == 1), 'false')
+end
 
 vim.cmd('qa!')
