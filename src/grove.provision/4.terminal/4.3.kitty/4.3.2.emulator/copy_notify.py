@@ -226,6 +226,23 @@ def _local_tmux_in_copy_mode(pane: tuple) -> bool:
     return pane[1]
 
 
+def _tmux_popup_view_open(window) -> bool:
+    # is super+v's nvim view open in a tmux popup over this window?
+    #
+    # 🛑 a fourth receiver, invisible to the other three
+    #   - a popup has no pane: tmux still reports the pane BENEATH it, which
+    #     runs a shell, so the allowlist rejects it and copy-mode reads False
+    #   - 📜 so on a local duct, ctrl+c in the view was a silent no-op
+    #   - while the popup is open tmux hands every key to the popup's nvim,
+    #     which yanks <C-S-c>; the key cannot reach the shell beneath
+    #
+    # the view's nvim sets this mark on open and clears it on leave
+    # (4.5.nvim/visual_select.lua) — the same mark visual_select.py reads.
+    # ⚠️ a stale mark (the view killed hard) sends CSI 99;6u to tmux, whose root
+    #   bind relays it only into an nvim pane — inert, never the ^C byte
+    return bool((getattr(window, 'user_vars', {}) or {}).get('visual_select_tmux'))
+
+
 def _focused_app(window, pids: list, client: tuple, pane: tuple) -> str:
     # name the app the human actively drives in this window
     #   - through tmux that is the active pane's command (`pane`, read once)
@@ -262,12 +279,15 @@ def _is_copy_receiver(window, pids: list) -> bool:
     # | an allowlisted app (nvim)      | it YANKS the key — <C-S-c> -> "+y      |
     # | a local tmux pane in copy-mode | tmux swallows it; no process reads     |
     # | a duct past an ssh hop         | the far tmux decides; ssh is a pipe    |
+    # | super+v's view in a tmux popup | the popup's nvim YANKS the key         |
     #
     # ⚠️ fail closed is the shared discipline: every reader below answers ''
     #   or False when unsure, so an unknown focus is judged NOT a receiver
     #
     # ⚠️ one tmux read feeds both tmux-side reasons: the client's own server,
     #   asked once (`_tmux_active_pane`). a press costs at most ONE tmux call
+    if _tmux_popup_view_open(window):
+        return True
     client = _tmux_client(pids)
     pane = _tmux_active_pane(client)
     if _focused_app(window, pids, client, pane) in FORWARD_ALLOWLIST:

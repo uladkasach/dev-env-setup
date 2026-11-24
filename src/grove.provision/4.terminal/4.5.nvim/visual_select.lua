@@ -1,15 +1,15 @@
 -- visual_select.lua — the super+v selector, the same nvim in every holder
 --
--- .what = turn an nvim fed a terminal's history on stdin into a line selector:
---         enter toggles a linewise selection, ctrl+c copies and keeps it,
---         ctrl+x / q / escape leave
+-- .what = turn an nvim fed a terminal's history on stdin into a plain vim view:
+--         every key is stock vim (shift+v selects, k moves, ctrl+c copies via
+--         init.lua's visual map, :q leaves). one addition: ctrl+d k / ctrl+d j
+--         jump to the prior / next shell command, so a selection grows by command
 -- .why  = one view in every terminal, so one gesture. two openers feed it:
 --           - kitty, with no tmux: an overlay over kitty's scrollback
 --             (4.3.2.emulator/visual_select.py)
 --           - tmux: a popup over the pane, fed `capture-pane` (2.8.tmux/tmux.conf)
 --
--- every map is BUFFER-local: init.lua binds a global <CR> and visual <C-c>, and
--- a buffer map outranks both here, while every other nvim stays untouched
+-- the one map is BUFFER-local, so every other nvim stays untouched
 
 local buf = vim.api.nvim_get_current_buf()
 
@@ -56,8 +56,10 @@ end
 
 -- while open in a tmux popup, mark kitty's window so super+v closes the view
 --   - tmux runs no key bind while a popup is open, so super+v cannot reach
---     tmux's bind; kitty's kitten reads this mark and sends escape instead
---     (4.3.2.emulator/visual_select.py), and escape leaves (below)
+--     tmux's bind; kitty's kitten reads this mark and types `:qa!` instead
+--     (4.3.2.emulator/visual_select.py)
+--   - kitty's copy_notify.py reads the same mark: the pane under the popup
+--     runs a shell, so without it ctrl+c would never be forwarded here
 --   - set on open, cleared on leave — the same user var write the in_tmux
 --     hooks use (OSC 1337 SetUserVar, value base64 "1")
 if client_tty then
@@ -121,24 +123,37 @@ vim.cmd('normal! G')
 vim.fn.search('\\S', 'bcW')
 vim.cmd('normal! zb')
 
-local function map(modes, lhs, rhs, desc)
-  vim.keymap.set(modes, lhs, rhs, { buffer = buf, nowait = true, desc = desc })
+-- ctrl+d k / ctrl+d j: the prior / next shell command — command hunks, the
+-- view's twin of the diff-hunk jumps ctrl+d k / j make in a code buffer
+--   - a command starts on starship's prompt line, whose last glyph before the
+--     typed command is `➜` (2.6.starship/starship.toml); the prompt may lead
+--     with a battery, jobs, or status glyph, so `➜` may sit a few cells in
+--   - plain text only: OSC 133 prompt marks do not survive `capture-pane` or
+--     `@screen_scrollback`, so the glyph is the one mark the view holds
+--   - bound in normal AND visual, so shift+v then ctrl+d k selects a command
+--     whole, from its prompt to the line the cursor left
+--   - ⚠️ a starship glyph change owes a change here
+local prompt = vim.regex([[\v^.{0,24}➜( |$)]])
+local function command_jump(step)
+  return function()
+    local last = vim.api.nvim_buf_line_count(buf)
+    local lnum = vim.fn.line('.') + step
+    while lnum >= 1 and lnum <= last do
+      if prompt:match_line(buf, lnum - 1) then
+        return vim.api.nvim_win_set_cursor(0, { lnum, 0 })
+      end
+      lnum = lnum + step
+    end
+    vim.notify('no ' .. (step < 0 and 'earlier' or 'later') .. ' command', vim.log.levels.INFO)
+  end
 end
-
--- enter: begin a linewise selection; enter again ends it
-map('n', '<CR>', 'V', 'visual select: begin')
-map('x', '<CR>', '<Esc>', 'visual select: end')
-
--- ctrl+c: kitty forwards it as <C-S-c> (copy_notify.py); copy, keep the selection
-map('x', '<C-S-c>', '"+ygv', 'visual select: copy')
--- with no selection there is naught to copy, so it leaves — as tmux copy-mode does
-map('n', '<C-S-c>', '<Cmd>qa!<CR>', 'visual select: leave')
-
--- ctrl+x: kitty sends the bare ^C byte (kitty.conf), so it lands as <C-c>
---   - 🛑 the global visual <C-c> is a COPY (the non-kitty fallback in init.lua);
---     here it must leave, or ctrl+x would copy instead of exit
-map({ 'n', 'x' }, '<C-c>', '<Cmd>qa!<CR>', 'visual select: leave')
--- q leaves from a selection too, as tmux copy-mode's stock q does
-map({ 'n', 'x' }, 'q', '<Cmd>qa!<CR>', 'visual select: leave')
--- escape leaves too, from a selection or not — tmux copy-mode binds it the same
-map({ 'n', 'x' }, '<Esc>', '<Cmd>qa!<CR>', 'visual select: leave')
+local up, down = command_jump(-1), command_jump(1)
+for _, m in ipairs({
+  { '<C-d>k', up }, { '<C-d><C-k>', up },
+  { '<C-d>j', down }, { '<C-d><C-j>', down },
+  -- kitty remaps ctrl+j to shift+enter, and tmux re-spells that as a bare enter
+  -- (init.lua's diff-boundary chords bind the same pair, for the same reason)
+  { '<C-d><S-CR>', down }, { '<C-d><CR>', down },
+}) do
+  vim.keymap.set({ 'n', 'x' }, m[1], m[2], { buffer = buf, desc = 'visual select: command jump' })
+end

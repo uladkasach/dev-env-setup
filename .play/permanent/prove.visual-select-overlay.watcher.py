@@ -44,10 +44,10 @@ def _finish(boss):
     os._exit(0)
 
 
-def _kitten():
+def _kitten(name='visual_select'):
     # the DEPLOYED kitten, the file kitty's map runs
-    path = os.path.join(config_dir, 'visual_select.py')
-    spec = importlib.util.spec_from_file_location('visual_select_under_proof', path)
+    path = os.path.join(config_dir, f'{name}.py')
+    spec = importlib.util.spec_from_file_location(f'{name}_under_proof', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -160,12 +160,21 @@ def _tmux_flow(boss, window):
         _row('popup_marks_the_window', str(var('visual_select_tmux')), 'True')
         rows = [r.rstrip() for r in window.as_text().splitlines()]
         _row('popup_shows_the_history_bare', str(str(LINES) in rows), 'True')
-        # super+v again: the kitten reads the popup's mark and sends escape
+        # ctrl+c must be forwarded into the popup: the pane beneath runs a
+        # shell, so only the popup's mark can make this window a receiver
+        _row('ctrl_c_reaches_the_popup', str(copy_receiver()), 'True')
+        # super+v again: the kitten reads the popup's mark and types :qa!
         _kitten().handle_result([], None, window.id, boss)
         _await(lambda: not var('visual_select_tmux') and not drawn(), closed, 'super_v_again_closes_the_popup')
 
+    def copy_receiver():
+        notify = _kitten('copy_notify')
+        return notify._is_copy_receiver(window, notify._window_pids(window))
+
     def closed():
         _row('super_v_again_closes_the_popup', 'True', 'True')
+        # the discriminator: popup gone, a shell in front — ctrl+c must NOT go
+        _row('ctrl_c_spares_the_shell_once_closed', str(copy_receiver()), 'False')
         _finish(boss)
 
     _await(lambda: var('in_tmux'), tmux_marked, 'tmux_marks_the_window')
