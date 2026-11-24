@@ -202,7 +202,8 @@ lives only on that disk. exit 3 = there is work to rescue.
 ⇒ **first ask the backup, which is cheaper.** on the old box, `rhx grove.backup.get` reads its
 last pass. a ✓ means every tree landed as of that pass; only work since then is at risk. one pass
 by hand closes that window, run by the agent itself as camper through the duct:
-`rhx git.grove.send <old> --reply --within 3600 --what grove-backup`. the agent holds one lock per
+`rhx git.grove.send <old> --reply --within 3600 --what /usr/local/lib/grove-backup/grove-backup`
+(the agent sits outside camper's PATH, so a bare `grove-backup` answers *command not found*). the agent holds one lock per
 box, so a pass the timer already began makes this one exit, never a double put. a first pass, or
 the first after a cut rule changes, packs every tree and can run for hours; `rhx grove.backup.get`
 reads its verdict once it returns. the hash compare below is owed only where the backup reads ✗.

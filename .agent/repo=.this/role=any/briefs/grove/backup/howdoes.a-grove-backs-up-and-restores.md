@@ -280,8 +280,31 @@ aside dir.
 key per unit, and `home=.claude` re-puts whole. no grove's grant may prune, so growth is infra's to
 bound (owed in the pr body).
 
-an object older than 180 days sits in deep archive; the restore asks s3 to thaw it, says how long
-it waits (12–48h), and finishes once the copy reads.
+an archived object (deep archive at 180 days today; at 90 under infra's S8 grant) takes a thaw.
+where the grant lets this box thaw, the restore asks s3, says how long it waits (12–48h), and
+finishes once the copy reads. where the grant refuses, the restore stops with a ✋ that names the
+admin tier's `restore-object` command; once the admin runs it, the same restore lays the unit. a
+quiet unit is put again before it ages 80 days, so its latest copy stays in reach.
+
+### .prove a restore came back whole
+
+lay it aside (`--into`), never over a live tree, then fingerprint both:
+
+```sh
+rhx grove.backup.restore --from <grove> --of <org/repo> --tree <dir> --into ~/restore-check/<dir>
+rhx grove.backup.tree.fingerprint --path ~/restore-check/<dir>   # here
+rhx grove.backup.tree.fingerprint --path ~/git/<…>/<dir>         # on the grove that wrote it
+```
+
+equal digests = the tree came back whole: its HEAD, its checked-out branch, and each uncommitted
+file by content (a symlink by its target, since a link to `~/.claude/settings.json` reaches each
+box's own file). branches and stash print beside it, outside the digest, since a clone shares them
+across its worktrees. three differences are expected, and none is a loss:
+
+- a file the live tree changed after the pass that packed it: run the pass first, and read its
+  age with `/usr/local/lib/grove-backup/grove-backup --line`
+- a cut credential file: absent by design; the restore names each one
+- an ignored build dir outside the kept list: never packed
 
 🛑 **a unit is untrusted input.** every grove's role may write every grove's prefix, so the restore
 validates what a unit names before it lays one byte:
