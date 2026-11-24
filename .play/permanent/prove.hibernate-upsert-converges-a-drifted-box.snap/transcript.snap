@@ -883,6 +883,15 @@ is-active idle-hibernate.timer
 ### systemctl
 
 
+## offec2.hetzner (exit 0)
+### stdout
+         🌙 declined — the act is `aws ec2 stop-instances` on this box's own
+            instance, and cloud@hetzner.hetzbot has no ec2 identity
+### stderr
+
+### systemctl
+
+
 ## onec2 (exit 0)
 ### stdout
 

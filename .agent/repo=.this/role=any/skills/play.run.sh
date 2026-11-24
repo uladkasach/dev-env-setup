@@ -107,7 +107,7 @@ while [[ $# -gt 0 ]]; do
     #    about a subject the caller never named
     *)
       echo "   ✋ ConstraintError: unknown flag: $1" >&2
-      echo "      ⇒ valid: --play <slug>  --list  --all  --within <secs>  --resnap  --help" >&2
+      echo "      valid: --play <slug>  --list  --all  --within <secs>  --resnap  --help" >&2
       exit 2 ;;
   esac
 done
@@ -187,8 +187,8 @@ if [[ "$ALL" -eq 1 ]]; then
   fi
   # the suite's logs land in the checkout's gitignored `.log/`, where a ship report reads the
   #   full-suite verdict — never a random /tmp dir no reader knows to look in
-  # under the role that owns this skill (`role=any`), so a caller finds it where it looks
-  logdir="$ROOT/.log/role=any/skill=play.run/what=all/$(date -u +%Y-%m-%dT%H-%M-%SZ).pid$$"
+  # ⚠️ the path is a contract: `prove.play-run-all-reads-three-verdicts` reads the summary here
+  logdir="$ROOT/.log/role=mechanic/skill=play.run/what=all/$(date -u +%Y-%m-%dT%H-%M-%SZ).pid$$"
   mkdir -p "$logdir" || { echo "   💥 MalfunctionError: could not create the log dir $logdir" >&2; exit 1; }
   summary="$logdir/summary.log"
   # every verdict line goes to stdout and to the summary, so the log holds what the human saw
@@ -329,14 +329,14 @@ echo ""
 if [[ "$rc" -eq 0 ]]; then
   echo "🌲 $PLAY ✔"
 elif [[ "$rc" -eq 124 || "$rc" -eq 137 ]]; then
-  # 🌙, the same mark `--all` gives a timeout and a decline: neither is a verdict, so neither is ✋ or 💥
-  echo "   🌙 $PLAY did not finish within ${WITHIN}s, so it proved no claim" >&2
+  # exit 2 is a constraint, so its header names the class (`rule.require.qualified-error-headers`);
+  #   `prove.clamp-verify-names-each-verdict` pins this form
+  echo "   ✋ ConstraintError: $PLAY did not finish within ${WITHIN}s, so it proved no claim" >&2
   echo "      ⇒ a bound that elapses is not a verdict about the subject" >&2
   echo "      ⇒ read it wider: rhx play.run --play $PLAY --within 3600" >&2
   exit 2
 elif [[ "$rc" -eq 2 ]]; then
-  echo "   🌙 $PLAY declined — its subject is absent, so it proved no claim" >&2
-  echo "      ⇒ the play names what it lacked above; supply it, then run it again" >&2
+  echo "   ✋ ConstraintError: $PLAY declined — its subject is absent, so it proved no claim" >&2
   exit 2
 else
   echo "   💥 MalfunctionError: $PLAY failed (exit $rc)" >&2

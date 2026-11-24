@@ -19,7 +19,8 @@ the wish says *"no duct"*, which reads as presence. a crew parked at a prompt fo
 activity and lives under presence.
 
 ## .where
-`src/grove.provision/1.system/1.12.hibernate/idle-hibernate.sh`, the duct block.
+`src/grove.provision/1.system/1.15.hibernate/idle-hibernate.sh`, the duct block (the slug moved
+from 1.12 to 1.15 when main took 1.12–1.14; see F5).
 
 ## .verdict
 approved — director ahbode-ktlo, 2026-10-23: the call is clean

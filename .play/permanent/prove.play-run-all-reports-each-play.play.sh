@@ -16,7 +16,7 @@
 #
 # .the arms
 #   mixed      pass + decline + fail      → exit 1; ✔ / 🌙 / 💥 rows; `1 passed · 1 declined · 1 failed`
-#   logs       the same run               → the summary and one log per play, under `.log/role=any/skill=play.run/what=all/`
+#   logs       the same run               → the summary and one log per play, under `.log/role=mechanic/skill=play.run/what=all/`
 #   declined   pass + decline             → exit 2; the decline is said to prove no claim
 #   allpass    pass alone                 → exit 0, `every play passed`
 #   twosubjects  `--all --play x`         → exit 2, `name two subjects`
@@ -25,7 +25,7 @@
 #   empty      `--all`, no tracked play   → exit 2, never `every play passed`
 #   unknownflag, playnovalue, withinnovalue, noplay, pathescape, notfound, notindex,
 #   repairverb, wrongverb                         → exit 2, each with its own ✋ words
-#   timeout, playdecline   → exit 2 under 🌙, the mark `--all` gives them: neither is a verdict
+#   timeout, playdecline   → exit 2 under ✋ ConstraintError: a constraint, never a verdict
 #   playfail   a single play that fails   → exit 1, `💥 MalfunctionError: <play> failed`
 #   list.untracked `--list`, an untracked play beside → exit 2, ✋ with a count and no name
 #   list       `--list`, a tracked suite  → exit 0, each name in a tree under its count
@@ -90,10 +90,10 @@ suite a-pass b-decline c-fail; run --all --within 30
   && "$ERR" == *"💥 MalfunctionError: 1 play(s) failed"* ]]
 judge mixed $? "a pass, a decline, and a fail read as three rows and three counts, and exit 1"
 
-LOGDIR="$(find "$T/.log/role=any/skill=play.run/what=all" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -1)"
+LOGDIR="$(find "$T/.log/role=mechanic/skill=play.run/what=all" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -1)"
 [[ -n "$LOGDIR" && -f "$LOGDIR/summary.log" && -f "$LOGDIR/prove.a-pass.log" && -f "$LOGDIR/prove.c-fail.log" \
   && "$(cat "$LOGDIR/summary.log")" == *"1 passed · 1 declined · 1 failed"* && "$(cat "$LOGDIR/prove.c-fail.log")" == *"broke"* ]]
-judge logs $? "the summary and one log per play land under .log/role=any/skill=play.run/what=all/"
+judge logs $? "the summary and one log per play land under .log/role=mechanic/skill=play.run/what=all/"
 
 suite a-pass b-decline; run --all --within 30
 [[ "$RC" -eq 2 && "$OUT" == *"└─ 1 passed · 1 declined · 0 failed"* && "$ERR" == *"declined or timed out, so proved no claim"* ]]
@@ -153,11 +153,11 @@ run --play fix.g-noverb
 [[ "$RC" -eq 2 && "$ERR" == *"does not name a verb this runner drives"* ]]
 judge wrongverb $? "a play with no driven verb is refused, with the allowed set"
 run --play prove.h-hang --within 1
-[[ "$RC" -eq 2 && "$ERR" == *"🌙 prove.h-hang did not finish within 1s, so it proved no claim"* ]]
+[[ "$RC" -eq 2 && "$ERR" == *"✋ ConstraintError: prove.h-hang did not finish within 1s, so it proved no claim"* ]]
 judge timeout $? "a play past its bound exits 2, never a verdict on its subject"
 run --play prove.b-decline
-[[ "$RC" -eq 2 && "$ERR" == *"🌙 prove.b-decline declined — its subject is absent"* && "$ERR" != *"✋ ConstraintError: prove.b-decline"* ]]
-judge playdecline $? "a single play's decline exits 2 under 🌙, the mark --all gives it"
+[[ "$RC" -eq 2 && "$ERR" == *"✋ ConstraintError: prove.b-decline declined — its subject is absent"* ]]
+judge playdecline $? "a single play's decline exits 2 under ✋ ConstraintError, never a verdict"
 run --play prove.c-fail
 [[ "$RC" -eq 1 && "$ERR" == *"💥 MalfunctionError: prove.c-fail failed (exit 1)"* ]]
 judge playfail $? "a single play's fail exits 1, with a qualified malfunction line"

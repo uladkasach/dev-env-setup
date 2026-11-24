@@ -1,30 +1,30 @@
 ## mixed (exit 1)
 ### stdout
 🎭 play.run --all --within 30
-   ├─ logs: .log/role=any/skill=play.run/what=all/<stamp>
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
    └─ verdicts
       ├─ ✔ prove.a-pass
       ├─ 🌙 prove.b-decline — declined or timed out
       ├─ 💥 prove.c-fail — failed (exit 1)
       └─ 1 passed · 1 declined · 1 failed
 ### stderr
-   💥 MalfunctionError: 1 play(s) failed — read each log under .log/role=any/skill=play.run/what=all/<stamp>
+   💥 MalfunctionError: 1 play(s) failed — read each log under .log/role=mechanic/skill=play.run/what=all/<stamp>
 
 ## declined (exit 2)
 ### stdout
 🎭 play.run --all --within 30
-   ├─ logs: .log/role=any/skill=play.run/what=all/<stamp>
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
    └─ verdicts
       ├─ ✔ prove.a-pass
       ├─ 🌙 prove.b-decline — declined or timed out
       └─ 1 passed · 1 declined · 0 failed
 ### stderr
-   🌙 1 play(s) declined or timed out, so proved no claim — read each log under .log/role=any/skill=play.run/what=all/<stamp>
+   🌙 1 play(s) declined or timed out, so proved no claim — read each log under .log/role=mechanic/skill=play.run/what=all/<stamp>
 
 ## allpass (exit 0)
 ### stdout
 🎭 play.run --all --within 30
-   ├─ logs: .log/role=any/skill=play.run/what=all/<stamp>
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
    └─ verdicts
       ├─ ✔ prove.a-pass
       └─ 1 passed · 0 declined · 0 failed
@@ -74,7 +74,7 @@ GROVE_RESNAP=unset
 
 ### stderr
    ✋ ConstraintError: unknown flag: --bogus
-      ⇒ valid: --play <slug>  --list  --all  --within <secs>  --resnap  --help
+      valid: --play <slug>  --list  --all  --within <secs>  --resnap  --help
 
 ## playnovalue (exit 2)
 ### stdout
@@ -146,7 +146,7 @@ GROVE_RESNAP=unset
 🎭 play.run --play prove.h-hang --within 1
    └─ <tmp>/.play/permanent/prove.h-hang.play.sh
 ### stderr
-   🌙 prove.h-hang did not finish within 1s, so it proved no claim
+   ✋ ConstraintError: prove.h-hang did not finish within 1s, so it proved no claim
       ⇒ a bound that elapses is not a verdict about the subject
       ⇒ read it wider: rhx play.run --play prove.h-hang --within 3600
 
@@ -157,8 +157,7 @@ GROVE_RESNAP=unset
 
 no subject here
 ### stderr
-   🌙 prove.b-decline declined — its subject is absent, so it proved no claim
-      ⇒ the play names what it lacked above; supply it, then run it again
+   ✋ ConstraintError: prove.b-decline declined — its subject is absent, so it proved no claim
 
 ## playfail (exit 1)
 ### stdout
@@ -240,7 +239,7 @@ exit:
 
 ### stderr
 mkdir: cannot create directory '<tmp>/.log': Not a directory
-   💥 MalfunctionError: could not create the log dir <tmp>/.log/role=any/skill=play.run/what=all/<stamp>
+   💥 MalfunctionError: could not create the log dir <tmp>/.log/role=mechanic/skill=play.run/what=all/<stamp>
 
 ## noplaydir (exit 2)
 ### stdout

@@ -93,15 +93,15 @@ W2="$(stamps "$WAITER")"
 
 # .what = judge one claim: judge <arm> <ok 0|1> <what> <evidence>; each verdict line joins the snap
 # .why the snap masks the epochs: they differ per run and per box, and the verdict shape does not
-# .why by RELATION, never one token for all: each distinct epoch in a line is <t0>, <t1>, … in
-#   order of first sight, so `<t0>→<t0>` (held) and `<t0>→<t1>` (moved) read apart in the snap
-SNAP="# <t0>, <t1> = the epochs in one line, numbered by first sight: <t0>→<t0> held, <t0>→<t1> moved"$'\n'
+# .why by RELATION, per pair: each `before→after` reads `<t0>→<t0>` (held) or `<t0>→<t1>` (moved).
+#   a count across the whole line would tie one field's numbers to another's, so whether atime
+#   happened to equal mtime would drift the snap with no change in the verdict
+SNAP="# each before→after pair: <t0>→<t0> held, <t0>→<t1> moved"$'\n'
 asRelativeEpochs() {
-  awk '{ out = ""; n = 0; delete seen
-    while (match($0, /[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]+(\.[0-9]+)?/)) {
-      tok = substr($0, RSTART, RLENGTH)
-      if (!(tok in seen)) seen[tok] = n++
-      out = out substr($0, 1, RSTART - 1) "<t" seen[tok] ">"
+  awk '{ out = ""
+    while (match($0, /[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]+(\.[0-9]+)?→[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]+(\.[0-9]+)?/)) {
+      pair = substr($0, RSTART, RLENGTH); split(pair, side, "→")
+      out = out substr($0, 1, RSTART - 1) (side[1] == side[2] ? "<t0>→<t0>" : "<t0>→<t1>")
       $0 = substr($0, RSTART + RLENGTH)
     }
     print out $0 }'

@@ -436,6 +436,16 @@ if [[ "$OUT" != *"🌙 declined"*"no ec2 identity"* || -s "$FIX/upgrades" || "$(
   echo "   │  ✋ a box with no ec2 identity ran a phase, or did not decline"; RC=-; quote; FAILED=1
 else echo "   │  ✔ 🌙 declined off ec2 — no phase ran, no write"; fi
 
+# a CLOUD grove off ec2 (hetzner, #203) declines too: the gate reads the platform, never the tier,
+#   since the stop act is ec2's `stop-instances --hibernate` and a hetzner box has no such call
+: > "$FIX/upgrades"
+USTDOUT="$(GROVE_ENV_SERVER=cloud@hetzner.hetzbot grove_provision_1_15_hibernate 2>"$FIX/uerr")"; RC=$?
+USTDERR="$(cat "$FIX/uerr")"; OUT="$USTDOUT"$'\n'"$USTDERR"; URUNS=$((URUNS + 1))
+arm offec2.hetzner
+if [[ "$OUT" != *"🌙 declined"*"cloud@hetzner.hetzbot has no ec2 identity"* || -s "$FIX/upgrades" || "$(writes)" -ne 0 ]]; then
+  echo "   │  ✋ a hetzner grove ran a phase, or did not decline"; RC=-; quote; FAILED=1
+else echo "   │  ✔ 🌙 a hetzner grove declines — no phase ran, no write"; fi
+
 : > "$FIX/upgrades"; : > "$SD/log"
 USTDOUT="$(GROVE_ENV_SERVER=cloud@aws.ec2 grove_provision_1_15_hibernate 2>"$FIX/uerr")"; RC=$?
 USTDERR="$(cat "$FIX/uerr")"; OUT="$USTDOUT"$'\n'"$USTDERR"; URUNS=$((URUNS + 1))
