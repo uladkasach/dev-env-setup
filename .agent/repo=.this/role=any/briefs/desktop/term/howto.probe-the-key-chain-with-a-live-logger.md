@@ -100,8 +100,15 @@ numbered — so their press and your read agree on which form is which.
 ### 3. open a real window and hand it over
 
 ```sh
-rhx term.open --name keyprobe --what 'nvim -u .temp/keyprobe/probe.lua'
+rhx term.keys.probe --via tmux                 # a byte logger: kitty → tmux → logger
+rhx term.keys.probe --via bare                 # the same, with no tmux in the chain
+rhx term.keys.probe --via tmux --what 'nvim -u .temp/keyprobe/probe.lua'   # any app
 ```
+
+one command opens the window AND starts the app, and the byte logger exits by itself after
+`--presses` keys. 📜 2026-11-24: a `term.open` + `term.send` pair raced a shell that was not up
+(`kitten: command not found`), and a logger that waited for `q` swallowed the next command sent
+to its pane as keystrokes.
 
 a **real kitty window**, because the chain under test IS kitty. a headless nvim, a `--embed`
 nvim, or a send over a duct each replace the very hop the probe exists to read.
@@ -111,7 +118,7 @@ then say so plainly: *"the window is open — press the three forms, then tell m
 ### 4. read it
 
 ```sh
-rhx term.read --pid <pid> --lines 60
+rhx term.keys.probe --read      # the byte logger's file — never the pane
 ```
 
 ## ⚠️ .the traps — each one cost a round

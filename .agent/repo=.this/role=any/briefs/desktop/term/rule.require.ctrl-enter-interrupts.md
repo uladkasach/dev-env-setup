@@ -1,10 +1,20 @@
-# rule.require.ctrl-enter-sends-now
+# rule.require.ctrl-enter-interrupts
 
 ## .what
 
-**ctrl+enter is claude's send-now key, in every window — plain kitty, kitty → tmux, and
-kitty → ssh → a grove's tmux.** it interrupts the turn and sends the queued message, and
-claude's own hint names ctrl+enter, never the `ctrl+x ctrl+s` chord.
+**in claude, enter never waits on a tool, and ctrl+enter cuts the turn — in every window:
+plain kitty, kitty → tmux, and kitty → ssh → a grove's tmux.**
+
+| key | action | while claude works |
+|---|---|---|
+| enter | `chat:sendNow` | a live tool moves to the background and keeps its work; the message reaches claude in the same turn. idle: it submits |
+| ctrl+enter | `chat:cancel` (the esc action) | the turn stops — a reply, a Stop hook, a step that cannot move to the background — and what is queued goes out |
+| ctrl+x ctrl+s | unbound | claude's default send-now chord; kitty maps ctrl+x to `^C`, so it cannot be typed here |
+
+📜 measured 2026-11-24 on claude-code 2.1.330, via `rhx term.keys.probe`: enter mid-tool moved a
+90s loop to the background and claude answered at once; ctrl+enter mid-reply printed
+`Interrupted`. from 2.1.281 the default send-now backgrounds a tool rather than stop the turn,
+which made a long turn impossible to cut without esc — the reason ctrl+enter is the interrupt.
 
 ## .why it breaks by default
 
@@ -25,10 +35,14 @@ advertised a key that interrupts the turn the wrong way.
 |---|---|---|
 | the marker | `2.8.tmux/tmux.conf` hooks | attach sets the kitty user var `in_tmux`, detach clears it — written to the CLIENT tty, so it crosses ssh too |
 | the encode | `4.3.2.emulator/kitty.conf` | `map --when-focus-on var:in_tmux ctrl+enter send_text all \x1b[13;5u` — tmux parses it as C-Enter and relays it |
-| the hint | `5.3.brains` → `~/.claude/keybindings.json` | `"ctrl+x ctrl+s": null` in the Chat block, so ctrl+enter is the one key left bound |
+| the binds | `5.3.brains` → `~/.claude/keybindings.json` | Chat block: `"enter": "chat:sendNow"`, `"ctrl+enter": "chat:cancel"`, `"ctrl+x ctrl+s": null` |
 
 measured after all three: inside tmux, ctrl+enter arrived as `^[[13;5u` while enter,
-shift+enter, and ctrl+j stayed `^M`; a live claude in tmux interrupted and sent on ctrl+enter.
+shift+enter, and ctrl+j stayed `^M`; a live claude in tmux backgrounded a tool on enter and
+interrupted on ctrl+enter.
+
+⚠️ an enrolled clone reads `keybindings.json` from its actor dir (`CLAUDE_CONFIG_DIR`), which
+rhachet does not yet link to `~/.claude/` (rhachet #579), so a clone keeps claude's default keys.
 
 ## 🛑 .the moves that look right and are not
 

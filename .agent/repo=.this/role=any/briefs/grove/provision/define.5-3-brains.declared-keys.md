@@ -26,6 +26,13 @@ the first two are not interchangeable, and a wrong pick fails silent. `settings.
 - claude reads it straight off the global config (`ie()`), never through `yo`, so no settings file reaches it.
 - it has no claude default, so a declared `false` survives claude's saves. a global-config key must have no default, or the next save drops it — the reason `verbose` lives in settings.
 
+## `enabledPlugins."cc-plugin-diff@builtin": false` — the diff panel's off switch
+
+- from 2.1.287 the diff panel is a built-in mod, `cc-plugin-diff`. it keeps its OWN saved open preference, and reads `diffSidebarOpen` only once, as a seed, while that store is empty. so `diffSidebarOpen: false` alone no longer holds the panel shut.
+- built-in mods are disabled by id in settings: `<id>@builtin: false`. 2.1.330's binary names its built-ins in that form (`cc-plugin-sec-default@builtin`).
+- with the mod off, `/diff` falls back to the older built-in panel, which reads `diffSidebarOpen` — so both keys stay declared.
+- 📌 the fallback and the mod's git poll cost rest on public reports (claude-code#101395, freeside-ai/freeside#2922), not a probe here.
+
 ## one home for every brain knob
 
 this patch is the sole home of every brain knob (`rule.require.brain-config-has-one-home`); no peer bundle declares one.

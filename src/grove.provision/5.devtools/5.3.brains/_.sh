@@ -596,6 +596,20 @@ _grove_provision_5_3_brains_keybindings_chord() {
     end' "$1"
 }
 
+# .what = print whether every Chat block that names <key> binds it to the action <want>:
+#   `held`, `absent` (no Chat block names it, so claude's default stays), or `differs`
+# .why  = claude merges every Chat block, so one block with the declared action beside a second
+#         that binds the key elsewhere is not held; `all` over the blocks that name the key
+# guarantee: exits nonzero where jq cannot read <file>, so "held" is never inferred from a failure
+_grove_provision_5_3_brains_keybindings_bind() {
+  jq -r --arg key "$2" --arg want "$3" '
+    [(.bindings // [])[] | objects | select(.context == "Chat") | .bindings | objects
+     | select(has($key)) | .[$key]] as $v
+    | if ($v | length) == 0 then "absent"
+      elif ($v | all(. == $want)) then "held"
+      else "differs" end' "$1"
+}
+
 grove_provision_5_3_brains() {
   bundle.upgrade 5.3.brains.provision.upsert
   bundle.upgrade 5.3.brains.provision.verify

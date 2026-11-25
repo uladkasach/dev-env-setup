@@ -1,0 +1,8 @@
+[Unit]
+Description=Snapshot the kitty session on a schedule
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/kitty_snap_periodic
+StandardOutput=journal
+StandardError=journal

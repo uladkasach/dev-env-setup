@@ -85,7 +85,7 @@ mkdir -p "$SNAP_DIR"
 # critical band: snap once past 5%
 if [[ "$cap" -le "$CRIT" ]]; then
   [[ -f "$MARK_CRIT" ]] && exit 0
-  bash "$SNAPPER" --save >/dev/null 2>&1
+  bash "$SNAPPER" --restore --save >/dev/null 2>&1
   touch "$MARK_CRIT"
   logger -t kitty_snap_lowbatt "battery ${cap}% (<=${CRIT}%) — snapped kitty session"
   exit 0
@@ -93,6 +93,6 @@ fi
 
 # warn band: 5% < cap <= 10%, snap once
 [[ -f "$MARK_WARN" ]] && exit 0
-bash "$SNAPPER" --save >/dev/null 2>&1
+bash "$SNAPPER" --restore --save >/dev/null 2>&1
 touch "$MARK_WARN"
 logger -t kitty_snap_lowbatt "battery ${cap}% (<=${WARN}%) — snapped kitty session"

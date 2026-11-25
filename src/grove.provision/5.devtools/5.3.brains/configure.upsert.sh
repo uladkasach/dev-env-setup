@@ -538,7 +538,7 @@ _grove_provision_5_3_brains_converge_filter() {
 ####################################################################
 _grove_provision_5_3_brains_settings_upsert() {
   local settings="$1" backup="$2" want="$3"
-  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_INSTALLATION_CHECKS": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false", "CLAUDE_CODE_DISABLE_COMMAND_INJECTION_CHECK": "1", "CLAUDE_CODE_ENABLE_TODO_TOOLS": "1", "ANTHROPIC_MODEL": "claude-opus-5-5[1m]", "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-5-5[1m]", "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50", "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000", "CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS": "450000"}, "disableClaudeAiConnectors": true, "permissions": {"defaultMode": "auto"}, "model": "claude-opus-5-5[1m]", "effortLevel": "medium", "cleanupPeriodDays": 36500, "skipAutoPermissionPrompt": true, "tui": "fullscreen", "verbose": false, "feedbackDrafts": "off"}'
+  local patch='{"env": {"DISABLE_AUTOUPDATER": "1", "DISABLE_INSTALLATION_CHECKS": "1", "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false", "CLAUDE_CODE_DISABLE_COMMAND_INJECTION_CHECK": "1", "CLAUDE_CODE_ENABLE_TODO_TOOLS": "1", "ANTHROPIC_MODEL": "claude-opus-5-5[1m]", "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-5-5[1m]", "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50", "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000", "CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS": "450000"}, "disableClaudeAiConnectors": true, "permissions": {"defaultMode": "auto"}, "model": "claude-opus-5-5[1m]", "effortLevel": "medium", "cleanupPeriodDays": 36500, "skipAutoPermissionPrompt": true, "tui": "fullscreen", "verbose": false, "feedbackDrafts": "off", "enabledPlugins": {"cc-plugin-diff@builtin": false}}'
   local tmp
 
   ####################################################################
@@ -854,13 +854,16 @@ _grove_provision_5_3_brains_config_upsert() {
 ####################################################################
 # .what = the KEYBINDINGS half — `~/.claude/keybindings.json`
 #
-# .why ctrl+enter is the one send-now key, in every window (`rule.require.ctrl-enter-sends-now`)
-#   - claude binds `chat:sendNow` to BOTH ctrl+enter and `ctrl+x ctrl+s`, and its hint picks the
-#     chord whenever $TMUX is set. on this repo's kitty the chord cannot even be typed: kitty
-#     maps ctrl+x to ^C, so the hint advertises a key that interrupts instead
-#   - unbind the chord, and ctrl+enter is the one key left bound — so the hint names it in tmux too
-#   - the key itself reaches claude through tmux via the kitty map + tmux marker (4.3.2.emulator,
-#     2.8.tmux); this half fixes only what the hint SAYS
+# .why enter never waits on a tool; ctrl+enter cuts the turn (`rule.require.ctrl-enter-interrupts`)
+#   - `enter → chat:sendNow`: while claude works, a live tool moves to the background and the
+#     message reaches claude in the same turn; while idle, send-now submits as enter did. so a
+#     message never queues behind a long command
+#   - `ctrl+enter → chat:cancel`: the esc action — it interrupts the turn (a reply, a Stop hook,
+#     a step that cannot move to the background) and sends what is queued
+#   - `ctrl+x ctrl+s → null`: claude's default send-now chord. kitty maps ctrl+x to ^C, so the
+#     chord cannot be typed here, and claude's tmux hint would advertise it
+#   - ctrl+enter reaches claude through tmux via the kitty map + tmux marker (4.3.2.emulator,
+#     2.8.tmux); this half decides what the key DOES
 #
 # ⚠️ merged, never overwritten — a human may hold their own keymaps here. the one entry is
 #   upserted into the `Chat` block; every other block and key is left as found
@@ -870,7 +873,7 @@ _grove_provision_5_3_brains_config_upsert() {
 _grove_provision_5_3_brains_keybindings_upsert() {
   # `arrow` is the path claude reads; `file` is what it leads to, and the one the half writes
   local arrow="$HOME/.claude/keybindings.json" file tmp
-  local add='{"ctrl+x ctrl+s": null}'
+  local add='{"ctrl+x ctrl+s": null, "enter": "chat:sendNow", "ctrl+enter": "chat:cancel"}'
   _grove_provision_5_3_brains_claude_dir_upsert || return 1
 
   # 🛑 a rename over a SYMLINK replaces the link, so the half writes the file it leads to
@@ -924,7 +927,7 @@ _grove_provision_5_3_brains_keybindings_upsert() {
     return 1
   fi
   if [[ "$held" == same ]]; then
-    echo "   • claude keybindings already unbind the ctrl+x ctrl+s chord → $file [KEEP]"
+    echo "   • claude keybindings already hold enter = send now, ctrl+enter = interrupt → $file [KEEP]"
     return 0
   fi
 
@@ -937,7 +940,7 @@ _grove_provision_5_3_brains_keybindings_upsert() {
     _grove_provision_5_3_brains_tmp_unguard; return 1
   fi
   _grove_provision_5_3_brains_file_swap "$tmp" "$file" 600 || return 1
-  echo "   • claude keybindings merged → $file (ctrl+enter is the one send-now key)"
+  echo "   • claude keybindings merged → $file (enter = send now, ctrl+enter = interrupt)"
 }
 
 # .what = print whether <file> already holds the <merged> document: `absent`, `same`, or `differs`

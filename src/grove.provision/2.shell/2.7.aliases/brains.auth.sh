@@ -22,7 +22,7 @@
 #   one, and you must add all three: the file, the source line, and the cp in the phase.
 #
 # vision: .behavior/v2026_07_28.brain-budget-utilization/1.vision.yield.md
-# tests:  rhx brains.auth.test   (340 cases, hermetic, no network, no real ~/.claude)
+# tests:  rhx brains.auth.test   (343 cases, hermetic, no network, no real ~/.claude)
 #         ⚠️ this number is ASSERTED, not maintained by hand — `header.count-matches-the-suite`
 #           reads it back out of this very line and compares it to the suite's own total. it
 #           drifted ~100 cases wrong once, when it was only a promise. now a case added
@@ -787,19 +787,69 @@ _brains_auth_round() {
   awk -v u="${1:-0}" 'BEGIN{printf "%.0f", u}'
 }
 
-# .what = draw a bar filled to the percent you pass ($1=percent, $2=width=10)
+# .what = draw a bar filled to the percent you pass ($1=percent, $2=width=10, $3=fable share)
 # .why  = one shared gauge glyph for the session + week windows
+# .note = $3 is the part of $1 that fable spent. it fills the LEAD cells of the bar in the
+#   fable hue (a pastel tan, 256-color 180: darker than the white fill, so it reads apart), so a glance splits the week into fable
+#   and the rest. off a color terminal those cells draw `▓` instead, so the split survives a
+#   pipe, a log, and a snapshot.
 _brains_auth_bar() {
-  local pct="${1%%.*}" w="${2:-10}" filled i out=''
+  local pct="${1%%.*}" w="${2:-10}" part="${3:-0}" filled fcells i out=''
+  part="${part%%.*}"
   [[ -z "$pct" ]] && pct=0
+  [[ -z "$part" ]] && part=0
   filled=$(( pct * w / 100 ))
   (( filled > w )) && filled=$w
   (( filled < 0 )) && filled=0
+  # round the fable cells, but a nonzero share inside a drawn fill always earns one cell —
+  #   a share that rounds to zero would vanish from the very bar meant to show it
+  fcells=$(( (part * w + 50) / 100 ))
+  (( part > 0 && fcells == 0 )) && fcells=1
+  (( fcells > filled )) && fcells=$filled
   # append the glyphs directly — NOT via `tr`, which maps bytes: a 3-byte utf-8
   # block (█ = e2 96 88) would collapse to one invalid byte and render as �.
-  for (( i = 0; i < filled; i++ )); do out+='█'; done
+  if (( fcells > 0 )); then
+    if _brains_auth_color_on; then
+      out+=$'\033[38;5;180m'
+      for (( i = 0; i < fcells; i++ )); do out+='█'; done
+      out+=$'\033[0m'
+    else
+      for (( i = 0; i < fcells; i++ )); do out+='▓'; done
+    fi
+  fi
+  for (( i = fcells; i < filled; i++ )); do out+='█'; done
   for (( i = filled; i < w; i++ )); do out+='░'; done
   printf '%s' "$out"
+}
+
+# .what = paint text in the fable hue when color is on ($1=text)
+# .why  = the `fable N%` label wears the same hue as its slice of the bar
+_brains_auth_fable_hue() {
+  if _brains_auth_color_on; then printf '\033[38;5;180m%s\033[0m' "$1"; return; fi
+  printf '%s' "$1"
+}
+
+# .what = is color on for this render?
+# .why  = the bar is drawn inside `$(...)`, where stdout is a pipe, so the answer is decided
+#   ONCE by the render (`_BRAINS_AUTH_COLOR`) against the real stdout. NO_COLOR always wins.
+_brains_auth_color_on() {
+  [[ -z "${NO_COLOR:-}" && "${_BRAINS_AUTH_COLOR:-0}" == 1 ]]
+}
+
+# .what = the percent of the WEEK that fable spent ($1=usage node); empty when unknown
+# .why  = the endpoint reports fable as a scoped weekly limit (`limits[]`, scope model
+#   "Fable") and that limit's share of the week (`weekly_scoped_shares[]`, keyed by the
+#   limit's index). a share with no fable limit to key it is not fable's, so it reads empty
+_brains_auth_fable_week_share() {
+  jq -r '
+    ([(.limits // []) | to_entries[]
+      | select(.value.kind == "weekly_scoped"
+               and ((.value.scope.model.display_name // "") | ascii_downcase) == "fable")
+      | .key][0]) as $i
+    | if $i == null then empty else
+        ([(.weekly_scoped_shares // [])[] | select(.limit_index == $i)
+          | .used_percent_of_weekly | numbers][0]) // empty
+      end' <<< "${1:-null}" 2>/dev/null
 }
 
 # .what = format an iso timestamp as a countdown "2h14m" from now ($1=iso)
@@ -2992,8 +3042,13 @@ _brains_auth_render() {
   local combined="$1" active="${2:-}" lastknown="${3:-}"
   local reach node err s_used w_used o_used s_reset w_reset s_pct w_pct
   local mark reset_txt lk_node lk_body kinds nkinds next i last row s_tail w_tail
+  local f_share f_pct f_txt
   local -a rows=() bills=()
   [[ -n "$lastknown" ]] || lastknown='{}'
+  # color is decided HERE, against the render's real stdout: every row is drawn inside
+  #   `$(...)`, where a `-t 1` would always read a pipe. dynamic scope hands it to the leaves
+  local _BRAINS_AUTH_COLOR=0
+  [[ -t 1 || -n "${FORCE_COLOR:-}" ]] && _BRAINS_AUTH_COLOR=1
   # `lastknown` is `{reach: {ts, seven_day, subscription}}` — the latest successful read per account, handed
   # in by the caller so this render stays a pure function of its arguments
   # `active` is detected once by the caller and passed in — every account line flags whether
@@ -3103,7 +3158,15 @@ _brains_auth_render() {
     if [[ "$(jq -r '.seven_day == null' <<< "$node")" == true ]]; then
       rows+=("$(printf '%-8s%s' week 'no weekly limit on this plan')")
     else
-      rows+=("$(printf '%-8s%s%5d%% %s' week "$(_brains_auth_bar "$w_pct")" "$w_pct" "$w_tail")")
+      # fable's slice of the week, when the endpoint reports one: the lead cells of the bar
+      #   in the fable hue, and a `fable N%` label of the same hue beside the total
+      f_share="$(_brains_auth_fable_week_share "$node")"
+      f_pct=''; f_txt=''
+      if [[ -n "$f_share" ]]; then
+        f_pct="$(_brains_auth_round "$f_share")"
+        f_txt=" · $(_brains_auth_fable_hue "fable ${f_pct}%")"
+      fi
+      rows+=("$(printf '%-8s%s%5d%%%s %s' week "$(_brains_auth_bar "$w_pct" 10 "$f_pct")" "$w_pct" "$f_txt" "$w_tail")")
     fi
     # each reset row shows only when such a reset exists: a full one (🎁 the whole week), then
     #   a fable one (🎀 the 5h limit + fable's share of the week) on its own row

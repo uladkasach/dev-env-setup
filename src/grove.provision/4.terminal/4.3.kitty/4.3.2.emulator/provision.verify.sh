@@ -32,7 +32,7 @@
 ######################################################################
 
 grove_provision_4_3_2_emulator_provision_verify() {
-  local want="0.47.4" failed=0
+  local want="0.51.1" failed=0
 
   ####################################################################
   # 1. the binary runs, at the pinned version
