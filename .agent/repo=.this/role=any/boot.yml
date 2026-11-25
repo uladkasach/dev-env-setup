@@ -18,8 +18,6 @@ always:
       - briefs/creds/rule.require.aws-params-on-camp-groves-only.md
       # a public repo: one leaked identifier is permanent
       - briefs/creds/rule.forbid.dox-in-public-repo.md
-      # a claim i wrote down is not evidence for itself
-      - briefs/evidence/gotcha.my-own-note-became-my-evidence.md
       # the bare `rhx …` form cannot reach sudo on a laptop; `sudo -v &&` first
       - briefs/shell/gotcha.rhx-runs-a-skill-with-no-tty.md
       # a provision defect is fixed now, never filed
@@ -28,6 +26,8 @@ always:
       - briefs/shell/rule.forbid.adhoc-shell.md
       # it governs the instant before an update is recommended — no backup, no firmware or os update
       - briefs/desktop/system/rule.forbid.firmware-or-os-updates-without-a-backup.md
+      # it governs the instant before any take leaves — a diagnosis, a claim, an ask
+      - briefs/skepticism/rule.always.question-your-first-take.md
 
     # reference — fetch on demand
     ref:
@@ -45,6 +45,9 @@ always:
       # the mechanic's lang.prose rules (booted say-level by that role) bind
       # every brief under role=any too — this names the scope + its carve-outs
       - briefs/prose/rule.require.briefs-obey-the-prose-rules.md
+      # a claim i wrote down is not evidence for itself — one instance of the
+      # say rule `rule.always.question-your-first-take`, which cites it
+      - briefs/evidence/gotcha.my-own-note-became-my-evidence.md
       # read before you trust a check that just went red
       - briefs/evidence/gotcha.a-check-that-cries-wolf-gets-silenced.md
       - briefs/evidence/define.cry-wolf-measurements.md
@@ -105,11 +108,13 @@ always:
     # dropped from the payload, never from disk. ~370 term clusters cost a path
     # line each every session; the glossary index above finds them on demand
     # each `.demo=` file is the evidence under one parent brief, and its parent
-    # names it in a `.refs` line — so the parent is the way in
+    # names it in a `.refs` line — so the parent is the way in. an
+    # `.example.case=` file is the same, listed in its parent's `.examples`
     # the exit-node plan is cited by `network.vpn.set` and the outbound invariant
     not:
       - briefs/domain.terms/term=*
       - briefs/**/*.demo=*
+      - briefs/**/*.example.case=*
       - briefs/grove/reach/plan.exit-node.md
   skills:
     # test snapshots are fixtures of brains.auth.test, never a skill to invoke
@@ -118,6 +123,7 @@ always:
     not:
       - skills/**/*.snap
       - skills/**/*.operations.sh
+    # use.apikeys.sh is sourced by the guard reviews, never invoked by hand, so
+    # its path line in the index is all a reader needs
     say:
       - skills/machine.diagnose.lag.sh
-      - skills/use.apikeys.sh

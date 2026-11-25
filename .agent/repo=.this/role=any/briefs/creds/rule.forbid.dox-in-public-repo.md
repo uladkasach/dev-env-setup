@@ -32,6 +32,7 @@ use a placeholder instead: `<acct>`, `<region>`, `<role>`, `<host>`, `<user>`, `
 | a real person's email, username, or full name | `<user>` |
 | an internal url (a grafana board, a broker endpoint) | `<internal-url>` |
 | a bucket name, a queue name, a secret path | `<bucket>`, `<secret-arn>` |
+| an org past ahbode and ehmpathy — its keyrack name or its github name, in a fixture or a snapshot too | `<org3>`, or a fake like `acme` |
 
 **a secret is a different and worse category.** an api key, a token, or a private key in this repo
 is not dox — it is a breach, and it needs rotation, not a redaction.

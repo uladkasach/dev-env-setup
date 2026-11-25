@@ -71,6 +71,37 @@ grove_provision_4_5_nvim_policy_render() {
   ' "$cur"
 }
 
+# .what = print one ✋ (a headline plus optional detail lines); caller sets `failed`
+_nvim_verify_say() {
+  printf '   ✋ %s\n' "$1" >&2
+  shift
+  local line
+  for line in "$@"; do
+    [[ -n "$line" ]] && printf '      %s\n' "$line" >&2
+  done
+}
+
+# .what = configure.verify claim 4, currency: does the file imagemagick READS carry this
+#   checkout's fence? never sets a failure — imagemagick is non-fatal (claims 4-6)
+grove_provision_4_5_nvim_policy_currency_verify() {
+  local pol_src="$1" pol_dst
+  if ! pol_dst="$(grove_provision_4_5_nvim_policy_path_readable)"; then
+    echo "   🌙 imagemagick names no readable policy file — read why: identify -list policy | grep '^Path:'"
+    return 0
+  fi
+  if [[ ! -r "$pol_src" ]]; then
+    echo "   🌙 this checkout has no imagemagick.policy.xml to compare $pol_dst against ($pol_src)"
+    return 0
+  fi
+  if grove_provision_4_5_nvim_policy_render "$pol_dst" "$pol_src" 2>/dev/null | cmp -s - "$pol_dst"; then
+    echo "   • $pol_dst carries this checkout's imagemagick rules ✔"
+    return 0
+  fi
+  echo "   🌙 $pol_dst lacks this checkout's imagemagick rules (absent or stale fence)"
+  echo "      fix: a box-wide write — on a grove, ground's apply; on a laptop:"
+  echo "        sudo -v && rhx grove.provision --what 4.5.nvim --mode apply"
+}
+
 grove_provision_4_5_nvim() {
   bundle.upgrade 4.5.nvim.provision.upsert
   bundle.upgrade 4.5.nvim.provision.verify

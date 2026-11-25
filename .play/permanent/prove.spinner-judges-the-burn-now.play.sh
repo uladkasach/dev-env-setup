@@ -11,7 +11,7 @@
 #         also samples /proc ticks over a live window; both clocks must clear
 #
 # .the arms — the old arm must go red, or this play is blind (term=bite)
-#   old-lifetime-only  the quiet pid, judged by the finder at 9f9f2e0
+#   old-lifetime-only  the quiet pid, judged by the finder at f10eb78
 #                      (before the window)         → in the kill list
 #   control-burn       a busy loop, still on cpu   → 🦎, in the kill list
 #   quiet-now          a 4s cpu burst, then sleep  → 💤, NOT in the kill list
@@ -25,7 +25,10 @@ set -uo pipefail
 
 REPO="${GROVE_SRC:-$PWD/src}"
 FINDER="$REPO/machine/machine_resource_procs_find_spinner"
-OLD_REV=9f9f2e0
+# the last finder on main that judged by the lifetime ratio alone (#166); #168 added the window
+# ⚠️ a pin must name a commit ON MAIN. the first pin, 9f9f2e0, was a branch commit that the
+#    squash merge of #168 erased, so the old arm could not run on any clone
+OLD_REV=f10eb782d5003bf88c98e3943cd9545d4cac483c
 FAILED=0
 BURN=""
 QUIET=""

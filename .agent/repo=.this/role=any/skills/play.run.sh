@@ -185,7 +185,12 @@ if [[ "$ALL" -eq 1 ]]; then
     [[ -n "$f" ]] || continue
     slug="$(basename "$f" .play.sh)"
     prc=0
-    bash "${BASH_SOURCE[0]}" --play "$slug" --within "$WITHIN" > "$logdir/$slug.log" 2>&1 || prc=$?
+    # 🛑 `</dev/null` is load-bear: the loop reads its list on THIS stdin, so a play that
+    #    inherits it and reads stdin (a stub ssh, a `cat`, a `read`) swallows every slug
+    #    still queued. the suite then ends early on a short count, every verdict green,
+    #    and the swallowed names land in that play's output as if they were its own.
+    #    📜 measured 2026-11-21: two `--all` runs each stopped after 21 of 73 plays
+    bash "${BASH_SOURCE[0]}" --play "$slug" --within "$WITHIN" > "$logdir/$slug.log" 2>&1 </dev/null || prc=$?
     case "$prc" in
       0) passed=$(( passed + 1 ));     say "      ├─ ✔ $slug" ;;
       2) declined=$(( declined + 1 )); say "      ├─ 🌙 $slug — declined or timed out" ;;

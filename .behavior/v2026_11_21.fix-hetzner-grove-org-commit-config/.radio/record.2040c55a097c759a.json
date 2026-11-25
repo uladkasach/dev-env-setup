@@ -1,0 +1,19 @@
+{
+  "key": "2040c55a097c759a",
+  "kind": "update",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-ehmpathy"
+  },
+  "exid": "1471",
+  "title": "fix(git.commit.push): --auth as-human applies to the pr open, never to the push",
+  "description": "## .what\n\n`git.commit.push --auth as-human` applies the human's gh login to the pr open only. the push itself (`git push origin HEAD --force-with-lease`, `git.commit.push.sh` line 496) runs with whatever credential helper the seat holds.\n\non a laptop whose https remote is served by a helper that declines (here a grove-only helper, `git-credential-keyrack`), the push falls through to a prompt and fails:\n\n```\nfatal: could not read Username for 'https://github.com/<owner>/<repo>.git': No such device or address\n```\n\nso `--auth as-human` cannot push from a laptop seat, though its help and its own retry hint offer it as the escape from a keyrack failure.\n\n## .why it matters\n\nthe documented fallback (`retry: rhx git.commit.push --mode apply --auth as-human`) is a dead end on the seat it is offered to. the caller is left with raw git config edits or a remote change.\n\n## .the shape of the fix\n\nunder `as-human`, push through gh's own credential, scoped to the one command, so no global config changes:\n\n```sh\ngit -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin HEAD --force-with-lease\n```\n\nstrip ambient `GH_TOKEN`/`GITHUB_TOKEN` the same way the pr open already does.\n\n## .a second defect: three skills ship read-only, so no pnpm patch can touch them\n\n`git.commit.push.sh`, `git.commit.set.sh`, and `keyrack.operations.sh` ship in 1.43.0 as mode `-r-xr-xr-x`; their peers ship `-rwxr-xr-x`. pnpm copies that mode into a patched dir. its applier then rewrites the file in place, the write throws on the read-only file, the error is swallowed, and pnpm reports only `ERR_PNPM_PATCH_FAILED` with no cause.\n\na consumer can work around it with `old mode 100644` / `new mode 100755` in the patch header. pnpm applies a mode change before the hunk, and it accepts only those two mode strings. the cure belongs at the source: publish all three as 0755, like their peers.\n\nmeasured: uladkasach/dev-env-setup#213 carries that workaround and a clamp that is red without the patch and green with it.\n\nclamp: a temp repo whose global helper declines; push under `as-human` to a local bare remote with a stub gh helper. red before the fix, green after.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": "as-human",
+  "idem": "upsert",
+  "heldSeq": 18,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "1471"
+}

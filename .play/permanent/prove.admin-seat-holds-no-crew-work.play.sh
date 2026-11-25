@@ -46,7 +46,7 @@ else
   held "no login shell exports a github token"
 fi
 
-# 2. crew work — clones other than the boot checkout, docker state
+# 2. crew work — clones other than the boot checkout, docker state, an org commit meter
 crew=0
 for d in "$HOME"/git/*/*; do
   [[ -d "$d" ]] || continue
@@ -55,6 +55,20 @@ for d in "$HOME"/git/*/*; do
 done
 (( crew == 0 )) && held "no crew clone under ~/git (the boot checkout is exempt)"
 if [[ -d "$HOME/.local/share/docker" ]]; then found "~/.local/share/docker holds docker state" "$HOME/.local/share/docker"; else held "no docker state"; fi
+# the org commit meter is crew work: `5.26.commitorgs` writes it on the crew seat and
+# declines here (`grove_provision_5_26_commitorgs_declines`), so a meter on this seat
+# means a crew-aimed apply reached ground. the path is the bundle's own, so both read one file
+_meter="$HOME/.rhachet/storage/repo=ehmpathy/role=mechanic/.meter/git.commit.uses.org.jsonc"
+_bundle="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/src/grove.provision/5.devtools/5.26.commitorgs/_.sh"
+# shellcheck disable=SC1090
+# a reader that answers empty (renamed, or failed) keeps the known path, so the check never loses its subject
+_derived=''; [[ -r "$_bundle" ]] && _derived="$(source "$_bundle" && grove_provision_5_26_commitorgs_meter_path)"
+[[ -n "$_derived" ]] && _meter="$_derived"
+if [[ -e "$_meter" ]]; then
+  found "${_meter/#$HOME/\~} holds an org commit meter — crew work on the admin seat" "$_meter"
+else
+  held "no org commit meter"
+fi
 
 if (( failed == 0 )); then
   echo "🌲 all claims held ✔"

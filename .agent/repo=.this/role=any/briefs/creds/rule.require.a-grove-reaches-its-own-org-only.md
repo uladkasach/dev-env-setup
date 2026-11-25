@@ -4,7 +4,7 @@
 
 # **A GROVE REACHES ITS OWN ORG. EVERY CROSS-ORG REACH IS AN OPT-IN, DECLARED ROW BY ROW.**
 
-an `aether` grove reaches aether accounts. an `ahbode` grove reaches ahbode accounts. neither
+an `<org3>` grove reaches <org3> accounts. an `ahbode` grove reaches ahbode accounts. neither
 inherits the other's reach, its keyrack rows, or its profiles — by default, and by construction.
 
 ## .the three clauses
@@ -16,7 +16,17 @@ inherits the other's reach, its keyrack rows, or its profiles — by default, an
 | 3 | 🔴 **an UNKNOWN org gets ZERO rows** | a grove whose org has no declared table reaches no account at all. it does not fall back to some other org's table |
 
 ⚠️ **clause 3 is the safety clause, and it is the one a "sensible default" deletes.** a fallback
-reads as helpful and is the exact mechanism that gave an aether box ahbode's reach table.
+reads as helpful and is the exact mechanism that gave an <org3> box ahbode's reach table.
+
+## .scope — reach tables, never the org commit meter
+
+the rule bounds a power a row GRANTS: an aws account, a keyrack row, a profile, a clone set.
+the org commit meter (`5.26.commitorgs`) grants none. it is a local gate in front of a push the
+grove's github token already authorizes, and github refuses a push the token cannot make.
+
+⇒ so the meter's bound is the token's push scope, chosen org by org where the token is minted.
+that mint IS the enumerated opt-in, held at its source; a second list here would copy it.
+`prove.org-scoped-rows` walks reach tables only, and holds no 5.26 arm by design.
 
 ## 🔴 .why the failure is SILENT, and why it points the WRONG WAY
 
@@ -48,11 +58,11 @@ question 1 is answered by the ORG, and the error message says no word about it.
 
 ## 📜 .measured 2026-09-24 — an ask was filed that would have widened a blast radius
 
-an `aether` grove refused five `sts:AssumeRole` calls into ahbode and ehmpathy accounts. an ask
-was drafted to have `aether-camp-grove-role` trusted on `ahbode-prep-for-grove`,
-`ahbode-prod-for-grove`, and `ehmpathy-demo-for-grove`.
+an `<org3>` grove refused five `sts:AssumeRole` calls into ahbode and ehmpathy accounts. an ask
+was drafted to have the `<org3>` camp grove role trusted on the ahbode prep and prod grove roles
+and the ehmpathy demo grove role.
 
-the wisher stopped it: **there is zero ahbode relationship on an aether grove.**
+the wisher stopped it: **there is zero ahbode relationship on an <org3> grove.**
 
 ### .what the box was actually told to want
 
@@ -63,20 +73,20 @@ the wisher stopped it: **there is zero ahbode relationship on an aether grove.**
 | `5.12.rack/_.sh` → `_declared` | `ahbode) camp test prep prod` · `ehmpathy) test prep prod` · `*) return 1` |
 | `5.12.rack/_.sh` → `_awsprofile_rows` | `ahbode:camp ehmpathy:prod` |
 | `5.16.keys/_.sh` → its rows | `ahbode:prep:…` · `ehmpathy:prep:…` |
-| `5.10.repos/_.sh` → its clone set | `ehmpathy ahbode whodisio` — declared TWICE, once per half |
+| `5.10.repos/_.sh` → its clone set | `ehmpathy ahbode <org4>` — declared TWICE, once per half |
 | `git.grove.provision test` → `REPO` | `ahbode/svc-chat` |
 
-**seven hardcoded tables, not one `aether` row, and no org-scope mechanism at all.** so an aether
+**seven hardcoded tables, not one `<org3>` row, and no org-scope mechanism at all.** so an <org3>
 grove inherits ahbode's reach table by construction, and the five refusals are aws correctly
 denying a hop nobody should have asked for.
 
 ⚠️ **the last two are the widest and the worst, in that order.**
 
 - `5.10.repos` has the widest BLAST RADIUS of the seven. a reach row buys one account; a clone
-  set buys **every repo a token can see** — so an aether grove cloned ahbode's, ehmpathy's, and
-  whodisio's entire private repo sets, and cloned no aether repo at all
+  set buys **every repo a token can see** — so an <org3> grove cloned ahbode's, ehmpathy's, and
+  <org4>'s entire private repo sets, and cloned no <org3> repo at all
 - the gate is the worst PLACE for it. every other table wires a capability; this one decides
-  **what a PASS means**. an aether box stood up ahbode's testdb, ran ahbode's suite, and printed
+  **what a PASS means**. an <org3> box stood up ahbode's testdb, ran ahbode's suite, and printed
   a verdict about ahbode's code
 
 ⚠️ **no check caught it, and every check was right.** each verify read its declared row and
@@ -93,8 +103,8 @@ is a different namespace each time: an aws account, a github org, a repo path.
 
 ⇒ **the two namespaces are free to disagree, and they do.**
 
-📜 measured 2026-09-24: `aether` is the keyrack org; `aether-auctions` is the github org. an arm
-written as `aether) printf 'aether'` listed an org github does not have, `gh repo list` answered
+📜 measured 2026-09-24: `<org3>` is the keyrack org; `<org3>-gh` is the github org. an arm
+written as `<org3>) printf '<org3>'` listed an org github does not have, `gh repo list` answered
 with an empty set, and the bundle reported `the token can see no repos here` — **a true verdict,
 about an org nobody owns.**
 
@@ -114,8 +124,8 @@ this is the ONE cross-org reach this repo declares, and it is the shape clause 2
 - **ehmpathy is a candidate only because it is generic infra.** that is why the opt-in was
   available to grant at all
 
-🔴 **and it does not generalize.** that ahbode opted in says nothing about aether. an aether
-grove has no ehmpathy row unless aether itself opts in, for its own reasons, as its own decision.
+🔴 **and it does not generalize.** that ahbode opted in says nothing about <org3>. an <org3>
+grove has no ehmpathy row unless <org3> itself opts in, for its own reasons, as its own decision.
 
 ⇒ the misread to avoid: *"ehmpathy is shared, so every grove gets it."* it is shared in the sense
 that it CAN be opted into, never in the sense that it IS.
@@ -182,7 +192,7 @@ and treat an empty read as `exit 2` rather than as a pass.
 
 🛑 **and the play committed the same defect on itself, the afternoon it was written.** two
 claim sections were added — for `5.10.repos` and for the gate — and the org derivation was left
-at the three tables it opened with. so `aether`, declared by only those two, was never walked:
+at the three tables it opened with. so `<org3>`, declared by only those two, was never walked:
 the run printed 22 ✔ and a green verdict over rows it never opened.
 
 ⇒ **a table added to the claims is added to the derivation in the SAME edit.**

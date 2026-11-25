@@ -11,6 +11,15 @@
 # guarantee:
 #   - hermetic: a fixture registry, a stub seat writer, a stub `rhx`; all in
 #     mktemp. the grove name is invented
+#
+# .the stand-ins, each in the .mock / .why / .real form
+#   - .mock = `rhx` — the answers of `git.grove.auth.keys.set` and `duct.reboot`
+#     .why  = each real skill reaches a live grove over ssh; a boot step's job is to read
+#             their answers and render a verdict, which is what this play grades
+#     .real = keys.set runs live in every boot of a real grove
+#   - .mock = `grove_ssh_platform_findsert`, the ground seat's declaration writer
+#     .why  = it writes `/etc/grove/platform` on a live box over ssh, with sudo
+#     .real = its own verdicts are pinned in prove.platform-findsert-names-each-verdict
 ######################################################################
 
 set -u
@@ -30,9 +39,15 @@ has() { [[ "$1" == *"$2"* ]]; }
 lacks() { [[ "$1" != *"$2"* ]]; }
 
 transcript=""
+# the login is masked so a laptop's own name stays out of the public snap. a grove's seat logins
+# (`camper`, `ground`) are left as is: the fixture names its seats with those same words, and a
+# mask over them would rewrite the fixture, not hide a person
+login_mask="$(id -un)"
+[[ "$login_mask" == camper || "$login_mask" == ground ]] && login_mask=""
 record() {
   local text="${2//$fixture/<fix>}"
-  transcript+="## $1 (rc $3)"$'\n'"${text//$(id -un)/<login>}"$'\n\n'
+  [[ -n "$login_mask" ]] && text="${text//$login_mask/<login>}"
+  transcript+="## $1 (rc $3)"$'\n'"$text"$'\n\n'
 }
 
 echo "🌲 prove.boot-steps-name-each-verdict"
@@ -55,6 +70,9 @@ run_step() {
   jq -n --arg p "$1" --arg h "${HOST:-localhost}" \
     '{host: $h} + (if $p == "" then {} else {platform: $p} end)' > "$fixture/forest/groves/grove-demo.json"
   (
+    # the boot's own shell options (git.grove.provision.boot.sh: `set -uo pipefail`): a step
+    #   graded under looser options than the boot runs it hides a pipe that fails only there
+    set -o pipefail
     export GIT_FOREST_DIR="$fixture/forest"
     GROVE=grove-demo MODE="$2" RHX="$fixture/bin/rhx" BOOT_ORG=ahbode
     # shellcheck source=/dev/null

@@ -52,6 +52,36 @@ print(load_config('$conf').window_alert_on_bell)
   esac
 }
 
+# .what = claim 2g of configure.verify: a program may write the clipboard, per the loader
+# .why
+#   - tmux copy-mode (and nvim in a duct) copies by an osc 52 write to kitty, the last hop
+#   - without `write-clipboard` kitty drops it, so a paste yields the OLD clipboard, silently
+#   - the tmux half of that hop is 2.8.tmux's `clipboard` feature check
+_kitty_verify_clipboard() {
+  local conf="$1" ccw=""
+  if command -v kitty >/dev/null 2>&1; then
+    ccw="$(timeout -k 5 20 kitty +runpy "
+from kitty.config import load_config
+print('write-clipboard' in load_config('$conf').clipboard_control)
+" </dev/null 2>/dev/null | tail -1 | tr -d '[:space:]')"
+  fi
+  case "$ccw" in
+    True)
+      echo "   • a program may write the clipboard ✔ (write-clipboard, per kitty's own loader)"
+      ;;
+    False)
+      _kitty_verify_fail "kitty's clipboard_control lacks write-clipboard" \
+        "⇒ an osc 52 write is dropped, so a tmux copy-mode copy (super+v, ctrl+c) and an" \
+        "  nvim yank in a duct never reach the desktop clipboard — silently" \
+        "fix: rhx grove.provision --what 4.3.2.emulator --mode apply" \
+        "⚠️ an open kitty keeps the value it started with; a new one reads this"
+      ;;
+    *)
+      echo "   🌙 kitty's loader did not answer, so whether a program may write the clipboard is UNREAD"
+      ;;
+  esac
+}
+
 # .what = claims 2c + 2d of configure.verify: the DECLARED window size wins over
 #   `remember_window_size`, per kitty's loader, and that override is STATED (m11)
 _kitty_verify_window_size() {

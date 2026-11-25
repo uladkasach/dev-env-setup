@@ -1,0 +1,19 @@
+{
+  "key": "8314fe38c71d7a43",
+  "kind": "create",
+  "repo": {
+    "owner": "ehmpathy",
+    "name": "rhachet-roles-ehmpathy"
+  },
+  "exid": null,
+  "title": "fix(git.commit.push): --auth as-human applies to the pr open, never to the push",
+  "description": "## .what\n\n`git.commit.push --auth as-human` applies the human's gh login to the pr open only. the push itself (`git push origin HEAD --force-with-lease`, `git.commit.push.sh` line 496) runs with whatever credential helper the seat holds.\n\non a laptop whose https remote is served by a helper that declines (here a grove-only helper, `git-credential-keyrack`), the push falls through to a prompt and fails:\n\n```\nfatal: could not read Username for 'https://github.com/<owner>/<repo>.git': No such device or address\n```\n\nso `--auth as-human` cannot push from a laptop seat, though its help and its own retry hint offer it as the escape from a keyrack failure.\n\n## .why it matters\n\nthe documented fallback (`retry: rhx git.commit.push --mode apply --auth as-human`) is a dead end on the seat it is offered to. the caller is left with raw git config edits or a remote change.\n\n## .the shape of the fix\n\nunder `as-human`, push through gh's own credential, scoped to the one command, so no global config changes:\n\n```sh\ngit -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin HEAD --force-with-lease\n```\n\nstrip ambient `GH_TOKEN`/`GITHUB_TOKEN` the same way the pr open already does.\n\nclamp: a temp repo whose global helper declines; push under `as-human` to a local bare remote with a stub gh helper. red before the fix, green after.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": null,
+  "idem": "findsert",
+  "heldSeq": 16,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "1471"
+}
