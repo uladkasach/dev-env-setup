@@ -20,7 +20,7 @@
     "allowUnusedPatches": true,
     "ignorePatchFailures": true,
     "patchedDependencies": {
-      "rhachet-roles-bhrain@0.43.1": "patches/rhachet-roles-bhrain@0.43.1.patch",
+      "rhachet-roles-bhrain@0.44.1": "patches/rhachet-roles-bhrain@0.44.1.patch",
       "rhachet-roles-ehmpathy@1.43.0": "patches/rhachet-roles-ehmpathy@1.43.0.patch"
     }
   },

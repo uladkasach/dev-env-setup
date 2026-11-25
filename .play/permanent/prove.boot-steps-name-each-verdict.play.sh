@@ -39,9 +39,15 @@ has() { [[ "$1" == *"$2"* ]]; }
 lacks() { [[ "$1" != *"$2"* ]]; }
 
 transcript=""
+# the login is masked so a laptop's own name stays out of the public snap. a grove's seat logins
+# (`camper`, `ground`) are left as is: the fixture names its seats with those same words, and a
+# mask over them would rewrite the fixture, not hide a person
+login_mask="$(id -un)"
+[[ "$login_mask" == camper || "$login_mask" == ground ]] && login_mask=""
 record() {
   local text="${2//$fixture/<fix>}"
-  transcript+="## $1 (rc $3)"$'\n'"${text//$(id -un)/<login>}"$'\n\n'
+  [[ -n "$login_mask" ]] && text="${text//$login_mask/<login>}"
+  transcript+="## $1 (rc $3)"$'\n'"$text"$'\n\n'
 }
 
 echo "🌲 prove.boot-steps-name-each-verdict"

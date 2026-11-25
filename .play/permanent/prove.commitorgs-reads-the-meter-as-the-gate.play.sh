@@ -97,10 +97,15 @@ trap 'rm -rf "$FIX"' EXIT
 #         so the public transcript carries none of them
 TRANSCRIPT="$FIX/transcript"; : > "$TRANSCRIPT"
 SNAP_HOST="$(hostname 2>/dev/null)"
+FIXTURE_SEATS=(camper ground human runner)
 snap() {
-  local text="${2//$FIX/<fix>}"
+  local text="${2//$FIX/<fix>}" i
   text="${text//$ROOT/<root>}"
+  # a fixture seat (`<seat>@box-7`) is a fixed string: shield it behind its index, so a real
+  # login that shares its name (a grove's `camper`) is never masked inside it
+  for i in "${!FIXTURE_SEATS[@]}"; do text="${text//${FIXTURE_SEATS[$i]}@box-7/<fixture-seat-$i>}"; done
   text="${text//$(whoami)/<login>}"
+  for i in "${!FIXTURE_SEATS[@]}"; do text="${text//<fixture-seat-$i>/${FIXTURE_SEATS[$i]}@box-7}"; done
   [[ -n "$SNAP_HOST" ]] && text="${text//$SNAP_HOST/<host>}"
   printf '## %s\n%s\n\n' "$1" "$text" >> "$TRANSCRIPT"
 }
@@ -484,7 +489,7 @@ claim "4r. jq present: the upsert is silent, rc=0" [ "$out" == "rc=0" ]
 ######################################################################
 # row 5 — declines: no phase acts, and no meter is written
 ######################################################################
-for row in "5a|local@unix|vlad|a local grove" "5b|local@cicd|runner|a ci runner" "5c|$HZ|ground|the admin seat"; do
+for row in "5a|local@unix|human|a local grove" "5b|local@cicd|runner|a ci runner" "5c|$HZ|ground|the admin seat"; do
   IFS='|' read -r tag server seat label <<< "$row"
   H="$FIX/d-$tag"; mkdir -p "$H"
   up="$(phase home="$H" server="$server" seat="$seat" phase=configure_upsert)"
@@ -536,7 +541,7 @@ claim "6c. apply again: converged, no write, rc=0" bash -c '[[ "$1" != *"allowed
 out="$(entry home="$H" mode=plan)"; entry_snap "public entry · plan, a granted seat" "$out"
 claim "6f. plan on a granted seat: ✔ each org, rc=0, no write" bash -c '[[ "$1" == *"allows org '"'"'acme'"'"'"* && "$1" != *"ConstraintError"* && "$1" == *"rc=0"* && "$2" == "$(cat "$3")" ]]' _ "$out" "$before" "$H/$METER_REL"
 
-for row in "6g|local@unix|vlad|a local grove" "6h|$HZ|ground|the admin seat"; do
+for row in "6g|local@unix|human|a local grove" "6h|$HZ|ground|the admin seat"; do
   IFS='|' read -r tag server seat label <<< "$row"
   H="$FIX/entry-$tag"; mkdir -p "$H"
   out="$(entry home="$H" mode=apply server="$server" seat="$seat")"; entry_snap "public entry · apply, $label" "$out"
