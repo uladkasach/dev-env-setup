@@ -53,6 +53,10 @@ grove_provision_5_devtools() {
   # AFTER 5.23.tailscale and 5.2.rust: it reads that client's route, and cargo builds it
   bundle.upgrade 5.24.vpntray
 
+  # AFTER 5.2.rust: cargo builds it. the kitty snapshot (`4.3.4`) runs earlier
+  #   and reads it only at snap time, so a fresh box converges in one run
+  bundle.upgrade 5.26.crewspace
+
   # 🛑 AFTER `5.12.rack` and `5.13.reach`: it reads keys through the profiles
   #   those two name and fill. any earlier, it blames a human for a key that
   #   is merely not placed yet. `5.18.openhours` reads no key, so it may follow

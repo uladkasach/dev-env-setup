@@ -49,7 +49,10 @@ grove_provision_4_3_4_snapshot_provision_upsert() {
     "kitty.snapshot.terminals.sh:$bin_dir/kitty.snap" \
     "kitty_snap_lowbatt:$bin_dir/kitty_snap_lowbatt" \
     "kitty_snap_lowbatt.service:$unit_dir/kitty_snap_lowbatt.service" \
-    "kitty_snap_lowbatt.timer:$unit_dir/kitty_snap_lowbatt.timer"
+    "kitty_snap_lowbatt.timer:$unit_dir/kitty_snap_lowbatt.timer" \
+    "kitty_snap_periodic:$bin_dir/kitty_snap_periodic" \
+    "kitty_snap_periodic.service:$unit_dir/kitty_snap_periodic.service" \
+    "kitty_snap_periodic.timer:$unit_dir/kitty_snap_periodic.timer"
   do
     local name="${pair%%:*}"
     local dst="${pair#*:}"
@@ -62,8 +65,8 @@ grove_provision_4_3_4_snapshot_provision_upsert() {
     fi
     cp "$src" "$dst" || return 1
   done
-  chmod +x "$bin_dir/kitty.snap" "$bin_dir/kitty_snap_lowbatt" || return 1
-  echo "   • kitty.snap, the low-battery guard, and its two units declared"
+  chmod +x "$bin_dir/kitty.snap" "$bin_dir/kitty_snap_lowbatt" "$bin_dir/kitty_snap_periodic" || return 1
+  echo "   • kitty.snap, the low-battery guard, the periodic snap, and their units declared"
 
   ####################################################################
   # 2. reload FIRST
@@ -82,6 +85,15 @@ grove_provision_4_3_4_snapshot_provision_upsert() {
     echo "   ✋ could not enable kitty_snap_lowbatt.timer" >&2
     echo "      ⇒ no snap fires on a low battery, so the window/pwd map is lost" >&2
     echo "        the one time it is most expensive to lose — an unattended die" >&2
+    return 1
+  fi
+
+  # the periodic snap covers the death with no notice — a crash, a hang
+  if systemctl --user enable --now kitty_snap_periodic.timer; then
+    echo "   • kitty_snap_periodic.timer enabled and started (a crash map every 20 min, keeps 2 weeks)"
+  else
+    echo "   ✋ could not enable kitty_snap_periodic.timer" >&2
+    echo "      ⇒ a crash loses the window/pwd map back to the last by-hand snap" >&2
     return 1
   fi
 }

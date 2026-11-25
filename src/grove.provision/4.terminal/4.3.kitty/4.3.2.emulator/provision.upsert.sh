@@ -26,8 +26,8 @@ grove_provision_4_3_2_emulator_provision_upsert() {
   # `$base` — `prove.sha256-pins-bite` reads `<name>_version`/`_sha256`/`_url`
   # and substitutes `${kitty_version}` as literal text
   # (rule.require.identical-bundle-composition)
-  local kitty_version="0.47.4"
-  local kitty_sha256="bc230142b2bd27f2a4bf1b1b67575f3d397a4ea2cc83f4ac2b912c306a939693"
+  local kitty_version="0.51.1"
+  local kitty_sha256="d309be978f017dbdcccae175d281092fefe7c8bc64478fa620581604ab0b53c0"
   local kitty_url="https://github.com/kovidgoyal/kitty/releases/download/v${kitty_version}/kitty-${kitty_version}-x86_64.txz"
 
   local version="$kitty_version"

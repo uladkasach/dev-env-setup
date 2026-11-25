@@ -187,6 +187,20 @@ FIXTURE_OPUS='{
   }
 }'
 
+# fable's share of the week — shape taken from a live read on 2026-11-24: a scoped weekly
+#   limit for model "Fable" in `limits[]`, and its share of the week keyed by that index
+FIXTURE_FABLE='{
+  "surfer@example.com": {
+    "five_hour": null,
+    "seven_day": { "utilization": 27.0, "resets_at": "2026-06-19T17:00:00+00:00" },
+    "limits": [
+      { "kind": "weekly_all", "percent": 27, "scope": null },
+      { "kind": "weekly_scoped", "percent": 20, "scope": { "model": { "id": null, "display_name": "Fable" }, "surface": null } }
+    ],
+    "weekly_scoped_shares": [ { "limit_index": 1, "used_percent_of_weekly": 10, "allowance_percent_of_weekly": 50 } ]
+  }
+}'
+
 FIXTURE_MIXED='{
   "kai@example.com": { "error": "refresh_rejected" },
   "surfer@example.com": {
@@ -215,6 +229,10 @@ _snap 'render.signed-in-mark' \
 
 _snap 'render.opus-row' \
   "$(_brains_auth_render "$FIXTURE_OPUS" | _normalize)"
+
+# fable's slice of the week: `▓` lead cells off a tty, and a `fable N%` label on the week row
+_snap 'render.fable-share' \
+  "$(_brains_auth_render "$FIXTURE_FABLE" | _normalize)"
 
 # a failed account must NOT abort the sweep — the healthy rows still render
 _snap 'render.partial-failure' \
@@ -289,6 +307,23 @@ for p in 0 3 50 99 100 150; do
   _bars+="$(printf '%3s%% -> %s' "$p" "$(_brains_auth_bar "$p")")"$'\n'
 done
 _snap 'bar.boundaries' "${_bars%$'\n'}"
+
+# the fable split: rounded lead cells, a tiny share still earns one, never past the fill,
+#   and the colored form wears the fable hue around exactly the lead cells
+_bars=''
+for c in '27 10' '27 3' '27 0' '5 5' '100 50' '0 10'; do
+  read -r _p _f <<< "$c"
+  _bars+="$(printf '%3s%% fable %3s%% -> %s' "$_p" "$_f" "$(_brains_auth_bar "$_p" 10 "$_f")")"$'\n'
+done
+_colored="$(_BRAINS_AUTH_COLOR=1 _brains_auth_bar 27 10 10)"
+_bars+="color 27/10 -> ${_colored//$'\033'/<esc>}"$'\n'
+_bars+="color NO_COLOR -> $(NO_COLOR=1 _BRAINS_AUTH_COLOR=1 _brains_auth_bar 27 10 10)"
+_snap 'bar.fable-split' "$_bars"
+_snap 'fable.week-share' "$(
+  printf 'live -> %s\n' "$(_brains_auth_fable_week_share "$(jq -c '.["surfer@example.com"]' <<< "$FIXTURE_FABLE")")"
+  printf 'absent -> [%s]\n' "$(_brains_auth_fable_week_share '{"seven_day":{"utilization":1}}')"
+  printf 'share-without-fable-limit -> [%s]' "$(_brains_auth_fable_week_share '{"limits":[{"kind":"weekly_all"}],"weekly_scoped_shares":[{"limit_index":0,"used_percent_of_weekly":9}]}')"
+)"
 
 # ---------------------------------------------------------------- the identity split
 # the wire format `<uuid>\t<email>` is known ONLY to these two accessors, so

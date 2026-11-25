@@ -229,10 +229,30 @@ _grove_provision_5_3_brains_unjudged_hooks_verify() {
 
 ####################################################################
 # .what = the KEYBINDINGS claim — `ctrl+x ctrl+s` is UNBOUND in every Chat block that names it
-# .why  = then ctrl+enter is the one send-now key claude has, and its hint names ctrl+enter
-#         even inside tmux (`rule.require.ctrl-enter-sends-now`). an explicit `null` is the
+# .why  = the chord is untypeable here (kitty maps ctrl+x to ^C); enter sends now and
+#         ctrl+enter interrupts (`rule.require.ctrl-enter-interrupts`). an explicit `null` is the
 #         unbind; a key merely ABSENT leaves claude's default chord bound, so absent is a ✋
 ####################################################################
+_grove_provision_5_3_brains_keybindings_binds_verify() {
+  local keys="$1" pair key want bound failed=0
+  for pair in 'enter=chat:sendNow' 'ctrl+enter=chat:cancel'; do
+    key="${pair%%=*}" want="${pair#*=}"
+    if ! bound="$(_grove_provision_5_3_brains_keybindings_bind "$keys" "$key" "$want")"; then
+      echo "   ✋ jq could not read $keys, so the $key bind is unproven" >&2
+      echo "      read why: jq . $keys" >&2
+      failed=1
+      continue
+    fi
+    [[ "$bound" == held ]] && continue
+    echo "   ✋ $key is not bound to $want in $keys (it reads $bound)" >&2
+    echo "      ⇒ enter is send now (a live tool moves to the background, the message goes in now);" >&2
+    echo "        ctrl+enter is interrupt (it cuts the turn, a Stop hook included, and sends what is queued)" >&2
+    echo "      fix: rhx grove.provision --what 5.3.brains --mode apply" >&2
+    failed=1
+  done
+  return $failed
+}
+
 _grove_provision_5_3_brains_keybindings_verify() {
   local keys="$HOME/.claude/keybindings.json" chord
   if [[ ! -r "$keys" ]]; then
@@ -247,10 +267,11 @@ _grove_provision_5_3_brains_keybindings_verify() {
     return 1
   fi
   if [[ "$chord" == unbound ]]; then
-    echo "   • ctrl+enter is the one send-now key (the ctrl+x ctrl+s chord is unbound) ✔"
+    _grove_provision_5_3_brains_keybindings_binds_verify "$keys" || return 1
+    echo "   • enter = send now, ctrl+enter = interrupt, ctrl+x ctrl+s unbound ✔"
     # the gap is named where the human reads the ✔, never buried in a brief: the cure is upstream
     echo "      ⇒ a bare session reads this file; an ENROLLED clone reads its actor dir's copy until"
-    echo "        rhachet links it there (ehmpathy/rhachet#579), so an enrolled hint may still name the chord"
+    echo "        rhachet links it there (ehmpathy/rhachet#579), so an enrolled clone keeps claude's default keys"
     return 0
   fi
   if [[ "$chord" == misshapen ]]; then
@@ -336,6 +357,7 @@ _grove_provision_5_3_brains_settings_claims() {
     '.tui' '"fullscreen"' 'the fullscreen tui' \
     '.verbose' 'false' 'the verbose output default' \
     '.feedbackDrafts' '"off"' 'the claude-drafted feedback queue' \
+    '.enabledPlugins["cc-plugin-diff@builtin"]' 'false' 'the built-in diff panel mod, off (it auto-opens beside the transcript and polls git; /diff still works without it)' \
     '.cleanupPeriodDays' '36500' 'the never-prune transcript retention'
 }
 

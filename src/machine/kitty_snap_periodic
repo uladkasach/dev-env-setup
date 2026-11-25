@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+######################################################################
+# .what = save a crash map of the kitty session every 20 minutes, and keep the
+#         last two weeks
+#
+# .why  = the low-battery guard and `power.*` cover a planned or slow death.
+#         a crash gives no notice: on 2026-11-24 a dock unplug segfaulted
+#         every kitty process at once, and the newest snap was 12 days old,
+#         so the window/pwd map of the whole day was gone
+#
+# .why  `--restore` = the map exists to put the crews back: each window, its
+#         workspace, its duct, each terminal's tmux attach target, in order.
+#         it skips the full /proc scan, the pane walk, and the memory sum,
+#         none of which a restore reads
+#
+# .why  a SUBDIR = frequent snaps would bury a by-hand or a low-battery snap,
+#         the ones a human looks for first
+#
+# .why  KEEP = 1008 at a 20 minute cadence is two weeks. a crash map is ~15 kB
+#         (📜 measured 2026-11-24: 8 kB of .txt for 16 windows, its .tsv alike),
+#         so two weeks costs ~15 MB, and it reaches back past a crash
+#         noticed late, a weekend away, or a layout worth return to. the cap
+#         keeps the dir bounded however long the box stays up
+#
+# .why  errors are NOT discarded = unlike the battery guard, this never runs
+#         on a box about to die, so a failure goes to the journal where it can
+#         be read (`rule.forbid.failhide`)
+#
+# .security = the snapper reads only /proc, tmux list-clients, and the
+#         compositor's window list; see its header
+######################################################################
+
+set -uo pipefail
+
+SNAP_DIR="$HOME/.kitty/snaps/periodic"
+KEEP=1008
+SNAPPER="$HOME/.local/bin/kitty.snap"
+
+mkdir -p "$SNAP_DIR" || exit 1
+
+# snap. the snapper exits 0 with no file when no kitty is open, which is correct
+if ! KITTY_SNAP_DIR="$SNAP_DIR" bash "$SNAPPER" --restore --save >/dev/null; then
+  logger -t kitty_snap_periodic "snap failed — see this unit's journal"
+  exit 1
+fi
+
+# prune past KEEP. a snap is one timestamp stem with several files (.tsv + .txt,
+# or the survey's .json + .txt). names are ISO timestamps, so a reverse lexical
+# sort of the stems is newest first, and every stem past KEEP is stale
+mapfile -t stale < <(
+  find "$SNAP_DIR" -maxdepth 1 -type f \( -name '*.tsv' -o -name '*.json' -o -name '*.txt' \) -printf '%f\n' \
+    | sed 's/\.[a-z]*$//' | sort -ru | tail -n +"$((KEEP + 1))"
+)
+for stem in "${stale[@]}"; do
+  rm -f -- "$SNAP_DIR/$stem.tsv" "$SNAP_DIR/$stem.json" "$SNAP_DIR/$stem.txt"
+done

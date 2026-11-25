@@ -46,7 +46,10 @@ grove_provision_4_3_4_snapshot_provision_verify() {
     "kitty.snapshot.terminals.sh:$bin_dir/kitty.snap" \
     "kitty_snap_lowbatt:$bin_dir/kitty_snap_lowbatt" \
     "kitty_snap_lowbatt.service:$unit_dir/kitty_snap_lowbatt.service" \
-    "kitty_snap_lowbatt.timer:$unit_dir/kitty_snap_lowbatt.timer"
+    "kitty_snap_lowbatt.timer:$unit_dir/kitty_snap_lowbatt.timer" \
+    "kitty_snap_periodic:$bin_dir/kitty_snap_periodic" \
+    "kitty_snap_periodic.service:$unit_dir/kitty_snap_periodic.service" \
+    "kitty_snap_periodic.timer:$unit_dir/kitty_snap_periodic.timer"
   do
     local name="${pair%%:*}"
     local dst="${pair#*:}"
@@ -73,33 +76,34 @@ grove_provision_4_3_4_snapshot_provision_verify() {
   #
   # see the header for why these are two claims, not one
   ####################################################################
-  local state_active state_enabled
-  state_active="$(systemctl --user is-active kitty_snap_lowbatt.timer 2>/dev/null)"
-  state_enabled="$(systemctl --user is-enabled kitty_snap_lowbatt.timer 2>/dev/null)"
+  local timer state_active state_enabled next
+  for timer in kitty_snap_lowbatt.timer kitty_snap_periodic.timer; do
+    state_active="$(systemctl --user is-active "$timer" 2>/dev/null)"
+    state_enabled="$(systemctl --user is-enabled "$timer" 2>/dev/null)"
 
-  if [[ "$state_active" == "active" ]]; then
-    local next
-    next="$(systemctl --user list-timers kitty_snap_lowbatt.timer --no-pager 2>/dev/null | head -2 | tail -1)"
-    echo "   • kitty_snap_lowbatt.timer is active ✔"
-    [[ -n "$next" ]] && echo "     next: $next"
-  else
-    echo "   ✋ kitty_snap_lowbatt.timer is '${state_active:-absent}', not active" >&2
-    echo "      ⇒ every file above can be byte-perfect and NO snap fires, so the" >&2
-    echo "        session map is lost the one time it costs most to lose" >&2
-    echo "      read why: systemctl --user status kitty_snap_lowbatt.timer" >&2
-    echo "      fix: rhx grove.provision --what 4.3.4.snapshot --mode apply" >&2
-    failed=1
-  fi
+    if [[ "$state_active" == "active" ]]; then
+      next="$(systemctl --user list-timers "$timer" --no-pager 2>/dev/null | head -2 | tail -1)"
+      echo "   • $timer is active ✔"
+      [[ -n "$next" ]] && echo "     next: $next"
+    else
+      echo "   ✋ $timer is '${state_active:-absent}', not active" >&2
+      echo "      ⇒ every file above can be byte-perfect and NO snap fires, so the" >&2
+      echo "        session map is lost the one time it costs most to lose" >&2
+      echo "      read why: systemctl --user status $timer" >&2
+      echo "      fix: rhx grove.provision --what 4.3.4.snapshot --mode apply" >&2
+      failed=1
+    fi
 
-  if [[ "$state_enabled" == "enabled" ]]; then
-    echo "   • kitty_snap_lowbatt.timer is enabled — it returns after a reboot ✔"
-  else
-    echo "   ✋ kitty_snap_lowbatt.timer is '${state_enabled:-absent}', not enabled" >&2
-    echo "      ⇒ it may be active THIS boot and gone the next, so the guard" >&2
-    echo "        silently stops guarding the box while the check above passes" >&2
-    echo "      fix: rhx grove.provision --what 4.3.4.snapshot --mode apply" >&2
-    failed=1
-  fi
+    if [[ "$state_enabled" == "enabled" ]]; then
+      echo "   • $timer is enabled — it returns after a reboot ✔"
+    else
+      echo "   ✋ $timer is '${state_enabled:-absent}', not enabled" >&2
+      echo "      ⇒ it may be active THIS boot and gone the next, so the guard" >&2
+      echo "        silently stops while the check above passes" >&2
+      echo "      fix: rhx grove.provision --what 4.3.4.snapshot --mode apply" >&2
+      failed=1
+    fi
+  done
 
   ####################################################################
   # 3. the snapper's mode bit — see the header for why a byte-diff misses it
@@ -110,6 +114,16 @@ grove_provision_4_3_4_snapshot_provision_verify() {
     echo "   ✋ $bin_dir/kitty.snap is not executable" >&2
     echo "      ⇒ the guard discards its own errors, so it still writes a marker" >&2
     echo "        and a journal line that reads 'snapped' — with no snap file" >&2
+    echo "      fix: rhx grove.provision --what 4.3.4.snapshot --mode apply" >&2
+    failed=1
+  fi
+
+  # the periodic executable is systemd's ExecStart, so without the bit it never runs
+  if [[ -x "$bin_dir/kitty_snap_periodic" ]]; then
+    echo "   • kitty_snap_periodic is executable ✔"
+  else
+    echo "   ✋ $bin_dir/kitty_snap_periodic is not executable" >&2
+    echo "      ⇒ its timer fires and the unit fails, so no periodic snap is kept" >&2
     echo "      fix: rhx grove.provision --what 4.3.4.snapshot --mode apply" >&2
     failed=1
   fi
@@ -141,7 +155,8 @@ grove_provision_4_3_4_snapshot_provision_verify() {
   ####################################################################
   local snaps="$HOME/.kitty/snaps"
   local count=0
-  [[ -d "$snaps" ]] && count="$(find "$snaps" -maxdepth 1 -name '*.json' -type f 2>/dev/null | wc -l)"
+  # a survey snap saves `.json`, a crash map `.tsv`; each stem is one snap
+  [[ -d "$snaps" ]] && count="$(find "$snaps" -maxdepth 1 -type f \( -name '*.json' -o -name '*.tsv' \) 2>/dev/null | wc -l)"
   if [[ "$count" -gt 0 ]]; then
     echo "   • $count snap(s) on record at $snaps"
   else
