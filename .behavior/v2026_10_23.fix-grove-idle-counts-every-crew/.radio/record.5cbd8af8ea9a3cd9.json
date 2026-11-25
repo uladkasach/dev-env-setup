@@ -1,0 +1,19 @@
+{
+  "key": "5cbd8af8ea9a3cd9",
+  "kind": "create",
+  "repo": {
+    "owner": "ahbode",
+    "name": "infrastructure"
+  },
+  "exid": null,
+  "title": "fix(grove): the idle check counts every live crew, and an idle box still sleeps",
+  "description": "# the grove idle check counts every live crew, and an idle box still sleeps\n\ntwin of uladkasach/dev-env-setup#214, for `provision/aws.infra/account=camp/grove/genGroveHibernatorUserData.ts`.\n\n## the defect\nthe first-boot idle check reads brain traces only under `/home/<user>/.claude/projects`\n(`GROVE_BRAIN_TRACES_DEFAULT`). fleet clones write theirs under each worktree, at\n`.agent/.actors/*/brain/.claude/projects`, so a box at work reads idle and hibernates under its\ncrews. its runs also log `sort: write failed: Broken pipe`.\n\n## the fix, as shipped in #214\n- read activity, not presence: every worktree actor trace root, each live tmux pane (a registered duct), and pts input reads\n- an unreadable source holds the box and fails loud; it never reads as idle\n- no `sort | head` pipe under pipefail: the newest stamp is a single-pass max\n\n## the clamp\ndev-env-setup `.play/permanent/prove.idle-check-clamp-bites-the-legacy-check.play.sh` runs every\nworld of `prove.idle-check-counts-every-crew` against any check named by `IDLE_CHECK=<path>`.\npoint it at the check userdata renders: red before the fix, green after.\n\n## owed here\nrender the same check from userdata (or install it from the bundle `1.15.hibernate`), and prove it\nwith the clamp via `IDLE_CHECK`. note: dev-env-setup#203 lets a hetzner box provision as a grove;\nthe stop act is ec2-only, so a non-ec2 platform must decline the act, never call aws.",
+  "status": null,
+  "via": "gh.issues",
+  "auth": "as-human",
+  "idem": "findsert",
+  "heldSeq": 3,
+  "recordStatus": "DELIVERED",
+  "reason": null,
+  "deliveredExid": "130"
+}
