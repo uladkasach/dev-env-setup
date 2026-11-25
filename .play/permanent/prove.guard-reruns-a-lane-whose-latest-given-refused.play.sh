@@ -6,7 +6,7 @@
 # .why  = the guard cached only passed givens, so a later refusal was skipped and the OLDER passed
 #         verdict served; the lane was held and never re-ran, while the judge read the refusal as one
 #         blocker. a residual that no stance and no re-run could clear. the cure is a local pnpm patch
-#         (patches/rhachet-roles-bhrain@0.43.1.patch); the upstream cure is rhachet-roles-bhrain#711
+#         (patches/rhachet-roles-bhrain@0.44.1.patch); the upstream cure is rhachet-roles-bhrain#711
 #
 # arms:
 #   0  the fixture took: a refusal parses as `constraint`, a review as `passed`
