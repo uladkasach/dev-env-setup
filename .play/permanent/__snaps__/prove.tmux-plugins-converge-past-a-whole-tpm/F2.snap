@@ -1,0 +1,3 @@
+   ✋ ConstraintError: the pin did not land, and the distro tmux floor did not install either
+      ⇒ this grove holds no tmux, so no duct can reach it
+      read why: sudo apt-get install tmux

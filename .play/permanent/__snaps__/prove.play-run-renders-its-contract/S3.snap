@@ -1,0 +1,6 @@
+🎭 play.run --play prove.stub-snaps --within 900
+   └─ <fixture>/.play/permanent/prove.stub-snaps.play.sh
+
+   • stub snap holds ✔
+
+🌲 prove.stub-snaps ✔

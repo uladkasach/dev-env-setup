@@ -1,0 +1,23 @@
+   • machine_openhours_reconcile matches this checkout ✔
+   • machine_openhours_reconcile.service matches this checkout ✔
+   • machine_openhours_reconcile.timer matches this checkout ✔
+   • the reconciler is executable ✔
+   • schedule matches the tree ✔ — days 1-5, 08:00–20:00 America/Chicago
+   ✋ ConstraintError: machine_openhours_reconcile.timer is 'inactive', not active
+      ⇒ every file above can be byte-perfect and the gate never moves
+      read why: systemctl --user status machine_openhours_reconcile.timer
+      fix: rhx grove.provision --what 5.18.openhours --mode apply
+   ✋ ConstraintError: the timer is 'disabled', not enabled
+      ⇒ it may be active THIS boot and gone the next, so the gate
+        silently stops converging while the check above passes
+      fix: rhx grove.provision --what 5.18.openhours --mode apply
+   • the reconciler's cwd is built and at the pin ✔
+     <fixture>/home/.local/state/machine_openhours/cwd
+   • rhx git.commit.uses answers from that cwd ✔
+   • rhx radio.uses answers from that cwd ✔
+   • gate right now — commit: open · radio: open
+     read the store: rhx rhachet.storage.get --what '.meter/*' --body
+   🌙 the CONVERGE leg is unproven on a box with no drift
+      it runs only when the gate disagrees with the clock, so the next
+      real boundary crossing is what proves it. read the verdict:
+        journalctl --user -u machine_openhours_reconcile.service --since today

@@ -2,7 +2,7 @@
 
 ## .what
 
-the why behind every key `5.3.brains/configure.upsert.sh` declares. the phase cites each section by its `##` title, so the phase stays an outline (`prove.headers-carry-their-weight`).
+the why behind every key `5.3.brains/_.sh` declares. its configure.upsert operations cite each section by its `##` title, so they stay an outline (`prove.headers-carry-their-weight`).
 
 ## the two files, and which one owns a key
 
@@ -236,6 +236,6 @@ claude's own writer refuses a write whose re-read config lacks the auth its cach
 
 ## .see also
 
-- `5.3.brains/configure.upsert.sh`, `5.3.brains/configure.verify.sh`
+- `5.3.brains/_.sh` — the configure.upsert and configure.verify operations
 - `gotcha.5-3-brains.demo=one-home-consolidation` — m1–m7, the measurements behind these keys
 - `define.claude-code-config`, `howto.silence-claude-cli-nags`

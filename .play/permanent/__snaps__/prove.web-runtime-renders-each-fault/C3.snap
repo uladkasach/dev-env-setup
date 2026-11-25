@@ -1,0 +1,2 @@
+   ✋ ConstraintError: git_clone: unknown flag '--depth'
+      valid: <url> <dir>, --at <commit>, --within <secs>

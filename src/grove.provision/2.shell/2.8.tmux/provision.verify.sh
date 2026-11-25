@@ -32,14 +32,55 @@
 grove_provision_2_8_tmux_provision_verify() {
   local failed=0
 
-  if command -v tmux >/dev/null 2>&1; then
-    echo "   • tmux present ($(tmux -V 2>/dev/null | awk '{print $2}')) ✔"
-  else
-    echo "   ✋ tmux is not on PATH" >&2
+  ####################################################################
+  # the binary — one reader (`_.sh`), so the upsert's skip and this verdict
+  # agree on "converged". a grove owes the PIN; a laptop owes presence
+  ####################################################################
+  local state ver bin
+  state="$(grove_provision_2_8_tmux_binary_state)"
+  ver="$(grove_provision_2_8_tmux_binary_version)"
+  bin="$(grove_provision_2_8_tmux_binary_path)"
+
+  # a placed pin off PATH is a PATH defect, and the apply refuses to rebuild under it — so this
+  #   ✋ names PATH, never an apply that would loop (the upsert's arm O says the same)
+  if [[ "$state" == absent \
+    && "$(grove_provision_2_8_tmux_pin_dst_version)" == "$GROVE_UPGRADE_2_8_TMUX_VERSION" ]]; then
+    # one reader for one defect, so the verify and the upsert's arm O read alike
+    grove_provision_2_8_tmux_pin_shadow_refusal "" "$(grove_provision_2_8_tmux_pin_dst)"
+    failed=$(( failed + 1 ))
+  elif [[ "$state" == absent ]]; then
+    echo "   ✋ ConstraintError: tmux is not on PATH" >&2
     echo "      ⇒ a duct IS tmux, so this box cannot be reached over a duct and" >&2
     echo "        every termwork skill fails" >&2
-    echo "      fix: rhx grove.provision --what 2.8.tmux --mode apply" >&2
+    echo "      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply" >&2
+    echo "           (on a grove: run it on the ground seat, which holds sudo)" >&2
     failed=$(( failed + 1 ))
+  fi
+
+  if [[ "$ver" == unreadable ]]; then
+    echo "   ✋ ConstraintError: the tmux at $bin does not answer 'tmux -V' within 5s" >&2
+    echo "      ⇒ a file on PATH is not a binary that runs: it is broken, or the box" >&2
+    echo "        is wedged, and a duct IS tmux" >&2
+    echo "      read why: timeout 5 $bin -V" >&2
+    echo "      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply" >&2
+    echo "           (on a grove: run it on the ground seat, which holds sudo)" >&2
+    failed=$(( failed + 1 ))
+  elif [[ "$state" == adrift ]] && ! grove_provision_2_8_tmux_binary_meets_owed \
+    && grove_provision_2_8_tmux_pin_is_shadowed; then
+    grove_provision_2_8_tmux_pin_shadow_refusal "$bin" "$(grove_provision_2_8_tmux_pin_dst)"
+    failed=$(( failed + 1 ))
+  elif [[ "$state" == adrift ]] && ! grove_provision_2_8_tmux_binary_meets_owed; then
+    echo "   ✋ ConstraintError: tmux on PATH is $ver ($bin), not the pinned $GROVE_UPGRADE_2_8_TMUX_VERSION" >&2
+    echo "      ⇒ every crew on a grove shares one tmux server, and the distro 3.2a" >&2
+    echo "        server segfaults — one crash ends every crew on the box" >&2
+    echo "      fix: sudo -v && rhx grove.provision --what 2.8.tmux --mode apply" >&2
+    echo "           the seat with root builds the pin into $(grove_provision_2_8_tmux_pin_dst)" >&2
+    echo "           (on a grove: run it on the ground seat, which holds sudo)" >&2
+    failed=$(( failed + 1 ))
+  fi
+
+  if grove_provision_2_8_tmux_binary_meets_owed; then
+    echo "   • tmux present ($ver, $bin) ✔"
   fi
 
   ####################################################################
@@ -51,13 +92,7 @@ grove_provision_2_8_tmux_provision_verify() {
   #   - the fallback is tpm's historical default, used only when the conf names no run line
   ####################################################################
   local conf_live="$HOME/.tmux.conf"
-  local tpm_bin=""
-  if [[ -f "$conf_live" ]]; then
-    tpm_bin="$(grep -oE "run(-shell)? +'[^']*tpm/tpm'" "$conf_live" 2>/dev/null \
-      | head -1 | grep -oE "'[^']*'" | tr -d "'")"
-    tpm_bin="${tpm_bin/#\~/$HOME}"
-  fi
-  [[ -n "$tpm_bin" ]] || tpm_bin="$HOME/.tmux/plugins/tpm/tpm"
+  local tpm_bin; tpm_bin="$(grove_provision_2_8_tmux_tpm_bin_of_conf "$conf_live")"
 
   ####################################################################
   # ⚠️ the SHARED reader from `_.sh`, asked about the dir the conf's run line names
@@ -76,7 +111,7 @@ grove_provision_2_8_tmux_provision_verify() {
       echo "   • tpm present at the declared commit ✔ ($tpm_bin)"
       ;;
     adrift)
-      echo "   ✋ tpm is present but NOT at the commit this repo declares" >&2
+      echo "   ✋ ConstraintError: tpm is present but NOT at the commit this repo declares" >&2
       echo "      ⇒ tpm's tip is shell code ~/.tmux.conf RUNS on every session, so" >&2
       echo "        this box executes different code than a box at the pin — which" >&2
       echo "        is the deterministic clause of one-command provision" >&2
@@ -88,7 +123,7 @@ grove_provision_2_8_tmux_provision_verify() {
       failed=$(( failed + 1 ))
       ;;
     *)
-      echo "   ✋ no usable tpm at the path the conf runs ($tpm_bin)" >&2
+      echo "   ✋ ConstraintError: no usable tpm at the path the conf runs ($tpm_bin)" >&2
       echo "      ⇒ tmux starts with no plugins and prints a run-shell error on" >&2
       echo "        every session — which reads as a broken conf, not an absent tool" >&2
       echo "      ⇒ a clone killed mid-flight leaves exactly this: a dir, a .git," >&2

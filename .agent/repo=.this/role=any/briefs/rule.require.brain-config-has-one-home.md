@@ -79,7 +79,7 @@ is a shell surface, and the shell bundle owns it.**
 
 ## .how to change a knob
 
-1. edit the `patch` in `5.3.brains/configure.upsert.sh`
+1. edit the `patch` in `5.3.brains/_.sh`
 2. edit the paired row in `configure.verify.sh`, or the verify reddens
 3. `rhx grove.provision --what 5.3.brains --mode apply`
 

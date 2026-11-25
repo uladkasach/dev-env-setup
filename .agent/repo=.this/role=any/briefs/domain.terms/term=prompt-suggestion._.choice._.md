@@ -17,9 +17,9 @@ continuation while you type, or a proposed follow-up prompt after a turn. `tab` 
 
 **the contract** (landed 2026-08-03):
 
-- `src/grove.provision/5.devtools/5.3.brains/configure.upsert.sh` — the patch that merges
+- `src/grove.provision/5.devtools/5.3.brains/_.sh` — the patch that merges
   `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` into `~/.claude/settings.json`
-- `src/grove.provision/5.devtools/5.3.brains/configure.verify.sh` — reads the value back,
+- `src/grove.provision/5.devtools/5.3.brains/_.sh` — reads the value back,
   since a merged file can hold the key at the wrong value
 - `.agent/repo=.this/role=any/briefs/desktop/system/howto.silence-claude-cli-nags.md` — the "prompt suggestions"
   section, which names the feature and its polarity trap

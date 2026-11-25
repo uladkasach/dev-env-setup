@@ -1,0 +1,4 @@
+   • tpm already at the declared commit (<fixture>/home/.tmux/plugins/tpm)
+   • tmux-resurrect was 'adrift'; moved aside, re-clone follows
+     kept at: <fixture>/home/.tmux/plugins/tmux-resurrect.aside.20261023T000000Z
+   • tmux-resurrect installed at the declared commit

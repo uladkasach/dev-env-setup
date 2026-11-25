@@ -1,0 +1,2 @@
+   ✋ ConstraintError: no keyrack_daemon_prune.timer at <fixture>/repo/src/machine/keyrack_daemon_prune.timer
+      ⇒ this run's own checkout is incomplete

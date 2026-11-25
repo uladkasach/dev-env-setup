@@ -1,0 +1,11 @@
+   • tmux.conf declared (~/.tmux.conf)
+   • tmux plugins installed (tmux-resurrect)
+   • conf sourced into 1 of 2 live tmux server(s)
+   🌙 1 live server(s) would not load the conf: crewtwo
+      ⇒ each keeps its PRIOR options — a REMOVED plugin's among them,
+        since an option outlives the line that asked for it
+      ⇒ a socket that outlived its server reads the same way here; the
+        bundle's verify is what tells the two apart
+      read why: tmux -L crewtwo source-file ~/.tmux.conf
+     ⚠️ a live CLIENT still needs a reattach: terminal-features (RGB,
+        extkeys, clipboard) are negotiated at attach, never at source

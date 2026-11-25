@@ -1,0 +1,6 @@
+   • ~/.tmux.conf matches the checkout ✔
+   • ~/.tmux.conf is the only conf on disk ✔ (retired: <fixture>/home/.config/tmux/tmux.conf)
+     🌙 the live server still NAMES it — its list is fixed at start — and
+        an option ONLY it set lingers there until that server restarts
+   • all 2 declared tmux plugins present, each at its pin ✔ (<fixture>/home/.tmux/plugins)
+   • default-terminal 'tmux-256color' — terminfo holds it ✔

@@ -102,6 +102,22 @@ rhx radio.uses --global allow
 deliberate (`rule.forbid.tty-as-a-proxy-for-a-human`) — the gate moves by a human's hand or by a
 schedule they declared, never by anything else.
 
+## 🛑 .a closed gate INSIDE open hours is the gate at work — hold, never ask
+
+the stranded gate above is the one case a human lifts by hand. inside the window the block is the
+schedule a human declared, so **nobody asks to open it**:
+
+| the gate is closed, and… | then… |
+|---|---|
+| the clock sits inside open hours | the gate holds as declared. HOLD the gated act (stage, commit, push) to the window's close |
+| the act it gates is one step of a larger stone | do every other step now; only the gated act waits |
+| a check reddens because of the held act | leave it red and name it as held — never route around it |
+| the clock sits outside open hours | stranded (above). then a human lifts it |
+
+⚠️ an ask to open the gate mid-window spends a human's attention to defeat the schedule that same
+human declared. the cue is the refusal text itself — `git.commit.uses allow --global` reads like
+a remedy, and inside the window it is not one.
+
 ⚠️ the grove send uses the path form deliberately — a grove's `rhx` resolves no repo skill
 (`rule.forbid.the-driver-by-path`, carve-out 3).
 

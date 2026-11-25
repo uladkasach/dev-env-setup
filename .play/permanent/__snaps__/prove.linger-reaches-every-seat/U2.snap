@@ -1,0 +1,5 @@
+   ✋ ConstraintError: could not grant linger to seattwo
+      ⇒ its user manager, and every crew scope under it, ends at its
+        last logout — on a cloud grove, when the duct closes; on a laptop,
+        when the desktop session ends
+      read why: sudo loginctl enable-linger seattwo

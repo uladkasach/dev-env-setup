@@ -70,6 +70,18 @@ grove_provision_5_18_openhours_schedule_check() {
   }
 }
 
+# .what = run one file step of the upsert; on a fault, a ✋ that carries the tool's own words
+# .why  = a bare `|| return 1` let a raw coreutils line print above no ✋ at all
+grove_provision_5_18_openhours_step() {
+  local what="$1"; shift
+  local err
+  # LC_ALL=C: the tool's words ride as `cause:`, alike on every box
+  err="$(LC_ALL=C "$@" 2>&1)" && return 0
+  echo "   ✋ ConstraintError: could not $what" >&2
+  [[ -n "$err" ]] && echo "      cause: $err" >&2
+  return 1
+}
+
 # .what = the schedule as the payload reads it
 # .why  = ONE renderer, so the upsert WRITES and the verify DIFFS one text
 grove_provision_5_18_openhours_schedule_render() {

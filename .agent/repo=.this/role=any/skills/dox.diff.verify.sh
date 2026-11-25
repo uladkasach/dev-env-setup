@@ -21,7 +21,8 @@
 #   host      this box's hostname as a bare word, a distro default aside
 #   machine   a named grove (`grove-<org>-v<date>`) or an instance id
 #   email     a person's address. aside: `example.{com,org,net}` (rfc 2606), a
-#             `<tier>@<platform>` server tag, a vendor's published key uid
+#             `<tier>@<platform>` server tag, a vendor's published key uid,
+#             a forge's ssh user (`git@github.com`)
 #   account   a 12-digit run, the declared dummy aside
 #   ssm       an ssm arn or parameter path
 #
@@ -49,7 +50,7 @@ while [[ $# -gt 0 ]]; do
     --message) MESSAGES+=("${2:?--message needs a path}"); shift 2 ;;
     --since) SINCE="${2:?--since needs a ref}"; shift 2 ;;
     --repo|--role|--skill) shift 2 ;;   # rhx passes these through
-    --help|-h) sed -n '2,41p' "$0"; exit 0 ;;
+    --help|-h) sed -n '2,42p' "$0"; exit 0 ;;
     *) echo "✋ ConstraintError: unknown option: $1" >&2; echo "   └─ see: rhx dox.diff.verify --help" >&2; exit 2 ;;
   esac
 done
@@ -62,6 +63,8 @@ HOST="$(hostname 2>/dev/null)"
 [[ "$HOST" =~ ^(pop-os|ubuntu|localhost|debian)$ ]] && HOST=""
 # the vendors whose published key uids a bundle pins
 VENDORS='tailscale\.com'
+# the forges whose ssh user is the literal `git` — a public, structural address
+FORGES='github\.com|gitlab\.com|bitbucket\.org'
 
 HITS=()
 LINES_READ=0
@@ -86,6 +89,7 @@ scan_line() {
     [[ "$m" =~ @example\.(com|org|net)$ ]] && continue
     [[ "$m" =~ ^(local|cloud|house)@ ]] && continue
     [[ "$m" =~ @($VENDORS)$ ]] && continue
+    [[ "$m" =~ ^git@($FORGES)$ ]] && continue   # a forge's ssh user, never a person
     HITS+=("$where|email|$m")
   done < <(grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b' <<< "$text" | grep -vE '\.[A-Za-z]*[0-9]')
   while read -r m; do
