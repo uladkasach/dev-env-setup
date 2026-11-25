@@ -379,7 +379,7 @@ echo "   └─ run"
 ######################################################################
 _prior_apply_at() {
   local seat="$1" log="$2" rc=0
-  "$RHX" git.grove.send "$seat" --await 15 --reply --within 25 \
+  rhx_run git.grove.send "$seat" --await 15 --reply --within 25 \
     --what "test -f $log" >/dev/null 2>&1 || rc=$?
   case "$rc" in
     0)  echo yes ;;      # the log is there — an apply ran on THIS disk
@@ -432,7 +432,7 @@ drive_seat() {
   #    that swallows its steps' errors reports a step number and destroys the
   #    one sentence that says WHY (`term=swallow`) — and the `fix:` below is a
   #    guess by construction, since it cannot see what went wrong.
-  if ! "$RHX" git.grove.push "$seat" --from . --into "$INTO" --mode apply >/dev/null; then
+  if ! rhx_run git.grove.push "$seat" --from . --into "$INTO" --mode apply >/dev/null; then
     halt "$step" "$label" \
       "the push to $seat did not land" \
       "$RHX git.grove.wake $seat --mode apply" \
@@ -499,7 +499,7 @@ drive_seat() {
   #   human's box — which is the whole point, since the seats do not share one.
   local slice="sed -n \"/$mark/,\\\$p\" $log"
 
-  if ! "$RHX" git.grove.send "$seat" --reply \
+  if ! rhx_run git.grove.send "$seat" --reply \
          --what "printf '%s\n' '$mark' >> $log" >/dev/null; then
     halt "$step" "$label" \
       "the run marker did not land, so no read here can be bounded to THIS run" \
@@ -511,7 +511,7 @@ drive_seat() {
 
   # ── ONE apply, detached, so it outlives this connection
   local sent rc=0
-  sent="$("$RHX" git.grove.send "$seat" --detach --log "$log" --what "$upgrade" 2>&1)" || rc=$?
+  sent="$(rhx_run git.grove.send "$seat" --detach --log "$log" --what "$upgrade" 2>&1)" || rc=$?
   [[ "$rc" -eq 97 ]] && boot_seat_unproven_halt "$seat" "$step" "$label" "$slice"
   if [[ "$rc" -ne 0 ]]; then
     halt "$step" "$label" "the apply could not be sent (rc=$rc)" "$sent"
@@ -594,7 +594,7 @@ drive_seat() {
       #    claims then shows none of them, and the halt below says "each is
       #    named above" over an empty space
       #    (`rule.forbid.bare-globs-in-dual-shell-files`).
-      "$RHX" git.grove.send "$seat" --reply \
+      rhx_run git.grove.send "$seat" --reply \
         --what "$slice | grep ✋ | grep -v 'grove.provision finished'" || true
       echo ""
       halt "$step" "$label" \
@@ -774,7 +774,7 @@ if [[ "$FROM" -le 1 ]]; then
   else
     # ⚠️ stderr flows through — see drive_seat for why a sequencer must not
     #    swallow its steps' own reasons
-    "$RHX" git.grove.wake "$GROVE" --mode apply >/dev/null || boot_wake_halt "$?"
+    rhx_run git.grove.wake "$GROVE" --mode apply >/dev/null || boot_wake_halt "$?"
     say "│  ├─ wake ✔"
 
     if [[ "$TRUST" == "keep" ]]; then
@@ -794,7 +794,7 @@ if [[ "$FROM" -le 1 ]]; then
       # a pass prints one line; a refusal replays trust.gen's own rows, since the
       #   halt sends the human to them (escape bytes from a box are stripped)
       # shellcheck disable=SC2086
-      TRUST_OUT="$("$RHX" git.grove.trust.gen --grove "$GROVE" --mode apply $TRUST_FLAGS)" \
+      TRUST_OUT="$(rhx_run git.grove.trust.gen --grove "$GROVE" --mode apply $TRUST_FLAGS)" \
         || { printf '%s\n' "$TRUST_OUT" | tr -d '\033\007' | sed 's/^/│  │  /'; boot_trust_halt; }
       say "│  ├─ trust ✔ ($TRUST)"
       BOOT_TRUST_HELD=1
@@ -855,7 +855,7 @@ if [[ "$FROM" -le 4 ]]; then
     exit 0
   fi
   echo ""
-  if ! "$RHX" git.grove.provision test "$GROVE"; then
+  if ! rhx_run git.grove.provision test "$GROVE"; then
     ####################################################################
     # 🛑 this line names NO SUBJECT, on purpose
     #

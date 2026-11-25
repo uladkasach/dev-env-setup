@@ -3,7 +3,7 @@
 # .what = back up every unit on this grove to its bucket, then write the status
 #
 # .who runs it
-#   - `grove-backup.service`, as camper, every 15 minutes (`grove-backup.timer`)
+#   - `grove-backup.service`, as camper, every 3 hours (`grove-backup.timer`)
 #   - a human, by hand, from ground: `sudo systemctl start grove-backup.service`
 #   - a play, which SOURCES it and calls `grove_backup_run` against fixtures
 #
@@ -342,7 +342,7 @@ grove_backup_help() {
   echo "grove-backup — back up this grove's units to its bucket, then write the status"
   echo ""
   echo "usage:"
-  echo "  grove-backup            one pass, as camper (the timer runs it every 15 minutes)"
+  echo "  grove-backup            one pass, as camper (the timer runs it every 3 hours)"
   echo "  grove-backup --line     the one status line every surface prints"
   echo "  grove-backup --adopt    as camper: this box writes the prefix its name already holds"
   echo "  grove-backup --help     this text"

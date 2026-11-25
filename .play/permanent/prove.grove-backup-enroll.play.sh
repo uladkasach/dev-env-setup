@@ -42,9 +42,9 @@ claim "service · takes the box's spare cycles only" \
   bash -c 'for l in Nice=10 CPUWeight=10 IOWeight=10 IOSchedulingClass=idle; do grep -qxF "$l" "$1" || exit 1; done' _ "$REAL/grove-backup.service"
 claim "service · no start bound: each aws call carries its own" has_line grove-backup.service TimeoutStartSec=infinity
 claim "service · its state dir is world-readable, for infra's stats" has_line grove-backup.service StateDirectoryMode=0755
-claim "timer · fires every 15 minutes, and a missed fire runs on wake" \
-  bash -c 'grep -qxF "OnCalendar=*:0/15" "$1" && grep -qxF Persistent=true "$1" && grep -qxF WantedBy=timers.target "$1"' _ "$REAL/grove-backup.timer"
-claim "timer · systemd reads its calendar" systemd-analyze calendar '*:0/15' >/dev/null
+claim "timer · fires every 3 hours, and a missed fire runs on wake" \
+  bash -c 'grep -qxF "OnCalendar=0/3:00" "$1" && grep -qxF Persistent=true "$1" && grep -qxF WantedBy=timers.target "$1"' _ "$REAL/grove-backup.timer"
+claim "timer · systemd reads its calendar" systemd-analyze calendar '0/3:00' >/dev/null
 
 ######################################################################
 # the fixture: a checkout of the bundle whose library reads a fixture state dir,
@@ -64,6 +64,10 @@ source "$GROVE_SRC/grove.provision/5.devtools/5.26.backup/_.sh"
 source "$GROVE_SRC/grove.provision/5.devtools/5.26.backup/provision.upsert.sh"
 # shellcheck source=/dev/null
 source "$GROVE_SRC/grove.provision/5.devtools/5.26.backup/provision.verify.sh"
+
+claim "timer · the stale bound outlasts one 3-hour interval, so a healthy box never reads ✗ between passes" \
+  bash -c 'source "$1" && test "${GROVE_BACKUP_STALE_SECS:-0}" -gt 10800' _ \
+    "$GROVE_SRC/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh"
 eval "$(declare -f grove_provision_5_26_backup_files | sed '1s/grove_provision_5_26_backup_files/real_files/')"
 grove_provision_5_26_backup_files() { real_files | awk -F'\t' -v r="$ROOT" 'BEGIN { OFS = "\t" } { $2 = r $2; print }'; }
 
@@ -216,12 +220,12 @@ printf '{"verdict":"failed","cause":"1 of 7 units did not land","fix":"free spac
   "$(now_iso)" "$(date -u -d '-5 days' +%Y-%m-%dT%H:%MZ)" >"$STATE/status.json"
 verify; rc=$?
 claim "verify · the last run failed · rc 1, 💥, and when it last succeeded" \
-  test "$rc" -eq 1 -a "$(grep -c '💥 MalfunctionError: grove backup · FAILED · 1 of 7 units did not land · 0m · last ok 5d ago' "$fixture/verify.out")" -eq 1
+  test "$rc" -eq 1 -a "$(grep -cE '💥 MalfunctionError: grove backup · FAILED · 1 of 7 units did not land · [0-9]+m · last ok 5d ago' "$fixture/verify.out")" -eq 1
 claim "verify · it names the fix, and each failed unit with its why" \
   test "$(grep -c -e '├─ free space on the disk' -e '├─ user=c/org=a/repo=w/tree=w: disk · 3 MiB free' "$fixture/verify.out")" -eq 2
 
 rm -f "$STATE/status.json"
-TIMER_SINCE='-3 hours' SERVICE_STATE=activating
+TIMER_SINCE='-9 hours' SERVICE_STATE=activating
 verify; rc=$?
 claim "verify · a first run still at work past the grace · ⏳, never a ✗" \
   test "$rc" -eq 0 -a "$(grep -c '⏳ the first run is at work' "$fixture/verify.out")" -eq 1
@@ -230,16 +234,16 @@ verify; rc=$?
 claim "verify · enrolled past its grace with no run · ✗ STALE · never" \
   test "$rc" -eq 1 -a "$(grep -c 'STALE · never' "$fixture/verify.out")" -eq 1
 
-old_iso="$(date -u -d '-3 hours' +%Y-%m-%dT%H:%MZ)"
+old_iso="$(date -u -d '-9 hours' +%Y-%m-%dT%H:%MZ)"
 printf '{"verdict":"ok","at":"%s","last_ok":"%s","put":1,"skipped":1,"failures":[]}\n' "$old_iso" "$old_iso" >"$STATE/status.json"
 SERVICE_STATE=activating
 verify
 claim "verify · a long pass at work over an older ok · ⏳, never ✗ STALE" \
-  test "$(grep -c '⏳ a pass is at work · last ok 3h ago' "$fixture/verify.out")" -eq 1
+  test "$(grep -c '⏳ a pass is at work · last ok 9h ago' "$fixture/verify.out")" -eq 1
 SERVICE_STATE=inactive
 verify
 claim "verify · the same status with no pass at work · ✗ STALE" \
-  test "$(grep -c 'STALE · last ok 3h ago' "$fixture/verify.out")" -eq 1
+  test "$(grep -c 'STALE · last ok 9h ago' "$fixture/verify.out")" -eq 1
 rm -f "$STATE/status.json"
 
 printf '\n# drift\n' >>"$ROOT/etc/systemd/system/grove-backup.timer"

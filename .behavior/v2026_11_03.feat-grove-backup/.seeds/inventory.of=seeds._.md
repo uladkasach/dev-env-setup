@@ -10,3 +10,4 @@
 | [S6](./inventory.of=seeds.case=S6-brief-the-design-then-rewind-to-execution.md) | brief the design, no trace of the old shape; update the vision; rewind to execution; build at once | the brief; the vision; the route |
 | [S7](./inventory.of=seeds.case=S7-no-0901-apply-at-its-disk-gate.md) | no apply of the backup fix on the ec2 grove while its disk reads 90 pct or more; the hetzner proof stands | 5.1 yield; pr #192 body |
 | [S8](./inventory.of=seeds.case=S8-per-grove-isolation-ninety-day-reach-same-day-overwrite.md) | per-grove isolation enforced by the grant; camper reaches its own prefix for 90 days, then is locked out; overwrite only on the key's own day; infra enforces, this repo builds to it | the infra handoff; the agent; get; restore |
+| [S9](./inventory.of=seeds.case=S9-back-up-every-three-hours.md) | back up every 3 hours; a dead grove is rare, so the loss window is the accepted bound | the timer; the stale bound; the briefs; the play; the vision q5 |

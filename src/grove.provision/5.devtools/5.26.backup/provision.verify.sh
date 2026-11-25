@@ -103,6 +103,6 @@ grove_provision_5_26_backup_provision_verify() {
   owed="$(jq -r '.fix // empty' "$(grove_backup_status_file)" 2>/dev/null)"
   [[ -n "$owed" ]] && echo "      ├─ $owed" >&2
   jq -r '.failures[]? | "      ├─ \(.unit): \(.why)"' "$(grove_backup_status_file)" 2>/dev/null | head -n 10 >&2
-  echo "      └─ read the runs, as ground: sudo journalctl -u grove-backup --since -3h" >&2
+  echo "      └─ read the runs, as ground: sudo journalctl -u grove-backup --since -12h" >&2
   return 1
 }

@@ -1,17 +1,17 @@
-# .what = fire the grove backup every 15 minutes
+# .what = fire the grove backup every 3 hours
 #
 # .why Persistent=true: an ec2 grove hibernates and a hetzner grove reboots; a pass
 #   missed while the box was down fires on wake or boot (inventory b12)
-# .why 15 minutes, and cheap: a quiet tree costs a metadata read and no pack, so a
-#   short window costs a busy box little. 15 minutes is the most a dead grove loses
+# .why 3 hours: a dead grove is rare, so the window a loss could cover is worth less
+#   than eight quiet passes a day saved per box. 3 hours is the most a dead grove loses
 # .why never per commit: a commit trigger needs a hook in every clone, which no
 #   bundle owns, and an uncommitted edit would wait for it
 
 [Unit]
-Description=Back up this grove every 15 minutes
+Description=Back up this grove every 3 hours
 
 [Timer]
-OnCalendar=*:0/15
+OnCalendar=0/3:00
 Persistent=true
 
 [Install]

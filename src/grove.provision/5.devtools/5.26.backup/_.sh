@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = camper's trees and home dirs back up every 15 minutes, each tree one unit
+# .what = camper's trees and home dirs back up every 3 hours, each tree one unit
 #
 # .why
 #   - a grove holds the only copy of its unpushed work; a restore is the path back

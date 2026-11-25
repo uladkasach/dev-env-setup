@@ -152,7 +152,7 @@ is red (`rule.require.every-function-has-a-driver`).
 
 ## .then restore its work from the backup
 
-every camp grove backs up camper's `~/git`, `~/.claude`, and `~/.rhachet` every 15 minutes
+every camp grove backs up camper's `~/git`, `~/.claude`, and `~/.rhachet` every 3 hours
 (`howdoes.a-grove-backs-up-and-restores`). so the dead grove's trees, their unpushed commits, and
 their conversations come back. after the converge, as camper, from this repo's checkout on the
 new grove:

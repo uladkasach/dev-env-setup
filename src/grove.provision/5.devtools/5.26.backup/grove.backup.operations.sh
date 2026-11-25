@@ -448,8 +448,13 @@ grove_backup_staged_secret_cuts() {
 GROVE_BACKUP_SLUG_PATTERN='^[a-z0-9][a-z0-9-]{0,62}$'
 GROVE_BACKUP_BUCKET_PATTERN='^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$'
 
-# a status older than this reads ✗ STALE: eight missed passes of the 15-minute timer
-GROVE_BACKUP_STALE_SECS=7200
+# a status older than this reads ✗ STALE: two missed passes of the 3-hour timer, plus an
+#   hour for a long pass. it moves with the timer: a bound under one interval reads a
+#   healthy box as ✗ between passes
+GROVE_BACKUP_STALE_SECS=25200
+
+# a pass at work past this reads ✗, however long it runs: it has run too long to vouch for
+GROVE_BACKUP_PASS_BOUND_SECS=43200
 
 # every aws call is bounded, so a hung endpoint fails one run and never holds the timer
 GROVE_BACKUP_AWS_TIMEOUT_SECS=900
@@ -1797,8 +1802,8 @@ grove_backup_age_of() {
 #
 #   ✓ 20m ago · 3 put · 9 skipped
 #   ✗ FAILED · <cause> · 4m · last ok 5d ago      ✗ FAILED · <cause> · 4m · never ok
-#   ✗ STALE · last ok 3h ago        ✗ STALE · never
-#   ⏳ the first run is at work      ⏳ a pass is at work · last ok 3h ago
+#   ✗ STALE · last ok 9h ago        ✗ STALE · never
+#   ⏳ the first run is at work      ⏳ a pass is at work · last ok 9h ago
 #   ✗ NOT ENROLLED
 #
 # usage: grove_backup_status_line [enrolled]   # enrolled = the timer is in place
@@ -1835,7 +1840,7 @@ grove_backup_status_line() {
   skipped="$(jq -r '.skipped // 0' "$file" 2>/dev/null)"
 
   # a failed pass names when the backup last SUCCEEDED: the timer rewrites the failed
-  #   pass's own end time every 15 minutes, so that age alone says naught of what is safe
+  #   pass's own end time every 3 hours, so that age alone says naught of what is safe
   if [[ "$verdict" != ok ]]; then
     age="$(grove_backup_age_of "$at")" && age=" · $(grove_backup_age "$age")" || age=""
     ok_age=" · never ok"
@@ -1847,9 +1852,9 @@ grove_backup_status_line() {
   fi
 
   age="$(grove_backup_age_of "$last_ok")" || { echo "✗ FAILED · the status file is unreadable: $file"; return 1; }
-  # a long pass at work is no stale backup, up to a bound: past 12h, even a pass at work
-  #   has run too long to vouch for, and the line goes ✗
-  if [[ "$age" -gt "$GROVE_BACKUP_STALE_SECS" && "$age" -le $((GROVE_BACKUP_STALE_SECS * 6)) ]] && grove_backup_run_active; then
+  # a long pass at work is no stale backup, up to GROVE_BACKUP_PASS_BOUND_SECS: past it,
+  #   even a pass at work has run too long to vouch for, and the line goes ✗
+  if [[ "$age" -gt "$GROVE_BACKUP_STALE_SECS" && "$age" -le "$GROVE_BACKUP_PASS_BOUND_SECS" ]] && grove_backup_run_active; then
     echo "⏳ a pass is at work · last ok $(grove_backup_age "$age") ago"
     return 1
   fi

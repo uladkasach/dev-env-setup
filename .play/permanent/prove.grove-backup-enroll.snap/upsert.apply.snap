@@ -1,2 +1,2 @@
    • the agent, its library, grove-backup.service, and grove-backup.timer declared
-   • grove-backup.timer enabled and started (every 15 minutes, Persistent=true)
+   • grove-backup.timer enabled and started (every 3 hours, Persistent=true)

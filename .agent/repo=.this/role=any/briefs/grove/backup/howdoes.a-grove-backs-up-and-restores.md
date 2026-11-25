@@ -158,8 +158,9 @@ naught else in the home rides. dotfiles come back from this repo's own bundles, 
 
 ## .when
 
-- the timer fires every 15 minutes; `Persistent=true`, so a run missed while the box was down
-  fires on wake or boot
+- the timer fires every 3 hours (`OnCalendar=0/3:00`); `Persistent=true`, so a run missed while
+  the box was down fires on wake or boot. a dead grove is rare, so the 3-hour window at risk is
+  worth eight quiet passes a day saved per box
 - **a run takes the stalest unit first.** each unit records its own mark the moment it lands or is
   found quiet, so a run that stops early hands its tail to the front of the next
 - **a quiet unit costs a metadata read.** a unit whose refs, HEAD, index, and reflog did not move,
@@ -232,9 +233,9 @@ the line every surface prints (this skill, the verify, infra's `git.grove.stats`
 |---|---|
 | `✓ 20m ago · 3 put · 9 skipped` | every unit is current as of that run |
 | `⏳ the first run is at work` | enrolled; the first pass has not yet written its status |
-| `⏳ a pass is at work · last ok 3h ago` | a long pass runs now; the age is the safe copy's |
+| `⏳ a pass is at work · last ok 9h ago` | a long pass runs now; the age is the safe copy's |
 | `✗ FAILED · <cause> · 4m · last ok 5d ago` | the last run failed; the cause names the fix, and `last ok` says how old the safe copy is |
-| `✗ STALE · last ok 3h ago` | no good run in two hours |
+| `✗ STALE · last ok 9h ago` | no good run in seven hours: two missed passes, plus an hour |
 | `✗ STALE · never` | enrolled past its grace, and no pass has ever landed |
 | `✗ NOT ENROLLED` | the timer is absent: apply the bundle |
 

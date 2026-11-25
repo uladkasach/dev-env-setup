@@ -2,7 +2,7 @@ $ grove-backup --help (exit 0)
 grove-backup — back up this grove's units to its bucket, then write the status
 
 usage:
-  grove-backup            one pass, as camper (the timer runs it every 15 minutes)
+  grove-backup            one pass, as camper (the timer runs it every 3 hours)
   grove-backup --line     the one status line every surface prints
   grove-backup --adopt    as camper: this box writes the prefix its name already holds
   grove-backup --help     this text

@@ -15,6 +15,17 @@
 ######################################################################
 
 ######################################################################
+# .what = run one of this role's own skills, scoped to repo=.this/role=any
+# .why  = the bhuild supervisor role ships its own git.grove.send, git.grove.wake,
+#   duct.*, and term.*, so a bare slug refuses as ambiguous and boot never reaches
+#   the box. a stub RHX (the plays) takes the args unscoped, so its echoes hold
+######################################################################
+rhx_run() {
+  [[ "${RHX:-rhx}" == rhx ]] || { "$RHX" "$@"; return; }
+  rhx "$@" --repo .this --role any
+}
+
+######################################################################
 # halt — name the step, why it did not hold, and the command that repairs it
 #
 # 🛑 EVERY line it prints goes through `__duct_strip_escapes`
@@ -362,7 +373,7 @@ boot_seat_duct_reborn() {
   local seat="$1" step="$2" label="$3" uri out
   # the address follows `_git_grove_duct_uri` (bash_aliases.sh), as git.grove.play.await does
   uri="duct://$seat/main/mechanic"
-  if out="$("$RHX" duct.reboot --on "$uri" 2>&1)"; then
+  if out="$(rhx_run duct.reboot --on "$uri" 2>&1)"; then
     say "│  └─ ✔ duct reborn ($uri) — its shell reads this apply's PATH"
     return 0
   fi
@@ -400,7 +411,7 @@ boot_keys_place() {
     say "│  ├─ keys · would run: $RHX git.grove.auth.keys.set $GROVE --mode apply${BOOT_ORG:+ --org $BOOT_ORG}"
     return 0
   fi
-  if ! "$RHX" git.grove.auth.keys.set "$GROVE" --mode apply ${BOOT_ORG:+--org "$BOOT_ORG"}; then
+  if ! rhx_run git.grove.auth.keys.set "$GROVE" --mode apply ${BOOT_ORG:+--org "$BOOT_ORG"}; then
     # the camper's apply already held; only the keys are owed, so the fix places them
     #   and the resume starts at the gate, never a second camper apply
     BOOT_RESUME_FROM=4 halt 3 keys \
@@ -428,7 +439,7 @@ boot_admin_seat_clean() {
     say "│  └─ admin seat · would run: $RHX git.grove.send $GROVE.ground --reply --play $play"
     return 0
   fi
-  if ! "$RHX" git.grove.send "$GROVE.ground" --reply --play "$play"; then
+  if ! rhx_run git.grove.send "$GROVE.ground" --reply --play "$play"; then
     BOOT_RESUME_FROM=4 halt 3 "admin seat" \
       "the admin seat $GROVE.ground holds a credential or crew work — the play above names each by path" \
       "⇒ a camper-aimed command reached ground. read where each seat dials:" \

@@ -85,5 +85,5 @@ grove_provision_5_26_backup_provision_upsert() {
     echo "      ⇒ read why: systemctl status grove-backup.timer" >&2
     return 1
   }
-  echo "   • grove-backup.timer enabled and started (every 15 minutes, Persistent=true)"
+  echo "   • grove-backup.timer enabled and started (every 3 hours, Persistent=true)"
 }
