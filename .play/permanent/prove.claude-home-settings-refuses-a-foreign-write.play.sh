@@ -439,7 +439,7 @@ out="$( env -u CLAUDE_CONFIG_DIR HOME="$home" GROVE_SRC="$fix/src" \
 
 # 10b: the verify after the public entry → every claim ✔, the keybindings and config halves too
 out="$(verify_run ':')"; code=$?
-[[ "$code" == 0 && "$out" == *"ctrl+enter is the one send-now key"*"✔"* && "$out" == *"diff panel shut-at-start holds the declared value ✔"* \
+[[ "$code" == 0 && "$out" == *"enter = send now, ctrl+enter = interrupt, ctrl+x ctrl+s unbound ✔"* && "$out" == *"diff panel shut-at-start holds the declared value ✔"* \
    && "$out" == *"is read-only (mode $lockmode) ✔"* && "$out" != *"✋"* ]] \
   && pass "10b verify after the public entry: exit 0, all three files ✔" \
   || fail "10b verify after the public entry: exit $code: $out"
@@ -453,7 +453,7 @@ keys="$home/.claude/keybindings.json"
 
 # 10c: a second run → the keybindings half keeps the file, byte-equal
 was="$(cat "$keys")"; out="$(entry)"; code=$?
-[[ "$code" == 0 && "$out" == *"keybindings already unbind"*"[KEEP]"* && "$(cat "$keys")" == "$was" ]] \
+[[ "$code" == 0 && "$out" == *"keybindings already hold enter = send now, ctrl+enter = interrupt"*"[KEEP]"* && "$(cat "$keys")" == "$was" ]] \
   && pass "10c second run: keybindings [KEEP], byte-equal" || fail "10c keybindings keep: exit $code: $out"
 
 # 10d: keybindings is an arrow → the half writes the target, and the arrow stays an arrow
@@ -545,7 +545,7 @@ out="$(apply 2>&1)"; code=$?
 [[ "$code" == 1 && "$out" == *"could not be followed, so naught was written"* && -L "$settings" ]] \
   && pass "13c an arrow that loops → the upsert ✋, naught written" || fail "13c upsert on a loop: exit $code: $out"
 out="$(verify_run ':')"; code=$?
-[[ "$code" == 1 && "$out" == *"the strip and the lock are unproven"* && "$out" == *"send-now"* ]] \
+[[ "$code" == 1 && "$out" == *"the strip and the lock are unproven"* && "$out" == *"enter = send now, ctrl+enter = interrupt"* ]] \
   && pass "13c an arrow that loops → the verify ✋s the lock and still reads the keybindings" \
   || fail "13c verify on a loop: exit $code: $out"
 rm -f "$settings"

@@ -4,7 +4,7 @@
          • claude settings merged → <seam>/home/.claude/settings.json (mode 644 → 400, swapped in by rename)
          🌙 boot gate: no rhachet checkout beside this run, so no init to prove the lock against
          • claude global config declared → <seam>/home/.claude.json
-         • claude keybindings merged → <seam>/home/.claude/keybindings.json (ctrl+enter is the one send-now key)
+         • claude keybindings merged → <seam>/home/.claude/keybindings.json (enter = send now, ctrl+enter = interrupt)
       ├─ 5.3.brains.configure.verify
          • the auto-updater holds the declared value ✔
          • the native-installer migration nag holds the declared value ✔
@@ -27,11 +27,12 @@
          • the fullscreen tui holds the declared value ✔
          • the verbose output default holds the declared value ✔
          • the claude-drafted feedback queue holds the declared value ✔
+         • the built-in diff panel mod, off (it auto-opens beside the transcript and polls git; /diff still works without it) holds the declared value ✔
          • the never-prune transcript retention holds the declared value ✔
          • no role-authored hook in <seam>/home/.claude/settings.json ✔
          • <seam>/home/.claude/settings.json is read-only (mode 400) ✔
-         • ctrl+enter is the one send-now key (the ctrl+x ctrl+s chord is unbound) ✔
+         • enter = send now, ctrl+enter = interrupt, ctrl+x ctrl+s unbound ✔
             ⇒ a bare session reads this file; an ENROLLED clone reads its actor dir's copy until
-              rhachet links it there (ehmpathy/rhachet#579), so an enrolled hint may still name the chord
+              rhachet links it there (ehmpathy/rhachet#579), so an enrolled clone keeps claude's default keys
          • the diff panel shut-at-start holds the declared value ✔
 exit=0
