@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = the COSMIC desktop — its terminal, its theme, and its shell layout
+# .what = the COSMIC desktop — its terminal, its theme, its shell layout,
+#         and its monitor layout
 #
 # .every child declines on a cloud box
 #   - COSMIC is a wayland compositor, and a grove runs none
@@ -23,4 +24,5 @@ grove_provision_3_cosmic() {
   bundle.upgrade 3.1.term
   bundle.upgrade 3.2.theme
   bundle.upgrade 3.3.desktop
+  bundle.upgrade 3.4.displays
 }

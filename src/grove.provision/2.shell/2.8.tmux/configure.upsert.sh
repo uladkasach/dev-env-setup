@@ -119,6 +119,13 @@ grove_provision_2_8_tmux_configure_upsert() {
 
   # tear the isolated server down either way — it holds no state worth a keep
   timeout -k 2 5 tmux -L "$sock" kill-server 2>/dev/null || true
+  # 🛑 and its SOCKET. 📜 2026-10-25: the file outlived the server, so the source
+  #    step below counted this bundle's own corpse as "a live server that would not
+  #    load the conf" on every apply. removed only once no server answers on it
+  local sock_path="${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/$sock"
+  if [[ -S "$sock_path" ]] && ! timeout -k 2 5 tmux -L "$sock" list-sessions >/dev/null 2>&1; then
+    rm -f "$sock_path"
+  fi
 
   if [[ ${#absent[@]} -gt 0 ]]; then
     echo "   ✋ tpm did not land every plugin the conf names: ${absent[*]}" >&2

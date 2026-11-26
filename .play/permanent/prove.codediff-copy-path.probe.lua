@@ -6,6 +6,10 @@
 --   dir_row    explorer, cursor on the aa/ row    → owes aa
 --   rev_pane   the revision side of a1's diff      → owes aa/a1.txt
 --   plain_buf  an ordinary buffer on bb/b1.txt     → owes bb/b1.txt
+--   image_old_<key>, image_new_<key>
+--              each pane of cc/c1.png's image diff, under ctrl+r, ctrl+alt+r and
+--              ctrl+super+r → owes cc/c1.png
+--   image_file `:tabnew cc/c1.png`                  → owes cc/c1.png
 --
 -- .the arms
 --   control    as shipped → every row hit
@@ -23,12 +27,15 @@ local function say(s) rows[#rows + 1] = s; vim.fn.writefile(rows, out) end
 local function quit() vim.cmd('qa!') end
 
 local root = vim.fn.tempname()
-vim.fn.mkdir(root .. '/aa', 'p'); vim.fn.mkdir(root .. '/bb', 'p')
+vim.fn.mkdir(root .. '/aa', 'p'); vim.fn.mkdir(root .. '/bb', 'p'); vim.fn.mkdir(root .. '/cc', 'p')
 local function sh(cmd) return vim.fn.system({ 'bash', '-c', 'cd ' .. vim.fn.shellescape(root) .. ' && ' .. cmd }) end
+local magick = vim.fn.executable('magick') == 1 and 'magick' or 'convert'
 sh('git init -q && git config user.email p@p && git config user.name p')
 for _, f in ipairs({ 'aa/a1.txt', 'aa/a2.txt', 'bb/b1.txt' }) do vim.fn.writefile({ 'x' }, root .. '/' .. f) end
+sh(magick .. ' -size 8x8 xc:red cc/c1.png')
 sh('git add -A && git commit -qm init')
 for _, f in ipairs({ 'aa/a1.txt', 'aa/a2.txt' }) do vim.fn.writefile({ 'y' }, root .. '/' .. f) end
+sh(magick .. ' -size 8x8 xc:blue cc/c1.png')
 vim.cmd('cd ' .. vim.fn.fnameescape(root))
 
 pcall(require, 'codediff')
@@ -67,7 +74,7 @@ for k in pairs(line_of) do if k:match('^dir:.*aa$') then dir_key = k end end
 if not dir_key then say('world=absent reason=dir_row_absent (tree view?)'); return quit() end
 say('world=present')
 
-local keys = vim.api.nvim_replace_termcodes('<C-A-r>', true, false, true)
+local keys = vim.api.nvim_replace_termcodes('<C-A-r>', true, false, true) -- reassigned per image key
 local function press(name, want)
   copied = nil
   vim.api.nvim_feedkeys(keys, 'mx', false)
@@ -98,7 +105,39 @@ else
   say('rev_pane=miss want=aa/a1.txt got=<no codediff: revision pane found>')
 end
 
--- 4. an ordinary buffer, in a fresh tab
+-- 4. both panes of an image diff, under all three copy keys
+--    the panes are found as codediff's own diff windows — never by the record
+--    the fix writes, so a probe that reads the fix cannot pass on its own say-so
+if line_of['cc/c1.png'] then
+  vim.api.nvim_set_current_win(ex.winid)
+  vim.api.nvim_win_set_cursor(ex.winid, { line_of['cc/c1.png'], 0 })
+  ex.on_file_select(ex.tree:get_node(line_of['cc/c1.png']).data)
+  vim.wait(1500, function() return false end, 20)
+  sess = lc.get_session(tab)
+  local sides = { image_old = sess and sess.original_win, image_new = sess and sess.modified_win }
+  for _, side in ipairs({ 'image_old', 'image_new' }) do
+    local w = sides[side]
+    if w and vim.api.nvim_win_is_valid(w) and vim.bo[vim.api.nvim_win_get_buf(w)].filetype ~= 'codediff-explorer' then
+      vim.api.nvim_set_current_win(w)
+      for _, k in ipairs({ { 'C-r', '<C-r>' }, { 'C-A-r', '<C-A-r>' }, { 'C-D-r', '<C-D-r>' } }) do
+        keys = vim.api.nvim_replace_termcodes(k[2], true, false, true)
+        press(side .. '_' .. k[1], 'cc/c1.png')
+      end
+    else
+      say(side .. '=miss want=cc/c1.png got=<no image pane found>')
+    end
+  end
+  keys = vim.api.nvim_replace_termcodes('<C-A-r>', true, false, true)
+else
+  say('image_old=miss want=cc/c1.png got=<no cc/c1.png row in the explorer>')
+end
+
+-- 5. an ordinary buffer, in a fresh tab
 vim.cmd('tabnew ' .. vim.fn.fnameescape(root .. '/bb/b1.txt'))
 press('plain_buf', 'bb/b1.txt')
+
+-- 6. an image opened directly, in a fresh tab
+vim.cmd('tabnew ' .. vim.fn.fnameescape(root .. '/cc/c1.png'))
+vim.wait(500, function() return false end, 20)
+press('image_file', 'cc/c1.png')
 quit()
