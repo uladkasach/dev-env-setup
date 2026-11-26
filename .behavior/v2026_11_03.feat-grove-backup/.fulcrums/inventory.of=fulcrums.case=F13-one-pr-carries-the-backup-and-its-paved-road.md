@@ -2,7 +2,7 @@
 
 ## .the fork
 
-pr #192 holds the backup (`5.26.backup`, `grove.backup.*`) and the work that let it be proven
+pr #192 holds the backup (`5.27.backup`, `grove.backup.*`) and the work that let it be proven
 on a live grove: `git.grove.provision boot --what`, `file.exec.set`, `git.tree.aside`, the
 `play.stop` / `play.await` pair, `git grove sync` and `list`, `network.tailnet.peers.get`,
 `aws.reach --gitroot`, and shell fixes the boot met. a peer (i004 r011 blocker.4) asked for three

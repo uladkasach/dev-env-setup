@@ -9,11 +9,11 @@ step. a dead grove's work comes back onto any grove with `rhx grove.backup.resto
 - **what**: `~/git` (every clone, worktree, orphan, and set-aside), `~/.claude`, `~/.rhachet`
 - **where**: the bucket infra names in `/etc/grove/backup.bucket` (from `CAMP_GROVE_BUCKET_NAME`).
   this repo is public, so the literal never appears here
-- **how it lands**: bundle `5.devtools/5.26.backup`. ground installs the agent and its timer;
+- **how it lands**: bundle `5.devtools/5.27.backup`. ground installs the agent and its timer;
   the agent runs as camper, through camper's own aws config
 
 ```sh
-rhx git.grove.provision boot <grove> --what 5.26.backup --mode apply   # enroll, from a laptop
+rhx git.grove.provision boot <grove> --what 5.27.backup --mode apply   # enroll, from a laptop
 ```
 
 ## .the unit — one tree, one atomic object

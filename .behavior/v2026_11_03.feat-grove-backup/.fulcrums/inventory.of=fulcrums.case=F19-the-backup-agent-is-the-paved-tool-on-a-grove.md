@@ -5,7 +5,7 @@
 `howto.adopt-a-replacement-grove` hands two lines a human runs on the new grove:
 `/usr/local/lib/grove-backup/grove-backup --adopt` and `sudo systemctl start grove-backup.service`.
 
-- **A** — keep them: the agent is the tool this PR ships, laid and verified by `5.26.backup`, with
+- **A** — keep them: the agent is the tool this PR ships, laid and verified by `5.27.backup`, with
   its own `--help`, its words refused when unknown, and its CLI snapped (`agent.cli.snap`); the
   unit is the declared interface systemd runs it by
 - **B** — wrap both in `rhx grove.backup.adopt` and `rhx grove.backup.run`

@@ -80,8 +80,8 @@ help() {
 # the root is four dirs above this skill, never `git rev-parse`: a grove's checkout
 #   is pushed with no .git, so git finds no repo there (see grove.backup.get)
 REPO_ROOT="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)"
-# shellcheck source=../../../../src/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh
-source "$REPO_ROOT/src/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh" || {
+# shellcheck source=../../../../src/grove.provision/5.devtools/5.27.backup/grove.backup.operations.sh
+source "$REPO_ROOT/src/grove.provision/5.devtools/5.27.backup/grove.backup.operations.sh" || {
   echo "💥 MalfunctionError: could not load grove.backup.operations.sh under $REPO_ROOT" >&2; exit 1; }
 
 ######################################################################

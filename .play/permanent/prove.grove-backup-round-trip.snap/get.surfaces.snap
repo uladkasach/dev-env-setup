@@ -29,7 +29,7 @@ rc=0
 🗄️ grove.backup.get
    ├─ grove: grove-1
    └─ backup: ✗ NOT ENROLLED
-      └─ fix: rhx grove.provision --what 5.26.backup --mode apply
+      └─ fix: rhx grove.provision --what 5.27.backup --mode apply
 
 ## · status, never enrolled, the camper seat
 rc=0
@@ -38,7 +38,7 @@ rc=0
 🗄️ grove.backup.get
    ├─ grove: grove-1
    └─ backup: ✗ NOT ENROLLED
-      └─ fix: rhx grove.provision --what 5.26.backup --mode apply, from the seat with sudo (ground); this seat holds none
+      └─ fix: rhx grove.provision --what 5.27.backup --mode apply, from the seat with sudo (ground); this seat holds none
 
 ## · status, on a laptop
 rc=0

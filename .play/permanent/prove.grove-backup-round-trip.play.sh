@@ -33,7 +33,7 @@
 set -u
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-BUNDLE="$HERE/src/grove.provision/5.devtools/5.26.backup"
+BUNDLE="$HERE/src/grove.provision/5.devtools/5.27.backup"
 
 fixture="$(mktemp -d)"
 trap 'rm -rf "$fixture"' EXIT
@@ -1050,7 +1050,7 @@ GROVE_ENV_SERVER=cloud@hetzner.hetzbot
 # sudo is a stub here, so the seat a human reads is the fixture's, never this box's
 STUB_SUDO=1; sudo() { [[ "$STUB_SUDO" == 1 ]]; }
 surface "· status, never enrolled, the ground seat"  0
-claim "get · status, never enrolled · names the bundle that enrolls" out_has "--what 5.26.backup"
+claim "get · status, never enrolled · names the bundle that enrolls" out_has "--what 5.27.backup"
 claim "get · status, never enrolled, ground · asks no other seat" test "$(grep -c 'from the seat with sudo' "$fixture/out")" -eq 0
 STUB_SUDO=0
 surface "· status, never enrolled, the camper seat"  0
@@ -1059,7 +1059,7 @@ unset -f sudo
 GROVE_ENV_SERVER=local@unix
 surface "· status, on a laptop"          0
 claim "get · status, on a laptop · names camp groves, never a fix that declines" \
-  test "$(grep -c -- '--what 5.26.backup' "$fixture/out")" -eq 0 -a "$(grep -c 'runs on camp groves' "$fixture/out")" -eq 1
+  test "$(grep -c -- '--what 5.27.backup' "$fixture/out")" -eq 0 -a "$(grep -c 'runs on camp groves' "$fixture/out")" -eq 1
 GROVE_ENV_SERVER=cloud@hetzner.hetzbot
 STUB_ENROLLED=1
 surface "· status, enrolled, no run has written yet" 0

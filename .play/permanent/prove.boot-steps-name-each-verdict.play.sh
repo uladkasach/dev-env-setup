@@ -298,8 +298,8 @@ check "resume · step 0 carries the trust asked for" has "$out" "--from 0 --trus
 out="$(TRUST=replace run_step '' apply boot_resume_line_2 2>&1)"
 check "resume · step 2 keeps the trust that held" has "$out" "--from 2 --trust keep"
 # a one-bundle boot resumes as one bundle: a resume without --what converges the whole tree
-out="$(WHAT=5.26.backup TRUST=verified run_step '' apply boot_resume_line_0 2>&1)"
-check "resume · a --what boot's resume carries its --what" has "$out" "--from 0 --trust verified --what 5.26.backup"
+out="$(WHAT=5.27.backup TRUST=verified run_step '' apply boot_resume_line_0 2>&1)"
+check "resume · a --what boot's resume carries its --what" has "$out" "--from 0 --trust verified --what 5.27.backup"
 out="$(WHAT='' TRUST=verified run_step '' apply boot_resume_line_0 2>&1)"
 check "resume · a whole-tree boot's resume names no --what" bash -c '[[ "$1" != *--what* ]]' _ "$out"
 

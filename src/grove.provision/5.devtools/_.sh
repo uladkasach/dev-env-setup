@@ -62,20 +62,15 @@ grove_provision_5_devtools() {
   #   is merely not placed yet. `5.18.openhours` reads no key, so it may follow
   bundle.upgrade 5.16.keys
 
-  # .why AFTER 5.3.brains: its reconciler drives `rhx git.commit.uses` and
-  #   `rhx radio.uses`, and `rhx` arrives with rhachet at `5.3.brains`. its
-  #   verify PROBES that reach rather than assume it, so a box that cannot
-  #   reach the two skills says so — instead of a timer that ticks forever
-  #   over a gate that never closes
+  # AFTER 5.3.brains: its reconciler drives `rhx`, which rhachet lands there.
+  #   its verify probes that reach, so a box that lacks it says so
   bundle.upgrade 5.18.openhours
 
-  # .why AFTER 5.4.gh: it allows, in the commit meter, each unset org the token gh
-  #   holds can push to; a block is kept, and a local grove declines
+  # AFTER 5.4.gh: it allows, in the commit meter, each unset org gh's token can push to
   bundle.upgrade 5.26.commitorgs
 
-  # .why AFTER 5.6.aws: the agent calls the aws cli that bundle installs.
-  #   it reads no key from the rack: its credential is the box's own identity
-  bundle.upgrade 5.26.backup
+  # AFTER 5.6.aws: the agent calls that aws cli, as the box's own identity
+  bundle.upgrade 5.27.backup
 
   # LAST: the crew boot gate reads this marker, so a box declares itself a work
   #   grove only once every bundle above has converged it

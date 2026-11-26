@@ -283,7 +283,7 @@ inputs:
             no key placement, no gate — those are claims about a WHOLE box
 
 examples:
-  rhx git.grove.provision boot <name> --what 5.26.backup --mode apply    # one bundle
+  rhx git.grove.provision boot <name> --what 5.27.backup --mode apply    # one bundle
   rhx git.grove.provision boot <name>                                    # plan
   rhx git.grove.provision boot <name> --mode apply                       # the whole boot
   rhx git.grove.provision boot <name> --mode apply --trust tofu          # a tailnet first contact

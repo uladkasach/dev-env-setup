@@ -9,15 +9,15 @@
 #   - infra owes /etc/grove/name and /etc/grove/backup.bucket; a run names the one absent
 ######################################################################
 
-grove_provision_5_26_backup() {
-  bundle.upgrade 5.26.backup.provision.upsert
-  bundle.upgrade 5.26.backup.provision.verify
+grove_provision_5_27_backup() {
+  bundle.upgrade 5.27.backup.provision.upsert
+  bundle.upgrade 5.27.backup.provision.verify
 }
 
 # .what = the four files this bundle installs → "src<TAB>dst<TAB>mode" lines
 # .why one list: the upsert copies exactly what the verify diffs
-grove_provision_5_26_backup_files() {
-  local dir="$GROVE_SRC/grove.provision/5.devtools/5.26.backup"
+grove_provision_5_27_backup_files() {
+  local dir="$GROVE_SRC/grove.provision/5.devtools/5.27.backup"
   printf '%s\t%s\t%s\n' \
     "$dir/grove-backup"                 /usr/local/lib/grove-backup/grove-backup                 755 \
     "$dir/grove.backup.operations.sh"   /usr/local/lib/grove-backup/grove.backup.operations.sh   644 \
@@ -26,4 +26,4 @@ grove_provision_5_26_backup_files() {
 }
 
 # .what = does this tier carry the camp aws identity the bucket grants? — the one gate both phases ask
-grove_provision_5_26_backup_applies() { [[ "${GROVE_ENV_SERVER:-}" == cloud@* ]]; }
+grove_provision_5_27_backup_applies() { [[ "${GROVE_ENV_SERVER:-}" == cloud@* ]]; }

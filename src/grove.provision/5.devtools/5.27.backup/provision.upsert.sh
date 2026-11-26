@@ -15,8 +15,8 @@
 #   - idempotent: a second apply on a converged box writes naught
 ######################################################################
 
-grove_provision_5_26_backup_provision_upsert() {
-  if ! grove_provision_5_26_backup_applies; then
+grove_provision_5_27_backup_provision_upsert() {
+  if ! grove_provision_5_27_backup_applies; then
     echo "   🌙 a ${GROVE_ENV_SERVER:-（underived）} box holds no camp aws identity, so no grant can reach the backup bucket"
     return 0
   fi
@@ -35,7 +35,7 @@ grove_provision_5_26_backup_provision_upsert() {
   local src dst mode converged=1
   while IFS=$'\t' read -r src dst mode; do
     cmp -s "$src" "$dst" || converged=0
-  done < <(grove_provision_5_26_backup_files)
+  done < <(grove_provision_5_27_backup_files)
   systemctl is-enabled grove-backup.timer >/dev/null 2>&1 || converged=0
   systemctl is-active grove-backup.timer >/dev/null 2>&1 || converged=0
 
@@ -67,7 +67,7 @@ grove_provision_5_26_backup_provision_upsert() {
       echo "      ⇒ the agent stays at its prior version; read why above" >&2
       return 1
     }
-  done < <(grove_provision_5_26_backup_files)
+  done < <(grove_provision_5_27_backup_files)
   echo "   • the agent, its library, grove-backup.service, and grove-backup.timer declared"
 
   ####################################################################

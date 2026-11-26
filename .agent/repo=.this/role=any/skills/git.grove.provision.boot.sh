@@ -79,7 +79,7 @@
 #   --what    one bundle slug — the same steps 1-3, each apply narrowed to it
 #
 # 🛑 .--what is how ONE bundle reaches a grove — never a hand-typed push + send
-#      📜 2026-11-20: asked to apply 5.26.backup alone, a clone handed the human six
+#      📜 2026-11-20: asked to apply 5.27.backup alone, a clone handed the human six
 #         commands (sync, trust, wake .ground, push, send plan, send apply) copied out
 #         of this file's own internals. each was a step this skill already owns, in an
 #         order it already enforces. a skill short one flag is a skill to extend, never
@@ -123,7 +123,7 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "            no key placement, no gate — those are claims about a WHOLE box"
   echo ""
   echo "examples:"
-  echo "  rhx git.grove.provision boot <name> --what 5.26.backup --mode apply    # one bundle"
+  echo "  rhx git.grove.provision boot <name> --what 5.27.backup --mode apply    # one bundle"
   echo "  rhx git.grove.provision boot <name>                                    # plan"
   echo "  rhx git.grove.provision boot <name> --mode apply                       # the whole boot"
   echo "  rhx git.grove.provision boot <name> --mode apply --trust tofu          # a tailnet first contact"

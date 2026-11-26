@@ -20,7 +20,7 @@
 set -u
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-REAL="$HERE/src/grove.provision/5.devtools/5.26.backup"
+REAL="$HERE/src/grove.provision/5.devtools/5.27.backup"
 
 fixture="$(mktemp -d)"
 trap 'rm -rf "$fixture"' EXIT
@@ -55,21 +55,21 @@ mkdir -p "$GROVE_SRC/grove.provision/5.devtools"
 cp -a "$REAL" "$GROVE_SRC/grove.provision/5.devtools/"
 STATE="$fixture/state"; mkdir -p "$STATE"
 printf '\ngrove_backup_state_dir() { printf %%s %q; }\n' "$STATE" \
-  >>"$GROVE_SRC/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh"
+  >>"$GROVE_SRC/grove.provision/5.devtools/5.27.backup/grove.backup.operations.sh"
 ROOT="$fixture/root"
 
 # shellcheck source=/dev/null
-source "$GROVE_SRC/grove.provision/5.devtools/5.26.backup/_.sh"
+source "$GROVE_SRC/grove.provision/5.devtools/5.27.backup/_.sh"
 # shellcheck source=/dev/null
-source "$GROVE_SRC/grove.provision/5.devtools/5.26.backup/provision.upsert.sh"
+source "$GROVE_SRC/grove.provision/5.devtools/5.27.backup/provision.upsert.sh"
 # shellcheck source=/dev/null
-source "$GROVE_SRC/grove.provision/5.devtools/5.26.backup/provision.verify.sh"
+source "$GROVE_SRC/grove.provision/5.devtools/5.27.backup/provision.verify.sh"
 
 claim "timer · the stale bound outlasts one 3-hour interval, so a healthy box never reads ✗ between passes" \
   bash -c 'source "$1" && test "${GROVE_BACKUP_STALE_SECS:-0}" -gt 10800' _ \
-    "$GROVE_SRC/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh"
-eval "$(declare -f grove_provision_5_26_backup_files | sed '1s/grove_provision_5_26_backup_files/real_files/')"
-grove_provision_5_26_backup_files() { real_files | awk -F'\t' -v r="$ROOT" 'BEGIN { OFS = "\t" } { $2 = r $2; print }'; }
+    "$GROVE_SRC/grove.provision/5.devtools/5.27.backup/grove.backup.operations.sh"
+eval "$(declare -f grove_provision_5_27_backup_files | sed '1s/grove_provision_5_27_backup_files/real_files/')"
+grove_provision_5_27_backup_files() { real_files | awk -F'\t' -v r="$ROOT" 'BEGIN { OFS = "\t" } { $2 = r $2; print }'; }
 
 LOG="$fixture/calls.log"; : >"$LOG"
 CAN_SUDO=1 TIMER_ENABLED=disabled TIMER_ACTIVE=inactive SERVICE_STATE=inactive TIMER_SINCE=now
@@ -109,11 +109,11 @@ none_installed() { [[ -z "$(find "$ROOT" -type f 2>/dev/null)" ]]; }
 # 2. off cloud@*, both phases decline
 ######################################################################
 GROVE_ENV_SERVER=local@unix
-out="$(grove_provision_5_26_backup_provision_upsert 2>&1)"; rc=$?
+out="$(grove_provision_5_27_backup_provision_upsert 2>&1)"; rc=$?
 claim "decline · a laptop's upsert declines, rc 0, and names why" \
   bash -c '[[ "$1" -eq 0 && "$2" == *"🌙 a local@unix box holds no camp aws identity"* ]]' _ "$rc" "$out"
 snap_decline="# upsert, local@unix (exit $rc)"$'\n'"$out"$'\n\n'
-out="$(grove_provision_5_26_backup_provision_verify 2>&1)"; rc=$?
+out="$(grove_provision_5_27_backup_provision_verify 2>&1)"; rc=$?
 claim "decline · a laptop's verify declines, rc 0" test "$rc" -eq 0 -a -n "$out"
 snap_decline+="# verify, local@unix (exit $rc)"$'\n'"$out"$'\n'
 claim "decline · naught is installed off cloud@*" none_installed
@@ -122,7 +122,7 @@ claim "decline · naught is installed off cloud@*" none_installed
 # 3. the camper seat, with no root, declines to the seat that has it
 ######################################################################
 GROVE_ENV_SERVER=cloud@hetzner.hetzbot CAN_SUDO=0
-out="$(grove_provision_5_26_backup_provision_upsert 2>&1)"; rc=$?
+out="$(grove_provision_5_27_backup_provision_upsert 2>&1)"; rc=$?
 claim "camper · an unconverged seat with no root declines, rc 0" \
   bash -c '[[ "$1" -eq 0 && "$2" == *"🌙 the grove backup agent is a BOX-WIDE fact, and this seat has no root"* ]]' _ "$rc" "$out"
 claim "camper · the decline names what it saw, and that no step is owed" \
@@ -135,7 +135,7 @@ claim "camper · naught is installed" none_installed
 # 4. ground's apply
 ######################################################################
 CAN_SUDO=1
-grove_provision_5_26_backup_provision_upsert >"$fixture/apply.out" 2>&1; rc=$?
+grove_provision_5_27_backup_provision_upsert >"$fixture/apply.out" 2>&1; rc=$?
 claim "ground · the apply exits 0" test "$rc" -eq 0
 claim "ground · the four files land" installed
 claim "ground · the agent is executable, the rest are not" \
@@ -149,7 +149,7 @@ claim "ground · the timer is enabled and started" test "$TIMER_ENABLED $TIMER_A
 # 5. the second apply writes naught
 ######################################################################
 : >"$LOG"
-out="$(grove_provision_5_26_backup_provision_upsert 2>&1)"; rc=$?
+out="$(grove_provision_5_27_backup_provision_upsert 2>&1)"; rc=$?
 claim "converged · the second apply reads ✔ and exits 0" \
   bash -c '[[ "$1" -eq 0 && "$2" == *"match this checkout, and the timer is enabled ✔"* ]]' _ "$rc" "$out"
 claim "converged · it asks no root" bash -c '! grep -q "^sudo" "$1"' _ "$LOG"
@@ -158,7 +158,7 @@ snap_converged="$out"
 # the camper seat on a box ground already converged: the common state at boot. it verifies
 #   alone, never a decline that reads as a failure, and asks no root
 CAN_SUDO=0; : >"$LOG"
-out="$(grove_provision_5_26_backup_provision_upsert 2>&1)"; rc=$?
+out="$(grove_provision_5_27_backup_provision_upsert 2>&1)"; rc=$?
 claim "camper, converged · reads ✔ and exits 0, with no root" \
   bash -c '[[ "$1" -eq 0 && "$2" == *"match this checkout, and the timer is enabled ✔"* ]]' _ "$rc" "$out"
 claim "camper, converged · never a 🌙 decline" bash -c '[[ "$1" != *"🌙"* ]]' _ "$out"
@@ -200,7 +200,7 @@ claim "agent · a pass as root is refused, exit 2, and writes no status" \
 ######################################################################
 snap_verify=""
 verify() {
-  grove_provision_5_26_backup_provision_verify >"$fixture/verify.out" 2>&1
+  grove_provision_5_27_backup_provision_verify >"$fixture/verify.out" 2>&1
   local rc=$?
   snap_verify+="# verify (exit $rc)"$'\n'"$(cat "$fixture/verify.out")"$'\n\n'
   return "$rc"
@@ -258,7 +258,7 @@ verify; rc=$?
 claim "verify · the files match but the timer is off · ✋ NOT ENROLLED, both states named, rc 1" \
   test "$rc" -eq 1 -a "$(grep -cxF '   ✋ ConstraintError: grove backup · NOT ENROLLED · timer is inactive, disabled' "$fixture/verify.out")" -eq 1
 claim "verify · the timer arm names the apply as its fix" \
-  test "$(grep -cxF '      └─ fix: rhx grove.provision --what 5.26.backup --mode apply' "$fixture/verify.out")" -eq 1
+  test "$(grep -cxF '      └─ fix: rhx grove.provision --what 5.27.backup --mode apply' "$fixture/verify.out")" -eq 1
 
 # an installed file is absent: the box was never enrolled, or lost a file since
 mv "$ROOT/etc/systemd/system/grove-backup.service" "$fixture/service.aside"
@@ -266,7 +266,7 @@ verify; rc=$?
 claim "verify · an installed file is absent · ✋ NOT ENROLLED, rc 1" \
   test "$rc" -eq 1 -a "$(grep -cxF '   ✋ ConstraintError: grove backup · NOT ENROLLED' "$fixture/verify.out")" -eq 1
 claim "verify · the absent arm names the apply as its fix, and reads no timer" \
-  bash -c '[[ "$(grep -cxF "      └─ fix: rhx grove.provision --what 5.26.backup --mode apply" "$1")" -eq 1 && "$(grep -c "timer is" "$1")" -eq 0 ]]' _ "$fixture/verify.out"
+  bash -c '[[ "$(grep -cxF "      └─ fix: rhx grove.provision --what 5.27.backup --mode apply" "$1")" -eq 1 && "$(grep -c "timer is" "$1")" -eq 0 ]]' _ "$fixture/verify.out"
 
 ######################################################################
 # the apply's failure arms — each names what stays live, and never prints the ✔ row
@@ -276,7 +276,7 @@ snap_fail=""
 fail_arm() {
   local label="$1" rc
   ROOT="$fixture/root.fail"; rm -rf "$ROOT"; TIMER_ENABLED=disabled TIMER_ACTIVE=inactive; : >"$LOG"
-  grove_provision_5_26_backup_provision_upsert >"$fixture/fail.out" 2>&1; rc=$?
+  grove_provision_5_27_backup_provision_upsert >"$fixture/fail.out" 2>&1; rc=$?
   snap_fail+="# $label (exit $rc)"$'\n'"$(cat "$fixture/fail.out")"$'\n\n'
   return "$rc"
 }
@@ -297,10 +297,10 @@ claim "fail · enable · rc 1, and names that the work has one copy" \
 claim "fail · enable · never the started row" bash -c '! grep -qF "enabled and started" "$1"' _ "$fixture/fail.out"
 
 # the checkout lacks a source: the runtime's own files list, one row pointed at naught
-eval "$(declare -f grove_provision_5_26_backup_files | sed '1s/grove_provision_5_26_backup_files/files_whole/')"
-grove_provision_5_26_backup_files() { files_whole | awk -F'\t' -v a="$fixture/absent" 'BEGIN { OFS = "\t" } NR == 1 { $1 = a "/grove-backup" } { print }'; }
+eval "$(declare -f grove_provision_5_27_backup_files | sed '1s/grove_provision_5_27_backup_files/files_whole/')"
+grove_provision_5_27_backup_files() { files_whole | awk -F'\t' -v a="$fixture/absent" 'BEGIN { OFS = "\t" } NR == 1 { $1 = a "/grove-backup" } { print }'; }
 fail_arm "upsert, a checkout that lacks the agent"; rc=$?
-eval "$(declare -f files_whole | sed '1s/files_whole/grove_provision_5_26_backup_files/')"
+eval "$(declare -f files_whole | sed '1s/files_whole/grove_provision_5_27_backup_files/')"
 claim "fail · absent source · rc 1, named as an incomplete checkout" \
   bash -c '[[ "$1" -eq 1 ]] && grep -qF "💥 MalfunctionError: no grove-backup at" "$2" && grep -qF "own checkout is incomplete" "$2"' _ "$rc" "$fixture/fail.out"
 claim "fail · absent source · naught is installed" bash -c '! grep -q "^sudo install" "$1"' _ "$LOG"

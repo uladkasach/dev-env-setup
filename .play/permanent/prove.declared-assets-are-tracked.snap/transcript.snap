@@ -24,8 +24,8 @@
    ├─ ✔ src/grove.provision/4.terminal/4.3.kitty/4.3.2.emulator
    ├─ ✔ src/grove.provision/4.terminal/4.5.nvim
    ├─ ✔ src/grove.provision/4.terminal/4.6.pqiv/pqivrc
-   ├─ ✔ src/grove.provision/5.devtools/5.26.backup
-   ├─ ✔ src/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh
+   ├─ ✔ src/grove.provision/5.devtools/5.27.backup
+   ├─ ✔ src/grove.provision/5.devtools/5.27.backup/grove.backup.operations.sh
    ├─ ✔ src/grove.provision/5.devtools/5.6.aws/aws-cli-team.pgp
    ├─ ✔ src/grove.provision/5.devtools/5.6.aws/ssm-plugin-signer.pgp
    ├─ ✔ src/machine/machine_power_profile_sync

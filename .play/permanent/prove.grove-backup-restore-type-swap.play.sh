@@ -20,7 +20,7 @@
 set -u
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-BUNDLE="$HERE/src/grove.provision/5.devtools/5.26.backup"
+BUNDLE="$HERE/src/grove.provision/5.devtools/5.27.backup"
 
 fixture="$(mktemp -d)"
 trap 'rm -rf "$fixture"' EXIT

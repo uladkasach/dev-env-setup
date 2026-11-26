@@ -50,8 +50,8 @@ get_help() {
 #   is pushed with no .git, so git finds no repo there and the source path collapses
 #   to /src/… (📜 2026-11-20, both groves: the restore died before its first row)
 GET_ROOT="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../../../.." && pwd)"
-# shellcheck source=../../../../src/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh
-source "$GET_ROOT/src/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh" || {
+# shellcheck source=../../../../src/grove.provision/5.devtools/5.27.backup/grove.backup.operations.sh
+source "$GET_ROOT/src/grove.provision/5.devtools/5.27.backup/grove.backup.operations.sh" || {
   echo "💥 MalfunctionError: could not load grove.backup.operations.sh under $GET_ROOT" >&2; exit 1; }
 
 ######################################################################
@@ -80,7 +80,7 @@ get_status() {
     if [[ -z "$enrolled" ]]; then
       local seat_note=""
       sudo -n true 2>/dev/null || seat_note=", from the seat with sudo (ground); this seat holds none"
-      echo "      └─ fix: rhx grove.provision --what 5.26.backup --mode apply$seat_note"
+      echo "      └─ fix: rhx grove.provision --what 5.27.backup --mode apply$seat_note"
     fi
     return 0
   fi

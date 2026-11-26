@@ -26,15 +26,15 @@
 
 # verify (exit 1)
    ✋ ConstraintError: the installed <fixture>/root/etc/systemd/system/grove-backup.timer DIFFERS from this checkout
-      ├─ read the drift: diff <fixture>/src/grove.provision/5.devtools/5.26.backup/grove-backup.timer <fixture>/root/etc/systemd/system/grove-backup.timer
-      └─ fix: rhx grove.provision --what 5.26.backup --mode apply
+      ├─ read the drift: diff <fixture>/src/grove.provision/5.devtools/5.27.backup/grove-backup.timer <fixture>/root/etc/systemd/system/grove-backup.timer
+      └─ fix: rhx grove.provision --what 5.27.backup --mode apply
    💥 MalfunctionError: grove backup · STALE · never
       └─ read the runs, as ground: sudo journalctl -u grove-backup --since -12h
 
 # verify (exit 1)
    ✋ ConstraintError: grove backup · NOT ENROLLED · timer is inactive, disabled
-      └─ fix: rhx grove.provision --what 5.26.backup --mode apply
+      └─ fix: rhx grove.provision --what 5.27.backup --mode apply
 
 # verify (exit 1)
    ✋ ConstraintError: grove backup · NOT ENROLLED
-      └─ fix: rhx grove.provision --what 5.26.backup --mode apply
+      └─ fix: rhx grove.provision --what 5.27.backup --mode apply

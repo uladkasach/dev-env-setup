@@ -97,7 +97,7 @@ boot_resume_line() {
   #   where `keep` would skip the very step that failed (the tailnet trust halt)
   [[ -n "${BOOT_RESUME_TRUST:-}" ]] && trust="$BOOT_RESUME_TRUST"
   # --what rides along: a resume without it converges the WHOLE tree, where the
-  #   human asked for one bundle (measured 2026-11-22: a 5.26.backup boot's step-1
+  #   human asked for one bundle (measured 2026-11-22: a 5.27.backup boot's step-1
   #   halt printed a resume that would have applied every bundle)
   printf '%s git.grove.provision boot %s --mode apply --from %s --trust %s%s' "$RHX" "$GROVE" "$step" "$trust" "${WHAT:+ --what $WHAT}"
 }

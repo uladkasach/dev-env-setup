@@ -15,7 +15,7 @@ only campers need backups
 
 ## .landed
 
-- `src/grove.provision/5.devtools/5.26.backup/` — `grove-backup.service`, the walk, the agent
+- `src/grove.provision/5.devtools/5.27.backup/` — `grove-backup.service`, the walk, the agent
 - `term=grove.backup._.choice.reason.md` — the invariant
 - `5.1.execution.from_vision.yield.md` — the narrowed scope
 - ahbode/infrastructure#99 — ask 3 withdrawn

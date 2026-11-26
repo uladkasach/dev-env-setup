@@ -22,7 +22,7 @@ its kind is one of:
 - `home` — `~/.claude` or `~/.rhachet`, packed as plain files
 
 ## .refs
-- src/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh   # grove_backup_units_walk, grove_backup_key_unit
+- src/grove.provision/5.devtools/5.27.backup/grove.backup.operations.sh   # grove_backup_units_walk, grove_backup_key_unit
 - .agent/repo=.this/role=any/skills/grove.backup.get.sh                   # `--from <grove> --list` lists them
 
 ## .reason

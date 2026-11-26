@@ -18,20 +18,20 @@
 #   - READ-ONLY. the camper seat runs it with no sudo; every read is world-readable
 ######################################################################
 
-grove_provision_5_26_backup_provision_verify() {
-  if ! grove_provision_5_26_backup_applies; then
+grove_provision_5_27_backup_provision_verify() {
+  if ! grove_provision_5_27_backup_applies; then
     echo "   🌙 a ${GROVE_ENV_SERVER:-（underived）} box holds no camp aws identity, so no grant can reach the backup bucket"
     return 0
   fi
 
   # shellcheck source=./grove.backup.operations.sh
-  source "$GROVE_SRC/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh" || {
+  source "$GROVE_SRC/grove.provision/5.devtools/5.27.backup/grove.backup.operations.sh" || {
     echo "   💥 MalfunctionError: could not load grove.backup.operations.sh from this checkout" >&2
     return 1
   }
 
   # the fix names the seat that can make it: a seat with no sudo cannot enroll a root unit
-  local failed=0 fix="rhx grove.provision --what 5.26.backup --mode apply"
+  local failed=0 fix="rhx grove.provision --what 5.27.backup --mode apply"
   pkg_can_sudo || fix="$fix, from the seat with sudo (ground); this seat holds none"
 
   ####################################################################
@@ -45,7 +45,7 @@ grove_provision_5_26_backup_provision_verify() {
     echo "      ├─ read the drift: diff $src $dst" >&2
     echo "      └─ fix: $fix" >&2
     failed=1
-  done < <(grove_provision_5_26_backup_files)
+  done < <(grove_provision_5_27_backup_files)
 
   if [[ "$absent" -eq 1 ]]; then
     echo "   ✋ ConstraintError: grove backup · NOT ENROLLED" >&2

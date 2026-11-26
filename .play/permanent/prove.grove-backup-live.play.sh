@@ -53,13 +53,13 @@ checkout="$HOME/git/more/dev-env-setup"
 cd "$checkout" || { echo "   💥 MalfunctionError: no checkout at $checkout — boot pushes it there"; exit 1; }
 
 grove="$(cat /etc/grove/name 2>/dev/null)"
-[[ -n "$grove" ]] || { echo "   💥 MalfunctionError: /etc/grove/name is empty — 5.26.backup declares it"; exit 1; }
+[[ -n "$grove" ]] || { echo "   💥 MalfunctionError: /etc/grove/name is empty — 5.27.backup declares it"; exit 1; }
 echo "   ├─ grove: $grove"
 
 # ── a pass at work: wait for it, bounded, so the claims read a settled pass
 # .why a box's first pass packs every tree, and on a full box it runs past an hour
 # shellcheck source=/dev/null
-source "$checkout/src/grove.provision/5.devtools/5.26.backup/grove.backup.operations.sh"
+source "$checkout/src/grove.provision/5.devtools/5.27.backup/grove.backup.operations.sh"
 wait_secs="${GROVE_BACKUP_LIVE_WAIT_SECS:-10800}"
 waited=0
 # .why wait for ONE pass to end, never for an idle unit: on a busy box the timer
