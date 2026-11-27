@@ -1102,13 +1102,13 @@ unset -f systemctl
 ######################################################################
 # admit — the writer asks the reader's own question, of the reader's own set (peer i013)
 #   the agent's own pass over a seat, never a pack call with a path no pass would hand it:
-#   each unit either lands and lays, or its pack refuses, named
+#   each unit lands and lays; a name no restore can lay is cut from it, named
 ######################################################################
 admit_failed_before="$failed"
 BUCKET="$fixture/bucket.odd"; STATE="$fixture/state.odd"; mkdir -p "$BUCKET" "$STATE"
 HOME_ROOT="$fixture/odd"; odd="$HOME_ROOT/$ME"
 nl_name=$'line\nbreak.txt'
-# a home unit that holds a name with a newline: the restore would refuse it whole
+# a home unit that holds a name with a newline: no restore can lay it, so the pack cuts it
 mkdir -p "$odd/.claude/projects/p" && printf '{"line":1}\n' >"$odd/.claude/projects/p/s.jsonl"
 printf 'odd\n' >"$odd/.claude/projects/p/$nl_name"
 # a home unit that holds a name whose first byte is a dash: it lays
@@ -1132,20 +1132,21 @@ mkdir -p "$odd_or/$(dirname "$transcript_rel")"
 printf 'gitdir: %s\n' "$fixture/nowhere" >"$odd_or/.git"
 printf '{"line":1,"text":"an orphan with its gitfile"}\n' >"$odd_or/$transcript_rel"
 run
-odd_why() { jq -r --arg u "$1" '.failures[] | select(.unit | endswith($u)) | .why' "$STATE/status.json"; }
-claim "admit · a home unit with a newline name: the pack refuses it, named" \
-  bash -c '[[ "$1" == "a restore would refuse this unit: "*newline* ]]' _ "$(odd_why home=.claude)"
-claim "admit · a refused home unit is never put" test -z "$(key_of home=.claude)"
-claim "admit · a tree with a newline name under an untracked dir: the pack refuses it, named" \
-  bash -c '[[ "$1" == "a restore would refuse this unit: "*newline* ]]' _ "$(odd_why repo=widget/tree=widget)"
-claim "admit · a refused tree is never put" test -z "$(key_of repo=widget/tree=widget)"
-claim "admit · exactly those two fail" test "$(status .failed)" -eq 2
+# a name no restore can lay is cut from its unit, never the unit itself: one stray temp name
+#   once failed a whole tree, every pass (prove.grove-backup-packs-past-a-stray-file)
+admit_cut() { [[ -n "$1" ]] && ! tar -tzf "$1" | grep -q 'break\.txt'; }
+claim "admit · a home unit with a newline name lands, that one name cut" admit_cut "$(key_of home=.claude)"
+claim "admit · a tree with a newline name under an untracked dir lands, that one name cut" \
+  admit_cut "$(key_of repo=widget/tree=widget)"
+claim "admit · no unit fails over a stray name" test "$(status .failed)" -eq 0
 claim "admit · a home unit with a dash-first name lands" test -n "$(key_of home=.rhachet)"
 claim "admit · a set-aside with its gitfile lands" test -n "$(key_of 'setaside=widget.old*')"
 claim "admit · an orphan with its gitfile lands" test -n "$(key_of orphan=widget.broken)"
 odd_fresh="$fixture/odd.fresh/$ME"; mkdir -p "$odd_fresh"
 ( HOME="$odd_fresh"; restore_main --from grove-1 --all ) >"$fixture/out.odd" 2>&1
 odd_fsa="$(find "$odd_fresh/git/acme/_setaside/widget" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -n 1)"
+claim "admit · the newline unit's peer file lays" cmp -s "$odd/.claude/projects/p/s.jsonl" "$odd_fresh/.claude/projects/p/s.jsonl"
+claim "admit · the tree with a newline name lays" test -d "$odd_fresh/git/acme/widget/.git"
 claim "admit · the dash-first home file lays" cmp -s "$odd/.rhachet/meter/-dash.txt" "$odd_fresh/.rhachet/meter/-dash.txt"
 claim "admit · the set-aside's transcript lays" cmp -s "$odd_sa/$transcript_rel" "$odd_fsa/$transcript_rel"
 claim "admit · the set-aside's dash-first file lays" cmp -s "$odd_sa/-dash.md" "$odd_fsa/-dash.md"

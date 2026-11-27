@@ -1200,6 +1200,52 @@ grove_backup_pack_excludes() {
 }
 
 ######################################################################
+# .what = the top-most path under <path> whose name a restore cannot lay → unit-relative,
+#   NUL-separated, on stdout; each named once on stderr as a ⚠️
+#
+# 🛑 .why cut the one name, never fail the unit: a restore refuses a unit that lays a name
+#   with a newline (grove_backup_unit_rel_is_valid), so the old pass failed the WHOLE tree,
+#   every pass, over one stray temp file — and its unpushed work rode out on no pass at all
+# .why `-prune` at the match: a dir so named is cut whole, so no name below it need be asked
+# .why each is printed with every odd byte as `?`: the raw name would break the line a human reads
+######################################################################
+grove_backup_unlayable_cuts() {
+  local path="$1" label="$2" rel
+  (cd "$path" && find . -mindepth 1 \( -path ./.git -o -name node_modules \) -prune \
+    -o -name $'*\n*' -prune -printf '%P\0' 2>/dev/null) \
+    | while IFS= read -r -d '' rel; do
+        printf '%s\0' "$rel"
+        echo "   ⚠️ $label · '$(printf '%s' "$rel" | tr '\n' '?' | tr -c '[:print:]' '?')' has a newline in its name; a restore cannot lay it, so it does not ride" >&2
+      done
+}
+
+######################################################################
+# .what = did tar fail only because files it was told to read are gone since it was told?
+#   rc 0 = yes, each named once on stderr as a ⚠️ · 1 = some other fault, or a path still there
+#
+# .why a busy tree deletes as it is read: a test removes its temp file, a build swaps its dir.
+#   tar lists it, the file goes, tar exits 2 on "Cannot stat". that file is no longer work, so
+#   it is no fault; one retry raced the same churn and lost, again and again (📜 2026-11-26)
+# 🛑 .why each path is asked of the disk, never taken from the message: a file still present
+#   that tar could not stat (a denied read) is a real fault, and stays one
+######################################################################
+grove_backup_tar_err_is_vanish() {
+  local base="$1" errf="$2" label="$3" line p
+  local -a gone=()
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" || "$line" == "tar: "*" with failure status due to previous errors" ]] && continue
+    [[ "$line" == *": file changed as we read it" || "$line" == *": "[Ff]"ile removed before we read it" ]] && continue
+    [[ "$line" =~ ^tar:\ (.+):\ Cannot\ (stat|open):\ No\ such\ file\ or\ directory$ ]] || return 1
+    p="${BASH_REMATCH[1]#./}"
+    [[ -e "$base/$p" || -L "$base/$p" ]] && return 1
+    gone+=("$p")
+  done <"$errf"
+  [[ "${#gone[@]}" -gt 0 ]] || return 1
+  for p in "${gone[@]}"; do echo "   ⚠️ $label · $p was deleted as it was read; it rides the next pass if it returns" >&2; done
+  return 0
+}
+
+######################################################################
 # the change check — a quiet unit costs a metadata read, never a pack
 ######################################################################
 
@@ -1600,6 +1646,8 @@ grove_backup_pack_tree() {
   grove_backup_staged_secret_cuts "$gb/staged" >>"$work/cuts"
   grove_backup_staged_secret_cuts "$gb/repo" .grove-backup/repo/ >>"$work/cuts"
   while IFS= read -r -d '' rel; do excludes+=("--exclude=$rel"); done <"$work/cuts"
+  # a name a restore cannot lay is cut from the tar alone: the manifest cannot name it either
+  while IFS= read -r -d '' rel; do excludes+=("--exclude=$rel"); done < <(grove_backup_unlayable_cuts "$path" "${path##*/}")
 
   # the disk: this unit's bytes land three times (the tar, the admit's unpack, then its gz),
   #   and must leave the floor free
@@ -1610,7 +1658,8 @@ grove_backup_pack_tree() {
   jq -n \
     --arg kind "$kind" --arg head_sha "$head_sha" --arg head_ref "$head_ref" --arg origin "$origin" \
     --argjson checked "$checked" --argjson pit "$pit" --argjson version "$GROVE_BACKUP_UNIT_VERSION" \
-    --rawfile deletes <(if [[ -n "$head_sha" ]]; then grove_backup_git "$path" diff -z --name-only --no-renames --diff-filter=D HEAD; fi) \
+    --rawfile deletes <(if [[ -n "$head_sha" ]]; then grove_backup_git "$path" diff -z --name-only --no-renames --diff-filter=D HEAD \
+      | while IFS= read -r -d '' rel; do grove_backup_unit_rel_is_valid "$rel" && printf '%s\0' "$rel"; done; fi) \
     --rawfile staged <(cd "$gb/staged" && find . -type f -printf '%P\0' | sort -z) \
     --rawfile cut <(LC_ALL=C sort -zu "$work/cuts") \
     '{ version: $version, kind: $kind,
@@ -1631,8 +1680,9 @@ grove_backup_pack_tree() {
     tar --no-wildcards "${excludes[@]}" -C "$path" --sort=name --numeric-owner \
       -rf "$work/unit.tar" --null -T "$work/files" 2>"$work/tar.err"
     rc=$?
-    # 1 = a file changed as tar read it: the settle check after the pack judges that
-    if [[ "$rc" -ge 2 ]]; then
+    # 1 = a file changed as tar read it: the settle check after the pack judges that.
+    #   a file deleted since it was listed is no longer work, so no fault either
+    if [[ "$rc" -ge 2 ]] && ! grove_backup_tar_err_is_vanish "$path" "$work/tar.err" "${path##*/}"; then
       GROVE_BACKUP_PACK_WHY="tar failed: $(grep -v 'changed as we read it\|removed before we read it' "$work/tar.err" | head -n 1)"
       return 2
     fi
@@ -1692,7 +1742,7 @@ grove_backup_pack_change_is_live() {
 ######################################################################
 grove_backup_pack_home() {
   local home="$1" path="$2" out="$3" kind="$4"
-  local errf="$out.tarerr" gzerr="$out.gzerr" cuts="$out.cuts" stage="$out.stage" tar_rc gz_rc sha
+  local errf="$out.tarerr" gzerr="$out.gzerr" cuts="$out.cuts" stage="$out.stage" tar_rc gz_rc sha rel
   local -a flags changed codes
 
   # the cuts, then the manifest that names them
@@ -1703,6 +1753,8 @@ grove_backup_pack_home() {
     >"$stage/.grove-backup/meta.json" || { GROVE_BACKUP_PACK_WHY="the manifest could not be written"; return 2; }
   touch -d @0 "$stage/.grove-backup/meta.json" "$stage/.grove-backup"
   mapfile -t flags < <(grove_backup_pack_excludes "$home" "$path" "$cuts")
+  # NUL-read, never via the line list above: the name it cuts holds a newline
+  while IFS= read -r -d '' rel; do flags+=("--exclude=./$rel"); done < <(grove_backup_unlayable_cuts "$path" "${path#"$home"/}")
 
   # ⚠️ both exit codes in ONE read: an assignment is a command, so a second
   #   `${PIPESTATUS[1]}` after `tar_rc=${PIPESTATUS[0]}` reads a reset array
@@ -1717,6 +1769,11 @@ grove_backup_pack_home() {
   if [[ "$gz_rc" -ne 0 ]]; then
     GROVE_BACKUP_PACK_WHY="the temp tar could not be written: $(head -n 1 "$gzerr")"
     return 2
+  fi
+  # a file deleted since tar listed it is no longer work: what else tar said is judged below
+  if [[ "$tar_rc" -ge 2 ]] && grove_backup_tar_err_is_vanish "$path" "$errf" "${path#"$home"/}"; then
+    tar_rc=0
+    grep -q 'changed as we read it\|removed before we read it' "$errf" && tar_rc=1
   fi
   if [[ "$tar_rc" -ge 2 ]]; then
     GROVE_BACKUP_PACK_WHY="tar failed: $(grep -v 'changed as we read it\|removed before we read it' "$errf" | head -n 1)"
