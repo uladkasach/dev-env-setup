@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = prove Xvfb and x11vnc are on PATH, and that x11vnc does NOT run
+# .what = prove Xvfb, x11vnc, and xdotool are on PATH, and that x11vnc does NOT run
 #
 # .why the second claim — x11vnc serves a screen over the network; the
 #   install must leave it dormant, so a human starts it per need
@@ -11,7 +11,7 @@
 
 grove_provision_5_20_xvfb_provision_verify() {
   local failed=0 bin
-  for bin in Xvfb x11vnc; do
+  for bin in Xvfb x11vnc xdotool; do
     command -v "$bin" >/dev/null 2>&1 && continue
     echo "   ✋ $bin is absent from PATH" >&2
     echo "      fix: sudo -v && rhx grove.provision --what 5.20.xvfb --mode apply" >&2
@@ -28,5 +28,5 @@ grove_provision_5_20_xvfb_provision_verify() {
     return 1
   fi
 
-  echo "   • Xvfb + x11vnc are present, and x11vnc is dormant ✔"
+  echo "   • Xvfb + x11vnc + xdotool are present, and x11vnc is dormant ✔"
 }

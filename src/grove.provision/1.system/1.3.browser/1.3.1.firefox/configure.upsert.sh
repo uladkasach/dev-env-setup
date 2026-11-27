@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = declare firefox's prefs via `user.js`, and open a tab for each extension
-#         that is genuinely absent
+# .what = declare firefox's prefs via `user.js`, its keybinds via autoconfig, and
+#         its three extensions via a force-install policy
 #
 # .why
 #   - `user.js`, never `prefs.js`: firefox rewrites `prefs.js` on every clean exit
 #   - the profile dir is READ from `profiles.ini`, since its name is generated
-#   - an extension needs a human to accept its prompt, so a tab opens only for
-#     one `extensions.json` does not name
-#   - the ctrl+N rebind runs FIRST: the profile read returns early on a fresh box
+#   - the extensions are a POLICY: `ExtensionSettings` force-installs them at
+#     firefox's next start with no prompt, so no tab and no hand step
+#   - the ctrl+N rebind and the policy run FIRST: both ride the systemconfig
+#     channel, and the profile read returns early on a fresh box
 #
 # guarantee:
 #   - idempotent: `user.js` is overwritten from this file's text
 #   - idempotent: the systemconfig channel is copied from the checkout's assets
-#   - idempotent: a tab opens only for an extension absent from `extensions.json`
+#   - idempotent: `policies.json` is copied from the checkout's assets
 ######################################################################
 
 grove_provision_1_3_1_firefox_configure_upsert() {
@@ -29,7 +30,7 @@ grove_provision_1_3_1_firefox_configure_upsert() {
   local ext_dir="$HOME/.local/share/flatpak/extension/org.mozilla.firefox.systemconfig/x86_64/stable"
   local ff_assets="$GROVE_SRC/grove.provision/1.system/1.3.browser/1.3.1.firefox/firefox"
 
-  if [[ ! -f "$ff_assets/autoconfig.js" || ! -f "$ff_assets/firefox.cfg" || ! -f "$ff_assets/gtk.css" ]]; then
+  if [[ ! -f "$ff_assets/autoconfig.js" || ! -f "$ff_assets/firefox.cfg" || ! -f "$ff_assets/gtk.css" || ! -f "$ff_assets/policies.json" ]]; then
     echo "   ✋ the firefox autoconfig assets are absent from this checkout" >&2
     echo "      looked in: $ff_assets" >&2
     echo "      ⇒ \$GROVE_SRC is this run's OWN src/, so an absent file here is" >&2
@@ -50,6 +51,19 @@ grove_provision_1_3_1_firefox_configure_upsert() {
     echo "   ✋ could not write the systemconfig channel into $ext_dir" >&2
     echo "      ⇒ without both files firefox keeps the linux default alt+N, so" >&2
     echo "        ctrl+2 does not move a tab and reads as a broken keyboard" >&2
+    return 1
+  fi
+
+  ####################################################################
+  # 0a. the extensions — force-installed by policy, through the same channel
+  #   - flatpak firefox reads `/app/etc/firefox/policies/policies.json`, which
+  #     this host dir surfaces; the host's `/etc/firefox/policies` it ignores
+  ####################################################################
+  if mkdir -p "$ext_dir/policies" && cp "$ff_assets/policies.json" "$ext_dir/policies/policies.json"; then
+    echo "   • extension policy declared: 1password, firefox-color, vimium (installed at next firefox start)"
+  else
+    echo "   ✋ could not write $ext_dir/policies/policies.json" >&2
+    echo "      ⇒ without it, the three extensions are never installed on a fresh box" >&2
     return 1
   fi
 
@@ -89,24 +103,24 @@ grove_provision_1_3_1_firefox_configure_upsert() {
   # 1. find the profile — it is generated, so it must be read
   ####################################################################
   local profile_dir
-  profile_dir="$(grep -oP 'Path=\K.*default-release' "$ff_root/profiles.ini" 2>/dev/null)"
+  profile_dir="$(grove_provision_1_3_1_firefox_profile_dir)"
   if [[ -z "$profile_dir" ]]; then
     # 🛑 an absent profile is owed work only where a human can launch the GUI —
     #    elsewhere it can never be met, and a "fix" would loop forever
     #    (rule.require.one-command-provision). the flatpak and ctrl+N above converge
     if [[ "$GROVE_ENV_SERVER" != "local@unix" ]]; then
       echo "   🌙 no firefox profile here, and none is owed"
-      echo "      ⇒ a profile is born of a GUI launch, and the prefs and the three"
-      echo "        extensions below all live inside one. this box has no display"
-      echo "        to launch into and no hand to accept an extension prompt"
+      echo "      ⇒ a profile is born of a GUI launch, and the prefs below live"
+      echo "        inside one. this box has no display to launch into"
       echo "      ⇒ what this bundle converges here is already done above: the"
-      echo "        flatpak itself, and the ctrl+N systemconfig channel"
+      echo "        flatpak itself, the ctrl+N channel, and the extension policy"
       return 0
     fi
 
     echo "   🌙 no firefox profile yet at $ff_root"
     echo "      ⇒ a fresh install creates no profile until firefox is STARTED once."
-    echo "        prefs and extensions both live in the profile, so both are owed."
+    echo "        the prefs live in the profile, so they are owed; the extensions"
+    echo "        arrive by policy at that same first start."
     echo "      fix: open firefox once, then re-drive:"
     echo "        rhx grove.provision --what 1.3.browser --mode apply"
     return 0
@@ -180,67 +194,20 @@ EOF
   esac
 
   ####################################################################
-  # 3. the three extensions a human must accept
-  #
-  # each is opened ONLY when `extensions.json` does not already name it
+  # 3. the desert palette — the one option NO policy or store write reaches
+  #   - firefox color applies a theme from a SHARE url, by a click
+  #   - its storage IS readable, so the step is printed only while owed,
+  #     and the verify reports it ✔ once done
   ####################################################################
-  local addons="$profile/extensions.json"
-  local opened=0
-
-  # 🛑 a tab opens only where a HUMAN can accept its prompt — gated HERE too, since
-  #    a grove can gain a profile (ssh -X, a restored $HOME) and walk past the gate
-  #    above. `local@unix`, never `local@*`: `local@cicd` has no screen
-  if [[ "$GROVE_ENV_SERVER" != "local@unix" ]]; then
-    echo "   🌙 the three extensions are not offered here, and none is owed"
-    echo "      ⇒ each is accepted through a permission prompt mozilla shows on a"
-    echo "        SCREEN; no command can accept one. so a tab opened on this box"
-    echo "        would ask a question with nobody to answer it"
-    return 0
-  fi
-
-  __browser_addon_absent() {
-    # no extensions.json at all ⇒ no addon is accepted yet
-    [[ -f "$addons" ]] || return 0
-    grep -qiF "$1" "$addons" && return 1
-    return 0
-  }
-
-  if __browser_addon_absent '1password'; then
-    "$HOME/.local/bin/browser" \
-      'https://addons.mozilla.org/en-US/firefox/addon/1password-x-password-manager/'
-    echo "   🌙 1password extension is absent — a tab is open; accept it by hand"
-    opened=$(( opened + 1 ))
-  fi
-
-  # the desert palette — a firefox-color SHARE url, inert until that extension
-  # is accepted. ⚠️ whether the THEME is applied lives in extension storage no
-  # file exposes, so it is unprovable; the all-accepted branch prints the url
-  # rather than claim it (rule.forbid.failhide)
+  [[ "$GROVE_ENV_SERVER" == "local@unix" ]] || return 0
   local theme_url='https://color.firefox.com/?theme=XQAAAAIQAQAAAAAAAABBKYhm849SCia2CaaEGccwS-xMDPr_qlXDOMsy5fmNc7qTuOgZgZdB1JimDBY6_wyFhPNbQTHUNdhC5aOH-hbXzzZFdz54UfdCX_Q0U6BYOxbB4cKbN3-x8JbJB-nSYQTDMnJWVFqwFxW6UsMywRqsEjH6xrdahroi3D8vQwbLUkWN2HPFTCEwFJ-BNUTe2qbjSkITKQzctI3TSSXE5trErmv_7LBNAA'
-
-  if __browser_addon_absent 'firefox color'; then
-    "$HOME/.local/bin/browser" \
-      'https://addons.mozilla.org/en-US/firefox/addon/firefox-color/'
-    echo "   🌙 firefox-color extension is absent — a tab is open; accept it by hand"
-    opened=$(( opened + 1 ))
-
-    "$HOME/.local/bin/browser" "$theme_url"
-    echo "      and the desert theme — click 'Yes, apply theme' in that tab"
+  local theme
+  theme="$(grove_provision_1_3_1_firefox_theme_state)"
+  if [[ "$theme" == done ]]; then
+    echo "   • the desert palette is applied ✔"
+    return 0
   fi
-
-  if __browser_addon_absent 'vimium'; then
-    "$HOME/.local/bin/browser" \
-      'https://addons.mozilla.org/en-US/firefox/addon/vimium-ff/'
-    echo "   🌙 vimium extension is absent — a tab is open; accept it by hand"
-    opened=$(( opened + 1 ))
-  fi
-
-  unset -f __browser_addon_absent
-
-  if [[ "$opened" -eq 0 ]]; then
-    echo "   • all three extensions already accepted — no tab opened"
-    echo "     if firefox is not in the desert palette, apply it by hand:"
-    echo "       $theme_url"
-  fi
+  echo "   🌙 owed, once per profile — desert palette: open, then 'Yes, apply theme':"
+  echo "        $theme_url"
   return 0
 }

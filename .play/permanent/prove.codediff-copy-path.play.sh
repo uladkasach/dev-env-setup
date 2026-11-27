@@ -5,8 +5,10 @@
 #
 # .what = drives `prove.codediff-copy-path.probe.lua` against the SHIPPED nvim
 #         config. criteria: codediff.copy-path
-#           control    → file_row dir_row rev_pane plain_buf all hit
+#           control    → file_row dir_row rev_pane plain_buf image_file, and both
+#                        image-diff panes under ctrl+r / ctrl+alt+r / ctrl+super+r, all hit
 #           old-label  → file_row misses: it copies the explorer's label (the defect)
+#                        image_new misses: an unnamed image pane copies naught
 #
 # .the write — `rule.forbid.repair-plays` exception 2. a headless nvim over a temp
 #   git repo, both gone on exit; rows land in a temp dir a trap removes
@@ -50,7 +52,8 @@ echo "🔭 does ctrl+alt+r in a codediff tab copy the file's path?"
 echo ""
 
 if arm control; then
-  for r in file_row dir_row rev_pane plain_buf; do
+  for r in file_row dir_row rev_pane plain_buf image_file \
+           image_old_C-r image_old_C-A-r image_old_C-D-r image_new_C-r image_new_C-A-r image_new_C-D-r; do
     v="$(verdict control "$r")"
     if [[ "$v" == hit ]]; then echo "   │  ✔ $r"; else echo "   │  ✋ $r=${v:-none}"; FAILED=1; fi
   done
@@ -59,6 +62,9 @@ if arm old-label; then
   v="$(verdict old-label file_row)"
   if [[ "$v" == miss ]]; then echo "   │  ✔ file_row misses under the old read, so the clamp bites"
   else echo "   │  ✋ file_row=${v:-none} under the old read — this probe cannot see the defect"; FAILED=1; fi
+  v="$(verdict old-label image_new_C-A-r)"
+  if [[ "$v" == miss ]]; then echo "   │  ✔ image_new_C-A-r misses under the old read, so the image clamp bites"
+  else echo "   │  ✋ image_new_C-A-r=${v:-none} under the old read — this probe cannot see the image defect"; FAILED=1; fi
 fi
 
 echo ""

@@ -953,10 +953,12 @@ end
 --         a file in the tree copied "CodeDiff Explorer [2]" (criteria:
 --         codediff.copy-path)
 --
--- .how  = explorer → the row under the cursor (a file's path, or a directory's
+-- .how  = an image-diff pane → the path it recorded (b:image_diff_path);
+--         explorer → the row under the cursor (a file's path, or a directory's
 --         dir_path), joined onto the explorer's git root; a revision pane → its
 --         own URL's root + path, via codediff's parse_url
 local function get_codediff_abspath()
+  if vim.b.image_diff_path then return vim.b.image_diff_path end
   local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
   local explorer = lc_ok and lifecycle.get_explorer and lifecycle.get_explorer(vim.api.nvim_get_current_tabpage())
   local root = ((explorer and explorer.git_root) or vim.fn.getcwd()):gsub('/+$', '')
@@ -1004,24 +1006,41 @@ local function is_image_diff_path(path)
 end
 
 -- fill one pane: render an image, or show a text label on a blank pane
-local function set_image_diff_pane(win, present, image_mod, img_path, label, winbar)
+--
+-- 🛑 file_path is the REPO file this pane stands for, recorded as
+--    `b:image_diff_path` before any render. the pane is an unnamed scratch
+--    buffer, so `%` is empty — measured 2026-10-25, ctrl+alt+r on an image pane
+--    copied naught. get_codediff_abspath reads this first (criteria:
+--    codediff.copy-path, usecase.5). set before the hijack, so a render that
+--    fails still leaves a pane whose path can be copied.
+local function set_image_diff_pane(win, present, image_mod, img_path, label, winbar, file_path)
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_win_set_buf(win, buf)
   vim.bo[buf].bufhidden = 'wipe'
+  vim.b[buf].image_diff_path = file_path
   vim.wo[win].winbar = winbar
   vim.wo[win].number = false
   vim.wo[win].relativenumber = false
   vim.wo[win].signcolumn = 'no'
+  local img = nil
   if present then
-    -- render the image into this specific window + buffer
-    image_mod.hijack_buffer(img_path, win, buf)
+    -- render the image into this specific window + buffer. a render that
+    -- throws is named on the pane, never allowed to abort the other pane
+    local ok, res = pcall(image_mod.hijack_buffer, img_path, win, buf)
+    if ok then
+      img = res
+    else
+      vim.bo[buf].modifiable = true
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, { '', '  could not render: ' .. vim.split(('%s'):format(res), '\n')[1], '' })
+      vim.bo[buf].modifiable = false
+    end
   else
     -- absent side: a text label on a blank pane
     vim.bo[buf].modifiable = true
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, { '', '  ' .. label, '' })
     vim.bo[buf].modifiable = false
   end
-  return buf
+  return buf, img
 end
 
 -- the pane pair an image diff owns when codediff has NO session to hand it one
@@ -1235,13 +1254,16 @@ local function open_codediff_image_diff(opts)
     end
   end
 
-  local old_buf = set_image_diff_pane(
+  -- each pane stands for the repo file, never the temp blob it renders from
+  local old_buf, old_img = set_image_diff_pane(
     old_win, has_old, image_mod, old_tmp,
-    'no before version (added)', 'before (' .. base .. ')'
+    'no before version (added)', 'before (' .. base .. ')',
+    git_root .. '/' .. old_path
   )
-  local new_buf = set_image_diff_pane(
+  local new_buf, new_img = set_image_diff_pane(
     new_win, has_new, image_mod, abs_new,
-    'no after version (deleted)', 'after (tree)'
+    'no after version (deleted)', 'after (tree)',
+    abs_new
   )
 
   -- delete the temp blob on any close path, not just q
@@ -1270,8 +1292,528 @@ local function open_codediff_image_diff(opts)
 
   -- hand back WHAT WAS PAINTED, so the caller's already-shown guard can key on
   -- the live panes rather than on a second record of its own (m.9).
-  return old_win, new_win, old_buf, new_buf
+  return old_win, new_win, old_buf, new_buf, old_img, new_img
 end
+
+--------------------------------------------------------------------
+-- image diff ZOOM — ctrl+= / ctrl+- magnify both panes of an image diff
+--
+-- .what = a zoom level and a center, per tab. a zoom > 1 crops the SOURCE to
+--         1/zoom of its width and height, around the center, and swaps that
+--         crop into the pane's own image.nvim object. image.nvim then fits the
+--         crop to the pane exactly as it fit the whole — so it reads as a zoom.
+--
+-- .why both panes, in sync = a diff exists to COMPARE. one center, in
+--         normalized coords, lands on the same spot of before and after even
+--         when the two differ in size.
+--
+-- .why swap the source of the SAME image object, never a second image
+--         - `hijack_buffer` caches by win:buf, so a second hijack of one buffer
+--           re-renders the FIRST image and ignores the new path
+--         - a second image on the pane is re-rendered by image.nvim on every
+--           scroll/resize beside the first, so both would paint
+--         - a fresh buffer per zoom would fail the already-shown guard in
+--           open_image_diff_for_selection, and the next refresh would repaint
+--           the pane at 1x
+--         ⇒ one object, its `original_path` pointed at the crop. Image:render
+--           reloads a source whose mtime differs from `last_modified`, so a
+--           sentinel there forces the reload.
+--
+-- .why a fresh temp file per crop = `last_modified` is getftime(), at 1s
+--         grain. two crops written into one path inside a second read as
+--         unchanged, and the second zoom step would never paint.
+--
+-- 🛑 kitty owns ctrl+= / ctrl+- as font size. it hands them to nvim only
+--    while the kitty user var `nvim_image_zoom` is set (4.3.2.emulator/
+--    kitty.conf). nvim sets that var while the current tab shows an image
+--    diff, and clears it on focus loss, suspend, and exit — so outside an
+--    image diff, ctrl+= is still font size, in nvim and out.
+--------------------------------------------------------------------
+local IMAGE_ZOOM_STEPS = { 1, 1.5, 2, 3, 4, 6, 8 }
+
+-- { [tabpage] = { step, cx, cy, panes = { { win, buf, img, src, w, h, crop } } } }
+local image_zoom_by_tab = {}
+
+-- what the zoom and the kitty wire share (the wire half lives in image.nvim's
+-- config, where it wraps the transform and the placement):
+--   pane_by_id   = image internal_id → its zoomed pane (view + band)
+--   band_by_path = held copy path → its record, so the transform hands it to
+--                  kitty as is (a file copy, never a magick pass)
+--   place(id)    = re-emit the image's last placement at its pane's current
+--                  view; false if it has none to re-emit
+local image_zoom_wire = { pane_by_id = {}, band_by_path = {}, place = function() return false end }
+
+-- true if this tab holds a live image diff that zoom can act on
+local function get_image_zoom_live(tabpage)
+  local z = image_zoom_by_tab[tabpage]
+  if not z then return nil end
+  for _, p in ipairs(z.panes) do
+    if vim.api.nvim_win_is_valid(p.win) and vim.api.nvim_win_get_buf(p.win) == p.buf then
+      return z
+    end
+  end
+  image_zoom_by_tab[tabpage] = nil
+  return nil
+end
+
+-- tell the outer kitty whether ctrl+= belongs to nvim. OSC 1337 SetUserVar,
+-- wrapped for tmux passthrough when inside tmux, so the bytes ride the pane →
+-- client tty → (ssh) → kitty. sent only on change.
+--
+-- .why the VALUE names the transport (`tmux` | `bare`), never a bare "1"
+--   kitty must encode the key differently for each (see kitty.conf), and only
+--   nvim knows for a fact which one it sits behind. kitty's own `var:in_tmux`
+--   is written by tmux hooks a long-lived tmux server may never have loaded —
+--   measured 2026-10-25: a local server on an older conf, no `client-attached`
+--   hook, so `in_tmux` stayed unset while nvim ran inside that very tmux.
+local image_zoom_var_last = nil
+local function set_image_zoom_kitty_var(on)
+  if image_zoom_var_last == on then return end
+  image_zoom_var_last = on
+  if #vim.api.nvim_list_uis() == 0 then return end
+  local value = ''
+  if on then value = vim.env.TMUX and 'dG11eA==' or 'YmFyZQ==' end -- base64 'tmux' | 'bare'
+  local seq = '\027]1337;SetUserVar=nvim_image_zoom=' .. value .. '\007'
+  if vim.env.TMUX then
+    seq = '\027Ptmux;' .. seq:gsub('\027', '\027\027') .. '\027\\'
+  end
+  pcall(function() io.stdout:write(seq); io.stdout:flush() end)
+end
+
+-- re-derive the var from the live tab: on while an image diff is shown here
+local function sync_image_zoom_kitty_var()
+  set_image_zoom_kitty_var(get_image_zoom_live(vim.api.nvim_get_current_tabpage()) ~= nil)
+end
+
+-- point one pane's image object at a new source and repaint it
+local function set_image_pane_source(img, path)
+  img.original_path = path
+  img.path = path
+  img.last_modified = -2 -- sentinel ≠ any getftime(); forces Image:render to reload
+  img:render()
+end
+
+-- the pane's drawable size in PIXELS: its cells × the terminal's cell size
+local function get_image_zoom_pane_px(win)
+  local ok, term = pcall(require, 'image/utils/term')
+  local size = ok and term.get_size() or nil
+  local cw = size and size.cell_width or 8
+  local ch = size and size.cell_height or 16
+  local rows = vim.api.nvim_win_get_height(win)
+  return vim.api.nvim_win_get_width(win) * cw, rows * ch
+end
+
+-- the VIEW a zoom shows, in pixels of the zoomed page: magnify the fit by `zoom`
+-- around (cx, cy), and keep what lands inside the pane
+--
+-- 🛑 the view takes the PANE's shape, never the image's. measured 2026-10-26: a
+--    1300x5865 invoice in a 136x68-cell pane fits by height, ~30 cells wide.
+--    a crop of 1/zoom of BOTH axes kept that shape, so every step painted the
+--    same thin strip — magnified, never wider. a viewer zooms the other way:
+--    the picture grows until it meets the pane edge, and only what overflows
+--    is cut. so a tall page widens with each step until it fills the width.
+local function get_image_zoom_view(pane, zoom, cx, cy)
+  local pw, ph = get_image_zoom_pane_px(pane.win)
+  local s = math.min(pw / pane.w, ph / pane.h) * zoom
+  local sw, sh = math.max(1, math.floor(pane.w * s)), math.max(1, math.floor(pane.h * s))
+  local vw, vh = math.min(pw, sw), math.min(ph, sh)
+  return {
+    s = s, sw = sw, sh = sh, w = vw, h = vh,
+    x = math.max(0, math.min(sw - vw, math.floor(cx * sw - vw / 2))),
+    y = math.max(0, math.min(sh - vh, math.floor(cy * sh - vh / 2))),
+  }
+end
+
+-- the WHOLE image, sent to kitty ONCE per zoom: every zoom step and every pan
+-- after that is a placement — a source rect of that one image, drawn into a
+-- cell box (c,r) that kitty scales it to. no magick, no transmit
+--
+-- 🛑 the source does not change between steps, so nor may the bytes on the wire.
+--    measured 2026-10-26, a grove duct: each zoom step and each j/k cut a fresh
+--    png (a magick decode + encode, then image.nvim's own magick pass), which
+--    image.nvim read as a new image and sent whole, base64 through tmux and ssh.
+--    every step was a slow load, and a crop at painted size upscaled the page ~9x
+--    — bytes the source never had. a wider view is more cells over a bigger rect
+--    of the SAME image; kitty draws that with no new data
+--
+-- .the held copy = the source file itself, copied byte for byte when it is a png
+--    inside the budget (no decode). all else — another format, or a source past
+--    the budget — is converted ONCE, on the first zoom, and kept until the pane
+--    dies
+--
+-- .the budget = pixels on the wire. over ssh a send is base64 through tmux; on a
+--    local box kitty reads the file. a 1300x5865 invoice is 7.6M px. a side past
+--    16384 px is also cut down, the common gpu texture limit
+--
+-- .1x stays image.nvim's own fitted render: a 4x+ downscale by kitty's sampler
+--    would alias text that magick's resize keeps clean
+local IMAGE_ZOOM_HELD_PIXELS = (vim.env.SSH_CLIENT or vim.env.SSH_TTY) and 12000000 or 24000000
+local IMAGE_ZOOM_HELD_SIDE = 16384
+
+-- the held copy of a pane's source, cut once; nil if it cannot be made
+local function gen_image_zoom_held(pane)
+  if pane.held then return pane.held end
+  local f = math.min(1,
+    math.sqrt(IMAGE_ZOOM_HELD_PIXELS / (pane.w * pane.h)),
+    IMAGE_ZOOM_HELD_SIDE / math.max(pane.w, pane.h))
+  local held = {
+    pw = math.max(1, math.floor(pane.w * f)), ph = math.max(1, math.floor(pane.h * f)),
+    path = vim.fn.tempname() .. '.png',
+  }
+  local fd = io.open(pane.src, 'rb')
+  local magic = fd and fd:read(8)
+  if fd then fd:close() end
+  if f >= 1 and magic == '\137PNG\r\n\26\n' then
+    if not vim.uv.fs_copyfile(pane.src, held.path) then return nil end
+  else
+    local bin = vim.fn.executable('magick') == 1 and 'magick' or 'convert'
+    local res = vim.system({
+      bin, pane.src .. '[0]', '-resize', ('%dx%d!'):format(held.pw, held.ph), 'png:' .. held.path,
+    }):wait()
+    if res.code ~= 0 then
+      vim.notify('image zoom: copy failed — ' .. (res.stderr or ''), vim.log.levels.WARN)
+      return nil
+    end
+  end
+  pane.held = held
+  image_zoom_wire.band_by_path[held.path] = held
+  return held
+end
+
+-- drop a pane's held copy: its file, and its record on the wire
+local function del_image_zoom_band(p)
+  if p.img then image_zoom_wire.pane_by_id[p.img.internal_id] = nil end
+  if p.held then
+    image_zoom_wire.band_by_path[p.held.path] = nil
+    pcall(os.remove, p.held.path)
+  end
+  p.held, p.band, p.view = nil, nil, nil
+end
+
+-- repaint every pane of this tab's image diff at its current zoom + center
+local function set_image_zoom_render(z)
+  local zoom = IMAGE_ZOOM_STEPS[z.step]
+  for _, p in ipairs(z.panes) do
+    if vim.api.nvim_win_is_valid(p.win) and vim.api.nvim_win_get_buf(p.win) == p.buf then
+      p.region = nil
+      if zoom == 1 then
+        if p.band then
+          image_zoom_wire.pane_by_id[p.img.internal_id] = nil
+          p.band, p.view = nil, nil
+          set_image_pane_source(p.img, p.src)
+        end
+      else
+        local v = get_image_zoom_view(p, zoom, z.cx, z.cy)
+        p.view = v
+        p.span_x, p.span_y = v.w / v.sw, v.h / v.sh
+        p.region = ('%dx%d+%d+%d'):format(
+          math.floor(v.w / v.s), math.floor(v.h / v.s), math.floor(v.x / v.s), math.floor(v.y / v.s))
+        image_zoom_wire.pane_by_id[p.img.internal_id] = p
+        if p.band and p.img.original_path == p.band.path and image_zoom_wire.place(p.img.internal_id) then
+          -- placement only: kitty already holds the whole image
+        else
+          local held = gen_image_zoom_held(p)
+          if held then
+            p.band = held
+            set_image_pane_source(p.img, held.path)
+          end
+        end
+      end
+    end
+  end
+  local label = zoom == 1 and '' or (' 🔍 ' .. zoom .. 'x')
+  for _, p in ipairs(z.panes) do
+    if vim.api.nvim_win_is_valid(p.win) then
+      vim.wo[p.win].winbar = p.winbar .. label
+    end
+  end
+end
+
+-- step the zoom by delta (+1 in, -1 out); 0 resets to 1x and recenters
+local function set_image_zoom_step(delta)
+  local z = get_image_zoom_live(vim.api.nvim_get_current_tabpage())
+  if not z then return end
+  local step = delta == 0 and 1 or math.max(1, math.min(#IMAGE_ZOOM_STEPS, z.step + delta))
+  if delta == 0 then z.cx, z.cy = 0.5, 0.5 end
+  if step == z.step and delta ~= 0 then return end
+  z.step = step
+  set_image_zoom_render(z)
+end
+
+-- pan the zoom window by `frac` of its own span (a key or a wheel notch: a
+-- quarter; ctrl+d/u: a half), per axis. a view that spans the whole of an axis (a tall
+-- page, zoomed until it fits the width) has naught to pan along it, so that
+-- axis holds still
+local function set_image_zoom_pan(dx, dy, frac)
+  frac = frac or 0.25
+  local z = get_image_zoom_live(vim.api.nvim_get_current_tabpage())
+  if not z or z.step == 1 then return end
+  local sx, sy = 0, 0
+  for _, p in ipairs(z.panes) do
+    sx = math.max(sx, p.span_x or 0)
+    sy = math.max(sy, p.span_y or 0)
+  end
+  if sx == 0 or sy == 0 then return end
+  local function step(c, d, span)
+    local half = span / 2
+    if half >= 0.5 then return 0.5 end
+    return math.max(half, math.min(1 - half, c + d * span * frac))
+  end
+  z.cx = step(z.cx, dx, sx)
+  z.cy = step(z.cy, dy, sy)
+  set_image_zoom_render(z)
+end
+
+-- jump the zoomed view to an edge: gg = the top, G = the bottom (x holds)
+local function set_image_zoom_jump(cy)
+  local z = get_image_zoom_live(vim.api.nvim_get_current_tabpage())
+  if not z or z.step == 1 then return end
+  local sy = 0
+  for _, p in ipairs(z.panes) do sy = math.max(sy, p.span_y or 0) end
+  local half = math.min(0.5, sy / 2)
+  z.cy = cy > 0.5 and (1 - half) or half
+  set_image_zoom_render(z)
+end
+
+-- record the panes of a fresh image diff render, at 1x. a pane with no image
+-- (the absent side of an add/delete) is left out — naught there to zoom.
+local function set_image_zoom_panes(tabpage, panes)
+  for _, p in ipairs((image_zoom_by_tab[tabpage] or { panes = {} }).panes) do
+    del_image_zoom_band(p)
+  end
+  local kept = {}
+  for _, p in ipairs(panes) do
+    if p.img and p.img.image_width and p.img.image_height then
+      kept[#kept + 1] = {
+        win = p.win, buf = p.buf, img = p.img, src = p.img.original_path,
+        w = p.img.image_width, h = p.img.image_height,
+        winbar = vim.wo[p.win].winbar, band = nil,
+      }
+      -- pan keys live on the image panes; ctrl+=/- are global (see below)
+      local o = { buffer = p.buf, nowait = true, silent = true }
+      vim.keymap.set('n', 'h', function() set_image_zoom_pan(-1, 0) end, vim.tbl_extend('force', o, { desc = 'image zoom: pan left' }))
+      vim.keymap.set('n', 'l', function() set_image_zoom_pan(1, 0) end, vim.tbl_extend('force', o, { desc = 'image zoom: pan right' }))
+      vim.keymap.set('n', 'k', function() set_image_zoom_pan(0, -1) end, vim.tbl_extend('force', o, { desc = 'image zoom: pan up' }))
+      vim.keymap.set('n', 'j', function() set_image_zoom_pan(0, 1) end, vim.tbl_extend('force', o, { desc = 'image zoom: pan down' }))
+      vim.keymap.set('n', '<C-d>', function() set_image_zoom_pan(0, 1, 0.5) end, vim.tbl_extend('force', o, { desc = 'image zoom: half view down' }))
+      vim.keymap.set('n', '<C-u>', function() set_image_zoom_pan(0, -1, 0.5) end, vim.tbl_extend('force', o, { desc = 'image zoom: half view up' }))
+      vim.keymap.set('n', 'G', function() set_image_zoom_jump(1) end, vim.tbl_extend('force', o, { desc = 'image zoom: to the bottom' }))
+      vim.keymap.set('n', 'gg', function() set_image_zoom_jump(0) end, vim.tbl_extend('force', o, { desc = 'image zoom: to the top' }))
+      vim.keymap.set('n', '0', function() set_image_zoom_step(0) end, vim.tbl_extend('force', o, { desc = 'image zoom: reset' }))
+      vim.keymap.set('n', '+', function() set_image_zoom_step(1) end, vim.tbl_extend('force', o, { desc = 'image zoom: in' }))
+      vim.keymap.set('n', '-', function() set_image_zoom_step(-1) end, vim.tbl_extend('force', o, { desc = 'image zoom: out' }))
+      vim.api.nvim_create_autocmd('BufWipeout', {
+        buffer = p.buf,
+        once = true,
+        callback = function()
+          for _, q in ipairs((image_zoom_by_tab[tabpage] or { panes = {} }).panes) do
+            if q.buf == p.buf then del_image_zoom_band(q) end
+          end
+        end,
+      })
+    end
+  end
+  image_zoom_by_tab[tabpage] = #kept > 0 and { step = 1, cx = 0.5, cy = 0.5, panes = kept } or nil
+  sync_image_zoom_kitty_var()
+end
+
+-- ctrl+= / ctrl+- anywhere on a tab that shows an image diff (tree focus
+-- included — that is where focus rests after a select). on any other tab,
+-- kitty never sends them here, since the var is off.
+vim.keymap.set('n', '<C-=>', function() set_image_zoom_step(1) end, { desc = 'image diff: zoom in' })
+vim.keymap.set('n', '<C-->', function() set_image_zoom_step(-1) end, { desc = 'image diff: zoom out' })
+
+-- the mouse wheel pans a zoomed image diff, under the pointer, focus or not
+--
+-- .why global, never buffer-local = focus rests in the explorer tree after a
+--   select, so a wheel over the image pane would read the TREE's maps. the map
+--   asks which window sits under the pointer; any window that is not a zoomed
+--   image pane gets the wheel's own behavior back, untouched
+-- .why scheduled = an expr map may not repaint; the pan runs just after it
+local function get_image_zoom_wheel(key, dx, dy)
+  return function()
+    local z = get_image_zoom_live(vim.api.nvim_get_current_tabpage())
+    if z and z.step > 1 then
+      local under = vim.fn.getmousepos().winid
+      for _, p in ipairs(z.panes) do
+        if p.win == under then
+          vim.schedule(function() set_image_zoom_pan(dx, dy, 0.25) end)
+          return ''
+        end
+      end
+    end
+    return key
+  end
+end
+for _, w in ipairs({
+  { '<ScrollWheelDown>', 0, 1 }, { '<ScrollWheelUp>', 0, -1 },
+  { '<ScrollWheelRight>', 1, 0 }, { '<ScrollWheelLeft>', -1, 0 },
+  { '<S-ScrollWheelDown>', 1, 0 }, { '<S-ScrollWheelUp>', -1, 0 },
+}) do
+  vim.keymap.set({ 'n', 'v' }, w[1], get_image_zoom_wheel(w[1], w[2], w[3]),
+    { expr = true, replace_keycodes = true, desc = 'image diff zoom: wheel pans' })
+end
+
+-- a resized pane re-cuts its view: the old one was sized for the old pane
+vim.api.nvim_create_autocmd({ 'WinResized', 'VimResized' }, {
+  group = vim.api.nvim_create_augroup('image-diff-zoom-resize', { clear = true }),
+  callback = function()
+    vim.schedule(function()
+      local z = get_image_zoom_live(vim.api.nvim_get_current_tabpage())
+      if z and z.step > 1 then set_image_zoom_render(z) end
+    end)
+  end,
+})
+
+-- :ImageDiffZoomReport — what each pane PAINTS, never only what it was handed
+--
+-- .why = the crop can be exactly right while the picture on screen is wrong.
+--        measured 2026-10-25: crop sizes and regions all checked out, and the
+--        human saw the image SHRINK per step, because the footprint was never
+--        read. this reads the footprint image.nvim actually rendered (in cells),
+--        so a zoom that does not hold its footprint is a number, not a hunch.
+-- .note = one line per pane: zoom · source WxH · crop region · the file in use
+--         WxH · rendered cells WxH · rendered yes/no
+vim.api.nvim_create_user_command('ImageDiffZoomReport', function()
+  local z = get_image_zoom_live(vim.api.nvim_get_current_tabpage())
+  if not z then
+    print('image zoom: no image diff on this tab')
+    return
+  end
+  -- 🛑 settle first. image.nvim resizes off the main loop and paints in a
+  --    scheduled callback; a hit-enter prompt (this report's own output, the
+  --    last time it ran) holds that callback, so a read taken at once reported
+  --    `rendered=no` on panes that were fine — measured 2026-10-25. vim.wait
+  --    pumps the loop until every pane is idle, bounded so a stuck render
+  --    reads as stuck rather than as a hang.
+  local settled = vim.wait(3000, function()
+    for _, p in ipairs(z.panes) do
+      if p.img.pending_transform_key then return false end
+      -- a zoomed pane is settled once its placement drew THIS view; over ssh a
+      -- band's send lands later, and a read before it reports the last step
+      if p.view and not (p.placed and p.placed.view == p.view) then return false end
+    end
+    return true
+  end, 20)
+  if not settled then print('image zoom: a render is STILL pending after 3s — the numbers below are not final') end
+  local zoom = IMAGE_ZOOM_STEPS[z.step]
+  for _, p in ipairs(z.panes) do
+    -- a zoomed pane paints the rect its last placement named (`p.placed`, written
+    -- by the wire); an unzoomed one paints the whole file image.nvim holds
+    local g = p.img.rendered_geometry or {}
+    local pl = p.view and p.placed
+    print(('win=%d zoom=%sx center=%.3f,%.3f src=%dx%d region=%s painted_src=%dx%d cells=%sx%s band=%s rendered=%s'):format(
+      p.win, zoom, z.cx, z.cy, p.w, p.h, p.region or 'full',
+      pl and pl.w or p.img.image_width or -1, pl and pl.h or p.img.image_height or -1,
+      pl and pl.c or g.width or '?', pl and pl.r or g.height or '?',
+      p.band and ('%dx%d'):format(p.band.pw, p.band.ph) or 'none',
+      p.img.is_rendered and 'yes' or 'no'))
+  end
+end, { desc = 'image diff zoom: report what each pane paints' })
+
+-- keep the kitty var true to the live tab, and never leave it set behind us
+local image_zoom_group = vim.api.nvim_create_augroup('image-diff-zoom', { clear = true })
+vim.api.nvim_create_autocmd({ 'TabEnter', 'WinEnter', 'BufEnter', 'FocusGained', 'VimResume' }, {
+  group = image_zoom_group,
+  callback = function(ev)
+    if vim.v.vim_did_enter ~= 1 then return end
+    -- focus re-asserts even when unchanged: another nvim (or a FocusLost here)
+    -- may have cleared the var on the shared kitty window
+    if ev.event == 'FocusGained' or ev.event == 'VimResume' then image_zoom_var_last = nil end
+    sync_image_zoom_kitty_var()
+  end,
+})
+vim.api.nvim_create_autocmd({ 'FocusLost', 'VimSuspend', 'VimLeavePre' }, {
+  group = image_zoom_group,
+  callback = function() set_image_zoom_kitty_var(false) end,
+})
+
+--------------------------------------------------------------------
+-- image LIFETIME — no kitty placement outlives the pane it was drawn for
+--
+-- .why = kitty keeps a placement until a DELETE reaches it. nvim does not own
+--        the pixels; a missed delete leaves the picture on screen after the
+--        pane, the tab, or nvim itself is gone — measured 2026-10-25, a human
+--        quit a diff and the png stayed painted over their next work.
+--
+-- .the holes, and which line here closes each
+--   1. image.nvim's close cleanup (its BufLeave/WinClosed/TabEnter loop)
+--      `return`s after the FIRST image it clears, so a close of two panes
+--      clears one → `reap_image_orphans`, which walks every image
+--   2. the exit delete is image.nvim's own async tty write → a SYNC delete
+--      below, flushed before nvim lets go of the terminal
+--   3. a return to an image-diff tab painted naught: these panes are unnamed,
+--      so image.nvim's TabEnter re-hijack never matches them → the TabEnter
+--      repaint below
+--
+-- 🌙 unmeasured: the original report was a grove duct (nvim → tmux → ssh →
+--    kitty). kitty.sandbox runs nvim → tmux → kitty on the laptop, and there no
+--    close path left a picture behind: `:qa` from the diff and a tmux window
+--    switch were clean before these lines; `:tabclose`, `:qa`, and the switch
+--    after them. the ssh leg is not yet seen
+--
+-- ⚠️ a pane killed from outside (tmux kill-pane, a dropped ssh) runs no
+--    autocmd at all; `rhx term.images.clear` is the cure for that residue
+--------------------------------------------------------------------
+local image_life_group = vim.api.nvim_create_augroup('image-lifetime', { clear = true })
+
+-- clear every image whose window or buffer is gone, or whose window is on
+-- another tab. a dead pane's image is dropped; another tab's is kept (shallow)
+-- so a return to that tab can paint it again
+local function reap_image_orphans()
+  local image_mod = package.loaded['image']
+  if not image_mod then return end
+  local tab = vim.api.nvim_get_current_tabpage()
+  for _, img in ipairs(image_mod.get_images()) do
+    local win, buf = img.window, img.buffer
+    if win then
+      local win_live = vim.api.nvim_win_is_valid(win)
+      local buf_live = not buf or (vim.api.nvim_buf_is_valid(buf) and win_live and vim.api.nvim_win_get_buf(win) == buf)
+      if not win_live or not buf_live then
+        pcall(function() img:clear() end)
+      elseif vim.api.nvim_win_get_tabpage(win) ~= tab then
+        pcall(function() img:clear(true) end)
+      end
+    end
+  end
+end
+
+vim.api.nvim_create_autocmd({ 'WinClosed', 'TabClosed', 'BufWipeout', 'BufWinLeave', 'TabEnter' }, {
+  group = image_life_group,
+  -- scheduled: on WinClosed the window is still listed until the event ends
+  callback = function() vim.schedule(reap_image_orphans) end,
+})
+
+-- a return to an image-diff tab paints its panes again. image.nvim re-hijacks
+-- only a buffer whose NAME matches its file patterns, and these panes are
+-- unnamed scratch buffers, so no one else would
+vim.api.nvim_create_autocmd('TabEnter', {
+  group = image_life_group,
+  callback = function()
+    vim.schedule(function()
+      local z = get_image_zoom_live(vim.api.nvim_get_current_tabpage())
+      if not z then return end
+      for _, p in ipairs(z.panes) do
+        if vim.api.nvim_win_is_valid(p.win) and vim.api.nvim_win_get_buf(p.win) == p.buf then
+          pcall(function() p.img:render() end)
+        end
+      end
+    end)
+  end,
+})
+
+-- the exit delete, written and flushed SYNC — all placements on this screen,
+-- the same scope image.nvim's own exit clear names (d=a), tmux-wrapped for
+-- passthrough. only where image.nvim ran, so a plain session writes naught
+vim.api.nvim_create_autocmd('VimLeavePre', {
+  group = image_life_group,
+  callback = function()
+    if not package.loaded['image'] or #vim.api.nvim_list_uis() == 0 then return end
+    local seq = '\027_Ga=d,d=a,q=2\027\\'
+    if vim.env.TMUX then seq = '\027Ptmux;' .. seq:gsub('\027', '\027\027') .. '\027\\' end
+    pcall(function() io.stdout:write(seq); io.stdout:flush() end)
+  end,
+})
 
 -- open the image diff for an explorer selection — the ONE funnel every image
 -- entry point takes (<CR>, <2-LeftMouse>, and the on_file_select wrapper that
@@ -1343,7 +1885,7 @@ local function open_image_diff_for_selection(explorer, file_data, opts)
   -- rather than leave it on a file the panes no longer show.
   if explorer.clear_selection then pcall(explorer.clear_selection) end
 
-  local old_win, new_win, old_buf, new_buf = open_codediff_image_diff({
+  local old_win, new_win, old_buf, new_buf, old_img, new_img = open_codediff_image_diff({
     git_root = explorer.git_root or file_data.git_root,
     path = file_data.path,
     old_path = file_data.old_path,
@@ -1363,8 +1905,28 @@ local function open_image_diff_for_selection(explorer, file_data, opts)
       old_buf = old_buf,
       new_buf = new_buf,
     }
+    -- a fresh render starts at 1x; the guard above returns early, so a refresh
+    -- re-select of the SAME image keeps whatever zoom the human set
+    set_image_zoom_panes(tabpage, {
+      { win = old_win, buf = old_buf, img = old_img },
+      { win = new_win, buf = new_buf, img = new_img },
+    })
+
+    -- 🛑 hand codediff an EMPTY diff, so its TabEnter resume has one to render.
+    --    a session whose first select is an image never computed a text diff,
+    --    so `stored_diff_result` is `{}`; resume_diff (ui/lifecycle/state.lua)
+    --    reuses it and core.render_diff ipairs its nil `.changes`. measured
+    --    2026-10-25: tab away and back → `bad argument #1 to 'ipairs'`. the
+    --    shape is codediff's own empty form (ui/explorer/render.lua). it renders
+    --    onto codediff's hidden diff buffers, never onto these image panes.
+    local lc_ok, lifecycle = pcall(require, 'codediff.ui.lifecycle')
+    local sess = lc_ok and lifecycle.get_session(tabpage)
+    if sess and type(sess.stored_diff_result) == 'table' and sess.stored_diff_result.changes == nil then
+      sess.stored_diff_result = { changes = {}, moves = {} }
+    end
   else
     image_diff_shown_by_tab[tabpage] = nil
+    set_image_zoom_panes(tabpage, {})
   end
 end
 
@@ -3538,10 +4100,29 @@ local PLUGIN_SPEC = {
   {
     'mrjones2014/smart-splits.nvim',
     version = '>=1.0.0',
+    -- 🛑 no multiplexer integration — ctrl+h/l move between NVIM windows only
+    --    (at_edge = 'stop'), and tmux.conf never reads the `@pane-is-vim` the
+    --    integration writes. so it buys naught, and it cost a startup prompt:
+    --
+    --    📜 measured 2026-10-25, `nvim pic.png` in tmux stopped on
+    --       "[smart-splits.nvim] tmux init: failed to detect pane_id / Press ENTER".
+    --       the pinned `mux/tmux.lua` `tmux_exec` returns the text and drops the
+    --       exit code, so `on_init`'s `code ~= 0` is true on every start — the
+    --       tmux call itself succeeds (exit 0, run by hand in the same pane).
+    --       while the prompt stood, a deferred callback never ran (its report
+    --       file appeared only after Enter) — so image.nvim's VimEnter render of
+    --       a directly opened image waited on a keypress too.
+    --
+    -- ⚠️ set in `init`, never only in setup(): the mux starts when the plugin
+    --    loads, BEFORE `config` runs. `vim.g` is the plugin's own pre-load switch
+    init = function()
+      vim.g.smart_splits_multiplexer_integration = false
+    end,
     config = function()
       local ss = require('smart-splits')
       ss.setup({
         at_edge = 'stop',  -- don't wrap navigation at window edges
+        multiplexer_integration = false,
       })
       -- navigate between windows. only left/right — ctrl+j/ctrl+k are half-page
       -- scroll (see the scroll keymaps near the bottom of this file).
@@ -3640,6 +4221,203 @@ local PLUGIN_SPEC = {
     --   bundle that owns it (rule.require.bundles-own-their-dependencies)
     build = false,  -- magick_cli processor needs no build step
     config = function()
+      -- 🛑 tmux before 3.3 passes every wrapped sequence through, unconditionally —
+      --   `allow-passthrough` is the 3.3 GATE on that, and it does not exist below 3.3.
+      --   image.nvim reads the absent option as "off" and its kitty setup throws
+      --   "tmux does not have allow-passthrough enabled". the lazy backend is already
+      --   stored when it throws, so later renders still draw, yet the rest of setup is
+      --   skipped, its VimLeavePre clear among it ⇒ every image outlives nvim
+      --   - 📜 2026-10-25, a grove on tmux 3.2a: the first image diff errored, the next
+      --     drew, and pictures stayed on the duct after nvim exited
+      --   ⇒ tell it the truth for an old tmux; 3.3+ is read by the plugin as before
+      local tmux_ver = vim.env.TMUX and vim.fn.system({ 'tmux', '-V' }):match('(%d+%.%d+)')
+      if tmux_ver and vim.version.lt(tmux_ver, '3.3') then
+        require('image/utils/tmux').has_passthrough = true
+      end
+
+      -- 🛑 a re-render of a LIVE pane must not re-send the picture
+      --   - the kitty backend's clear writes `d=i`: lowercase, so kitty drops the
+      --     placement and KEEPS the image data. yet the same clear forgets that
+      --     the image was sent, so the next render transmits every byte again
+      --   - and a re-render is routine: image.nvim deep-clears an image on every
+      --     tab leave, and clears + renders every image on every FocusGained
+      --   - over ssh a transmit is the whole png as base64, in 4 KiB chunks,
+      --     through tmux and ssh ⇒ 📜 2026-10-25, a grove duct: an image diff
+      --     went blank on every tab return and "took forever" to come back
+      --   ⇒ keep the sent-record across a clear while the image's pane is alive
+      --     (its window valid, and still on the image's buffer). a dead pane, and
+      --     image.nvim's own reset on VimResized, still forget it
+      --   - the record is a local of the backend; it is read by name per call,
+      --     since VimResized REPLACES the table rather than empties it
+      local kitty = require('image/backends/kitty')
+      if not kitty.__keeps_sent then
+        local function sent_record()
+          for i = 1, 50 do
+            local name, val = debug.getupvalue(kitty.__clear_shipped, i)
+            if not name then return nil end
+            if name == 'transmitted_images' then return val end
+          end
+        end
+        local function pane_alive(img)
+          local win, buf = img.window, img.buffer
+          return win and vim.api.nvim_win_is_valid(win)
+            and (not buf or vim.api.nvim_win_get_buf(win) == buf)
+        end
+        kitty.__clear_shipped = kitty.clear
+        kitty.clear = function(id, shallow, ...)
+          local img = id and kitty.state and kitty.state.images[id]
+          local sent = img and sent_record()
+          local hash = sent and sent[img.id]
+          local r = { kitty.__clear_shipped(id, shallow, ...) }
+          if hash and pane_alive(img) then
+            local sent_now = sent_record()
+            if sent_now then sent_now[img.id] = hash end
+          end
+          return unpack(r)
+        end
+        kitty.__keeps_sent = true
+      end
+
+      -- 🛑 a zoomed image diff is ONE send per zoom, and every step and pan a
+      --   placement (the zoom half, and its measurement: "image diff ZOOM")
+      --   - transform: the held copy goes to kitty as is — a file copy. image.nvim
+      --     would fit it to the pane (a tall page squeezed back into a thin
+      --     column), and a magick pass on it is a decode + encode that changes naught
+      --   - placement: a zoomed pane's placement names the VIEW's rect within the
+      --     held image, and a cell box (c,r) of the view's cells. every placement
+      --     is recorded, so a step or a pan re-emits it with a new rect and cells,
+      --     and sends no picture
+      --   - both local and over ssh; the ssh send cap wraps this from outside,
+      --     and never trips on it (image.nvim asks for a pane-fit size)
+      if not kitty.__zoom_wire then
+        local magick = require('image/processors/magick_cli')
+        local wire = require('image/backends/kitty/' .. 'help' .. 'ers')
+        local term = require('image/utils/term')
+        local last_place = {}  -- internal_id → { config, x, y } as image.nvim wrote it
+
+        local transform_band_shipped = magick.transform
+        magick.transform = function(path, request, output_path, callback)
+          -- a held copy is already the png kitty should hold: copy the bytes, no magick
+          if image_zoom_wire.band_by_path[path] then
+            local ok = vim.uv.fs_copyfile(path, output_path)
+            vim.schedule(function()
+              callback(ok and { ok = true, path = output_path } or { ok = false, error = 'image zoom: copy failed' })
+            end)
+            return
+          end
+          return transform_band_shipped(path, request, output_path, callback)
+        end
+
+        local write_at_band_shipped = wire.write_graphics_at
+        wire.write_graphics_at = function(config, x, y, ...)
+          local id = config.image_id
+          local p = id and image_zoom_wire.pane_by_id[id]
+          if not (p and p.view and p.band and p.img.original_path == p.band.path) then
+            return write_at_band_shipped(config, x, y, ...)
+          end
+          last_place[id] = { config = config, x = x, y = y }
+          local size = term.get_size()
+          local v, b = p.view, p.band
+          local c = math.max(1, math.floor(v.w / size.cell_width + 0.5))
+          local r = math.max(1, math.floor(v.h / size.cell_height + 0.5))
+          p.placed = { w = v.w, h = v.h, c = c, r = r, view = v }
+          -- the view's rect in HELD pixels: k held px per zoomed-page px at this
+          -- zoom, kept inside the png
+          local k = b.pw / (p.w * v.s)
+          local rx = math.max(0, math.min(b.pw - 1, math.floor(v.x * k + 0.5)))
+          local ry = math.max(0, math.min(b.ph - 1, math.floor(v.y * k + 0.5)))
+          return write_at_band_shipped(vim.tbl_extend('force', config, {
+            display_x = rx, display_y = ry,
+            display_width = math.max(1, math.min(b.pw - rx, math.floor(v.w * k + 0.5))),
+            display_height = math.max(1, math.min(b.ph - ry, math.floor(v.h * k + 0.5))),
+            display_columns = c, display_rows = r,
+          }), x, y, ...)
+        end
+
+        image_zoom_wire.place = function(id)
+          local last = last_place[id]
+          local p = image_zoom_wire.pane_by_id[id]
+          if not (last and p and p.img.is_rendered) then return false end
+          wire.write_graphics_at(last.config, last.x, last.y)
+          return true
+        end
+        kitty.__zoom_wire = true
+      end
+
+      -- 🛑 over ssh, send a picture no larger than a pixel budget; kitty scales it up
+      --   - image.nvim scales each image to the WINDOW's pixel size, writes it as a
+      --     lossless png, and over ssh streams that png as base64 (it hands kitty a
+      --     file path only on a local box). a hidpi pane at full width is ~4000px
+      --     across, and a photo as png at that size runs to megabytes, often larger
+      --     than the jpeg it came from ⇒ a photo took seconds to appear on a grove
+      --   - its placement names a source rect in PIXELS (w,h,x,y) and no cell box,
+      --     so kitty draws the png at its native size. that is the only reason the
+      --     png must be window-sized
+      --   ⇒ cap the scale target at IMAGE_SEND_MAX_PIXELS, then scale the placement
+      --     rect to match and add the cell box (c,r) the image already fills, so
+      --     kitty stretches the smaller png over the same cells
+      --   - a local box is left as shipped: kitty reads the file, no bytes cross a wire
+      --   - the cap bounds the BYTES; a pane smaller than the cap is sent as before
+      --   - the placement is written through `wire.__write_at_shipped` so a probe
+      --     can record what would reach the terminal (prove.image-send-capped)
+      local IMAGE_SEND_MAX_PIXELS = 1000000
+      local over_ssh = vim.env.SSH_CLIENT ~= nil or vim.env.SSH_TTY ~= nil
+      if over_ssh and not kitty.__sends_capped then
+        local magick = require('image/processors/magick_cli')
+        local wire = require('image/backends/kitty/' .. 'help' .. 'ers')
+        local term = require('image/utils/term')
+        local shrink_of = {}  -- transform output path → the factor it was shrunk by
+        local shrink_now      -- the factor of the image kitty.render draws, if any
+
+        local transform_shipped = magick.transform
+        magick.transform = function(path, request, output_path, callback)
+          local w, h = request.target_width, request.target_height
+          local f = 1
+          if w and h and w * h > IMAGE_SEND_MAX_PIXELS then f = math.sqrt(IMAGE_SEND_MAX_PIXELS / (w * h)) end
+          shrink_of[output_path] = f
+          if f >= 1 then return transform_shipped(path, request, output_path, callback) end
+          local function px(n) return math.max(1, math.floor(n * f)) end
+          local capped = vim.tbl_extend('force', request, { target_width = px(w), target_height = px(h) })
+          if request.crop then
+            capped.crop = {
+              x = math.floor(request.crop.x * f), y = math.floor(request.crop.y * f),
+              width = px(request.crop.width), height = px(request.crop.height),
+            }
+          end
+          return transform_shipped(path, capped, output_path, callback)
+        end
+
+        local render_shipped = kitty.render
+        kitty.render = function(image, ...)
+          shrink_now = image and shrink_of[image.cropped_path]
+          local r = { pcall(render_shipped, image, ...) }
+          shrink_now = nil
+          if not r[1] then error(r[2], 0) end
+          return unpack(r, 2)
+        end
+
+        -- the placement goes out through write_graphics_at, never write_graphics
+        wire.__write_at_shipped = wire.write_graphics_at
+        wire.write_graphics_at = function(config, ...)
+          local f = shrink_now
+          local size = f and f < 1 and config.display_width and term.get_size()
+          if size then
+            config = vim.tbl_extend('force', config, {
+              display_columns = math.max(1, math.floor(config.display_width / size.cell_width + 0.5)),
+              display_rows = math.max(1, math.floor(config.display_height / size.cell_height + 0.5)),
+              display_width = math.max(1, math.floor(config.display_width * f)),
+              display_height = math.max(1, math.floor(config.display_height * f)),
+              display_x = math.floor((config.display_x or 0) * f),
+              display_y = math.floor((config.display_y or 0) * f),
+            })
+          end
+          return wire.__write_at_shipped(config, ...)
+        end
+
+        kitty.__send_max_pixels = IMAGE_SEND_MAX_PIXELS
+        kitty.__sends_capped = true
+      end
+
       require('image').setup({
         backend = 'kitty',
         processor = 'magick_cli',  -- imagemagick cli, avoids luarocks/magick rock
@@ -3694,6 +4472,15 @@ local PLUGIN_SPEC = {
         -- derived from IMAGE_DIFF_EXTS (top of file) — one source of truth,
         -- shared with the codediff image-diff detect
         hijack_file_patterns = IMAGE_DIFF_GLOBS,
+        -- 🛑 a tmux window switch CLEARS the screen, and kitty drops every
+        --    placement a clear covers — but image.nvim never learns, still holds
+        --    each image as rendered, and so never paints it again. measured
+        --    2026-10-25 in kitty.sandbox: off, a switch away and back left both
+        --    image-diff panes BLANK for good; on, image.nvim clears on FocusLost
+        --    when the tmux window changed and paints again on FocusGained (needs
+        --    tmux `focus-events on`, which 2.8.tmux sets). a plain kitty focus
+        --    loss leaves the image up
+        tmux_show_only_in_active_window = true,
       })
     end,
   },

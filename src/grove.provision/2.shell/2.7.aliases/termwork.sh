@@ -220,12 +220,42 @@ term.send — send text (+Enter) to a terminal or tab
   --via kitty            (required) terminal backend
   --on <terminal>        the terminal by slug
   --pid <pid>            the terminal by pid
-  --what <text>          (required) the text to send
+  --what <text>          the text to send, then Enter
+  --keys <seq>           a raw key sequence, NO Enter; printf escapes decoded
+                         (e.g. '\e[61;5u' = ctrl+= in CSI-u form)
   --for <role>           send only to the role's tab (= --tab <role>)
   --tab <slug>           send only to that tab
   --help, -h             show this help
 
-  --tab/--for require --on.
+  one of --what / --keys is required. --tab/--for require --on.
+  ⚠️ --keys writes bytes to the app; it does NOT pass through kitty.conf maps.
+EOF
+      ;;
+    term.images.clear)
+      cat <<'EOF'
+term.images.clear — drop every image kitty holds in a terminal's windows
+
+  --via kitty            (required) terminal backend
+  --on <terminal>        the terminal by slug
+  --pid <pid>            the terminal by pid
+  --help, -h             show this help
+
+  for an image left painted over the text (a program exited before it
+  cleared it). writes kitty's delete-all to each window's tty: display
+  output only, never input to the shell, and it works through tmux + ssh.
+EOF
+      ;;
+    term.vars)
+      cat <<'EOF'
+term.vars — print the kitty user vars of every window in a terminal
+
+  --via kitty            (required) terminal backend
+  --on <terminal>        the terminal by slug
+  --pid <pid>            the terminal by pid
+  --help, -h             show this help
+
+  user vars gate kitty.conf maps (`--when-focus-on var:<name>`); this shows
+  which are set, e.g. in_tmux (tmux hooks) or nvim_image_zoom (nvim).
 EOF
       ;;
     term.list)
@@ -766,19 +796,22 @@ __term_get_text_base() {
   kitten @ --to "$socket" get-text
 }
 
-# .what = send text + Enter to a matched window (exit 0 = sent)
+# .what = send bytes to a matched window, then a tail (exit 0 = sent)
+# .note = tail is "\r" (Enter) for a typed line, "" for a raw key sequence
 __term_send_text() {
   local socket="$1"
   local match="$2"
   local what="$3"
-  printf '%s\r' "$what" | kitten @ --to "$socket" send-text --match "$match" --stdin
+  local tail="${4-$'\r'}"
+  printf '%s%s' "$what" "$tail" | kitten @ --to "$socket" send-text --match "$match" --stdin
 }
 
-# .what = send text + Enter to a terminal's base window (exit 0 = sent)
+# .what = send bytes to a terminal's base window, then a tail (exit 0 = sent)
 __term_send_text_base() {
   local socket="$1"
   local what="$2"
-  printf '%s\r' "$what" | kitten @ --to "$socket" send-text --stdin
+  local tail="${3-$'\r'}"
+  printf '%s%s' "$what" "$tail" | kitten @ --to "$socket" send-text --stdin
 }
 
 term.open() {
@@ -1504,11 +1537,135 @@ term.read() {
   fi
 }
 
+# .what = print the kitty USER VARS of every window in a terminal
+# .why  = kitty.conf gates keys on user vars (`--when-focus-on var:in_tmux`,
+#         `var:nvim_image_zoom`), set by tmux hooks and by nvim over OSC 1337.
+#         a map that "does not fire" is first a question of whether its var is
+#         set — and that is a fact only kitty holds. this asks kitty for it.
+__term_get_user_vars() {
+  local socket="$1"
+  kitten @ --to "$socket" ls \
+    | jq -r '.[].tabs[].windows[] | "window \(.id) [\(.title)]" + (if (.user_vars | length) == 0 then " (no user vars)" else "" end), (.user_vars | to_entries[] | "   \(.key)=\(.value)")'
+}
+
+term.vars() {
+  local via=""
+  local pid=""
+  local duct=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --via) via="$2"; shift 2 ;;
+      --pid) pid="$2"; shift 2 ;;
+      --on) duct="$2"; shift 2 ;;
+      --help|-h) __term_usage term.vars; return 0 ;;
+      *) echo "✋ term.vars: unknown arg '$1'" >&2; return 2 ;;
+    esac
+  done
+
+  if [[ "$via" != "kitty" ]]; then
+    echo "✋ term.vars: --via kitty required" >&2
+    return 2
+  fi
+
+  # lookup pid from duct name
+  if [[ -n "$duct" && -z "$pid" ]]; then
+    pid=$(__term_find_by_duct "$duct")
+    if [[ -z "$pid" ]]; then
+      echo "✋ term.vars: no terminal for duct '$duct'" >&2
+      return 2
+    fi
+  fi
+  if [[ -z "$pid" ]]; then
+    echo "✋ term.vars: --pid or --on required" >&2
+    return 2
+  fi
+
+  local socket
+  socket=$(__term_get_socket "$pid")
+  if [[ -z "$socket" ]]; then
+    echo "✋ term.vars: terminal $pid not found" >&2
+    return 2
+  fi
+
+  if ! __term_get_user_vars "$socket"; then
+    echo "💥 term.vars: failed to list windows of terminal '$pid' (stale socket?)" >&2
+    return 1
+  fi
+}
+
+# .what = drop every image kitty holds in a terminal's windows
+# .why  = kitty keeps a graphics placement until told to delete it. an image a
+#         program never cleared (image.nvim behind tmux, a program that died)
+#         stays painted over the text, through tmux, ssh, and exit alike.
+#         the delete is written to each window's OWN tty — output to kitty,
+#         never input to the shell — so it reaches kitty directly, with no
+#         tmux passthrough to drop it, and a remote grove pane needs no reach.
+#         `a=d,d=A` = delete every placement and free its image data
+__term_clear_images() {
+  local socket="$1"
+  local child tty cleared=0
+  for child in $(kitten @ --to "$socket" ls | jq -r '.[].tabs[].windows[].pid'); do
+    tty="$(readlink "/proc/$child/fd/0" 2>/dev/null)"
+    [[ "$tty" == /dev/pts/* && -w "$tty" ]] || continue
+    printf '\033_Ga=d,d=A,q=2\033\\' > "$tty" && cleared=$(( cleared + 1 ))
+  done
+  echo "$cleared"
+}
+
+term.images.clear() {
+  local via=""
+  local pid=""
+  local duct=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --via) via="$2"; shift 2 ;;
+      --pid) pid="$2"; shift 2 ;;
+      --on) duct="$2"; shift 2 ;;
+      --help|-h) __term_usage term.images.clear; return 0 ;;
+      *) echo "✋ term.images.clear: unknown arg '$1'" >&2; return 2 ;;
+    esac
+  done
+
+  if [[ "$via" != "kitty" ]]; then
+    echo "✋ term.images.clear: --via kitty required" >&2
+    return 2
+  fi
+  if [[ -n "$duct" && -z "$pid" ]]; then
+    pid=$(__term_find_by_duct "$duct")
+    if [[ -z "$pid" ]]; then
+      echo "✋ term.images.clear: no terminal for duct '$duct'" >&2
+      return 2
+    fi
+  fi
+  if [[ -z "$pid" ]]; then
+    echo "✋ term.images.clear: --pid or --on required" >&2
+    return 2
+  fi
+
+  local socket
+  socket=$(__term_get_socket "$pid")
+  if [[ -z "$socket" ]]; then
+    echo "✋ term.images.clear: terminal $pid not found" >&2
+    return 2
+  fi
+
+  local cleared
+  cleared=$(__term_clear_images "$socket")
+  if [[ -z "$cleared" || "$cleared" -eq 0 ]]; then
+    echo "💥 term.images.clear: reached no window tty in terminal '$pid' — no image was cleared" >&2
+    return 1
+  fi
+  echo "🧹 term://${duct:-$pid}: images cleared in $cleared window(s)"
+}
+
 term.send() {
   local via=""
   local pid=""
   local duct=""
   local what=""
+  local keys=""
   local tab=""
   local role=""
 
@@ -1518,6 +1675,7 @@ term.send() {
       --pid) pid="$2"; shift 2 ;;
       --on) duct="$2"; shift 2 ;;
       --what) what="$2"; shift 2 ;;
+      --keys) keys="$2"; shift 2 ;;
       --tab) tab="$2"; shift 2 ;;
       --for) role="$2"; shift 2 ;;
       --help|-h) __term_usage term.send; return 0 ;;
@@ -1577,9 +1735,20 @@ term.send() {
     return 2
   fi
 
-  if [[ -z "$what" ]]; then
-    echo "✋ term.send: --what required" >&2
+  # --what types a line (+Enter); --keys sends a raw key sequence (no Enter),
+  # printf-style escapes decoded, so `\e[61;5u` reaches the window as ctrl+=
+  if [[ -n "$what" && -n "$keys" ]]; then
+    echo "✋ term.send: --what types a line, --keys sends raw keys; pick one" >&2
     return 2
+  fi
+  if [[ -z "$what" && -z "$keys" ]]; then
+    echo "✋ term.send: --what or --keys required" >&2
+    return 2
+  fi
+  local tail=$'\r'
+  if [[ -n "$keys" ]]; then
+    what="$(printf '%b' "$keys")"
+    tail=""
   fi
 
   local socket
@@ -1606,7 +1775,7 @@ term.send() {
         echo "💥 term.send: could not derive match for tab '$tab' (corrupt registry?)" >&2
         return 1
       fi
-      if ! __term_send_text "$socket" "$match" "$what"; then
+      if ! __term_send_text "$socket" "$match" "$what" "$tail"; then
         echo "💥 term.send: failed to send to tab '$tab' in terminal '$duct' (stale window?)" >&2
         return 1
       fi
@@ -1615,7 +1784,7 @@ term.send() {
   fi
 
   # no --tab: send to the terminal's base window; fail loud on a stale socket
-  if ! __term_send_text_base "$socket" "$what"; then
+  if ! __term_send_text_base "$socket" "$what" "$tail"; then
     echo "💥 term.send: failed to send to terminal '$pid' (stale socket?)" >&2
     return 1
   fi

@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = prove the ctrl+N tab rebind is declared, prove `user.js` declares the
-#         prefs that matter, and report which of the three human-click extensions
-#         are still owed
+# .what = prove the ctrl+N tab rebind and the extension policy are declared,
+#         prove `user.js` declares the prefs that matter, and report which of the
+#         three policy extensions firefox has not installed yet
 #
 # .why
 #   - it asserts only the prefs whose absence a human would misdiagnose as another
 #     defect; a check per pref would be a second copy of the upsert, free to drift
-#   - an absent extension is a 🌙: it is owed a human click, never a defect, and a
-#     ✋ would fire on every fresh box until ignored (rule.forbid.failhide)
+#   - an absent extension is a 🌙: the policy file IS the declaration, and claim 0
+#     diffs it ✋-hard; firefox installs a policy extension at its NEXT start, so
+#     a box not yet restarted holds the policy and not the addon — a lag, never a
+#     defect (rule.forbid.failhide cuts both ways)
 #
 # guarantee:
 #   - READ-ONLY. it reads the systemconfig extension dir, profiles.ini, user.js,
-#     and extensions.json. it opens no window, launches no sandbox, repairs no state
+#     extensions.json, and a COPY of two extensions' storage sqlite. it opens no
+#     window, launches no sandbox, repairs no state
 #
 # exit:
 #   0 = the tab rebind is declared AND user.js declares the three load-bear prefs.
@@ -37,6 +40,7 @@ grove_provision_1_3_1_firefox_configure_verify() {
   for pair in \
     "autoconfig.js:$ext_dir/defaults/pref/autoconfig.js" \
     "firefox.cfg:$ext_dir/firefox.cfg" \
+    "policies.json:$ext_dir/policies/policies.json" \
     "gtk.css:$HOME/.var/app/org.mozilla.firefox/config/gtk-3.0/gtk.css"
   do
     local name="${pair%%:*}"
@@ -45,8 +49,9 @@ grove_provision_1_3_1_firefox_configure_verify() {
 
     if [[ ! -f "$dst" ]]; then
       echo "   ✋ $name is absent from $dst" >&2
-      echo "      ⇒ without it firefox keeps a default the terminal contradicts:" >&2
-      echo "        alt+N tabs, ctrl+w close-tab, or ctrl+w that deletes no word" >&2
+      echo "      ⇒ without it firefox keeps a default the terminal contradicts —" >&2
+      echo "        alt+N tabs, ctrl+w close-tab, a ctrl+w that deletes no word —" >&2
+      echo "        or, for policies.json, never installs the three extensions" >&2
       echo "      fix: rhx grove.provision --what 1.3.browser --mode apply" >&2
       failed=$(( failed + 1 ))
     elif [[ ! -f "$src" ]]; then
@@ -56,8 +61,8 @@ grove_provision_1_3_1_firefox_configure_verify() {
     else
       echo "   ✋ the installed $name DIFFERS from this checkout" >&2
       echo "      read the drift: diff $src $dst" >&2
-      echo "      ⇒ firefox loads the STALE copy, so the rebind that is live is" >&2
-      echo "        whichever one an older revision declared" >&2
+      echo "      ⇒ firefox loads the STALE copy, so what is live is whichever" >&2
+      echo "        copy an older revision declared" >&2
       echo "      fix: rhx grove.provision --what 1.3.browser --mode apply" >&2
       failed=$(( failed + 1 ))
     fi
@@ -81,7 +86,7 @@ grove_provision_1_3_1_firefox_configure_verify() {
   # 1. the profile must exist before its contents can be checked at all
   ####################################################################
   local profile_dir
-  profile_dir="$(grep -oP 'Path=\K.*default-release' "$ff_root/profiles.ini" 2>/dev/null)"
+  profile_dir="$(grove_provision_1_3_1_firefox_profile_dir)"
   if [[ -z "$profile_dir" ]]; then
     # 🛑 "yet" is true on one box only: off `local@unix` no hand can launch the
     #   GUI that births a profile, so "open firefox once" would be owed forever
@@ -197,7 +202,7 @@ grove_provision_1_3_1_firefox_configure_verify() {
   fi
 
   ####################################################################
-  # 4. the extensions — named when owed, never failed
+  # 4. the extensions — named when not yet installed, never failed
   ####################################################################
   local addons="$profile/extensions.json" owed=()
   local name
@@ -207,21 +212,28 @@ grove_provision_1_3_1_firefox_configure_verify() {
   done
 
   if [[ ${#owed[@]} -eq 0 ]]; then
-    echo "   • all three extensions are accepted ✔"
-  # ⚠️ reachable on a headless box only when a profile arrived by another route
-  #   - an ssh -X launch or a restored $HOME is such a route
-  #   - the extensions are genuinely absent there and also genuinely UNACCEPTABLE
-  #   - the upsert declines to open a tab on this tier
-  #   - ⇒ the fix must not name a re-drive, since that would be a cry-wolf
-  elif [[ "$GROVE_ENV_SERVER" != "local@unix" ]]; then
-    echo "   🌙 ${#owed[@]} extension(s) are unaccepted here, and none is owed: ${owed[*]}"
-    echo "      each is accepted through a prompt mozilla shows on a SCREEN, and no"
-    echo "      command can accept one — so this box can never hold them"
+    echo "   • all three extensions are installed ✔"
   else
-    echo "   🌙 ${#owed[@]} extension(s) still owed a human click: ${owed[*]}"
-    echo "      mozilla requires a hand on the permission prompt, so this is work"
-    echo "      owed to a human — not work this bundle got wrong"
-    echo "      fix: re-drive --what 1.3.browser and accept the tabs it opens"
+    echo "   🌙 ${#owed[@]} extension(s) not installed yet: ${owed[*]}"
+    echo "      the policy above declares them; firefox installs them at its next"
+    echo "      start. fix: fully quit firefox and open it again"
+  fi
+
+  ####################################################################
+  # 4b. the theme hand step — READ from firefox color's own storage
+  #
+  # .why a 🌙 and never a ✋ — no command can perform it, so a failure
+  #   would fire on every run until a human clicked; the step is NAMED
+  #   until it is done, then reported ✔
+  ####################################################################
+  if [[ "$GROVE_ENV_SERVER" == "local@unix" ]]; then
+    local state
+    state="$(grove_provision_1_3_1_firefox_theme_state)"
+    case "$state" in
+      done) echo "   • the desert palette is applied ✔" ;;
+      owed) echo "   🌙 owed — the desert palette is not applied yet. the apply prints the one click that does it" ;;
+      *)    echo "   🌙 unverified — whether the desert palette is applied: ${state#unknown: }" ;;
+    esac
   fi
 
   ####################################################################

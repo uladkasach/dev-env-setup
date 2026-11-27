@@ -61,6 +61,26 @@ given('user is in codediff tab')
   when('user presses ctrl+h/j/k/l')
     then('focus moves between explorer and diff panes')
 
+### usecase.6 = zoom an image diff
+
+given('the codediff tab shows an image diff (focus in explorer or in a pane)')
+  when('user presses ctrl+=')
+    then('both panes magnify one step: 1, 1.5, 2, 3, 4, 6, 8x')
+    then('the before and after panes show the SAME region')
+    then('each pane winbar shows the zoom, e.g. 🔍 2x')
+  when('user presses ctrl+-')
+    then('both panes step back toward 1x')
+
+given('an image diff is zoomed past 1x, focus in an image pane')
+  when('user presses h/j/k/l')
+    then('the view pans a quarter of its span, in both panes')
+  when('user presses 0')
+    then('zoom resets to 1x, centered')
+
+given('the tab shows no image diff, or nvim lost focus, or nvim exited')
+  when('user presses ctrl+= or ctrl+-')
+    then('kitty changes the font size, as everywhere else')
+
 ## boundaries
 
 - ctrl+g: toggle/focus codediff tab (staged + unstaged)
@@ -69,3 +89,6 @@ given('user is in codediff tab')
 - o: open file (new tab from pane, close from explorer)
 - ctrl+d [s|a|u|x]: git operations
 - ctrl+h/j/k/l: window navigation
+- ctrl+= / ctrl+-: image diff zoom — kitty yields them to nvim only while the kitty
+  user var `nvim_image_zoom` is set (by nvim, while the tab shows an image diff)
+- h/j/k/l, 0, +, -: pan, reset, zoom — inside an image pane only

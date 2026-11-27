@@ -1,0 +1,11 @@
+{
+  "toolbar": { "r": 65, "g": 65, "b": 65 },
+  "toolbar_text": { "r": 245, "g": 222, "b": 179 },
+  "frame": { "r": 51, "g": 51, "b": 51 },
+  "tab_background_text": { "r": 245, "g": 222, "b": 179 },
+  "toolbar_field": { "r": 84, "g": 84, "b": 84 },
+  "toolbar_field_text": { "r": 222, "g": 184, "b": 135 },
+  "tab_line": { "r": 218, "g": 196, "b": 154 },
+  "popup": { "r": 51, "g": 51, "b": 51 },
+  "popup_text": { "r": 222, "g": 184, "b": 135 }
+}
