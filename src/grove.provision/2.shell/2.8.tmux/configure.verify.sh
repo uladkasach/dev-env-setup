@@ -197,5 +197,34 @@ grove_provision_2_8_tmux_configure_verify() {
   grove_provision_2_8_tmux_verify_live_servers "$conf_live" "$term_declared" \
     || failed=$(( failed + 1 ))
 
+  # 10. a NEW pane in each live server execs the login shell
+  grove_provision_2_8_tmux_verify_pane_shell || failed=$(( failed + 1 ))
+
   [[ "$failed" -eq 0 ]] || return 1
+}
+
+# .what = does a NEW pane in each live server exec the login shell? — never the $SHELL a
+#   server was born with, which outlives a chsh (see `..._login_shell`)
+# .why its own function, so a play drives this arm alone over stub servers
+# exit: 0 = every live server answers the login shell, or no login shell is named · 1 = not
+grove_provision_2_8_tmux_verify_pane_shell() {
+  local login_shell sock have wrong=() noun
+  login_shell="$(grove_provision_2_8_tmux_login_shell)"
+  [[ -n "$login_shell" ]] || return 0
+  while IFS= read -r sock; do
+    [[ -n "$sock" ]] || continue
+    # a socket with no server answers naught; that is no claim about a pane. a closed
+    # stdin keeps tmux off the loop's own socket list, and fails a prompt at once
+    have="$(timeout -k 2 10 tmux -L "$sock" show-options -gv default-shell </dev/null 2>/dev/null)" || continue
+    [[ "$have" == "$login_shell" ]] || wrong+=("$sock=$have")
+  done < <(grove_provision_2_8_tmux_live_sockets)
+  if [[ "${#wrong[@]}" -eq 0 ]]; then
+    echo "   • a new pane in every live server execs the login shell ($login_shell) ✔"
+    return 0
+  fi
+  noun="live tmux servers open"; [[ "${#wrong[@]}" -eq 1 ]] && noun="live tmux server opens"
+  echo "   ✋ ConstraintError: ${#wrong[@]} $noun a new pane in a shell other than $login_shell: ${wrong[*]}" >&2
+  echo "      ⇒ each pane skips the login shell's rc, so it shows a bare prompt: no starship" >&2
+  echo "      fix: rhx grove.provision --what 2.8.tmux --mode apply" >&2
+  return 1
 }

@@ -1,0 +1,16 @@
+🐢 lets see what grove-1 left...
+
+🗄️ grove.backup.get --from grove-1 --list
+   ├─ grove-1
+   │  └─ user=?
+   │     ├─ 2026-11-21 ✋ refused: no shape a pass writes user=<seat>/home=.ssh
+   │     ├─ 2026-11-21 ✋ refused: no shape a pass writes user=<seat>/org=acme/repo=../tree=..
+   │     └─ 2026-11-21 ✋ refused: no shape a pass writes user=<seat>/org=acme/repo=x??31m/tree=y
+   └─ 3 units
+
+🥥 restore, as the row's seat, from this repo's checkout (cd ~/git/more/dev-env-setup)
+   ├─ org=<o>/repo=<r>/tree=<t>       rhx grove.backup.restore --from grove-1 --of <o>/<r> --tree <t>
+   ├─ org=<o>/orphan=<d>              rhx grove.backup.restore --from grove-1 --orphan <o>/<d>
+   ├─ org=<o>/repo=<r>/setaside=<s>   rhx grove.backup.restore --from grove-1 --of <o>/<r> --setaside <s>
+   ├─ home=<h>                        rhx grove.backup.restore --from grove-1 --home <h>
+   └─ every unit of the seat          rhx grove.backup.restore --from grove-1 --all

@@ -36,6 +36,8 @@
 #   --org       the org whose reach to remove            (required)
 #   --env       the env whose reach to remove            (required)
 #   --owner     rack owner + profile-name tail           (default: ehmpath)
+#   --gitroot   the git root the keyrack del runs from   (default: cwd if a repo,
+#               else 5.12.rack's scratch root)
 #   --mode      plan (default) or apply
 #
 # guarantee:
@@ -58,6 +60,7 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "  --org       the org whose reach to remove            (required)"
   echo "  --env       the env whose reach to remove            (required)"
   echo "  --owner     rack owner + profile-name tail           (default: ehmpath)"
+  echo "  --gitroot   git root for the keyrack del  (default: cwd if a repo, else the rack's)"
   echo "  --mode      plan (default) or apply"
   echo ""
   echo "it removes BOTH halves of the pointer:"
@@ -77,9 +80,15 @@ ORG=""
 ENV=""
 OWNER="ehmpath"
 MODE="plan"
+GITROOT_GIVEN=""
 
 while [[ $# -gt 0 ]]; do
+  # a value flag with no value refuses: `shift 2` past the last arg shifts naught,
+  # so the loop would read the same flag forever
+  [[ "$1" =~ ^--(gitroot|org|env|owner|mode|skill|repo|role)$ && $# -lt 2 ]] && {
+    echo "✋ ConstraintError: $1 needs a value" >&2; echo "   see: rhx aws.reach.del help" >&2; exit 2; }
   case "$1" in
+    --gitroot) GITROOT_GIVEN="$2"; shift 2 ;;
     --org)   ORG="$2";   shift 2 ;;
     --env)   ENV="$2";   shift 2 ;;
     --owner) OWNER="$2"; shift 2 ;;
@@ -92,6 +101,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# a given rack root must be a repo, refused before any step reads or writes on its behalf
+[[ -z "$GITROOT_GIVEN" ]] || git -C "$GITROOT_GIVEN" rev-parse --git-dir >/dev/null 2>&1 || {
+  echo "✋ ConstraintError: --gitroot '$GITROOT_GIVEN' is not a git repo" >&2
+  echo "   fix: rhx grove.provision --what 5.12.rack --mode apply   (it owns the rack root)" >&2
+  exit 2
+}
 [[ -n "$ORG" ]] || { echo "✋ ConstraintError: --org is required (e.g. --org ehmpathy)" >&2; exit 2; }
 [[ -n "$ENV" ]] || { echo "✋ ConstraintError: --env is required (e.g. --env demo)" >&2; exit 2; }
 [[ "$MODE" == "plan" || "$MODE" == "apply" ]] \
@@ -237,8 +252,12 @@ if [[ "$RACK_REACHABLE" -eq 1 ]]; then
     exit 1
   fi
 
+  # 🛑 a GIVEN root wins, as in `aws.reach.set`: the cwd's keyrack.yml allows its
+  #   own repo's org only, so a cross-org del run from a real checkout refuses
   GITROOT="$PWD"
-  if ! git -C "$PWD" rev-parse --git-dir >/dev/null 2>&1; then
+  # a given root is a repo, by the check right after the parse
+  [[ -n "$GITROOT_GIVEN" ]] && GITROOT="$GITROOT_GIVEN"
+  if [[ -z "$GITROOT_GIVEN" ]] && ! git -C "$PWD" rev-parse --git-dir >/dev/null 2>&1; then
     GITROOT="$HOME/.local/state/keyrack.gitroot"
     if [[ ! -d "$GITROOT/.git" ]]; then
       echo "      └─ 💥 MalfunctionError: the cwd is not a git repo, and the box has no rack root" >&2

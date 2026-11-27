@@ -28,4 +28,30 @@ grove_provision_2_6_starship_configure_upsert() {
   mkdir -p "$HOME/.config"
   cp "$src" "$HOME/.config/starship.toml"
   echo "   • starship.toml upgraded from $GROVE_SRC"
+
+  grove_provision_2_6_starship_bashrc_upsert
+}
+
+# .what = findsert the starship init into ~/.bashrc, by marker
+# .why zsh is served by `2.5.zsh/zshrc.sh`, which that bundle byte-owns. a BASH
+#   terminal — a pane a tmux server opened before the login shell became zsh, or a
+#   human who types `bash` — read only ~/.bashrc and drew a bare `user@host:~$`
+#   (📜 2026-11-20, a hetzner grove). no bundle byte-owns ~/.bashrc
+#   (`4.3.1.terminfo` findserts there the same way), so a marked block is the one seam
+# .why the full path: a non-login bash (a tmux pane) may hold no ~/.local/bin on PATH
+GROVE_STARSHIP_BASHRC_MARKER="# grove.provision:2.6.starship"
+grove_provision_2_6_starship_bashrc_upsert() {
+  local rc="$HOME/.bashrc"
+  [[ -f "$rc" ]] || : >"$rc" || { echo "   💥 MalfunctionError: could not make $rc" >&2; return 1; }
+  if grep -qF "$GROVE_STARSHIP_BASHRC_MARKER" "$rc"; then
+    echo "   • ~/.bashrc already inits starship — no work"
+    return 0
+  fi
+  cat >>"$rc" <<'EOF' || { echo "   💥 MalfunctionError: could not append the starship init to $rc" >&2; return 1; }
+
+# grove.provision:2.6.starship
+# .what — the starship prompt in an interactive bash, as zshrc does for zsh
+[[ $- == *i* && -t 1 && -x "$HOME/.local/bin/starship" ]] && eval "$("$HOME/.local/bin/starship" init bash)"
+EOF
+  echo "   • ~/.bashrc — starship init appended ✔ (the next bash reads it)"
 }

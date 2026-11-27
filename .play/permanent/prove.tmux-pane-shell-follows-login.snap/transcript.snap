@@ -1,0 +1,32 @@
+## the login shell, a record that names zsh (exit 0)
+zsh
+
+## the login shell, a record whose shell does not run (exit 0)
+
+
+## verify, a server born with bash (exit 1)
+   ✋ ConstraintError: 1 live tmux server opens a new pane in a shell other than zsh: duct=bash
+      ⇒ each pane skips the login shell's rc, so it shows a bare prompt: no starship
+      fix: rhx grove.provision --what 2.8.tmux --mode apply
+
+## verify, two servers born with bash (exit 1)
+   ✋ ConstraintError: 2 live tmux servers open a new pane in a shell other than zsh: duct=bash spare=bash
+      ⇒ each pane skips the login shell's rc, so it shows a bare prompt: no starship
+      fix: rhx grove.provision --what 2.8.tmux --mode apply
+
+## upsert tell, two servers born with bash (exit 0)
+
+
+## verify, every server told (exit 0)
+   • a new pane in every live server execs the login shell (zsh) ✔
+
+## upsert tell, a wedged server (exit 1)
+refused: wedged
+
+## upsert tell, a record that names no shell (exit 0)
+
+
+## verify, a record that names no shell (exit 0)
+
+
+

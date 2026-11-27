@@ -1,0 +1,22 @@
+🐢 lets see who left what...
+
+🗄️ grove.backup.get --list
+   ├─ <date>T<hh:mm>Z grove-1
+   └─ 1 grove
+
+## this box's own grove, named before its first backup
+🐢 lets see who left what...
+
+🗄️ grove.backup.get --list
+   ├─ <date>T<hh:mm>Z grove-1
+   ├─ (none yet)        grove-with-a-name-past-twenty-four
+   └─ 2 groves
+
+## a grant scoped per grove, with a declared predecessor
+🐢 lets see who left what...
+
+🗄️ grove.backup.get --list
+   ├─ <date>T<hh:mm>Z grove-1
+   ├─ (none yet)        grove-0
+   ├─ 2 groves in this box's reach
+   └─ the grant reaches this grove and its declared predecessor alone; the admin tier lists the fleet

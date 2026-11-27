@@ -278,8 +278,12 @@ inputs:
             tofu     — the check is skipped: a tailnet first contact, by your word
             keep     — the trust step is not run
   --within  seconds to allow one seat's apply               (default 2700)
+  --what    apply ONE bundle (a slug) on both seats, not the whole tree
+            the same reach, push, and ground-then-camper order; no grants,
+            no key placement, no gate — those are claims about a WHOLE box
 
 examples:
+  rhx git.grove.provision boot <name> --what 5.27.backup --mode apply    # one bundle
   rhx git.grove.provision boot <name>                                    # plan
   rhx git.grove.provision boot <name> --mode apply                       # the whole boot
   rhx git.grove.provision boot <name> --mode apply --trust tofu          # a tailnet first contact
@@ -301,7 +305,7 @@ exit 0 = provisioned + gated | 3 = a step failed | 2 = bad input
 
 ## cli · refused: '--wat' (rc 2)
 ✋ ConstraintError: unknown flag '--wat'
-   ├─ valid: --mode plan|apply  --from 0-4  --trust verified|replace|tofu|keep  --within <secs>  --help
+   ├─ valid: --mode plan|apply  --from 0-4  --trust verified|replace|tofu|keep  --within <secs>  --what <slug>  --help
    ├─ fix: rhx git.grove.provision boot <name> --mode apply
    └─ every input: rhx git.grove.provision boot --help
 
@@ -313,28 +317,95 @@ exit 0 = provisioned + gated | 3 = a step failed | 2 = bad input
 
 ## cli · refused: 'grove-demo --mode' (rc 2)
 ✋ ConstraintError: --mode needs a value
-   ├─ fix: rhx git.grove.provision boot <name> --mode apply
+   ├─ fix: rhx git.grove.provision boot grove-demo --mode apply
    └─ every input: rhx git.grove.provision boot --help
 
 ## cli · refused: 'grove-demo --mode yes' (rc 2)
 ✋ ConstraintError: --mode 'yes' is not plan or apply
-   ├─ fix: rhx git.grove.provision boot <name> --mode apply
+   ├─ fix: rhx git.grove.provision boot grove-demo --mode apply
    └─ every input: rhx git.grove.provision boot --help
 
 ## cli · refused: 'grove-demo --from 7' (rc 2)
 ✋ ConstraintError: --from '7' is not a step 0-4
-   ├─ fix: rhx git.grove.provision boot <name> --mode apply
+   ├─ fix: rhx git.grove.provision boot grove-demo --mode apply
    └─ every input: rhx git.grove.provision boot --help
 
 ## cli · refused: 'grove-demo --trust maybe' (rc 2)
 ✋ ConstraintError: --trust 'maybe' is not verified, replace, tofu, or keep
-   ├─ fix: rhx git.grove.provision boot <name> --mode apply
+   ├─ fix: rhx git.grove.provision boot grove-demo --mode apply
    └─ every input: rhx git.grove.provision boot --help
 
 ## cli · refused: 'grove-demo --within soon' (rc 2)
 ✋ ConstraintError: --within 'soon' is not a whole number of seconds
-   ├─ fix: rhx git.grove.provision boot <name> --mode apply
+   ├─ fix: rhx git.grove.provision boot grove-demo --mode apply
    └─ every input: rhx git.grove.provision boot --help
+
+## cli · refused: 'grove-demo --what' (rc 2)
+✋ ConstraintError: --what needs a value
+   ├─ fix: rhx git.grove.provision boot grove-demo --mode apply
+   └─ every input: rhx git.grove.provision boot --help
+
+## cli · refused: 'grove-demo --what a;b' (rc 2)
+✋ ConstraintError: --what 'a;b' is not a bundle slug ([A-Za-z0-9._-])
+   ├─ list them: rhx grove.provision --mode plan
+   ├─ fix: rhx git.grove.provision boot grove-demo --mode apply
+   └─ every input: rhx git.grove.provision boot --help
+
+## cli · refused: 'grove-demo --what 2.8.tmux --from 4' (rc 2)
+✋ ConstraintError: --from 4 skips both seats, so --what would apply naught
+   ├─ fix: rhx git.grove.provision boot grove-demo --what 2.8.tmux --from 2 --mode apply (both seats), or --from 3 (camper alone)
+   └─ every input: rhx git.grove.provision boot --help
+
+## cli · --what plan, --from 0 (rc 0)
+🐢 heres the wave...
+
+🌱 git.grove.provision boot grove-demo --mode plan
+   ├─ what: 2.8.tmux — one bundle, on each seat; no grants, keys, or gate
+   ├─ steps: 1..3
+   ├─ trust: verified
+   ├─ within: 2700s per apply
+   ├─ org: <none> — the apply will derive it off the pushed manifest
+   │  └─ set it if this box is not an ahbode one:
+   │     rhx git.grove.set grove-demo --org <org>
+   └─ run
+      ├─ 1. reach
+      │  · would wake grove-demo, then trust it --trust verified
+      │  · would set alias 'grove-demo.ground' → ground@grove-demo-1:22 (the ground seat, read first)
+      │  └─ platform · none declared in the registry (an ec2 box answers it alone)
+      ├─ 2. ground
+      │  · would push . → grove-demo.ground:git/more/dev-env-setup
+      │  · would apply, detached, up to 2700s
+      ├─ 3. camper
+      │  · would push . → grove-demo:git/more/dev-env-setup
+      │  · would apply, detached, up to 2700s
+
+🌱 plan only — no step ran. drive it with --mode apply
+
+## cli · --what plan, --from 3 (rc 0)
+🐢 heres the wave...
+
+🌱 git.grove.provision boot grove-demo --mode plan
+   ├─ what: 2.8.tmux — one bundle, on each seat; no grants, keys, or gate
+   ├─ steps: 3..3
+   ├─ trust: verified
+   ├─ within: 2700s per apply
+   ├─ org: <none> — the apply will derive it off the pushed manifest
+   │  └─ set it if this box is not an ahbode one:
+   │     rhx git.grove.set grove-demo --org <org>
+   └─ run
+      ├─ 3. camper
+      │  · would push . → grove-demo:git/more/dev-env-setup
+      │  · would apply, detached, up to 2700s
+
+🌱 plan only — no step ran. drive it with --mode apply
+
+## what summary, apply, --from 0 (rc 0)
+
+🌳 2.8.tmux applied on grove-demo — ground, then camper, ONE apply each
+
+## what summary, apply, --from 3 (rc 0)
+
+🌳 2.8.tmux applied on grove-demo — camper alone (--from 3 skipped ground), ONE apply
 
 ## sink · osc 52, bel-terminated (rc 0)
 in:   D I F F E R S : a w s . e c 2 033 ] 5 2 ; c ; Z X Z p b A = = \a e n d 

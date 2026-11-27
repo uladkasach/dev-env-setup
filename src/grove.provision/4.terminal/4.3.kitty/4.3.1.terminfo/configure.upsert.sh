@@ -51,6 +51,10 @@ grove_provision_4_3_1_terminfo_configure_upsert() {
     # prune any legacy block first, so the findsert below cannot double it
     local legacy
     for legacy in "${GROVE_TERMINFO_MARKERS_LEGACY[@]}"; do
+      # 🛑 the CURRENT marker is in the list too, so it must be skipped here: a prune of
+      #   it re-appended the block on every apply, and each run reported a change
+      #   (📜 2026-11-20, a hetzner grove: "pruned a legacy erase block")
+      [[ "$legacy" == "$marker" ]] && continue
       grep -qF "$legacy" "$rc" || continue
 
       # delete the marker line through the `stty erase` line that closes its block

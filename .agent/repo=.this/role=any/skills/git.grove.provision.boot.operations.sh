@@ -15,6 +15,17 @@
 ######################################################################
 
 ######################################################################
+# .what = run one of this role's own skills, scoped to repo=.this/role=any
+# .why  = the bhuild supervisor role ships its own git.grove.send, git.grove.wake,
+#   duct.*, and term.*, so a bare slug refuses as ambiguous and boot never reaches
+#   the box. a stub RHX (the plays) takes the args unscoped, so its echoes hold
+######################################################################
+rhx_run() {
+  [[ "${RHX:-rhx}" == rhx ]] || { "$RHX" "$@"; return; }
+  rhx "$@" --repo .this --role any
+}
+
+######################################################################
 # halt — name the step, why it did not hold, and the command that repairs it
 #
 # 🛑 EVERY line it prints goes through `__duct_strip_escapes`
@@ -85,7 +96,10 @@ boot_resume_line() {
   #   the key is laid, trust.gen answers "already trusted" and the resume re-proves it,
   #   where `keep` would skip the very step that failed (the tailnet trust halt)
   [[ -n "${BOOT_RESUME_TRUST:-}" ]] && trust="$BOOT_RESUME_TRUST"
-  printf '%s git.grove.provision boot %s --mode apply --from %s --trust %s' "$RHX" "$GROVE" "$step" "$trust"
+  # --what rides along: a resume without it converges the WHOLE tree, where the
+  #   human asked for one bundle (measured 2026-11-22: a 5.27.backup boot's step-1
+  #   halt printed a resume that would have applied every bundle)
+  printf '%s git.grove.provision boot %s --mode apply --from %s --trust %s%s' "$RHX" "$GROVE" "$step" "$trust" "${WHAT:+ --what $WHAT}"
 }
 
 # .what = is this grove reached over the tailnet? (the registry's host, by the shared reader)
@@ -335,6 +349,20 @@ boot_seat_outran_halt() {
 }
 
 ######################################################################
+# .what = the last line of a `--what` boot — what ran, on which seats
+# .why  = `--what` ends at the seats (the gate is a claim about a WHOLE box), so
+#   this line is the whole verdict a human reads; a function so
+#   `prove.boot-steps-name-each-verdict` can render each arm with no live seat
+######################################################################
+boot_what_summary() {
+  echo ""
+  [[ "$MODE" == "plan" ]] && { echo "🌱 plan only — no step ran. drive it with --mode apply"; return 0; }
+  # name only the seats that ran: --from 3 skips the ground step
+  [[ "$FROM" -le 2 ]] && { echo "🌳 $WHAT applied on $GROVE — ground, then camper, ONE apply each"; return 0; }
+  echo "🌳 $WHAT applied on $GROVE — camper alone (--from $FROM skipped ground), ONE apply"
+}
+
+######################################################################
 # .what = once a seat converges, respawn its duct, so the duct's shell reads the
 #   rc files this apply wrote
 # .why  = the duct opens at wake, before any apply lays PATH, and a tmux pane keeps
@@ -345,7 +373,7 @@ boot_seat_duct_reborn() {
   local seat="$1" step="$2" label="$3" uri out
   # the address follows `_git_grove_duct_uri` (bash_aliases.sh), as git.grove.play.await does
   uri="duct://$seat/main/mechanic"
-  if out="$("$RHX" duct.reboot --on "$uri" 2>&1)"; then
+  if out="$(rhx_run duct.reboot --on "$uri" 2>&1)"; then
     say "│  └─ ✔ duct reborn ($uri) — its shell reads this apply's PATH"
     return 0
   fi
@@ -383,7 +411,7 @@ boot_keys_place() {
     say "│  ├─ keys · would run: $RHX git.grove.auth.keys.set $GROVE --mode apply${BOOT_ORG:+ --org $BOOT_ORG}"
     return 0
   fi
-  if ! "$RHX" git.grove.auth.keys.set "$GROVE" --mode apply ${BOOT_ORG:+--org "$BOOT_ORG"}; then
+  if ! rhx_run git.grove.auth.keys.set "$GROVE" --mode apply ${BOOT_ORG:+--org "$BOOT_ORG"}; then
     # the camper's apply already held; only the keys are owed, so the fix places them
     #   and the resume starts at the gate, never a second camper apply
     BOOT_RESUME_FROM=4 halt 3 keys \
@@ -411,7 +439,7 @@ boot_admin_seat_clean() {
     say "│  └─ admin seat · would run: $RHX git.grove.send $GROVE.ground --reply --play $play"
     return 0
   fi
-  if ! "$RHX" git.grove.send "$GROVE.ground" --reply --play "$play"; then
+  if ! rhx_run git.grove.send "$GROVE.ground" --reply --play "$play"; then
     BOOT_RESUME_FROM=4 halt 3 "admin seat" \
       "the admin seat $GROVE.ground holds a credential or crew work — the play above names each by path" \
       "⇒ a camper-aimed command reached ground. read where each seat dials:" \

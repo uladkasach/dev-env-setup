@@ -6,23 +6,16 @@ when a human needs something installed or configured, hand them **the repo's ent
 never a one-off command, and never a `source <file> && <function>` pair.
 
 ```bash
-rhx grove.provision --what <slug> --mode apply
-```
-
-or, from a shell that has the aliases:
-
-```bash
-grove.provision --what <slug> --mode apply
+rhx grove.provision --what <slug> --mode apply   # or bare `grove.provision`, from a shell
 ```
 
 ## .why
 
-- **reproducible** — the next machine gets the same thing, because the repo is the record
-- **idempotent** — safe to re-run; a re-run is how the machine catches up
-- **verified** — the bundle's `*.verify` phases prove the result, which a bare command never
-  does (`rule.require.upgrade-entries-verify-themselves`)
-- **discoverable** — `--mode plan` shows what would happen before it happens
-- **one source of truth** — a one-off command is a second, unrecorded way to change a box
+- **reproducible** — the repo is the record, so the next machine converges alike
+- **idempotent** — a re-run is how a machine catches up
+- **verified** — the bundle's `*.verify` phases prove the result (`rule.require.upgrade-entries-verify-themselves`)
+- **discoverable** — `--mode plan` shows it first
+- **one source of truth** — a one-off is a second, unrecorded way to change a box
 
 ## .examples
 
@@ -45,17 +38,22 @@ source ~/git/more/dev-env-setup/src/install_env.pt5.devtools.sh
 install_rust
 ```
 
-## ⚠️ .why that last example is here — this rule broke its own rule
+📜 that last form was this brief's "good" example until 2026-07-31, and its file was gone. an
+example is read more often than the prose, so one that contradicts the `.what` teaches the
+opposite with the rule's authority.
 
-📜 until 2026-07-31 the `source` + call form above was this brief's **"good" example**. it was
-wrong twice over: the file it named had been deleted, so the command could not run — and
-`source <file> && <function>` IS a one-off command anyway. it is unrecorded, it skips the
-verify, it depends on a file layout free to change, and it converges no state. this brief
-forbade one-off commands in its `.what` and modeled one in its `.examples`.
+## 🛑 .on a GROVE, one command: `boot --what`
 
-> **a rule's examples are read far more often than its prose.** an example that contradicts
-> the `.what` does not merely fail to help; it teaches the opposite, with the rule's own
-> authority behind it.
+```bash
+rhx git.grove.provision boot <grove> --what <slug> --mode apply   # drop --what: whole tree
+```
+
+it owns the reach, the push, and the ground-then-camper order. never hand a human its
+internals (`wake`, `push`, `send … grove.provision._.sh`) as a list.
+
+📜 2026-11-20: a clone found no `--what`, and handed the human six raw steps against a live
+box. ⇒ **a skill short one flag is a skill to EXTEND, never a procedure to re-type.** a read
+of a skill's internals for steps is the cue (`rule.forbid.adhoc-shell`).
 
 ## .how to find the slug
 
@@ -75,14 +73,15 @@ the bundle must follow — else the box holds a change the repo cannot reproduce
 
 ## .note
 
-the filename keeps `install`, a superseded verb (`term=grove.provision._.choice._.md`): the
-rule forbids every one-off command, not only `grove.provision`'s.
+`install` in the filename is a superseded verb, kept since the rule spans every one-off.
 
 ## .enforcement
 
 - a one-off command handed to a human where a bundle exists = **blocker**
 - a `source <file> && <function>` instruction = **blocker** (it is a one-off in disguise)
 - a change applied to a box with no bundle to reproduce it = **blocker**
+- a push + send sequence handed to a human to apply a bundle on a grove = **blocker** —
+  `git.grove.provision boot <grove> --what <slug>` is the one command; extend it if it falls short
 
 ## .see also
 

@@ -1,0 +1,52 @@
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --all
+   ├─ org=acme/repo=solo/tree=solo · <date> · STANDARD
+   │  ├─ 🌙 1 file cut as a credential never left grove-1; re-derive each here
+   │  │  └─ store.jks
+   │  └─ + laid at <fixture>/fresh/<seat>/git/acme/solo, whole from its own unit (it has no origin)
+   │     ├─ HEAD main
+   │     └─ 0 files laid · 0 deletes applied
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  ├─ ⇄ graft into <fixture>/fresh/<seat>/git/acme/widget (each file it changed is kept)
+   │  ├─ feat-x                       = (already equal)
+   │  ├─ gone                         = (already equal)
+   │  ├─ main                         = (already equal)
+   │  ├─ topic                        ≠ diverged (live <sha>, grove-1 <sha>); landed as grove-1/topic
+   │  ├─ = 0 files of the dead checkout laid · 0 deletes applied
+   │  │  ├─ = notes.txt (kept: this clone changed it)
+   │  │  └─ to read the dead checkout whole, lay it aside: rhx grove.backup.restore --from grove-1 --of acme/widget --tree widget --into <dir>
+   │  └─ 🌙 4 files cut as a credential never left grove-1; re-derive each here
+   │     ├─ .env
+   │     ├─ certs/site.pem
+   │     ├─ deploy.txt
+   │     └─ token.txt
+   ├─ org=acme/repo=widget/tree=widget.feat-x · <date> · STANDARD
+   │  └─ = already here; kept as it stands
+   ├─ org=acme/repo=widget/tree=widget.spike · <date> · STANDARD
+   │  └─ + laid at <fixture>/fresh/<seat>/git/acme/_worktrees/widget.spike, linked into <fixture>/fresh/<seat>/git/acme/widget
+   │     ├─ HEAD detached at <sha>
+   │     └─ 1 file laid · 0 deletes applied
+   ├─ org=acme/orphan=widget.dropped · <date> · STANDARD
+   │  ├─ into <fixture>/fresh/<seat>/git/acme/_worktrees/widget.dropped
+   │  ├─ + .agent/… (1 file)
+   │  └─ 🌙 2 files cut as a credential never left grove-1; re-derive each here
+   │     ├─ .env
+   │     └─ notes.txt
+   ├─ org=acme/repo=widget/setaside=widget.old.<sha> · <date> · STANDARD
+   │  ├─ into <fixture>/fresh/<seat>/git/acme/_setaside/widget/widget.old.<sha>
+   │  ├─ + .agent/… (1 file)
+   │  └─ 🌙 1 file cut as a credential never left grove-1; re-derive each here
+   │     └─ notes.txt
+   ├─ home=.claude · <date> · STANDARD
+   │  ├─ into <fixture>/fresh/<seat>/.claude
+   │  ├─ + projects/… (1 file)
+   │  ├─ = settings.json (kept: this box's copy)
+   │  └─ 🌙 the brain login never left grove-1; log in here: rhx brains.auth.set
+   ├─ home=.rhachet · <date> · STANDARD
+   │  ├─ into <fixture>/fresh/<seat>/.rhachet
+   │  ├─ + meter/… (1 file)
+   │  ├─ 🌙 1 file cut as a credential never left grove-1; re-derive each here
+   │  │  └─ meter/notes.txt
+   │  └─ 🌙 keyrack/ not laid: it is sealed to the host key of the box that wrote it; to place this grove's own, from the laptop: rhx git.grove.auth.keys.set grove-1 --mode apply
+   └─ 8 units · 7 restored · 1 already here · 0 await a thaw · 0 refused · 0 failed

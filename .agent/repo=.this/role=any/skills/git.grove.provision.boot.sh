@@ -76,6 +76,14 @@
 #             `tofu` accepts a scan with NO attestation, and is a human's call
 #             to make explicitly — see the 🛑 at the trust step below
 #   --within  seconds to allow one apply   default 2700 (45m)
+#   --what    one bundle slug — the same steps 1-3, each apply narrowed to it
+#
+# 🛑 .--what is how ONE bundle reaches a grove — never a hand-typed push + send
+#      📜 2026-11-20: asked to apply 5.27.backup alone, a clone handed the human six
+#         commands (sync, trust, wake .ground, push, send plan, send apply) copied out
+#         of this file's own internals. each was a step this skill already owns, in an
+#         order it already enforces. a skill short one flag is a skill to extend, never
+#         a procedure to re-type (`rule.forbid.adhoc-shell`)
 #
 # guarantee:
 #   - exit 0 = the box provisioned AND passed the gate
@@ -110,8 +118,12 @@ if [[ " $* " == *" help "* || " $* " == *" --help "* || " $* " == *" -h "* ]]; t
   echo "            tofu     — the check is skipped: a tailnet first contact, by your word"
   echo "            keep     — the trust step is not run"
   echo "  --within  seconds to allow one seat's apply               (default 2700)"
+  echo "  --what    apply ONE bundle (a slug) on both seats, not the whole tree"
+  echo "            the same reach, push, and ground-then-camper order; no grants,"
+  echo "            no key placement, no gate — those are claims about a WHOLE box"
   echo ""
   echo "examples:"
+  echo "  rhx git.grove.provision boot <name> --what 5.27.backup --mode apply    # one bundle"
   echo "  rhx git.grove.provision boot <name>                                    # plan"
   echo "  rhx git.grove.provision boot <name> --mode apply                       # the whole boot"
   echo "  rhx git.grove.provision boot <name> --mode apply --trust tofu          # a tailnet first contact"
@@ -139,6 +151,7 @@ MODE="plan"
 #    invocation. to default to 1 would make the preflight opt-in, which is the
 #    same as absent: a human who knew to ask for it did not need it.
 FROM=0
+WHAT=""
 ####################################################################
 # 🛑 the default is VERIFIED, and never `tofu`
 #
@@ -169,28 +182,32 @@ FROM=0
 TRUST="verified"
 WITHIN=2700
 
-# a bad input names itself, the fix, and the help — then exits 2 (the caller fixes it)
+# a bad input names itself, ONE next step, and the help — then exits 2 (the caller fixes it)
+#   the hint, where the refusal has one, IS that step; else the call itself, with what the caller
+#   already named (its grove, its --what), so a fix never widens a one-bundle boot to the whole tree
 boot_input_refused() {
-  local what="$1" hint="${2:-}"
+  local what="$1" hint="${2:-}" call="rhx git.grove.provision boot ${GROVE:-<name>}"
+  [[ "${WHAT:-}" =~ ^[A-Za-z0-9._-]+$ ]] && call+=" --what $WHAT"
   echo "✋ ConstraintError: $what" >&2
-  [[ -n "$hint" ]] && echo "   ├─ $hint" >&2
-  echo "   ├─ fix: rhx git.grove.provision boot <name> --mode apply" >&2
+  [[ -n "$hint" && "$hint" != fix:* ]] && echo "   ├─ $hint" >&2
+  if [[ "$hint" == fix:* ]]; then echo "   ├─ $hint" >&2; else echo "   ├─ fix: $call --mode apply" >&2; fi
   echo "   └─ every input: rhx git.grove.provision boot --help" >&2
   exit 2
 }
 
 while [[ $# -gt 0 ]]; do
   # a value flag with no value names itself, never a bash `unbound variable`
-  [[ "$1" =~ ^--(mode|from|trust|within)$ && $# -lt 2 ]] && boot_input_refused "$1 needs a value"
+  [[ "$1" =~ ^--(mode|from|trust|within|what)$ && $# -lt 2 ]] && boot_input_refused "$1 needs a value"
   case "$1" in
     --mode)   MODE="$2";   shift 2 ;;
+    --what)   WHAT="$2";   shift 2 ;;
     --from)   FROM="$2";   shift 2 ;;
     --trust)  TRUST="$2";  shift 2 ;;
     --within) WITHIN="$2"; shift 2 ;;
     --skill|--repo|--role) shift 2 ;;
     --) shift; [[ -z "$GROVE" ]] && { GROVE="${1:-}"; shift 2>/dev/null || true; } ;;
     -*) boot_input_refused "unknown flag '$1'" \
-          "valid: --mode plan|apply  --from 0-4  --trust verified|replace|tofu|keep  --within <secs>  --help" ;;
+          "valid: --mode plan|apply  --from 0-4  --trust verified|replace|tofu|keep  --within <secs>  --what <slug>  --help" ;;
     *) [[ -z "$GROVE" ]] && GROVE="$1"; shift ;;
   esac
 done
@@ -201,6 +218,12 @@ done
 [[ "$TRUST" =~ ^(verified|tofu|replace|keep)$ ]] ||
   boot_input_refused "--trust '$TRUST' is not verified, replace, tofu, or keep"
 [[ "$WITHIN" =~ ^[0-9]+$ ]] || boot_input_refused "--within '$WITHIN' is not a whole number of seconds"
+# 🛑 a LIVE clamp — the slug reaches a command line on a remote box
+[[ -z "$WHAT" || "$WHAT" =~ ^[A-Za-z0-9._-]+$ ]] ||
+  boot_input_refused "--what '$WHAT' is not a bundle slug ([A-Za-z0-9._-])" "list them: rhx grove.provision --mode plan"
+# `--what` runs the two seat steps (2, 3) and no gate: a --from past them would apply naught
+[[ -z "$WHAT" || "$FROM" -le 3 ]] ||
+  boot_input_refused "--from $FROM skips both seats, so --what would apply naught" "fix: rhx git.grove.provision boot ${GROVE:-<name>} --what $WHAT --from 2 --mode apply (both seats), or --from 3 (camper alone)"
 
 # the transport, shared so it cannot drift from every other grove read
 # (`rule.forbid.two-writers-on-one-artifact`)
@@ -277,11 +300,17 @@ if [[ -n "$BOOT_ORG" && "$BOOT_ORG" == *[!A-Za-z0-9._@-]* ]]; then
 fi
 
 [[ -n "$BOOT_ORG" ]] && UPGRADE="$UPGRADE --org $BOOT_ORG"
+[[ -n "$WHAT" ]] && UPGRADE="$UPGRADE --what $WHAT"
 
 echo "🐢 heres the wave..."
 echo ""
 echo "🌱 git.grove.provision boot $GROVE --mode $MODE"
-echo "   ├─ steps: $FROM..4"
+if [[ -n "$WHAT" ]]; then
+  echo "   ├─ what: $WHAT — one bundle, on each seat; no grants, keys, or gate"
+  echo "   ├─ steps: $(( FROM > 1 ? FROM : 1 ))..3"
+else
+  echo "   ├─ steps: $FROM..4"
+fi
 echo "   ├─ trust: $TRUST"
 echo "   ├─ within: ${WITHIN}s per apply"
 # ⚠️ an ABSENT org is reported out loud, because its consequence is silent: the
@@ -350,7 +379,7 @@ echo "   └─ run"
 ######################################################################
 _prior_apply_at() {
   local seat="$1" log="$2" rc=0
-  "$RHX" git.grove.send "$seat" --await 15 --reply --within 25 \
+  rhx_run git.grove.send "$seat" --await 15 --reply --within 25 \
     --what "test -f $log" >/dev/null 2>&1 || rc=$?
   case "$rc" in
     0)  echo yes ;;      # the log is there — an apply ran on THIS disk
@@ -372,7 +401,8 @@ drive_seat() {
   local seat="$1" label="$2" step="$3" upgrade="${4:-$UPGRADE}"
   local log='$HOME/grove.provision.'"$label"'.log'
 
-  case "$(_prior_apply_at "$seat" "$log")" in
+  # a `--what` run follows a whole-tree one by design, so a prior log is no news there
+  [[ -z "$WHAT" ]] && case "$(_prior_apply_at "$seat" "$log")" in
     yes)
       say "│  ⚠️ this BOX already holds an apply log for $label"
       say "│     a second apply proves the SECOND run, and says none of what the"
@@ -402,7 +432,7 @@ drive_seat() {
   #    that swallows its steps' errors reports a step number and destroys the
   #    one sentence that says WHY (`term=swallow`) — and the `fix:` below is a
   #    guess by construction, since it cannot see what went wrong.
-  if ! "$RHX" git.grove.push "$seat" --from . --into "$INTO" --mode apply >/dev/null; then
+  if ! rhx_run git.grove.push "$seat" --from . --into "$INTO" --mode apply >/dev/null; then
     halt "$step" "$label" \
       "the push to $seat did not land" \
       "$RHX git.grove.wake $seat --mode apply" \
@@ -469,7 +499,7 @@ drive_seat() {
   #   human's box — which is the whole point, since the seats do not share one.
   local slice="sed -n \"/$mark/,\\\$p\" $log"
 
-  if ! "$RHX" git.grove.send "$seat" --reply \
+  if ! rhx_run git.grove.send "$seat" --reply \
          --what "printf '%s\n' '$mark' >> $log" >/dev/null; then
     halt "$step" "$label" \
       "the run marker did not land, so no read here can be bounded to THIS run" \
@@ -481,7 +511,7 @@ drive_seat() {
 
   # ── ONE apply, detached, so it outlives this connection
   local sent rc=0
-  sent="$("$RHX" git.grove.send "$seat" --detach --log "$log" --what "$upgrade" 2>&1)" || rc=$?
+  sent="$(rhx_run git.grove.send "$seat" --detach --log "$log" --what "$upgrade" 2>&1)" || rc=$?
   [[ "$rc" -eq 97 ]] && boot_seat_unproven_halt "$seat" "$step" "$label" "$slice"
   if [[ "$rc" -ne 0 ]]; then
     halt "$step" "$label" "the apply could not be sent (rc=$rc)" "$sent"
@@ -564,7 +594,7 @@ drive_seat() {
       #    claims then shows none of them, and the halt below says "each is
       #    named above" over an empty space
       #    (`rule.forbid.bare-globs-in-dual-shell-files`).
-      "$RHX" git.grove.send "$seat" --reply \
+      rhx_run git.grove.send "$seat" --reply \
         --what "$slice | grep ✋ | grep -v 'grove.provision finished'" || true
       echo ""
       halt "$step" "$label" \
@@ -615,8 +645,7 @@ drive_seat() {
 #      | the EPHEMERAL_VIA_GITHUB_APP rows | a human, but not YET — the mint needs
 #      |   | a tty ON THE BOX, and at minute 0 of a first boot no box exists
 #
-#      ⇒ each is a CLAIM, and the reach ask is filed in
-#        `briefs/creds/handoff.infra.grove-account-reach.md`.
+#      ⇒ each is a CLAIM, and the reach ask is ahbode/infrastructure's.
 #
 #      ⚠️ a rung for either would answer 🌙 on every run, forever. a rung whose
 #         verdict never varies reports no fact while it claims to — and it is the
@@ -640,7 +669,9 @@ _grant_param_github_token() {
   grove_provision_5_12_rack_param_name
 }
 
-if [[ "$FROM" -le 0 ]]; then
+# ⚠️ `--what` skips the grants: they are owed by the WHOLE tree, and one bundle
+#    asks a human for none of them
+if [[ "$FROM" -le 0 && -z "$WHAT" ]]; then
   say "├─ 0. grants"
 
   _grant_param="$(_grant_param_github_token)" || _grant_param=""
@@ -743,7 +774,7 @@ if [[ "$FROM" -le 1 ]]; then
   else
     # ⚠️ stderr flows through — see drive_seat for why a sequencer must not
     #    swallow its steps' own reasons
-    "$RHX" git.grove.wake "$GROVE" --mode apply >/dev/null || boot_wake_halt "$?"
+    rhx_run git.grove.wake "$GROVE" --mode apply >/dev/null || boot_wake_halt "$?"
     say "│  ├─ wake ✔"
 
     if [[ "$TRUST" == "keep" ]]; then
@@ -763,7 +794,7 @@ if [[ "$FROM" -le 1 ]]; then
       # a pass prints one line; a refusal replays trust.gen's own rows, since the
       #   halt sends the human to them (escape bytes from a box are stripped)
       # shellcheck disable=SC2086
-      TRUST_OUT="$("$RHX" git.grove.trust.gen --grove "$GROVE" --mode apply $TRUST_FLAGS)" \
+      TRUST_OUT="$(rhx_run git.grove.trust.gen --grove "$GROVE" --mode apply $TRUST_FLAGS)" \
         || { printf '%s\n' "$TRUST_OUT" | tr -d '\033\007' | sed 's/^/│  │  /'; boot_trust_halt; }
       say "│  ├─ trust ✔ ($TRUST)"
       BOOT_TRUST_HELD=1
@@ -792,13 +823,24 @@ if [[ "$FROM" -le 3 ]]; then
   say "├─ 3. camper"
   # the keys are this step's NEXT act, so the apply defers an unplaced key row to it
   #   rather than halt one step short of the step that places it (`5.16.keys` verify)
-  drive_seat "$GROVE" camper 3 "GROVE_BOOT_PLACES_KEYS=1 $UPGRADE"
+  if [[ -n "$WHAT" ]]; then
+    drive_seat "$GROVE" camper 3
+  else
+    drive_seat "$GROVE" camper 3 "GROVE_BOOT_PLACES_KEYS=1 $UPGRADE"
 
-  # 🛑 then the KEYS, on the camper — the boot places them, never a human
-  boot_keys_place
+    # 🛑 then the KEYS, on the camper — the boot places them, never a human
+    boot_keys_place
 
-  # 🛑 then the ADMIN seat is read, so ground's cleanliness is proven by the boot itself
-  boot_admin_seat_clean
+    # 🛑 then the ADMIN seat is read, so ground's cleanliness is proven by the boot itself
+    boot_admin_seat_clean
+  fi
+fi
+
+# ⚠️ `--what` ends at the seats: the gate is a claim about a WHOLE box, and one
+#    bundle's applies prove that bundle alone (each verify ran inside its apply)
+if [[ -n "$WHAT" ]]; then
+  boot_what_summary
+  exit 0
 fi
 
 ######################################################################
@@ -813,7 +855,7 @@ if [[ "$FROM" -le 4 ]]; then
     exit 0
   fi
   echo ""
-  if ! "$RHX" git.grove.provision test "$GROVE"; then
+  if ! rhx_run git.grove.provision test "$GROVE"; then
     ####################################################################
     # 🛑 this line names NO SUBJECT, on purpose
     #

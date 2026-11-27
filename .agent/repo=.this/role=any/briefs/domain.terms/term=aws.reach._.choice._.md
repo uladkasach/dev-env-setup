@@ -21,7 +21,6 @@ reach; so does a box with a profile whose role refuses it.
 - `.agent/repo=.this/role=any/skills/aws.reach.set.sh`         # the operation
 - `src/grove.provision/5.devtools/5.13.reach/`                  # the bundle
 - `.agent/repo=.this/role=any/briefs/creds/howdoes.a-box-reach-an-aws-account.md`
-- `.agent/repo=.this/role=any/briefs/creds/handoff.infra.grove-account-reach.md`
 
 ## .why the `aws.` prefix
 this dir requires a term to carry its bounded context (`.readme.md` — `grove.stop`,

@@ -1,0 +1,27 @@
+
+## the first pass, each unit put (exit 0)
+🌲 grove backup · grove=grove-1 · 8 units
+   + user=<seat>/home=.claude
+   + user=<seat>/home=.rhachet
+   + user=<seat>/org=acme/orphan=widget.dropped
+   + user=<seat>/org=acme/repo=solo/tree=solo
+   + user=<seat>/org=acme/repo=widget/setaside=widget.old.<sha>
+   + user=<seat>/org=acme/repo=widget/tree=widget
+   + user=<seat>/org=acme/repo=widget/tree=widget.feat-x
+   + user=<seat>/org=acme/repo=widget/tree=widget.spike
+✓ grove backup · 8 put · 0 skipped
+
+## a quiet pass, naught changed (exit 0)
+🌲 grove backup · grove=grove-1 · 8 units
+✓ grove backup · 0 put · 8 skipped
+
+## a pass whose put the bucket denied (verdict failed)
+🌲 grove backup · grove=grove-1 · 8 units
+✗ grove backup · FAILED · access denied: s3:PutObject
+   └─ the grant refused it. a box reaches its own grove and its declared predecessor alone: on those, owed by ahbode/infrastructure (the per-grove grant); on any other grove, the admin tier holds it
+
+## a failed pass, one unit with no room on the disk (exit 1)
+🌲 grove backup · grove=grove-1 · 8 units
+   ✗ user=<seat>/org=acme/repo=widget/tree=widget.feat-x · disk · <n> MiB free; this needs <n> MiB and keeps <n> MiB free
+✗ grove backup · FAILED · 1 of 8 units did not land · 0 put · 7 skipped
+   └─ free space on the disk that holds <fixture>/state, then: sudo systemctl start grove-backup.service

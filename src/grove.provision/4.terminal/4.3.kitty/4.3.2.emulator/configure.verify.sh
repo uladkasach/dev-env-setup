@@ -56,7 +56,7 @@ grove_provision_4_3_2_emulator_configure_verify() {
   local kitten unparsed=()
   for kitten in "${kittens[@]}"; do
     [[ -f "$conf_dir/$kitten" ]] || continue
-    kitty +runpy "
+    timeout -k 5 20 kitty +runpy "
 import sys
 src = open('$conf_dir/$kitten').read()
 try:
@@ -64,7 +64,7 @@ try:
 except SyntaxError as e:
     print('%s:%s %s' % ('$kitten', e.lineno, e.msg))
     sys.exit(1)
-" >/dev/null 2>&1 || unparsed+=("$kitten")
+" </dev/null >/dev/null 2>&1 || unparsed+=("$kitten")
   done
   if [[ ${#unparsed[@]} -gt 0 ]]; then
     _kitty_verify_fail "${#unparsed[@]} kitten(s) do not parse: ${unparsed[*]}" \
@@ -76,14 +76,8 @@ except SyntaxError as e:
   fi
 
   # 2. kitty's loader RESOLVES remote control to a disabled value — an allowlist (m2-m6)
-  local rc_policy="" rc_source=""
-  if command -v kitty >/dev/null 2>&1; then
-    rc_policy="$(timeout -k 5 20 kitty +runpy "
-from kitty.config import load_config
-print(load_config('$conf').allow_remote_control)
-" 2>/dev/null | tail -1 | tr -d '[:space:]')"
-    [[ -n "$rc_policy" ]] && rc_source="kitty's own loader"
-  fi
+  local rc_policy rc_source="kitty's own loader"
+  rc_policy="$(_kitty_loader_get "$conf" 'o.allow_remote_control')"
   if [[ -z "$rc_policy" ]]; then
     echo "   🌙 kitty's config loader did not answer, so the effective"
     echo "      allow_remote_control is UNREAD on this box"
@@ -135,14 +129,8 @@ print(load_config('$conf').allow_remote_control)
 
   # 2e. the render delays kitty READS — a delay felt as no change can mean either "no
   #     felt cost" or "never read", and only the loader parts the two
-  local delays=""
-  if command -v kitty >/dev/null 2>&1; then
-    delays="$(timeout -k 5 20 kitty +runpy "
-from kitty.config import load_config
-o = load_config('$conf')
-print(o.repaint_delay, o.input_delay)
-" 2>/dev/null | tail -1)"
-  fi
+  local delays
+  delays="$(_kitty_loader_get "$conf" "'%s %s' % (o.repaint_delay, o.input_delay)")"
   if [[ -z "$delays" ]]; then
     echo "   🌙 kitty's loader did not answer, so the render delays are UNREAD on this box"
   else
@@ -207,7 +195,7 @@ load_config('$conf', accumulate_bad_lines=bad)
 for b in bad:
     print('BADLINE line %s: %s' % (b.number, b.exception))
 print('PARSE_READ_OK')
-" 2>&1)" || parse_rc=$?
+" </dev/null 2>&1)" || parse_rc=$?
     if [[ "$parse_rc" -ne 0 ]] || [[ "$parse_out" != *PARSE_READ_OK* ]]; then
       echo "   🌙 kitty's config loader did not answer; parse unproven"
       echo "      ⇒ it said: $(printf '%s' "$parse_out" | head -2 | tr '\n' ' ')"

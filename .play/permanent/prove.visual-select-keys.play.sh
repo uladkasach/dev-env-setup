@@ -237,6 +237,13 @@ run_kitty() {
     grep -q '^done=1' "$kout" 2>/dev/null && break
     sleep 0.5
   done
+  # the bind runs in the server, so a refusal sits in its log; read it while kitty's client lives
+  if [[ "$mode" == tmux ]]; then
+    local client
+    # each ask is bounded and fed a closed stdin, so a wedged scratch server cannot hold the play
+    client="$(timeout -k 2 10 tmux -L "$KITTY_TMUX_SOCK" list-clients -F '#{client_name}' </dev/null 2>/dev/null | head -1)"
+    timeout -k 2 10 tmux -L "$KITTY_TMUX_SOCK" show-messages -t "$client" </dev/null 2>&1 | tail -n 8 >"$kout.msgs"
+  fi
   kill "$kpid" 2>/dev/null
   grep -q '^done=1' "$kout" || { echo "   ✋ the watcher never reported"; FAILED=1; }
   while IFS= read -r line; do
@@ -247,7 +254,11 @@ run_kitty() {
       *) echo "   · $line" ;;
     esac
   done < "$kout"
-  rm -f "$kout" "$kout.count"
+  if [[ "$mode" == tmux ]] && grep -q '=miss ' "$kout"; then
+    echo "   · the scratch tmux server's messages, last 8:"
+    sed 's/^/     │ /' "$kout.msgs" 2>/dev/null
+  fi
+  rm -f "$kout" "$kout.count" "$kout.msgs"
 }
 
 if [[ -z "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]]; then

@@ -1,0 +1,186 @@
+
+## · status, the last run ok
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   ├─ backup: ✓ <age> ago · 1 put · 7 skipped
+   │  └─ last run: <date>T<hh:mm>Z · 8 units · 1 put · 7 skipped · 0 failed
+   └─ last ok: <date>T<hh:mm>Z
+
+## · status, the last run failed
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   ├─ backup: ✗ FAILED · access denied: s3:PutObject · <age> · last ok <age> ago
+   │  └─ last run: <date>T<hh:mm>Z · 8 units · 0 put · 0 skipped · 0 failed · 8 not reached
+   ├─ last ok: <date>T<hh:mm>Z
+   └─ why
+      ├─ the grant refused it. a box reaches its own grove and its declared predecessor alone: on those, owed by ahbode/infrastructure (the per-grove grant); on any other grove, the admin tier holds it
+      └─ the run's full text, as ground (camper cannot read the journal): sudo journalctl -u grove-backup -n 50
+
+## · status, never enrolled, the ground seat
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   └─ backup: ✗ NOT ENROLLED
+      └─ fix: rhx grove.provision --what 5.27.backup --mode apply
+
+## · status, never enrolled, the camper seat
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   └─ backup: ✗ NOT ENROLLED
+      └─ fix: rhx grove.provision --what 5.27.backup --mode apply, from the seat with sudo (ground); this seat holds none
+
+## · status, on a laptop
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   └─ backup: 🌙 not on this box: the grove backup runs on camp groves (cloud@*); this is local@unix
+      └─ a laptop's own work rides by its git remotes, and `git backup` by hand
+
+## · status, enrolled, no run has written yet
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   └─ backup: ✗ STALE · never
+
+## · status, the first run at work
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   └─ backup: ⏳ the first run is at work
+
+## · status, the last ok run is old
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   ├─ backup: ✗ STALE · last ok <age> ago
+   │  └─ last run: <date>T<hh:mm>Z · 8 units · 1 put · 7 skipped · 0 failed
+   ├─ last ok: <date>T<hh:mm:ss>Z
+   └─ why
+      └─ the run's full text, as ground (camper cannot read the journal): sudo journalctl -u grove-backup -n 50
+
+## · status, failed: the grove name undeclared
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   ├─ backup: ✗ FAILED · grove name undeclared · <age> · last ok <age> ago
+   │  └─ last run: <date>T<hh:mm>Z · 0 units · 0 put · 0 skipped · 0 failed
+   ├─ last ok: <date>T<hh:mm>Z
+   └─ why
+      ├─ owed by ahbode/infrastructure: the grove name, declared at <fixture>/etc/name (owed item 2)
+      └─ the run's full text, as ground (camper cannot read the journal): sudo journalctl -u grove-backup -n 50
+
+## · status, failed: zero units
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   ├─ backup: ✗ FAILED · no units found under <fixture>/empty/<seat> · <age> · last ok <age> ago
+   │  └─ last run: <date>T<hh:mm>Z · 0 units · 0 put · 0 skipped · 0 failed
+   ├─ last ok: <date>T<hh:mm>Z
+   └─ why
+      ├─ a run of zero units is never a ✓; read the walk as ground, since camper cannot read the journal: sudo journalctl -u grove-backup -n 50
+      └─ the run's full text, as ground (camper cannot read the journal): sudo journalctl -u grove-backup -n 50
+
+## · status, failed: a rebuilt box that kept a dead grove's name
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   ├─ backup: ✗ FAILED · grove=grove-1 holds a backup this box never wrote · <age> · never ok
+   │  └─ last run: <date>T<hh:mm>Z · 8 units · 0 put · 0 skipped · 0 failed · 8 not reached
+   ├─ last ok: never
+   └─ why
+      ├─ if this box replaced grove-1, as camper: restore first, cd ~/git/more/dev-env-setup && rhx grove.backup.restore --from grove-1 --all; then adopt the prefix, /usr/local/lib/grove-backup/grove-backup --adopt
+      └─ the run's full text, as ground (camper cannot read the journal): sudo journalctl -u grove-backup -n 50
+
+## · status, failed: one unit with no room on the disk
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   ├─ backup: ✗ FAILED · 1 of 8 units did not land · <age> · last ok <age> ago
+   │  └─ last run: <date>T<hh:mm>Z · 8 units · 0 put · 7 skipped · 1 failed
+   ├─ last ok: <date>T<hh:mm>Z
+   └─ why
+      ├─ free space on the disk that holds <fixture>/state, then: sudo systemctl start grove-backup.service
+      ├─ user=<seat>/org=acme/repo=widget/tree=widget.feat-x: disk · <n> MiB free; this needs <n> MiB and keeps <n> MiB free
+      └─ the run's full text, as ground (camper cannot read the journal): sudo journalctl -u grove-backup -n 50
+
+## · status, failed: a tree whose commits ride in no unit
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: grove-1
+   ├─ backup: ✗ FAILED · 1 tree's commits ride in no unit · <age> · never ok
+   │  └─ last run: <date>T<hh:mm>Z · 9 units · 9 put · 0 skipped · 1 failed
+   ├─ last ok: never
+   └─ why
+      ├─ each is named in failures (rhx grove.backup.get); the run's full text, as ground: sudo journalctl -u grove-backup -n 50
+      ├─ user=<seat>/org=acme/orphan=widget: its files ride; its commits do not, since the clone acme/widget holds that name; rename the dir
+      └─ the run's full text, as ground (camper cannot read the journal): sudo journalctl -u grove-backup -n 50
+
+## · status, the grove name undeclared
+rc=0
+🐢 lets read the backup...
+
+🗄️ grove.backup.get
+   ├─ grove: （undeclared）
+   ├─ backup: ✓ <age> ago · 1 put · 7 skipped
+   │  └─ last run: <date>T<hh:mm>Z · 8 units · 1 put · 7 skipped · 0 failed
+   └─ last ok: <date>T<hh:mm>Z
+
+## --help
+rc=0
+grove.backup.get — read the grove backup
+
+usage:
+  rhx grove.backup.get                          this box's last run, as one line
+  rhx grove.backup.get --list                   every grove the bucket holds, latest backup each
+  rhx grove.backup.get --from <grove> --list    every unit that grove left, with date and class
+
+options:
+  --list            list, rather than read this box's status
+  --from <grove>    the grove whose units to list (implies --list)
+
+exit:
+  0  the read completed — a ✗ FAILED or ✗ STALE status included: the verdict is the line, not the exit
+  1  the bucket gave no answer; a retry may cure it
+  2  a constraint: bad args, a credential or grant, no such grove
+
+to restore a unit:  rhx grove.backup.restore --help
+on a grove, run each from this repo's checkout: cd ~/git/more/dev-env-setup
+
+## · a --from that is no slug
+rc=2
+✋ ConstraintError: 'grove 1' is not a grove slug
+   └─ list the groves: rhx grove.backup.get --list
+
+## · an unknown argument
+rc=2
+✋ ConstraintError: unknown argument '--bogus'
+   └─ see: rhx grove.backup.get --help

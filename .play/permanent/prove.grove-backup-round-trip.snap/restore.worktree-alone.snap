@@ -1,0 +1,14 @@
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.feat-x
+   ├─ org=acme/repo=widget/tree=widget.feat-x · <date> · STANDARD
+   │  ├─ + its clone <fixture>/fresh/<seat>/git/acme/widget, from origin
+   │  ├─ + stash · 1 entry
+   │  ├─ feat-x                       + new branch · 2 commits this clone lacked
+   │  ├─ 🌙 1 staged path of a secret shape left unstaged; its copy never left the dead grove
+   │  ├─ 🌙 1 file cut as a credential never left grove-1; re-derive each here
+   │  │  └─ .env.local
+   │  └─ + laid at <fixture>/fresh/<seat>/git/acme/_worktrees/widget.feat-x, linked into <fixture>/fresh/<seat>/git/acme/widget
+   │     ├─ HEAD feat-x
+   │     └─ 3 files laid · 1 delete applied
+   └─ 1 unit · 1 restored · 0 already here · 0 await a thaw · 0 refused · 0 failed

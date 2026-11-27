@@ -1,0 +1,29 @@
+## verify, before any apply (exit 1)
+   ✋ no starship.toml at <home>/.config/starship.toml
+      ⇒ configure.upsert did not take, so the prompt draws defaults
+      fix: rhx grove.provision --what 2.6.starship --mode apply
+
+## upsert 1, a ~/.bashrc with no init (exit 0)
+   • starship.toml upgraded from <checkout>/src
+   • ~/.bashrc — starship init appended ✔ (the next bash reads it)
+
+## upsert 2, a converged box (exit 0)
+   • starship.toml upgraded from <checkout>/src
+   • ~/.bashrc already inits starship — no work
+
+## verify, converged (exit 0)
+   • starship.toml found ✔ (parse UNCHECKED — no binary to ask)
+     ⇒ provision.verify reports the binary; read its line above
+   • ~/.bashrc inits starship ✔
+
+## verify, a ~/.bashrc that lost the block (exit 1)
+   • starship.toml found ✔ (parse UNCHECKED — no binary to ask)
+     ⇒ provision.verify reports the binary; read its line above
+   ✋ ConstraintError: ~/.bashrc inits no starship, so a bash terminal draws a bare prompt
+      fix: rhx grove.provision --what 2.6.starship --mode apply
+
+## upsert, a seat with no ~/.bashrc (exit 0)
+   • starship.toml upgraded from <checkout>/src
+   • ~/.bashrc — starship init appended ✔ (the next bash reads it)
+
+

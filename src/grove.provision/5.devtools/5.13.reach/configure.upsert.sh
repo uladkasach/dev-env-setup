@@ -143,7 +143,8 @@ grove_provision_5_13_reach_configure_upsert() {
     # 🛑 `--assume`, NEVER `--role` — rhachet injects `--role` itself, so the
     #    skill drops a caller's in silence. only a FROM-SCRATCH box shows it
     local reachlog rc refused
-    reachlog="$(env -C "$checkout" rhx aws.reach.set \
+    # 🛑 `--gitroot`: the write reads the rack root's orgs, never the cwd checkout's one org
+    reachlog="$(env -C "$checkout" rhx aws.reach.set --gitroot "$gitroot" \
                   --org "$org" --env "$env" --owner "$owner" \
                   --assume "$role" --account "$account" --mode apply 2>&1)"
     rc=$?

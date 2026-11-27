@@ -152,13 +152,21 @@ grove_provision_2_8_tmux_configure_upsert() {
   #    matters and reported it as refused (measured 2026-10-20). a socket with no
   #    server refuses at connect, so the wider bound costs time only on a live
   #    server that is slow — which is exactly the one owed the wait
+  # 🛑 a new pane execs the server's `default-shell`, which tmux took from its own $SHELL
+  #    at server START — so a server born before the login shell changed (a grove's seat
+  #    is made with bash, and zsh lands later) opens every pane in bash, with no zshrc
+  #    and no starship. 📜 2026-11-20, a hetzner grove: every camper
+  #    pane read `camper@host:~$`. so each live server is told the login record's shell
+  local login_shell
+  login_shell="$(grove_provision_2_8_tmux_login_shell)"
   for name in "${live[@]}"; do
-    if timeout -k 5 30 tmux -L "$name" source-file "$HOME/.tmux.conf" 2>/dev/null; then
+    if grove_provision_2_8_tmux_server_tell "$name" "$login_shell"; then
       sourced=$(( sourced + 1 ))
     else
       refused+=("$name")
     fi
   done
+  [[ -n "$login_shell" && ${#live[@]} -gt 0 ]] && echo "   • a new pane execs the login shell ($login_shell)"
 
   if [[ ${#live[@]} -eq 0 ]]; then
     echo "   • no tmux server up — the next one reads the conf fresh"
@@ -177,4 +185,16 @@ grove_provision_2_8_tmux_configure_upsert() {
 
   echo "     ⚠️ a live CLIENT still needs a reattach: terminal-features (RGB,"
   echo "        extkeys, clipboard) are negotiated at attach, never at source"
+}
+
+# .what = load the conf into one live server, then tell it the login shell a new pane execs
+# .why one act per server, so the upsert's loop reads as a count and a play drives the act
+#   alone. a closed stdin keeps tmux off the caller's socket list, and fails a prompt at once
+# usage: grove_provision_2_8_tmux_server_tell <socket> <login shell, or empty>
+# exit: 0 = both landed (or no login shell to tell) · 1 = the server refused either
+grove_provision_2_8_tmux_server_tell() {
+  local name="$1" login_shell="$2"
+  timeout -k 5 30 tmux -L "$name" source-file "$HOME/.tmux.conf" </dev/null 2>/dev/null || return 1
+  [[ -z "$login_shell" ]] && return 0
+  timeout -k 5 30 tmux -L "$name" set-option -g default-shell "$login_shell" </dev/null 2>/dev/null
 }

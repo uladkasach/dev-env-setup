@@ -1,0 +1,41 @@
+## ok
+{
+  "at": "<date>T<hh:mm>Z",
+  "began": "<date>T<hh:mm>Z",
+  "cause": null,
+  "failed": 0,
+  "failures": [],
+  "fix": null,
+  "grove": "grove-1",
+  "last_ok": "<date>T<hh:mm>Z",
+  "origin_unchecked": 0,
+  "put": 0,
+  "skipped": 8,
+  "units": 8,
+  "verdict": "ok",
+  "version": 1
+}
+
+## failed, one unit
+{
+  "at": "<date>T<hh:mm>Z",
+  "began": "<date>T<hh:mm>Z",
+  "cause": "1 of 8 units did not land",
+  "failed": 1,
+  "failures": [
+    {
+      "kind": "disk",
+      "unit": "user=<seat>/org=acme/repo=widget/tree=widget.feat-x",
+      "why": "disk · <n> MiB free; this needs <n> MiB and keeps <n> MiB free"
+    }
+  ],
+  "fix": "free space on the disk that holds <fixture>/state, then: sudo systemctl start grove-backup.service",
+  "grove": "grove-1",
+  "last_ok": "<date>T<hh:mm>Z",
+  "origin_unchecked": 0,
+  "put": 0,
+  "skipped": 7,
+  "units": 8,
+  "verdict": "failed",
+  "version": 1
+}

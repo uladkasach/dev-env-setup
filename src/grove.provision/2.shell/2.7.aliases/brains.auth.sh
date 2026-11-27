@@ -2923,8 +2923,10 @@ _brains_auth_reset_line() {
           | map(select(if $kind == "full" then isfull else (isfull | not) end)) | select(length > 0)
           | (map(.resets_left) | add) as $n
           | (map(select(.usable_now == true) | .resets_left) | add // 0) as $now
-          | (map(.ends_at) | sort | .[0]) as $end
-          | "\($glyph) \($n) saved · \(if $now == $n then "usable now" elif $now == 0 then "usable at your limit" else "\($now) usable now" end) · \(if length > 1 then "first expires" else "expires" end) \($end | mon)" ),
+          # 🛑 never `$end`: jq 1.6 (the apt jq on a grove) reads `end` as the keyword, and the
+          #   whole program fails to compile — every account then reads `?`
+          | (map(.ends_at) | sort | .[0]) as $expiry
+          | "\($glyph) \($n) saved · \(if $now == $n then "usable now" elif $now == 0 then "usable at your limit" else "\($now) usable now" end) · \(if length > 1 then "first expires" else "expires" end) \($expiry | mon)" ),
         ( select($kind == "full" and $jt.arm == "reset" and $jt.available == true) | "🎁 session reset available now" )
       ] | join(" · ")
     end

@@ -226,6 +226,8 @@ fi
 
 # shellcheck disable=SC1090
 source "$_ductwork"
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/git.grove.operations.sh"   # _play_pattern, shared with play.stop
 
 URI="duct://$GROVE/main/mechanic"
 if ! __duct_parse_uri "$URI"; then
@@ -272,9 +274,13 @@ fi
 #        (`gotcha.a-check-that-cries-wolf-gets-silenced`, m.2).
 #
 # ⚠️ .and the CLAMP was pointed at the wrong file
-#      `prove.play-await-bites` exists precisely to catch a false "finished",
+#      `prove.play-await-reads-three-answers` exists to catch a false "finished",
 #      and it did not, because it is run "after ANY change to how THIS SKILL
 #      decides busy" — and this skill did not change. `git.grove.send` did.
+#
+#      ⇒ the play's pattern is now one `_play_pattern` in `git.grove.operations.sh`,
+#        read by this skill and by `git.grove.play.stop`; a change to it owes both
+#        `prove.play-await-reads-three-answers` and `prove.play-stop-reads-three-answers`
 #
 #      ⇒ a convention shared by two skills needs its clamp run when EITHER
 #        moves. see that play's own header for the trigger this added
@@ -297,9 +303,8 @@ fi
 # returns: 0 + the pids = busy · 1 = no such play · 2 = the box was not asked
 ######################################################################
 __grove_play_pids() {
-  local name="${1:?}"
-  local rest="${name:1}"
-  local pattern="(^|/)[${name:0:1}]${rest//./\\.}\\.play\\.sh( |\$)"
+  local pattern
+  pattern="$(_play_pattern "${1:?}")"
   ####################################################################
   # ⚠️ the pattern is base64'd, because ssh takes NO ARGV
   #    it joins its arguments into one string and hands that to a login shell,

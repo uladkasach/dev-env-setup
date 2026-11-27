@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ######################################################################
-# .what = list the tailnet peers this laptop sees, by the short name a dial uses,
-#         whether each is online, and when it was last seen
+# .what = list the tailnet peers this box sees, by the short name a dial uses,
+#         whether each is online, when it was last seen, and its acl tags
 #
 # .why  = a rebuilt box re-joins the tailnet as a NEW node. while the old node's
 #         record survives, tailscale hands the new one a suffixed name (`<name>-1`),
@@ -52,7 +52,7 @@ main() {
   fi
 
   local js
-  if ! js="$(timeout 10 tailscale status --json 2>/dev/null)"; then
+  if ! js="$(timeout -k 2 10 tailscale status --json </dev/null 2>/dev/null)"; then
     echo "💥 MalfunctionError: tailscaled did not answer in 10s" >&2
     echo "   read why: systemctl status tailscaled" >&2
     return 1
@@ -62,13 +62,15 @@ main() {
   # the short name is the DNSName's first label: the name a dial resolves
   printf '%s' "$js" | jq -r --arg m "$match" '
     [ .Peer // {} | to_entries[] | .value
-      | { name: ((.DNSName // "") | split(".")[0]), online: .Online, seen: ((.LastSeen // "-") | .[0:16]) }
+      | { name: ((.DNSName // "") | split(".")[0]), online: .Online, seen: ((.LastSeen // "-") | .[0:16]),
+          tags: ((.Tags // []) | join(",")) }
       | select($m == "" or (.name | contains($m))) ]
     | sort_by(.name)
     | if length == 0 then "   └─ no peer matched"
       else (to_entries | map(
         (if .key == (length - 1) then "   └─ " else "   ├─ " end)
         + .value.name + "  " + (if .value.online then "online ✔" else "offline · last seen " + .value.seen end)
+        + (if .value.tags == "" then "" else "  · " + .value.tags end)
       ) | .[])
       end'
 }

@@ -24,11 +24,13 @@
    ├─ ✔ src/grove.provision/4.terminal/4.3.kitty/4.3.2.emulator
    ├─ ✔ src/grove.provision/4.terminal/4.5.nvim
    ├─ ✔ src/grove.provision/4.terminal/4.6.pqiv/pqivrc
+   ├─ ✔ src/grove.provision/5.devtools/5.27.backup
+   ├─ ✔ src/grove.provision/5.devtools/5.27.backup/grove.backup.operations.sh
    ├─ ✔ src/grove.provision/5.devtools/5.6.aws/aws-cli-team.pgp
    ├─ ✔ src/grove.provision/5.devtools/5.6.aws/ssm-plugin-signer.pgp
    ├─ ✔ src/machine/machine_power_profile_sync
    │
-   ├─ assets named:  25 (literal, de-duplicated)
+   ├─ assets named:  27 (literal, de-duplicated)
    ├─ runtime-built: 27 — out of this reader's reach, see below
    └─ untracked:     0
 
@@ -51,5 +53,5 @@
    ├─ … the first 8 files shown, of 23
    └─ ⇒ they are neither passed nor failed below
 
-🌲 assets: all 25 literal asset(s) a bundle names are tracked ✔
+🌲 assets: all 27 literal asset(s) a bundle names are tracked ✔
 

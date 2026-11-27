@@ -1,0 +1,179 @@
+
+## worktree · a named restore over a present one refuses
+rc=2
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget.feat-x
+   ├─ org=acme/repo=widget/tree=widget.feat-x · <date> · STANDARD
+   │  └─ ✋ ConstraintError: <fixture>/fresh/<seat>/git/acme/_worktrees/widget.feat-x is present; a restore never lays over it
+   │     └─ lay it aside instead: rhx grove.backup.restore --from grove-1 --of acme/widget --tree widget.feat-x --into <dir>
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## absent grove · never an empty success
+rc=2
+✋ ConstraintError: no backups under grove=grove-9
+   └─ list the groves the bucket holds: rhx grove.backup.get --list
+
+## help
+rc=0
+grove.backup.restore — restore a dead grove's work onto this box
+
+usage:
+  rhx grove.backup.restore --from <grove> --of <org/repo> --tree <dir> [--into <dir>]
+  rhx grove.backup.restore --from <grove> --home <.claude|.rhachet>   [--into <dir>]
+  rhx grove.backup.restore --from <grove> --orphan <org>/<dir>        [--into <dir>]
+  rhx grove.backup.restore --from <grove> --of <org/repo> --setaside <name> [--into <dir>]
+  rhx grove.backup.restore --from <grove> --all
+
+options:
+  --from <grove>     the grove whose backup to read (required)
+  --of <org/repo>    with --tree: one clone (--tree <repo>) or one worktree (--tree <dir>)
+                     with --setaside: one tree a clone set aside, laid at ~/git/<org>/_setaside/<repo>/
+  --orphan <o>/<d>   one worktree dir git had dropped, laid back at ~/git/<org>/_worktrees/<dir>
+  --home <dir>       one home dir
+  --all              every unit of this seat; a tree already here is kept
+  --into <dir>       lay the unit at <dir> as a clone of its own, rather than in ~/git
+
+it never overwrites: a present clone grafts, a home dir keeps each present file.
+see what a grove left first:  rhx grove.backup.get --from <grove> --list
+on a grove, run it as the seat that owns the work, from this repo's checkout:
+  cd ~/git/more/dev-env-setup && rhx grove.backup.restore --from <grove> --all
+
+## no --from
+rc=2
+✋ ConstraintError: --from <grove> is required
+   └─ see what each grove left: rhx grove.backup.get --list
+
+## a --from that is no grove slug
+rc=2
+✋ ConstraintError: 'grove 1' is not a grove slug
+   └─ list the groves: rhx grove.backup.get --list
+
+## no unit named
+rc=2
+✋ ConstraintError: name exactly one of: --all · --of <org/repo> --tree <dir> · --of <org/repo> --setaside <name> · --orphan <org>/<dir> · --home <dir>
+   └─ see: rhx grove.backup.restore --help
+
+## two units named
+rc=2
+✋ ConstraintError: name exactly one of: --all · --of <org/repo> --tree <dir> · --of <org/repo> --setaside <name> · --orphan <org>/<dir> · --home <dir>
+   └─ see: rhx grove.backup.restore --help
+
+## --of with no org/repo pair
+rc=2
+✋ ConstraintError: --of takes <org/repo>, with one of --tree or --setaside beside it
+   └─ e.g.: --of ahbode/svc-quotes --tree svc-quotes
+
+## --home of a dir never backed up
+rc=2
+✋ ConstraintError: --home takes one of the backed-up home dirs: .claude · .rhachet
+   └─ a clone or worktree takes --of and --tree
+
+## --into with --all
+rc=2
+✋ ConstraintError: --into lays ONE unit aside; it does not combine with --all
+   └─ drop --into, or name one unit in place of --all
+
+## an unknown argument
+rc=2
+✋ ConstraintError: unknown argument '--bogus'
+   └─ see: rhx grove.backup.restore --help
+
+## --orphan with no org/dir pair
+rc=2
+✋ ConstraintError: --orphan takes <org>/<dir>
+   └─ e.g.: --orphan ahbode/svc-quotes.feat-x
+
+## --into onto a present dir
+rc=2
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget --into <fixture>/aside/solo
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  └─ ✋ ConstraintError: <fixture>/aside/solo is present; --into lays a unit only where naught is
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## the bucket list denied
+rc=2
+✋ ConstraintError: cannot reach the backup bucket · access denied: s3:ListBucket
+   └─ the grant refused it. a box reaches its own grove and its declared predecessor alone: on those, owed by ahbode/infrastructure (the per-grove grant); on any other grove, the admin tier holds it
+
+## one unit's object denied
+rc=2
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --orphan acme/widget.dropped --into <fixture>/aside/denied
+   ├─ org=acme/orphan=widget.dropped · <date> · STANDARD
+   │  └─ ✋ ConstraintError: access denied: s3:GetObject
+   │     └─ fix: the grant refused it. a box reaches its own grove and its declared predecessor alone: on those, owed by ahbode/infrastructure (the per-grove grant); on any other grove, the admin tier holds it
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## an archived unit past the 90-day reach
+rc=2
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --orphan acme/widget.dropped --into <fixture>/aside/locked
+   ├─ org=acme/orphan=widget.dropped · <date> · DEEP_ARCHIVE
+   │  └─ ✋ ConstraintError: sits in DEEP_ARCHIVE, past this box's 90-day reach
+   │     ├─ why: the grant locks a grove out of an archived object; the admin tier alone thaws it
+   │     └─ fix: at the admin tier, thaw it; then this same command lays it, once it reads
+   │        └─ aws s3api restore-object --bucket fixture-bucket --key 'grove=grove-1/user=<seat>/org=acme/orphan=widget.dropped/date=<date>.tar.gz' --restore-request '{"Days":7,"GlacierJobParameters":{"Tier":"Standard"}}'
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## no bucket declared
+rc=2
+✋ ConstraintError: cannot reach the backup bucket · bucket name undeclared
+   └─ owed by ahbode/infrastructure: the bucket name, declared on the box at <fixture>/etc/bucket (owed item 1)
+
+## a tree the grove never backed up
+rc=2
+✋ ConstraintError: no backup of org=acme/repo=widget/tree=widget.nosuch under grove=grove-1
+   └─ the units this seat holds there
+      ├─ home=.claude
+      ├─ home=.rhachet
+      ├─ org=acme/orphan=widget.dropped
+      ├─ org=acme/repo=solo/tree=solo
+      ├─ org=acme/repo=widget/setaside=widget.old.<sha>
+      ├─ org=acme/repo=widget/tree=widget
+      ├─ org=acme/repo=widget/tree=widget.feat-x
+      └─ org=acme/repo=widget/tree=widget.spike
+
+## another seat · --all holds no unit of this seat
+rc=2
+✋ ConstraintError: grove=grove-1 holds no unit of seat ground
+   └─ a restore writes only its own seat's home; it holds <seat>, so become that seat and rerun (from ground: sudo -iu <seat>)
+
+## another seat · a named unit of another seat
+rc=2
+✋ ConstraintError: that unit belongs to seat <seat>, not ground
+   └─ a restore writes only its own seat's home; become that seat and rerun (from ground: sudo -iu <seat>)
+
+## no room on the disk, before any unit
+rc=2
+✋ ConstraintError: no room to lay a restore: <n> MiB free; this needs <n> MiB and keeps <n> MiB free
+   └─ free space on the disk that holds <fixture>/fresh/<seat>, then rerun
+
+## no room for this unit's own bytes
+rc=2
+🐢 lets carry grove-1's work home...
+
+🗄️ grove.backup.restore --from grove-1 --of acme/widget --tree widget --into <fixture>/aside/nofit
+   ├─ org=acme/repo=widget/tree=widget · <date> · STANDARD
+   │  └─ ✋ ConstraintError: no room to lay this unit: <n> MiB free; this needs <n> MiB and keeps <n> MiB free
+   │     └─ free space on the disk that holds <fixture>/fresh/<seat>, then rerun the same command
+   └─ 1 unit · 0 restored · 0 already here · 0 await a thaw · 1 refused · 0 failed
+
+## no credential to read the bucket
+rc=2
+✋ ConstraintError: cannot reach the backup bucket · no aws credential
+   └─ owed by ahbode/infrastructure: this grove's aws identity — the instance profile on ec2, roles anywhere on hetzner (infra#64, part 3)
+
+## aws gave no answer · a retry may cure it
+rc=1
+💥 MalfunctionError: cannot reach the backup bucket · aws unreachable
+   └─ the credential probe failed (no stderr); a transient reach heals on the next timed pass, or retry now: sudo systemctl start grove-backup.service
+
+## a restore is active on this seat
+rc=2
+✋ ConstraintError: a restore is active on this seat
+   └─ let it finish, then rerun this one
