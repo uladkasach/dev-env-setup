@@ -358,8 +358,8 @@ alias restart.wifi='systemctl restart NetworkManager.service'
 ######################################################################
 # grove.provision — raise this machine's state to the state the repo declares
 #
-#   grove.provision [--for cloud|local]          # every bundle this machine takes
-#   grove.provision.<part> [--for cloud|local]   # one bundle
+#   grove.provision [--for cloud|house|local]          # every bundle this machine takes
+#   grove.provision.<part> [--for cloud|house|local]   # one bundle
 #   git.repo.pull && grove.provision          # the whole loop, direction explicit
 #
 # .why `provision`, not `install` and not `upgrade`

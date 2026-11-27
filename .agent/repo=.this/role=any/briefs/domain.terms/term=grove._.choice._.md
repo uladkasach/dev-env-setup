@@ -10,22 +10,31 @@ term.synonyms.forbidden:
 ## .what
 a machine (a host) that holds trees. `localhost` is a grove; an ec2 box is a grove.
 
-## .the two kinds — and the noun spans BOTH
+## .the three kinds — and the noun spans ALL of them
 
-settled by the human 2026-08-30: *"local and cloud are two types of groves."*
+settled by the human 2026-08-30: *"local and cloud are two types of groves."* the house kind
+joined in the house-grove route (2026-10-17): a seat on a box we own is a grove too.
 
 | kind | `$GROVE_ENV_SERVER` | `--for` | reached by |
 |---|---|---|---|
 | **local** | `local@unix`, `local@cicd` | `local` | no transport — the shell is already on it |
-| **cloud** | `cloud@aws.ec2` | `cloud` | a duct (`term=duct`) |
+| **house** | `house@unix` | `house` | loopback ssh to a seat user on a box we own, named by a root-owned election |
+| **cloud** | `cloud@aws.ec2`, `cloud@hetzner.hetzbot` | `cloud` | a duct (`term=duct`) |
 
-⚠️ **the word is not a synonym for "a remote box".** the tree already treats the two as
-one subject with a tag — `--for local|cloud` is one flag over one bundle list — so a
+⚠️ a house grove shares its HARDWARE with a local grove and is still a second grove: it has its
+own unix users, its own home, its own reach. the kind is read off the election, never the box.
+a house grove is addressed by its registry NAME, `house://<name>` (`house://house-1`), never
+`house://localhost`: `localhost` keeps its one sense, this machine with no ssh, and one box may
+host many house groves. the registry row holds the seat address (`<seat>@<host>:<port>`).
+
+⚠️ **the word is not a synonym for "a remote box".** the tree already treats the kinds as
+one subject with a tag — `--for local|house|cloud` is one flag over one bundle list — so a
 reading of `grove` that excludes the laptop contradicts the inventory it describes.
 
-⇒ what the two kinds differ in is **reach**, never nature. a laptop is a grove you are
-standing on; a cloud grove is one you speak to through a duct. every bundle, every
-phase, and every verify is written for both, and a bundle that cannot serve one
+⇒ what the kinds differ in is **reach**, never nature. a laptop is a grove you stand on;
+a house grove is one you reach over loopback; a cloud grove is one you speak to through a
+duct. every bundle, every phase, and every verify is written for all three, and a bundle
+that cannot serve one
 DECLINES inline beside the reason (`repo.overview.md`).
 
 ⚠️ and this is why `git.grove.provision` reads honestly for a laptop: the act is the same
