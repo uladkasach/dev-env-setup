@@ -1,0 +1,8 @@
+[Unit]
+Description=hibernate this box after idle
+
+[Service]
+Type=oneshot
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/local/bin/idle-hibernate.sh
+TimeoutStartSec=180

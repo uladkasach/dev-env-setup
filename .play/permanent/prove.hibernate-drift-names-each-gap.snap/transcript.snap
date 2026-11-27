@@ -1,0 +1,363 @@
+## converged (exit 0)
+### stdout
+   • the idle check and its units match this checkout ✔
+   • no drop-in of their own on either unit, no reload owed, and no stopgap ✔
+   • idle-hibernate.timer is enabled and active, and no failed run is on record ✔
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+
+
+## lasttick (exit 0)
+### stdout
+   • the idle check and its units match this checkout ✔
+   • no drop-in of their own on either unit, no reload owed, and no stopgap ✔
+   • idle-hibernate.timer is enabled and active, and no failed run is on record ✔
+   • the last tick, at=2026-01-01T00:00:00Z exit=0 (<age> ago): idle-hibernate: hold — idle=5s limit=10800s, newest=duct d; seen traces=1 pts=0 ducts=1
+     ⇒ the timer ticks every 300s: unless this box just woke, the timer has stopped or the check cannot write its record — read: systemctl status idle-hibernate.timer
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+
+
+## drifted (exit 1)
+### stdout
+   • the last tick, at=2026-01-01T00:00:00Z exit=0 (<age> ago): idle-hibernate: hold — idle=5s limit=10800s, newest=duct d; seen traces=1 pts=0 ducts=1
+     ⇒ the timer ticks every 300s: unless this box just woke, the timer has stopped or the check cannot write its record — read: systemctl status idle-hibernate.timer
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — the installed check is older than this checkout's, and records no sleep; for a sleep before the ground apply, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ <fix>/box/idle-hibernate.sh differs from this checkout's idle-hibernate.sh
+      ⇒ now: the installed check is not this checkout's, and may not count every crew: a busy box can hibernate under its crews
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## unhealthy (exit 1)
+### stdout
+   • the last tick, at=2026-01-01T00:00:00Z exit=1 (<age> ago): idle-hibernate: hold — idle=9s limit=10800s, newest=boot
+     ⇒ the timer ticks every 300s: unless this box just woke, the timer has stopped or the check cannot write its record — read: systemctl status idle-hibernate.timer
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ the last idle check ended 'exit-code'
+      ⇒ its record, at <fix>/box/idle-hibernate.last:
+      │ at=2026-01-01T00:00:00Z exit=1
+      │ idle-hibernate: 💥 MalfunctionError: duct unreadable — why
+      │ idle-hibernate: hold — idle=9s limit=10800s, newest=boot
+      ⇒ a fault in the last run, not in the config: an apply resets the result, and the next tick raises it again until its cause is gone — the box may bill until then
+
+## lastsleep (exit 0)
+### stdout
+   • the idle check and its units match this checkout ✔
+   • no drop-in of their own on either unit, no reload owed, and no stopgap ✔
+   • idle-hibernate.timer is enabled and active, and no failed run is on record ✔
+   • the last tick, at=2026-01-02T00:00:00Z exit=0 (<age> ago): idle-hibernate: hold — idle=30s limit=10800s, newest=boot
+     ⇒ the timer ticks every 300s: unless this box just woke, the timer has stopped or the check cannot write its record — read: systemctl status idle-hibernate.timer
+   • the last sleep, at=2026-01-01T00:00:00Z exit=0 (<age> ago): idle-hibernate: sleep — idle=10900s limit=10800s, newest=trace t — hibernate now
+### stderr
+
+
+## unanswered (exit 0)
+### stdout
+   • the idle check and its units match this checkout ✔
+   • no drop-in of their own on either unit, no reload owed, and no stopgap ✔
+   • idle-hibernate.timer is enabled and active, and no failed run is on record ✔
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • the last sleep, at=2026-01-01T00:00:00Z exit=unanswered (<age> ago): idle-hibernate: sleep — idle=10900s limit=10800s, newest=trace t — hibernate now
+     ⇒ the stop act never answered: this box judged itself idle and may never have slept — a later tick overwrote its 💥, so read why from the ground seat: rhx machine.journal.read --scope system --unit idle-hibernate.service
+### stderr
+
+
+## unanswered.sametick (exit 1)
+### stdout
+   • the last tick, at=2026-01-01T00:00:00Z exit=1 (<age> ago): idle-hibernate: sleep — idle=10900s limit=10800s, newest=trace t — hibernate now
+     ⇒ the timer ticks every 300s: unless this box just woke, the timer has stopped or the check cannot write its record — read: systemctl status idle-hibernate.timer
+   • the last sleep, at=2026-01-01T00:00:00Z exit=unanswered (<age> ago): idle-hibernate: sleep — idle=10900s limit=10800s, newest=trace t — hibernate now
+     ⇒ the stop act never answered: this box judged itself idle and may never have slept — the 💥 in the last tick names why:
+       idle-hibernate: 💥 MalfunctionError: aws refused stop-instances --hibernate for stub
+### stderr
+   ✋ the last idle check ended 'exit-code'
+      ⇒ its record, at <fix>/box/idle-hibernate.last:
+      │ at=2026-01-01T00:00:00Z exit=1
+      │ idle-hibernate: 💥 MalfunctionError: aws refused stop-instances --hibernate for stub
+      │ idle-hibernate: sleep — idle=10900s limit=10800s, newest=trace t — hibernate now
+      ⇒ a fault in the last run, not in the config: an apply resets the result, and the next tick raises it again until its cause is gone — the box may bill until then
+
+## staletick (exit 0)
+### stdout
+   • the idle check and its units match this checkout ✔
+   • no drop-in of their own on either unit, no reload owed, and no stopgap ✔
+   • idle-hibernate.timer is enabled and active, and no failed run is on record ✔
+   • the last tick, at=2026-01-01T00:00:00Z exit=0 (<age> ago): idle-hibernate: hold — idle=5s limit=10800s, newest=boot
+     ⇒ the timer ticks every 300s: unless this box just woke, the timer has stopped or the check cannot write its record — read: systemctl status idle-hibernate.timer
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+
+
+## freshtick (exit 0)
+### stdout
+   • the idle check and its units match this checkout ✔
+   • no drop-in of their own on either unit, no reload owed, and no stopgap ✔
+   • idle-hibernate.timer is enabled and active, and no failed run is on record ✔
+   • the last tick, at=<now> exit=0 (<age> ago): idle-hibernate: hold — idle=5s limit=10800s, newest=boot
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+
+
+## notick (exit 0)
+### stdout
+   • the idle check and its units match this checkout ✔
+   • no drop-in of their own on either unit, no reload owed, and no stopgap ✔
+   • idle-hibernate.timer is enabled and active, and no failed run is on record ✔
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: Sat 2026-01-03 00:00:00 UTC
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+
+
+## oldnotick (exit 1)
+### stdout
+   • no tick on record at <fix>/box/idle-hibernate.last — the installed check is older than this checkout's, and writes none; the ground apply installs one that does
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — the installed check is older than this checkout's, and records no sleep; for a sleep before the ground apply, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ <fix>/box/idle-hibernate.sh differs from this checkout's idle-hibernate.sh
+      ⇒ now: the installed check is not this checkout's, and may not count every crew: a busy box can hibernate under its crews
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## skipnotick (exit 1)
+### stdout
+   • no tick on record at <fix>/box/idle-hibernate.last — a pre-check skips every tick, so none is written until the ground apply retires it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ the stopgap pre-check is still on the box: <fix>/box/idle-hibernate-holds.sh
+      ⇒ now: the stopgap pre-check holds every tick: no crew is at risk, and an idle box bills on
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## oldsleep (exit 1)
+### stdout
+   • no tick on record at <fix>/box/idle-hibernate.last — the installed check is older than this checkout's, and writes none; the ground apply installs one that does
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — the installed check is older than this checkout's, and records no sleep; for a sleep before the ground apply, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ <fix>/box/idle-hibernate.sh differs from this checkout's idle-hibernate.sh
+      ⇒ now: the installed check is not this checkout's, and may not count every crew: a busy box can hibernate under its crews
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## norecord (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ the last idle check ended 'exit-code'
+      ⇒ its record at <fix>/box/idle-hibernate.last is unreadable: cat: <fix>/box/idle-hibernate.last: No such file or directory
+      ⇒ from the ground seat, read why: rhx machine.journal.read --scope system --unit idle-hibernate.service --since today
+      ⇒ a fault in the last run, not in the config: an apply resets the result, and the next tick raises it again until its cause is gone — the box may bill until then
+
+## execcondition (exit 1)
+### stdout
+   • the last tick, at=2026-01-01T00:00:00Z exit=0 (<age> ago): idle-hibernate: hold — old
+     ⇒ a pre-check skips every tick, so this record is the last run before it; the ground apply retires it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ the last idle check ended 'exec-condition'
+      ⇒ a pre-check (ExecCondition=) skipped the tick, so the check never ran — a drop-in this bundle does not write; the ground apply retires it
+   ✋ the stopgap pre-check is still on the box: <fix>/box/idle-hibernate-holds.sh
+      ⇒ now: the stopgap pre-check holds every tick: no crew is at risk, and an idle box bills on
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## killed (exit 1)
+### stdout
+   • the last tick, at=2026-01-01T00:00:00Z exit=0 (<age> ago): idle-hibernate: hold — old
+     ⇒ the timer ticks every 300s: unless this box just woke, the timer has stopped or the check cannot write its record — read: systemctl status idle-hibernate.timer
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ the last idle check ended 'timeout'
+      ⇒ its record, at <fix>/box/idle-hibernate.last:
+      │ at=2026-01-01T00:00:00Z exit=0
+      │ idle-hibernate: hold — old
+      ⇒ the run was killed before its end, so the record above may be an earlier run's — a fault in the run, not in the config; the next tick raises it again until its cause is gone, and the box may bill until then
+
+## hostilerecord (exit 1)
+### stdout
+   • the last tick, at=x exit=1: no verdict line in the record
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ the last idle check ended 'exit-code'
+      ⇒ its record, at <fix>/box/idle-hibernate.last:
+      │ at=x exit=1
+      │ a?[31mb
+      ⇒ a fault in the last run, not in the config: an apply resets the result, and the next tick raises it again until its cause is gone — the box may bill until then
+
+## notimerecord (exit 0)
+### stdout
+   • the idle check and its units match this checkout ✔
+   • no drop-in of their own on either unit, no reload owed, and no stopgap ✔
+   • idle-hibernate.timer is enabled and active, and no failed run is on record ✔
+   • the last tick, at=x exit=0: idle-hibernate: hold — idle=5s limit=10800s, newest=boot
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+
+
+## risk.bytes (exit 1)
+### stdout
+   • no tick on record at <fix>/box/idle-hibernate.last — the installed check is older than this checkout's, and writes none; the ground apply installs one that does
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — the installed check is older than this checkout's, and records no sleep; for a sleep before the ground apply, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ <fix>/box/idle-hibernate.sh differs from this checkout's idle-hibernate.sh
+      ⇒ now: the installed check is not this checkout's, and may not count every crew: a busy box can hibernate under its crews
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## risk.stopgap (exit 1)
+### stdout
+   • no tick on record at <fix>/box/idle-hibernate.last — the installed check is older than this checkout's, and writes none; the ground apply installs one that does
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — the installed check is older than this checkout's, and records no sleep; for a sleep before the ground apply, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ <fix>/box/idle-hibernate.sh differs from this checkout's idle-hibernate.sh
+   ✋ the stopgap pre-check is still on the box: <fix>/box/idle-hibernate-holds.sh
+      ⇒ now: the stopgap pre-check holds every tick: no crew is at risk, and an idle box bills on
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## risk.stopped (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ idle-hibernate.timer is not active
+      ⇒ now: the idle check does not tick: no crew is at risk, and an idle box bills on
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## risk.held (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ <fix>/box/idle-hibernate.sh is held as '644 <uid>:<gid>', not '755 <uid>:<gid>'
+      ⇒ now: the check is this checkout's, and counts every crew; the gap is in how it is held or run
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## showhangs (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — when the timer last fired is unknown: systemctl gave no answer (systemctl show -p LastTriggerUSec --value idle-hibernate.timer did not answer within 1s — systemd may be wedged)
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ systemd could not report the last idle check's result: systemctl show -p Result --value idle-hibernate.service did not answer within 1s — systemd may be wedged
+   ✋ systemd could not report idle-hibernate.service: systemctl show -p LoadState --value idle-hibernate.service did not answer within 1s — systemd may be wedged
+   ✋ systemd could not report idle-hibernate.timer: systemctl show -p LoadState --value idle-hibernate.timer did not answer within 1s — systemd may be wedged
+   ✋ systemd could not report the drop-ins of idle-hibernate.service: systemctl show -p DropInPaths --value idle-hibernate.service did not answer within 1s — systemd may be wedged
+      ⇒ now: the check is this checkout's, and counts every crew; the gap is in how it is held or run
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## noaws (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ the stop act needs aws, and none is on the unit's PATH (<fix>/unitbin.noaws), so an idle box would bill
+      ⇒ the grove's first boot installs aws, so its install failed: read /var/log/cloud-init-output.log
+      ⇒ fix, from the ground seat: rhx grove.provision --what 5.6.aws --mode apply
+
+## nosetpriv (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ the check needs setpriv, and none is on the unit's PATH (<fix>/unitbin.nosetpriv), so every tick holds loud and an idle box would bill
+      ⇒ fix, from the ground seat: restore the base package that ships setpriv
+
+## gap.reload (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ systemd still runs the old definition of idle-hibernate.service — a daemon-reload is owed
+      ⇒ now: the check is this checkout's, and counts every crew; the gap is in how it is held or run
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## gap.dropin (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ a drop-in this bundle does not write: <fix>/box/run/idle-hibernate.timer.d/hold.conf
+      ⇒ now: the check is this checkout's, and counts every crew; the gap is in how it is held or run
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## gap.unloadeddropin (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ a drop-in this bundle does not write: <fix>/box/etc/idle-hibernate.service.d/late.conf
+      ⇒ now: the check is this checkout's, and counts every crew; the gap is in how it is held or run
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## gap.symlink (exit 1)
+### stdout
+   • no tick on record at <fix>/box/idle-hibernate.last — the installed check is older than this checkout's, and writes none; the ground apply installs one that does
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — the installed check is older than this checkout's, and records no sleep; for a sleep before the ground apply, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ <fix>/box/idle-hibernate.sh is a symlink, not the file this bundle writes
+      ⇒ now: the installed check is not this checkout's, and may not count every crew: a busy box can hibernate under its crews
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## gap.dropinsunread (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ systemd could not report the drop-ins of idle-hibernate.service: Failed to connect to bus
+      ⇒ now: the check is this checkout's, and counts every crew; the gap is in how it is held or run
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## gap.unloaded (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ idle-hibernate.timer is not-found, not loaded
+      ⇒ now: the check is this checkout's, and counts every crew; the gap is in how it is held or run
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## gap.unread (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — when the timer last fired is unknown: systemctl gave no answer (Failed to connect to bus: No such file or directory)
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ systemd could not report the last idle check's result: Failed to connect to bus: No such file or directory
+   ✋ systemd could not report idle-hibernate.service: Failed to connect to bus: No such file or directory
+   ✋ systemd could not report idle-hibernate.timer: Failed to connect to bus: No such file or directory
+   ✋ systemd could not report the drop-ins of idle-hibernate.service: Failed to connect to bus: No such file or directory
+      ⇒ now: the check is this checkout's, and counts every crew; the gap is in how it is held or run
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## gap.masked (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ idle-hibernate.timer is masked — a hand hold; the apply unmasks it
+      ⇒ now: the check is this checkout's, and counts every crew; the gap is in how it is held or run
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+## gap.timer (exit 1)
+### stdout
+   • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+     ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+   • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ idle-hibernate.timer is not enabled
+   ✋ idle-hibernate.timer is not active
+      ⇒ now: the idle check does not tick: no crew is at risk, and an idle box bills on
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+
+

@@ -1,0 +1,1026 @@
+## drifted (exit 0)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+     ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+   • unmasked idle-hibernate.timer — a hand hold is undone
+   • idle-hibernate.timer re-armed — it was inactive; a hand stop is undone
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## again (exit 0)
+### stdout
+   • the idle check and its units match this checkout, and idle-hibernate.timer is armed ✔
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+
+## reload (exit 0)
+### stdout
+   • idle-hibernate.timer restarted on its declared schedule
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## unloaded (exit 0)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/hand-hold.conf
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+     ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+   • unmasked idle-hibernate.timer — a hand hold is undone
+   • idle-hibernate.timer re-armed — it was inactive; a hand stop is undone
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## retimer (exit 0)
+### stdout
+   • <fix>/box/etc/idle-hibernate.timer declared
+   • idle-hibernate.timer restarted on its declared schedule
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## restart (exit 0)
+### stdout
+   • idle-hibernate.timer restarted on its declared schedule
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## mode (exit 0)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh held at 755 <uid>:<gid>
+   • idle-hibernate.timer restarted on its declared schedule
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## absent (exit 0)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • <fix>/box/etc/idle-hibernate.service declared
+   • <fix>/box/etc/idle-hibernate.timer declared
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+     ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+   • unmasked idle-hibernate.timer — a hand hold is undone
+   • idle-hibernate.timer re-armed — it was inactive; a hand stop is undone
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## timerdropin (exit 0)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   • retired the drop-in <fix>/box/etc/idle-hibernate.timer.d/hold.conf
+   🌙 <fix>/box/etc/idle-hibernate.timer.d holds a file systemd does not read; left in place — it changes no unit
+      ⇒ it holds: readme.txt
+      ⇒ to clear it, once each file is known to be no one's: sudo rm -r <fix>/box/etc/idle-hibernate.timer.d
+   • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+     ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+   • unmasked idle-hibernate.timer — a hand hold is undone
+   • idle-hibernate.timer re-armed — it was inactive; a hand stop is undone
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## dropinsunread (exit 1)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+### stderr
+systemd could not report the drop-ins of idle-hibernate.service: Failed to connect to bus
+   💥 MalfunctionError: could not list the units' drop-ins, so none was retired
+      └─ fix: read the error above, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+
+## reloadfails (exit 1)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+### stderr
+Failed to reload: Connection timed out
+   💥 MalfunctionError: systemctl daemon-reload failed
+      ⇒ the new units are on disk and the OLD definitions stay live
+      └─ fix: read the error above, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+
+## reloadhangs (exit 1)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+### stderr
+sudo systemctl daemon-reload did not answer within 1s — systemd may be wedged
+   💥 MalfunctionError: systemctl daemon-reload failed
+      ⇒ the new units are on disk and the OLD definitions stay live
+      └─ fix: read the error above, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+
+## nosource (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: no idle-hibernate.sh at <fix>/empty.src/grove.provision/1.system/1.15.hibernate/idle-hibernate.sh
+      ⇒ this run's own checkout is incomplete; fix: git.repo.pull, then re-run
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+
+## staleresult (exit 0)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+     ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+   • unmasked idle-hibernate.timer — a hand hold is undone
+   • idle-hibernate.timer re-armed — it was inactive; a hand stop is undone
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+show -p Result --value idle-hibernate.service
+show -p Result --value idle-hibernate.service
+show -p LastTriggerUSec --value idle-hibernate.timer
+
+## unhealthy (exit 0)
+### stdout
+   • the idle check and its units match this checkout, and idle-hibernate.timer is armed ✔
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+
+## unmaskfails (exit 1)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+     ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+### stderr
+Failed to unmask: Connection timed out
+   💥 MalfunctionError: could not unmask idle-hibernate.timer
+      ⇒ the box no longer hibernates itself when idle
+      └─ fix: read the error above, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+
+## enablefails (exit 1)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+     ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+   • unmasked idle-hibernate.timer — a hand hold is undone
+### stderr
+Failed to enable: Connection timed out
+   💥 MalfunctionError: could not enable and start idle-hibernate.timer
+      ⇒ the box no longer hibernates itself when idle, and bills by the hour — read why: rhx machine.journal.read --scope system --unit idle-hibernate.timer --since today
+      └─ fix: read the error above, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+
+## restartfails (exit 1)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+     ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+   • unmasked idle-hibernate.timer — a hand hold is undone
+### stderr
+Failed to restart: Connection timed out
+   💥 MalfunctionError: could not restart idle-hibernate.timer on its declared schedule
+      ⇒ the timer keeps whatever schedule it last loaded
+      └─ fix: read the error above, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## stagefails (exit 1)
+### stdout
+
+### stderr
+sudo: mktemp: an injected fault
+   💥 MalfunctionError: could not stage <fix>/box/bin/idle-hibernate.sh
+      └─ fix: read the error above, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+
+## installfails (exit 1)
+### stdout
+
+### stderr
+sudo: install: an injected fault
+   💥 MalfunctionError: could not install <fix>/box/bin/idle-hibernate.sh
+      ⇒ the box still holds its prior copy
+      └─ fix: read the error above, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+
+## rmfails (exit 1)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+### stderr
+sudo: rm: an injected fault
+   💥 MalfunctionError: could not remove the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+      └─ fix: read the error above, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+
+## rmdirfails (exit 1)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+### stderr
+   💥 MalfunctionError: could not remove the emptied <fix>/box/etc/idle-hibernate.service.d: sudo: rmdir: an injected fault
+      └─ fix: read the error on the 💥 line, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+
+## chownfails (exit 1)
+### stdout
+
+### stderr
+sudo: chown: an injected fault
+   💥 MalfunctionError: could not set <fix>/box/bin/idle-hibernate.sh to 755 <uid>:<gid>
+      └─ fix: read the error above, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+
+## stopgapfails (exit 1)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+### stderr
+sudo: rm: an injected fault
+   💥 MalfunctionError: could not remove <fix>/box/bin/idle-hibernate-holds.sh
+      └─ fix: read the error above, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+
+## resetfirst (exit 0)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+     ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+   • unmasked idle-hibernate.timer — a hand hold is undone
+   • idle-hibernate.timer re-armed — it was inactive; a hand stop is undone
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## resetfails (exit 0)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+     ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+   • unmasked idle-hibernate.timer — a hand hold is undone
+   • idle-hibernate.timer re-armed — it was inactive; a hand stop is undone
+### stderr
+Failed to reset: Connection timed out
+   💥 MalfunctionError: could not reset the last result of idle-hibernate.service
+      ⇒ the verify below may name a fault from before this apply; it clears on the next tick
+      └─ fix: read the error above, then re-run from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## symlink (exit 0)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+     ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+   • unmasked idle-hibernate.timer — a hand hold is undone
+   • idle-hibernate.timer re-armed — it was inactive; a hand stop is undone
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## alone.bytes (exit 0)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh declared
+   • idle-hibernate.timer restarted on its declared schedule
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## alone.mode (exit 0)
+### stdout
+   • <fix>/box/bin/idle-hibernate.sh held at 755 <uid>:<gid>
+   • idle-hibernate.timer restarted on its declared schedule
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## alone.reload (exit 0)
+### stdout
+   • idle-hibernate.timer restarted on its declared schedule
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## alone.dropin (exit 0)
+### stdout
+   • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/one.conf
+   • idle-hibernate.timer restarted on its declared schedule
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## alone.stopgap (exit 0)
+### stdout
+   • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+     ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+   • idle-hibernate.timer restarted on its declared schedule
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## alone.masked (exit 0)
+### stdout
+   • unmasked idle-hibernate.timer — a hand hold is undone
+   • idle-hibernate.timer restarted on its declared schedule
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## alone.unarmed (exit 0)
+### stdout
+   • idle-hibernate.timer re-armed — it was inactive; a hand stop is undone
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+
+## camper (exit 0)
+### stdout
+   🌙 the idle check, with its units, is a BOX-WIDE fact, and this seat has no root
+      ⇒ <fix>/box/bin/idle-hibernate.sh differs from this checkout's idle-hibernate.sh
+      ⇒ a seat converges its own $HOME; this lives outside it
+      ⇒ no step is owed by this seat; the seat with sudo owes one apply:
+        rhx grove.provision --what 1.15.hibernate --mode apply
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+
+## laptop (exit 0)
+### stdout
+   🌙 the idle check, with its units, is a BOX-WIDE fact, and this seat has no root
+      ⇒ <fix>/box/bin/idle-hibernate.sh differs from this checkout's idle-hibernate.sh
+      ⇒ on a laptop the seat with root is its human. run this ONCE, from a
+        terminal — the sudo -v is what lets the rhx run below reach root:
+        sudo -v && rhx grove.provision --what 1.15.hibernate --mode apply
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+
+## offec2 (exit 0)
+### stdout
+         🌙 declined — the act is `aws ec2 stop-instances` on this box's own
+            instance, and local@unix has no ec2 identity
+### stderr
+
+### systemctl
+
+
+## offec2.hetzner (exit 0)
+### stdout
+         🌙 declined — the act is `aws ec2 stop-instances` on this box's own
+            instance, and cloud@hetzner.hetzbot has no ec2 identity
+### stderr
+
+### systemctl
+
+
+## onec2 (exit 0)
+### stdout
+
+### stderr
+
+### systemctl
+
+
+### phases dispatched
+1.15.hibernate.configure.upsert
+1.15.hibernate.configure.verify
+
+## dispatch.plan (exit 1)
+### stdout
+      ├─ 1.15.hibernate
+         ├─ 1.15.hibernate.configure.upsert — would run (plan)
+         ├─ 1.15.hibernate.configure.verify
+            • no tick on record at <fix>/box/idle-hibernate.last — the installed check is older than this checkout's, and writes none; the ground apply installs one that does
+            • no sleep on record at <fix>/box/idle-hibernate.last-sleep — the installed check is older than this checkout's, and records no sleep; for a sleep before the ground apply, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ <fix>/box/bin/idle-hibernate.sh differs from this checkout's idle-hibernate.sh
+   ✋ systemd still runs the old definition of idle-hibernate.service — a daemon-reload is owed
+   ✋ a drop-in this bundle does not write: <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   ✋ the stopgap pre-check is still on the box: <fix>/box/bin/idle-hibernate-holds.sh
+   ✋ idle-hibernate.timer is masked — a hand hold; the apply unmasks it
+   ✋ idle-hibernate.timer is not active
+      ⇒ now: the idle check does not tick: no crew is at risk, and an idle box bills on
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+show -p Result --value idle-hibernate.service
+is-active idle-hibernate.timer
+
+## dispatch.camper (exit 1)
+### stdout
+      ├─ 1.15.hibernate
+         ├─ 1.15.hibernate.configure.upsert
+            🌙 the idle check, with its units, is a BOX-WIDE fact, and this seat has no root
+               ⇒ <fix>/box/bin/idle-hibernate.sh differs from this checkout's idle-hibernate.sh
+               ⇒ a seat converges its own $HOME; this lives outside it
+               ⇒ no step is owed by this seat; the seat with sudo owes one apply:
+                 rhx grove.provision --what 1.15.hibernate --mode apply
+         ├─ 1.15.hibernate.configure.verify
+            • no tick on record at <fix>/box/idle-hibernate.last — the installed check is older than this checkout's, and writes none; the ground apply installs one that does
+            • no sleep on record at <fix>/box/idle-hibernate.last-sleep — the installed check is older than this checkout's, and records no sleep; for a sleep before the ground apply, read CloudTrail's StopInstances events for this instance
+### stderr
+   ✋ <fix>/box/bin/idle-hibernate.sh differs from this checkout's idle-hibernate.sh
+   ✋ systemd still runs the old definition of idle-hibernate.service — a daemon-reload is owed
+   ✋ a drop-in this bundle does not write: <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+   ✋ the stopgap pre-check is still on the box: <fix>/box/bin/idle-hibernate-holds.sh
+   ✋ idle-hibernate.timer is masked — a hand hold; the apply unmasks it
+   ✋ idle-hibernate.timer is not active
+      ⇒ now: the idle check does not tick: no crew is at risk, and an idle box bills on
+      ⇒ fix, from the ground seat: rhx grove.provision --what 1.15.hibernate --mode apply
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+show -p Result --value idle-hibernate.service
+is-active idle-hibernate.timer
+
+## dispatch.apply (exit 0)
+### stdout
+      ├─ 1.15.hibernate
+         ├─ 1.15.hibernate.configure.upsert
+            • <fix>/box/bin/idle-hibernate.sh declared
+            • retired the drop-in <fix>/box/etc/idle-hibernate.service.d/stopgap-crews.conf
+            • retired the stopgap pre-check <fix>/box/bin/idle-hibernate-holds.sh
+              ⇒ a box now holds on activity, never on presence: a crew that prints naught, writes no trace, and takes no keystroke for 3h sleeps — keep one pane that prints to hold it
+            • unmasked idle-hibernate.timer — a hand hold is undone
+            • idle-hibernate.timer re-armed — it was inactive; a hand stop is undone
+         ├─ 1.15.hibernate.configure.verify
+            • the idle check and its units match this checkout ✔
+            • no drop-in of their own on either unit, no reload owed, and no stopgap ✔
+            • idle-hibernate.timer is enabled and active, and no failed run is on record ✔
+            • no tick on record yet at <fix>/box/idle-hibernate.last — the timer last fired: n/a
+              ⇒ the next tick writes it within 300s; a timer that fired and left none names a check that cannot write it
+            • no sleep on record at <fix>/box/idle-hibernate.last-sleep — none since this box last booted cold; a cold boot clears it, so for a sleep before that, read CloudTrail's StopInstances events for this instance
+### stderr
+
+### systemctl
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+daemon-reload
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+daemon-reload
+reset-failed idle-hibernate.service
+is-enabled idle-hibernate.timer
+unmask idle-hibernate.timer
+is-active idle-hibernate.timer
+enable --now idle-hibernate.timer
+try-restart idle-hibernate.timer
+show -p LoadState --value idle-hibernate.service
+show -p NeedDaemonReload --value idle-hibernate.service
+show -p LoadState --value idle-hibernate.timer
+show -p NeedDaemonReload --value idle-hibernate.timer
+show -p DropInPaths --value idle-hibernate.service
+show -p DropInPaths --value idle-hibernate.timer
+is-enabled idle-hibernate.timer
+is-active idle-hibernate.timer
+show -p Result --value idle-hibernate.service
+show -p Result --value idle-hibernate.service
+show -p LastTriggerUSec --value idle-hibernate.timer
+
+

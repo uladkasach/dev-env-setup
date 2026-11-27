@@ -1,0 +1,127 @@
+## first (exit 0)
+### stdout
+   • snapshot written: t — review it in the diff ✔
+### stderr
+
+
+## match (exit 0)
+### stdout
+   • snapshot matches: t ✔
+### stderr
+
+
+## drift (exit 1)
+### stdout
+
+### stderr
+   💥 MalfunctionError: 't' drifted from its snapshot (<tmp>/x.snap/t.snap)
+      ├─ the diff (< this run, > the snapshot)
+      │  1c1
+      │  < line two
+      │  ---
+      │  > line one
+      └─ fix, if the new output is right: rhx play.run --play <this play> --resnap, then review the diff
+
+## resnap (exit 0)
+### stdout
+   • snapshot rewritten: t (GROVE_RESNAP=1) — review it in the diff ✔
+### stderr
+
+
+## cimatch (exit 0)
+### stdout
+   • snapshot matches: t ✔
+### stderr
+
+
+## ciresnap (exit 1)
+### stdout
+
+### stderr
+   💥 MalfunctionError: GROVE_RESNAP=1 under CI — a CI run never rewrites a snapshot
+      ⇒ fix: resnap locally, review the snap in the diff, commit it
+
+## ciabsent (exit 1)
+### stdout
+
+### stderr
+   💥 MalfunctionError: no snapshot at <tmp>/x.snap/t.snap, and CI is set — a CI run never writes one
+      ⇒ fix: run the play locally, review the new snap in the diff, commit it
+
+## badarg (exit 1)
+### stdout
+
+### stderr
+   💥 MalfunctionError: the snapshot check got an unknown arg 'bogus' — it takes dir=, name=, actual=
+
+## noname (exit 1)
+### stdout
+
+### stderr
+   💥 MalfunctionError: the snapshot check was called with no name= — so it cannot find a snapshot
+      ⇒ fix: pass dir=<play>.snap and name=<snap>, beside actual=
+
+## nodir (exit 1)
+### stdout
+
+### stderr
+   💥 MalfunctionError: the snapshot check was called with no dir= — so it cannot find a snapshot
+      ⇒ fix: pass dir=<play>.snap and name=<snap>, beside actual=
+
+## noboth (exit 1)
+### stdout
+
+### stderr
+   💥 MalfunctionError: the snapshot check was called with no dir= and name= — so it cannot find a snapshot
+      ⇒ fix: pass dir=<play>.snap and name=<snap>, beside actual=
+
+## longdrift (exit 1)
+### stdout
+
+### stderr
+   💥 MalfunctionError: 't' drifted from its snapshot (<tmp>/x.snap/t.snap)
+      ├─ the diff (< this run, > the snapshot)
+      │  1,30c1,30
+      │  < 101
+      │  < 102
+      │  < 103
+      │  < 104
+      │  < 105
+      │  < 106
+      │  < 107
+      │  < 108
+      │  < 109
+      │  < 110
+      │  < 111
+      │  < 112
+      │  < 113
+      │  < 114
+      │  < 115
+      │  < 116
+      │  < 117
+      │  < 118
+      │  < 119
+      │  < 120
+      │  < 121
+      │  < 122
+      │  < 123
+      │  < 124
+      │  < 125
+      │  < 126
+      │  < 127
+      │  < 128
+      │  < 129
+      │  < 130
+      │  ---
+      │  > 1
+      │  > 2
+      │  > 3
+      │  > 4
+      │  > 5
+      │  > 6
+      │  > 7
+      │  > 8
+      │  … 22 more diff line(s) not shown
+      └─ fix, if the new output is right: rhx play.run --play <this play> --resnap, then review the diff
+
+

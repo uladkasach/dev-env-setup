@@ -1,0 +1,3 @@
+verdict line: idle-hibernate: <verdict> — idle=<n>s limit=<n>s, newest=<kind> <source>; seen traces=<n> pts=<n> ducts=<n>
+claims: verdict quiet counts fast
+

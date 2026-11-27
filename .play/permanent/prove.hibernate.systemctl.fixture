@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+######################################################################
+# prove.hibernate.systemctl.fixture — ONE model of systemd, for both
+# `1.15.hibernate` plays
+#
+# .what = `hibernate_systemctl_stub <bin dir> <state dir>` writes a stateful
+#         `systemctl` into <bin dir>. it answers from files under <state dir>,
+#         and logs every call to `<state dir>/log`
+#
+# .why one file
+#   - the drift play and the upsert play once each carried a stub, and the two
+#     drifted: one checked drop-ins exist, one did not; one held `Result` in a
+#     file, one hardcoded `success`. a gap one model had hid from the other play
+#
+# .the state files, all optional
+#   enabled · active                the answer to is-enabled / is-active
+#   loadstate.<unit>                LoadState (default: loaded)
+#   result                          the service's Result (default: success); reset-failed clears it
+#   lasttrigger                     the timer's LastTriggerUSec (default: n/a)
+#   needreload.<unit>               NeedDaemonReload = yes; a daemon-reload clears it
+#   dropins.<unit>                  paths systemd has LOADED (only those on disk print)
+#   queued.<unit>                   drop-in paths written since the last reload; a reload loads them
+#   fail.show · fail.dropins        a `show` (any, or DropInPaths alone) fails as a dead bus
+#   fail.reload · fail.enable       daemon-reload / enable fails
+#   fail.unmask · fail.restart      unmask / try-restart fails
+#   fail.reset                      reset-failed fails
+#   hang.<verb>                     that verb never returns (show, daemon-reload, …) — a wedged manager
+######################################################################
+
+hibernate_systemctl_stub() {
+  local bin="$1" sd="$2"
+  mkdir -p "$bin" "$sd"
+  cat > "$bin/systemctl" <<STUB
+#!/usr/bin/env bash
+SD="$sd"
+echo "\$*" >> "\$SD/log"
+# a wedged manager: the call never returns, so only the caller's bound can end it
+[[ -e "\$SD/hang.\$1" ]] && exec sleep 600
+failif() { [[ -e "\$SD/fail.\$1" ]] && { echo "Failed to \$1: Connection timed out" >&2; exit 1; }; return 0; }
+case "\$1" in
+  is-enabled) cat "\$SD/enabled" ;;
+  is-active)  cat "\$SD/active" ;;
+  show)
+    unit="\${@: -1}"
+    [[ -e "\$SD/fail.show" ]] && { echo "Failed to connect to bus: No such file or directory" >&2; exit 1; }
+    case "\$3" in
+      LoadState) [[ -e "\$SD/loadstate.\$unit" ]] && cat "\$SD/loadstate.\$unit" || echo loaded ;;
+      Result) [[ -e "\$SD/result" ]] && cat "\$SD/result" || echo success ;;
+      LastTriggerUSec) [[ -e "\$SD/lasttrigger" ]] && cat "\$SD/lasttrigger" || echo n/a ;;
+      NeedDaemonReload) [[ -e "\$SD/needreload.\$unit" ]] && echo yes || echo no ;;
+      DropInPaths)
+        [[ -e "\$SD/fail.dropins" ]] && { echo "Failed to connect to bus" >&2; exit 1; }
+        # as systemd prints it: every LOADED drop-in on disk, space-separated, on one line
+        [[ -e "\$SD/dropins.\$unit" ]] || exit 0
+        while read -r p; do [[ -e "\$p" ]] && printf '%s ' "\$p"; done < "\$SD/dropins.\$unit"
+        echo ;;
+    esac ;;
+  daemon-reload)
+    failif reload
+    rm -f "\$SD"/needreload.*
+    # a reload loads each drop-in written since the last one
+    for f in "\$SD"/queued.*; do [[ -e "\$f" ]] && { cat "\$f" >> "\$SD/dropins.\${f##*/queued.}"; rm -f "\$f"; }; done ;;
+  unmask) failif unmask; echo disabled > "\$SD/enabled" ;;
+  enable)
+    failif enable
+    [[ "\$(cat "\$SD/enabled")" == masked ]] && { echo "unit is masked" >&2; exit 1; }
+    echo enabled > "\$SD/enabled"; echo active > "\$SD/active" ;;
+  try-restart) failif restart ;;
+  reset-failed) failif reset; rm -f "\$SD/result" ;;
+esac
+exit 0
+STUB
+  chmod +x "$bin/systemctl"
+}

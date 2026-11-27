@@ -1,0 +1,251 @@
+## mixed (exit 1)
+### stdout
+🎭 play.run --all --within 30
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
+   └─ verdicts
+      ├─ ✔ prove.a-pass
+      ├─ 🌙 prove.b-decline — declined or timed out
+      ├─ 💥 prove.c-fail — failed (exit 1)
+      └─ 1 passed · 1 declined · 1 failed
+### stderr
+   💥 MalfunctionError: 1 play(s) failed — read each log under .log/role=mechanic/skill=play.run/what=all/<stamp>
+
+## declined (exit 2)
+### stdout
+🎭 play.run --all --within 30
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
+   └─ verdicts
+      ├─ ✔ prove.a-pass
+      ├─ 🌙 prove.b-decline — declined or timed out
+      └─ 1 passed · 1 declined · 0 failed
+### stderr
+   🌙 1 play(s) declined or timed out, so proved no claim — read each log under .log/role=mechanic/skill=play.run/what=all/<stamp>
+
+## allpass (exit 0)
+### stdout
+🎭 play.run --all --within 30
+   ├─ logs: .log/role=mechanic/skill=play.run/what=all/<stamp>
+   └─ verdicts
+      ├─ ✔ prove.a-pass
+      └─ 1 passed · 0 declined · 0 failed
+
+🌲 every play passed
+### stderr
+
+
+## twosubjects (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: --all and --play name two subjects; pick one
+
+## resnap.on (exit 0)
+### stdout
+🎭 play.run --play prove.d-resnap --within 900
+   └─ <tmp>/.play/permanent/prove.d-resnap.play.sh
+
+GROVE_RESNAP=1
+
+🌲 prove.d-resnap ✔
+### stderr
+
+
+## resnap.off (exit 0)
+### stdout
+🎭 play.run --play prove.d-resnap --within 900
+   └─ <tmp>/.play/permanent/prove.d-resnap.play.sh
+
+GROVE_RESNAP=unset
+
+🌲 prove.d-resnap ✔
+### stderr
+
+
+## empty (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: no tracked play in <tmp>/.play/permanent
+      ⇒ an empty suite proves no claim, so this halts rather than report a pass
+      ⇒ if you just wrote one: git add .play/permanent/<slug>.play.sh
+
+## unknownflag (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: unknown flag: --bogus
+      valid: --play <slug>  --list  --all  --within <secs>  --resnap  --help
+
+## playnovalue (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: --play needs a value
+
+## withinnovalue (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: --within needs a value
+
+## noplay (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: name a play: rhx play.run --play <slug>   (or --list, or --all)
+
+## pathescape (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: a play is named by SLUG, never by path: '../x'
+      ⇒ every play lives in <tmp>/.play/permanent, so a path adds no reach and
+        would let this runner become a general shell
+      ⇒ read what exists: rhx play.run --list
+
+## notfound (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: no play named 'prove.zz-absent'
+      ⇒ looked for: <tmp>/.play/permanent/prove.zz-absent.play.sh
+      ⇒ read what exists: rhx play.run --list
+
+## notindex (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: 'prove.e-untracked' is on disk and NOT in this repo's index
+      ⇒ this runner executes only what the repo PUBLISHES, because a
+        pulled tree can place a file here — .play/permanent is not in
+        GROVE_BOUNDARY_EXCLUDES, and .play/temporary is
+      ⇒ if you just wrote it, that is this check at work:
+           git add .play/permanent/prove.e-untracked.play.sh
+      ⇒ if you did NOT write it, read it before you do aught else
+
+## repairverb (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: 'repair.f-fix' is a repair play, and this repo has no such verb
+      ⇒ a play that moves a box FORWARD toward the declared state is
+        a BUNDLE (rule.forbid.repair-plays)
+      ⇒ fix: rhx grove.provision --what <slug> --mode apply
+
+## wrongverb (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: 'fix.g-noverb' does not name a verb this runner drives
+      ⇒ allowed: prove.* verify.* diagnose.* await.* hibernate.*
+      ⇒ the verb says what the play may do to the box, so an unnamed
+        one carries no such promise
+
+## timeout (exit 2)
+### stdout
+🎭 play.run --play prove.h-hang --within 1
+   └─ <tmp>/.play/permanent/prove.h-hang.play.sh
+### stderr
+   ✋ ConstraintError: prove.h-hang did not finish within 1s, so it proved no claim
+      ⇒ a bound that elapses is not a verdict about the subject
+      ⇒ read it wider: rhx play.run --play prove.h-hang --within 3600
+
+## playdecline (exit 2)
+### stdout
+🎭 play.run --play prove.b-decline --within 900
+   └─ <tmp>/.play/permanent/prove.b-decline.play.sh
+
+no subject here
+### stderr
+   ✋ ConstraintError: prove.b-decline declined — its subject is absent, so it proved no claim
+
+## playfail (exit 1)
+### stdout
+🎭 play.run --play prove.c-fail --within 900
+   └─ <tmp>/.play/permanent/prove.c-fail.play.sh
+
+broke
+### stderr
+   💥 MalfunctionError: prove.c-fail failed (exit 1)
+
+## list.untracked (exit 2)
+### stdout
+🎭 play.run --list
+   ├─ dir: <tmp>/.play/permanent
+   ├─ store: git ls-files (the index, not the disk)
+   └─ plays (1)
+      └─ prove.a-pass
+### stderr
+   ✋ ConstraintError: 7 untracked .play.sh file(s) sit in that dir, unlisted
+      ├─ this runner refuses each of them
+      ├─ fix: if one is yours, git add it; if it is not, read it — a pulled tree can write here
+      └─ read them: git -C <tmp> status --short .play/permanent
+
+## list (exit 0)
+### stdout
+🎭 play.run --list
+   ├─ dir: <tmp>/.play/permanent
+   ├─ store: git ls-files (the index, not the disk)
+   └─ plays (4)
+      ├─ prove.a-pass
+      ├─ prove.b-decline
+      ├─ prove.c-fail
+      └─ prove.d-resnap
+### stderr
+
+
+## list.all (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: --list and --all name two subjects; pick one
+
+## list.play (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: --list and --play name two subjects; pick one
+
+## help (exit 0)
+### stdout
+usage:
+  rhx play.run --list
+  rhx play.run --play prove.nvim-fetches-no-unpinned-plugin
+  rhx play.run --play prove.git-alias-seam --within 600
+  rhx play.run --all
+
+options:
+  --play SLUG    the play to run. the `.play.sh` suffix is optional
+  --list         name every play this box can run, then exit
+  --all          run every play --list names, one verdict line each; each
+                 play's full output lands in a log dir the summary names
+  --within SECS  bound per play, in seconds (default 900)
+  --resnap       rewrite the play's `.snap` baselines (exports GROVE_RESNAP=1);
+                 a play with no baseline ignores it. review the diff before a commit
+  --skill NAME   absorbed + ignored — rhachet injects this when invoked as
+                 `rhx play.run …`. same for --repo / --role
+  -h, --help     show this header
+
+exit:
+  0 = the play passed (--all: every play passed)
+  1 = the play failed, or malfunctioned (--all: at least one did)
+  2 = a constraint: bad args, no such play, a forbidden verb, or a timeout
+      (--all: none failed, and at least one declined or timed out)
+### stderr
+
+
+## logdirfail (exit 1)
+### stdout
+
+### stderr
+mkdir: cannot create directory '<tmp>/.log': Not a directory
+   💥 MalfunctionError: could not create the log dir <tmp>/.log/role=mechanic/skill=play.run/what=all/<stamp>
+
+## noplaydir (exit 2)
+### stdout
+
+### stderr
+   ✋ ConstraintError: no tracked play dir at <tmp>/bare/.play/permanent
+      ⇒ an empty set would report as a pass, so this halts instead
+
+

@@ -1,0 +1,6 @@
+# each before→after pair: <t0>→<t0> held, <t0>→<t1> moved
+printer: ✔ a pane that only prints moves mtime and holds atime (atime <t0>→<t0>, mtime <t0>→<t1>)
+waiter: ✔ a pane blocked in a read, with no input, holds atime (atime <t0>→<t0>)
+keystroke: ✔ one typed line, read by the pane, moves atime (atime <t0>→<t1>)
+tui: ✔ a TUI that redraws and polls its keyboard holds atime (atime <t0>→<t0>)
+
